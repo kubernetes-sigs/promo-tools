@@ -19,7 +19,7 @@ package inventory
 import (
 	"sync"
 
-	"k8s.io/container-image-promoter/lib/stream"
+	"github.com/GoogleCloudPlatform/k8s-container-image-promoter/lib/stream"
 )
 
 // RequestResult contains information about the result of running a request

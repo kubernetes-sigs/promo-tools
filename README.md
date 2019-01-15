@@ -35,8 +35,10 @@ Currently only Google Container Registry (GCR) is supported.
 # Install
 
 ```
-git clone https://github.com/GoogleCloudPlatform/k8s-container-image-promoter
-cd k8s-container-image-promoter
+cip_path=$(go env GOPATH)/src/github.com/GoogleCloudPlatform/k8s-container-image-promoter
+git clone https://github.com/GoogleCloudPlatform/k8s-container-image-promoter \
+    $cip_path
+cd $cip_path
 dep ensure
 make build
 ```

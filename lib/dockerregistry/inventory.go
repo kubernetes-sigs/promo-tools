@@ -26,8 +26,8 @@ import (
 
 	yaml "gopkg.in/yaml.v2"
 
-	json "k8s.io/container-image-promoter/lib/json"
-	"k8s.io/container-image-promoter/lib/stream"
+	json "github.com/GoogleCloudPlatform/k8s-container-image-promoter/lib/json"
+	"github.com/GoogleCloudPlatform/k8s-container-image-promoter/lib/stream"
 )
 
 // MakeSyncContext creates a SyncContext.

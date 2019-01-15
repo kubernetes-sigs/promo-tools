@@ -16,7 +16,8 @@ limitations under the License.
 
 package inventory
 
-import "k8s.io/container-image-promoter/lib/container"
+// nolint[lll]
+import "github.com/GoogleCloudPlatform/k8s-container-image-promoter/lib/container"
 
 // Various set manipulation operations. Some set operations are missing,
 // because, we don't use them.
