@@ -34,12 +34,14 @@ Currently only Google Container Registry (GCR) is supported.
 
 # Install
 
+1. Install [bazel][bazel].
+2. Run the steps below:
+
 ```
 cip_path=$(go env GOPATH)/src/github.com/GoogleCloudPlatform/k8s-container-image-promoter
 git clone https://github.com/GoogleCloudPlatform/k8s-container-image-promoter \
     $cip_path
 cd $cip_path
-dep ensure
 make build
 ```
 
@@ -53,5 +55,12 @@ up in the environment prior to running the promoter.
 Given the Example Manifest as above, you can run the promoter with:
 
 ```
-cip -verbosity=3 -manifest=path/to/manifest.yaml
+bazel run -- cip -h -verbosity=3 -manifest=path/to/manifest.yaml
 ```
+
+Alternatively, you can run the binary directly by examining the bazel output
+from running `make build`, and then invoking it with the correct path under
+`./bazel-bin`. For example, if you are on a Linux machine, running `make build`
+will output a binary at `./bazel-bin/linux_amd64_stripped/cip`.
+
+[bazel]:https://bazel.build/

@@ -1,0 +1,56 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+load("@io_bazel_rules_docker//go:image.bzl", "go_image")
+load("@io_bazel_rules_docker//container:container.bzl", "container_bundle")
+
+# Go image. "bazel build //:cip-docker-image.tar" results in a tarfile that is
+# "docker load -i"-able, but the image is automatially named
+# "bazel:cip-docker-image". To get around this, we use the container_bundle rule
+# to set the image name directly.
+go_image(
+    name = "cip-docker-image",
+    embed = [":go_default_library"],
+    importpath = "github.com/GoogleCloudPlatform/k8s-container-image-promoter",
+    goarch = "amd64",
+    goos = "linux",
+    pure = "on",
+)
+
+# Invoke with "bazel build //:cip-docker-loadable.tar". Then you can run "docker
+# load -i bazel-bin/cip-docker-loadable.tar" to load it into the local Docker
+# daemon.
+container_bundle(
+    name = "cip-docker-loadable",
+    images = {
+        "gcr.io/cip-demo-staging/cip:latest": "//:cip-docker-image",
+    },
+)
+
+load("@bazel_gazelle//:def.bzl", "gazelle")
+
+# gazelle:prefix github.com/GoogleCloudPlatform/k8s-container-image-promoter
+gazelle(name = "gazelle")
+
+go_library(
+    name = "go_default_library",
+    srcs = ["cip.go"],
+    importpath = "github.com/GoogleCloudPlatform/k8s-container-image-promoter",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//lib/dockerregistry:go_default_library",
+        "//lib/stream:go_default_library",
+    ],
+)
+
+go_binary(
+    name = "cip",
+    embed = [":go_default_library"],
+    # These gc_linkopts make it a static binary. See
+    # https://github.com/bazelbuild/rules_go/issues/161#issuecomment-304469169.
+    gc_linkopts = [
+        "-linkmode",
+        "external",
+        "-extldflags",
+        "-static",
+    ],
+    visibility = ["//visibility:public"],
+)

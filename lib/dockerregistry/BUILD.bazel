@@ -1,0 +1,28 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "inventory.go",
+        "set.go",
+        "types.go",
+    ],
+    importpath = "github.com/GoogleCloudPlatform/k8s-container-image-promoter/lib/dockerregistry",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//lib/container:go_default_library",
+        "//lib/json:go_default_library",
+        "//lib/stream:go_default_library",
+        "@in_gopkg_yaml_v2//:go_default_library",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["inventory_test.go"],
+    embed = [":go_default_library"],
+    deps = [
+        "//lib/json:go_default_library",
+        "//lib/stream:go_default_library",
+    ],
+)
