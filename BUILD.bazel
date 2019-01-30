@@ -1,6 +1,6 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
 load("@io_bazel_rules_docker//go:image.bzl", "go_image")
-load("@io_bazel_rules_docker//container:container.bzl", "container_bundle")
+load("@io_bazel_rules_docker//container:container.bzl", "container_bundle", "container_push")
 
 # Go image. "bazel build //:cip-docker-image.tar" results in a tarfile that is
 # "docker load -i"-able, but the image is automatially named
@@ -21,8 +21,10 @@ go_image(
 container_bundle(
     name = "cip-docker-loadable",
     images = {
-        "gcr.io/cip-demo-staging/cip:latest": "//:cip-docker-image",
+        "{IMG_REGISTRY}/{IMG_REPOSITORY}/{IMG_NAME}:latest": "//:cip-docker-image",
+        "{IMG_REGISTRY}/{IMG_REPOSITORY}/{IMG_NAME}:{IMG_TAG}": "//:cip-docker-image",
     },
+    stamp = True,
 )
 
 load("@bazel_gazelle//:def.bzl", "gazelle")
@@ -53,4 +55,23 @@ go_binary(
         "-static",
     ],
     visibility = ["//visibility:public"],
+)
+
+container_push(
+    name = "push-cip-latest",
+    image = ":cip-docker-image",
+    format = "Docker",
+    registry = "{IMG_REGISTRY}",
+    # repository should end with the name of the image to use.
+    repository = "{IMG_REPOSITORY}",
+    tag = "latest",
+)
+
+container_push(
+    name = "push-cip-tagged",
+    image = ":cip-docker-image",
+    format = "Docker",
+    registry = "{IMG_REGISTRY}",
+    repository = "{IMG_REPOSITORY}",
+    tag = "{IMG_TAG}",
 )
