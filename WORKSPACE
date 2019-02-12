@@ -42,3 +42,23 @@ go_repository(
     commit = "51d6538a90f86fe93ac480b35f37b2be17fef232",
     importpath = "gopkg.in/yaml.v2",
 )
+
+load("@io_bazel_rules_docker//container:container.bzl", "container_pull")
+
+container_pull(
+    name = "google-sdk-base",
+    registry = "index.docker.io",
+    repository = "google/cloud-sdk",
+    # Version 234.0.0
+    digest = "sha256:03ac1fb1715bb7a98163ffdc08bc66c57b555e7bfe03a904a9a1ef4be5bb2bd4",
+)
+
+# Maybe use cloud-builders/gcloud, for GCB. But for Prow just use the google-sdk
+# one.
+#container_pull(
+#    name = "google-sdk-base",
+#    registry = "gcr.io",
+#    repository = "cloud-builders/gcloud",
+#    # Version 232.0.0
+#    digest = "sha256:6e6b1e2fd53cb94c4dc2af8381ef50bf4c7ac49bc5c728efda4ab15b41d0b510",
+#)
