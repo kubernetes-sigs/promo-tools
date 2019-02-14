@@ -791,7 +791,9 @@ func (sc *SyncContext) Promote(
 	}
 	sc.ExecRequests(populateRequests, processRequest)
 
-	sc.PrintCapturedRequests(&captured)
+	if sc.DryRun {
+		sc.PrintCapturedRequests(&captured)
+	}
 }
 
 // PrintCapturedRequests pretty-prints all given PromotionRequests.
