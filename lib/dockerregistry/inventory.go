@@ -835,14 +835,18 @@ func (op *TagOp) PrettyValue() string {
 // PrettyValue is a prettified string representation of a PromotionRequest.
 func (pr *PromotionRequest) PrettyValue() string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "%v -> %v: Tag: '%v' <%v> %v@%v (from '%v')\n",
+	fmt.Fprintf(&b, "%v -> %v: Tag: '%v' <%v> %v@%v", //
 		string(pr.Registries.Src),
 		string(pr.Registries.Dest),
 		string(pr.Tag),
 		pr.TagOp.PrettyValue(),
 		string(pr.ImageName),
-		string(pr.Digest),
-		string(pr.DigestOld))
+		string(pr.Digest))
+	if len(pr.DigestOld) > 0 {
+		fmt.Fprintf(&b, " (move from '%v')", string(pr.DigestOld))
+	}
+	fmt.Fprintf(&b, "\n")
+
 	return b.String()
 }
 
