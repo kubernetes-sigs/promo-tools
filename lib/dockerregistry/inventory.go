@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -118,8 +119,50 @@ func ParseManifestFromFile(filePath string) Manifest {
 // from ParseManifestFromFile() so that it can be tested independently.
 func ParseManifest(bytes []byte) (Manifest, error) {
 	var m Manifest
-	err := yaml.UnmarshalStrict(bytes, &m)
-	return m, err
+	if err := yaml.UnmarshalStrict(bytes, &m); err != nil {
+		return m, err
+	}
+
+	return m, m.Validate()
+}
+
+// Validate checks for semantic errors in the yaml fields (the structure of the
+// yaml is checked during unmarshaling).
+func (m Manifest) Validate() error {
+	return validateImages(m.Images)
+}
+
+func validateImages(images []Image) error {
+	for _, image := range images {
+		for digest, tagSlice := range image.Dmap {
+			if err := validateDigest(digest); err != nil {
+				return err
+			}
+
+			for _, tag := range tagSlice {
+				if err := validateTag(tag); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func validateDigest(digest Digest) error {
+	validDigest := regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
+	if !validDigest.Match([]byte(digest)) {
+		return fmt.Errorf("invalid digest: %v", digest)
+	}
+	return nil
+}
+
+func validateTag(tag Tag) error {
+	var validTag = regexp.MustCompile(`^[\w][\w.-]{0,127}$`)
+	if !validTag.Match([]byte(tag)) {
+		return fmt.Errorf("invalid tag: %v", tag)
+	}
+	return nil
 }
 
 // PrettyValue creates a prettified string representation of MasterInventory.
