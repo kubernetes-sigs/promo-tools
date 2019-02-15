@@ -29,7 +29,7 @@ type Fake struct {
 }
 
 // Produce a fake stream. Unlike a real stream, this does not call a subprocess
-// --- instead it just reads from a predefined stream (Bytes).
+// --- instead it just provides a predefined stream (Bytes).
 func (producer *Fake) Produce() (io.Reader, io.Reader, error) {
 	producer.stream = bytes.NewReader(producer.Bytes)
 	blankStderr := strings.NewReader("")
