@@ -104,7 +104,7 @@ func TestReadJSONStream(t *testing.T) {
 	for _, test := range tests {
 		var sr stream.Fake
 		sr.Bytes = []byte(test.input)
-		h, _ := sr.Produce()
+		h, _, _ := sr.Produce()
 		jsons, err := json.Consume(h)
 		_ = sr.Close()
 

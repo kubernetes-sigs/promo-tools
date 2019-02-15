@@ -19,6 +19,7 @@ package stream
 import (
 	"bytes"
 	"io"
+	"strings"
 )
 
 // Fake is a predefined stream (set with Bytes).
@@ -29,9 +30,10 @@ type Fake struct {
 
 // Produce a fake stream. Unlike a real stream, this does not call a subprocess
 // --- instead it just reads from a predefined stream (Bytes).
-func (producer *Fake) Produce() (io.Reader, error) {
+func (producer *Fake) Produce() (io.Reader, io.Reader, error) {
 	producer.stream = bytes.NewReader(producer.Bytes)
-	return producer.stream, nil
+	blankStderr := strings.NewReader("")
+	return producer.stream, blankStderr, nil
 }
 
 // Close does nothing, as there is no actual subprocess to close.
