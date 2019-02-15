@@ -52,14 +52,6 @@ go_library(
 go_binary(
     name = "cip",
     embed = [":go_default_library"],
-    # These gc_linkopts make it a static binary. See
-    # https://github.com/bazelbuild/rules_go/issues/161#issuecomment-304469169.
-    gc_linkopts = [
-        "-linkmode",
-        "external",
-        "-extldflags",
-        "-static",
-    ],
     visibility = ["//visibility:public"],
 )
 
