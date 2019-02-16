@@ -104,15 +104,22 @@ func TestReadJSONStream(t *testing.T) {
 	for _, test := range tests {
 		var sr stream.Fake
 		sr.Bytes = []byte(test.input)
-		h, _, _ := sr.Produce()
-		jsons, err := json.Consume(h)
+		stdout, _, err := sr.Produce()
+
+		// The fake should never error out when producing a stdout stream for
+		// us.
+		eqErr := checkEqual(err, nil)
+		checkError(t, eqErr, fmt.Sprintf("Test: %v (Produce() err)\n",
+			test.name))
+
+		jsons, err := json.Consume(stdout)
 		_ = sr.Close()
 
 		// Check the error as well (at the very least, we can check that the
 		// error was nil).
-		// TODO: Add tests for purposeful failures (and expected errors).
-		eqErr := checkEqual(err, test.expectedOutput.err)
-		checkError(t, eqErr, fmt.Sprintf("Test: %v (err)\n", test.name))
+		eqErr = checkEqual(err, test.expectedOutput.err)
+		checkError(t, eqErr, fmt.Sprintf("Test: %v (json.Consume() err)\n",
+			test.name))
 
 		got := jsons
 		expected := test.expectedOutput.jsons
