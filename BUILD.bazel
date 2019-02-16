@@ -28,8 +28,8 @@ container_image(
 container_bundle(
     name = "cip-docker-loadable",
     images = {
-        "{IMG_REGISTRY}/{IMG_REPOSITORY}/{IMG_NAME}:latest": "//:cip-docker-image",
-        "{IMG_REGISTRY}/{IMG_REPOSITORY}/{IMG_NAME}:{IMG_TAG}": "//:cip-docker-image",
+        "{STABLE_IMG_REGISTRY}/{STABLE_IMG_REPOSITORY}/{STABLE_IMG_NAME}:latest": "//:cip-docker-image",
+        "{STABLE_IMG_REGISTRY}/{STABLE_IMG_REPOSITORY}/{STABLE_IMG_NAME}:{STABLE_IMG_TAG}": "//:cip-docker-image",
     },
     stamp = True,
 )
@@ -68,9 +68,9 @@ container_push(
     name = "push-cip-latest",
     image = ":cip-with-gcloud",
     format = "Docker",
-    registry = "{IMG_REGISTRY}",
+    registry = "{STABLE_IMG_REGISTRY}",
     # repository should end with the name of the image to use.
-    repository = "{IMG_REPOSITORY}",
+    repository = "{STABLE_IMG_REPOSITORY}",
     tag = "latest",
 )
 
@@ -78,7 +78,7 @@ container_push(
     name = "push-cip-tagged",
     image = ":cip-docker-image",
     format = "Docker",
-    registry = "{IMG_REGISTRY}",
-    repository = "{IMG_REPOSITORY}",
-    tag = "{IMG_TAG}",
+    registry = "{STABLE_IMG_REGISTRY}",
+    repository = "{STABLE_IMG_REPOSITORY}",
+    tag = "{STABLE_IMG_TAG}",
 )
