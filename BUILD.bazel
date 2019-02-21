@@ -70,7 +70,7 @@ container_push(
     format = "Docker",
     registry = "{STABLE_IMG_REGISTRY}",
     # repository should end with the name of the image to use.
-    repository = "{STABLE_IMG_REPOSITORY}",
+    repository = "{STABLE_IMG_REPOSITORY}/{STABLE_IMG_NAME}",
     tag = "latest",
 )
 
@@ -79,6 +79,6 @@ container_push(
     image = ":cip-docker-image",
     format = "Docker",
     registry = "{STABLE_IMG_REGISTRY}",
-    repository = "{STABLE_IMG_REPOSITORY}",
+    repository = "{STABLE_IMG_REPOSITORY}/{STABLE_IMG_NAME}",
     tag = "{STABLE_IMG_TAG}",
 )
