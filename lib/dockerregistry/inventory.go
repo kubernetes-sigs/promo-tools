@@ -201,17 +201,28 @@ func (riid *RegInvImageDigest) PrettyValue() string {
 func getJSONSFromProcess(req stream.ExternalRequest) (json.Objects, Errors) {
 	var jsons json.Objects
 	errors := make(Errors, 0)
-	h, err := req.StreamProducer.Produce()
+	stdoutReader, stderrReader, err := req.StreamProducer.Produce()
 	if err != nil {
 		errors = append(errors, Error{
 			Context: "running process",
 			Error:   err})
 	}
-	jsons, err = json.Consume(h)
+	jsons, err = json.Consume(stdoutReader)
 	if err != nil {
 		errors = append(errors, Error{
 			Context: "parsing JSON",
 			Error:   err})
+	}
+	be, err := ioutil.ReadAll(stderrReader)
+	if err != nil {
+		errors = append(errors, Error{
+			Context: "reading process stderr",
+			Error:   err})
+	}
+	if len(be) > 0 {
+		errors = append(errors, Error{
+			Context: "process had stderr",
+			Error:   fmt.Errorf("%v", string(be))})
 	}
 	err = req.StreamProducer.Close()
 	if err != nil {
@@ -753,19 +764,29 @@ func (sc *SyncContext) Promote(
 		for req := range reqs {
 			reqRes := RequestResult{Context: req}
 			errors := make(Errors, 0)
-			h, err := req.StreamProducer.Produce()
+			stdoutReader, stderrReader, err := req.StreamProducer.Produce()
 			if err != nil {
 				errors = append(errors, Error{
 					Context: "running process",
 					Error:   err})
 			}
-			b, err := ioutil.ReadAll(h)
+			b, err := ioutil.ReadAll(stdoutReader)
 			if err != nil {
 				errors = append(errors, Error{
 					Context: "reading process stdout",
 					Error:   err})
 			}
-			sc.Infof("process stdout:\n%v\n", b)
+			be, err := ioutil.ReadAll(stderrReader)
+			if err != nil {
+				errors = append(errors, Error{
+					Context: "reading process stderr",
+					Error:   err})
+			}
+			// The add-tag has stderr; it uses stderr for debug messages, so
+			// don't count it as an error. Instead just print it out as extra
+			// info.
+			sc.Infof("process stdout:\n%v\n", string(b))
+			sc.Infof("process stderr:\n%v\n", string(be))
 			err = req.StreamProducer.Close()
 			if err != nil {
 				errors = append(errors, Error{
@@ -791,7 +812,9 @@ func (sc *SyncContext) Promote(
 	}
 	sc.ExecRequests(populateRequests, processRequest)
 
-	sc.PrintCapturedRequests(&captured)
+	if sc.DryRun {
+		sc.PrintCapturedRequests(&captured)
+	}
 }
 
 // PrintCapturedRequests pretty-prints all given PromotionRequests.
@@ -833,14 +856,18 @@ func (op *TagOp) PrettyValue() string {
 // PrettyValue is a prettified string representation of a PromotionRequest.
 func (pr *PromotionRequest) PrettyValue() string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "%v -> %v: Tag: '%v' <%v> %v@%v (from '%v')\n",
+	fmt.Fprintf(&b, "%v -> %v: Tag: '%v' <%v> %v@%v",
 		string(pr.Registries.Src),
 		string(pr.Registries.Dest),
 		string(pr.Tag),
 		pr.TagOp.PrettyValue(),
 		string(pr.ImageName),
-		string(pr.Digest),
-		string(pr.DigestOld))
+		string(pr.Digest))
+	if len(pr.DigestOld) > 0 {
+		fmt.Fprintf(&b, " (move from '%v')", string(pr.DigestOld))
+	}
+	fmt.Fprintf(&b, "\n")
+
 	return b.String()
 }
 
@@ -965,6 +992,7 @@ func GetWriteCmd(
 		cmd = []string{"gcloud",
 			fmt.Sprintf("--account=%v", serviceAccount),
 			"--quiet",
+			"--verbosity=debug",
 			"container",
 			"images",
 			"add-tag",

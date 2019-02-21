@@ -28,22 +28,26 @@ type Subprocess struct {
 	cmd           *exec.Cmd
 }
 
-// Produce runs the external process and returns a handle to stdout (an
-// io.Reader).
-func (sp *Subprocess) Produce() (io.Reader, error) {
+// Produce runs the external process and returns two io.Readers (to stdout and
+// stderr).
+func (sp *Subprocess) Produce() (io.Reader, io.Reader, error) {
 	invocation := sp.CmdInvocation
 	cmd := exec.Command(invocation[0], invocation[1:]...)
 	stdoutReader, err := cmd.StdoutPipe()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
+	}
+	stderrReader, err := cmd.StderrPipe()
+	if err != nil {
+		return nil, nil, err
 	}
 	sp.cmd = cmd
 	err = cmd.Start()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return stdoutReader, nil
+	return stdoutReader, stderrReader, nil
 }
 
 // Close the subprocess by waiting for it.

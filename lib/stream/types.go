@@ -23,7 +23,9 @@ import (
 // Producer is an interface for anything that can generate an io.Reader from
 // which we can read from (typically JSON output).
 type Producer interface {
-	Produce() (io.Reader, error)
+	// The first two io.Readers are expected to be the stdout and stderr streams
+	// from the process, respectively.
+	Produce() (io.Reader, io.Reader, error)
 	Close() error
 }
 
