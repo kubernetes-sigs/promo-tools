@@ -46,17 +46,13 @@ func main() {
 		"delete-extra-tags",
 		false,
 		"delete tags in the destination registry that are not declared"+
-			" in the Manifest (default: false); implies -garbage-collect")
+			" in the Manifest (default: false)")
 	dryRunPtr := flag.Bool(
 		"dry-run",
 		false,
 		"print what would have happened by running this tool;"+
 			" do not actually modify any registry (default: false)")
 	flag.Parse()
-
-	if *deleteExtraTags {
-		*garbageCollectPtr = true
-	}
 
 	if *dryRunPtr {
 		fmt.Println("---------- DRY RUN ----------")
