@@ -1,6 +1,6 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
 load("@io_bazel_rules_docker//go:image.bzl", "go_image")
-load("@io_bazel_rules_docker//container:container.bzl", "container_bundle", "container_image", "container_push")
+load("@io_bazel_rules_docker//container:container.bzl", "container_bundle", "container_image", "container_layer", "container_push")
 
 # Go image. "bazel build //:cip-docker-image.tar" results in a tarfile that is
 # "docker load -i"-able, but the image is automatially named
@@ -20,6 +20,15 @@ container_image(
     name = "cip-with-gcloud",
     base = ":cip-docker-image",
     entrypoint = ["/bin/bash", "-c"],
+    layers = [":cip-util"],
+    env = {"PATH": "/cip:/cip/util:${PATH}"},
+    symlinks = {"/cip/cip": "/app/cip-docker-image.binary"},
+)
+
+container_layer(
+    name = "cip-util",
+    directory = "/cip/util",
+    files = ["util/multirun.sh"],
 )
 
 # Invoke with "bazel build //:cip-docker-loadable.tar". Then you can run "docker
