@@ -28,10 +28,9 @@ container_image(
 container_bundle(
     name = "cip-docker-loadable",
     images = {
-        "{STABLE_IMG_REGISTRY}/{STABLE_IMG_REPOSITORY}/{STABLE_IMG_NAME}:latest": "//:cip-docker-image",
-        "{STABLE_IMG_REGISTRY}/{STABLE_IMG_REPOSITORY}/{STABLE_IMG_NAME}:{STABLE_IMG_TAG}": "//:cip-docker-image",
+        "{STABLE_IMG_REGISTRY}/{STABLE_IMG_REPOSITORY}/{STABLE_IMG_NAME}:latest": "//:cip-with-gcloud",
+        "{STABLE_IMG_REGISTRY}/{STABLE_IMG_REPOSITORY}/{STABLE_IMG_NAME}:{STABLE_IMG_TAG}": "//:cip-with-gcloud",
     },
-    stamp = True,
 )
 
 load("@bazel_gazelle//:def.bzl", "gazelle")
@@ -76,7 +75,7 @@ container_push(
 
 container_push(
     name = "push-cip-tagged",
-    image = ":cip-docker-image",
+    image = ":cip-with-gcloud",
     format = "Docker",
     registry = "{STABLE_IMG_REGISTRY}",
     repository = "{STABLE_IMG_REPOSITORY}/{STABLE_IMG_NAME}",
