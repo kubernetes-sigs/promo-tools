@@ -206,6 +206,100 @@ images:
 	}
 }
 
+func TestParseImageDigest(t *testing.T) {
+	// nolint[lll]
+	var shouldBeValid = []string{
+		`sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef`,
+		`sha256:0000000000000000000000000000000000000000000000000000000000000000`,
+		`sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff`,
+		`sha256:3243f6a8885a308d313198a2e03707344a4093822299f31d0082efa98ec4e6c8`,
+	}
+
+	for _, testInput := range shouldBeValid {
+		d := Digest(testInput)
+		got := validateDigest(d)
+		eqErr := checkEqual(got, nil)
+		checkError(
+			t,
+			eqErr,
+			fmt.Sprintf("Test: `%v' should be valid\n", testInput))
+	}
+
+	// nolint[lll]
+	var shouldBeInvalid = []string{
+		// Empty.
+		``,
+		// Too short.
+		`sha256:0`,
+		// Too long.
+		`sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef1`,
+		// Invalid character 'x'.
+		`sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdex`,
+		// No prefix 'sha256'.
+		`0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef`,
+	}
+
+	for _, testInput := range shouldBeInvalid {
+		d := Digest(testInput)
+		got := validateDigest(d)
+		eqErr := checkEqual(got, fmt.Errorf("invalid digest: %v", d))
+		checkError(
+			t,
+			eqErr,
+			fmt.Sprintf("Test: `%v' should be invalid\n", testInput))
+	}
+}
+
+func TestParseImageTag(t *testing.T) {
+	// nolint[lll]
+	var shouldBeValid = []string{
+		`a`,
+		`_`,
+		`latest`,
+		`_latest`,
+		// Awkward, but valid.
+		`_____----hello........`,
+		// Longest tag is 128 chars.
+		`this-is-exactly-128-chars-this-is-exactly-128-chars-this-is-exactly-128-chars-this-is-exactly-128-chars-this-is-exactly-128-char`,
+	}
+
+	for _, testInput := range shouldBeValid {
+		tag := Tag(testInput)
+		got := validateTag(tag)
+		eqErr := checkEqual(got, nil)
+		checkError(
+			t,
+			eqErr,
+			fmt.Sprintf("Test: `%v' should be valid\n", testInput))
+	}
+
+	// nolint[lll]
+	var shouldBeInvalid = []string{
+		// Empty.
+		``,
+		// Does not begin with an ASCII word character.
+		`.`,
+		// Does not begin with an ASCII word character.
+		`-`,
+		// Unicode not allowed.
+		`안녕`,
+		// No spaces allowed.
+		`a b`,
+		// Too long (>128 ASCII chars).
+		`this-is-longer-than-128-chars-this-is-longer-than-128-chars-this-is-longer-than-128-chars-this-is-longer-than-128-chars-this-is-l`,
+	}
+
+	for _, testInput := range shouldBeInvalid {
+		tag := Tag(testInput)
+		got := validateTag(tag)
+		eqErr := checkEqual(got, fmt.Errorf("invalid tag: %v", tag))
+		checkError(
+			t,
+			eqErr,
+			fmt.Sprintf("Test: `%v' should be invalid\n", testInput))
+	}
+}
+
 func TestSyncContext(t *testing.T) {
 	const fakeRegName RegistryName = "gcr.io/foo"
 	var tests = []struct {
