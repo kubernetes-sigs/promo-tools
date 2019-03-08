@@ -26,7 +26,7 @@ images:
 ```
 
 Here, the Manifest cares about 3 images --- `apple`, `banana`, and `cherry`. The
-promoter will scan `gcr.io/staging-area` (*src*) as well as `gcr.io/production`
+promoter will scan `gcr.io/myproject-staging-area` (*src*) as well as `gcr.io/myproject-production`
 (*dest*). If any of the images are missing from *dest*, then they will be copied
 over from *src*.
 
@@ -38,8 +38,8 @@ Currently only Google Container Registry (GCR) is supported.
 2. Run the steps below:
 
 ```
-cip_path=$(go env GOPATH)/src/github.com/GoogleCloudPlatform/k8s-container-image-promoter
-git clone https://github.com/GoogleCloudPlatform/k8s-container-image-promoter \
+cip_path=$(go env GOPATH)/src/github.com/kubernetes-sigs/k8s-container-image-promoter
+git clone https://github.com/kubernetes-sigs/k8s-container-image-promoter \
     $cip_path
 cd $cip_path
 make build

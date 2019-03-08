@@ -24,7 +24,7 @@ set -o pipefail
 # at least).
 #
 # NOTE: This script will probably be deprecated once
-# https://github.com/GoogleCloudPlatform/k8s-container-image-promoter/issues/13#issuecomment-466474754
+# https://github.com/kubernetes-sigs/k8s-container-image-promoter/issues/13#issuecomment-466474754
 # lands and each prod registry gets a service account defined for it.
 
 usage()

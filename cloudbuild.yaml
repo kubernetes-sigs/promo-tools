@@ -22,10 +22,10 @@ steps:
     rm -rf /workspace/*
 
     git \
-      clone https://github.com/GoogleCloudPlatform/${_REPO} \
+      clone https://github.com/kubernetes-sigs/${_REPO} \
       --depth 1 \
       --branch $BRANCH_NAME \
-      ${_GOPATH}/src/github.com/GoogleCloudPlatform/${_REPO}
+      ${_GOPATH}/src/github.com/kubernetes-sigs/${_REPO}
 
     # Get golangci-lint; install into /workspace/bin/golangci-lint.
     pushd go
@@ -41,7 +41,7 @@ steps:
   entrypoint: "bash"
   env:
   - "GOPATH=${_GOPATH}"
-  dir: ${_GOPATH}/src/github.com/GoogleCloudPlatform/${_REPO}
+  dir: ${_GOPATH}/src/github.com/kubernetes-sigs/${_REPO}
   args:
   - "-c"
   - |
@@ -63,7 +63,7 @@ steps:
   waitFor:
   - setup
   entrypoint: "bash"
-  dir: ${_GOPATH}/src/github.com/GoogleCloudPlatform/${_REPO}
+  dir: ${_GOPATH}/src/github.com/kubernetes-sigs/${_REPO}
   args:
   - "-c"
   - |
@@ -76,7 +76,7 @@ steps:
 
 - name: "gcr.io/cloud-builders/bazel"
   id: build-image
-  dir: ${_GOPATH}/src/github.com/GoogleCloudPlatform/${_REPO}
+  dir: ${_GOPATH}/src/github.com/kubernetes-sigs/${_REPO}
   args:
   - "build"
   - "--workspace_status_command=$${PWD}/workspace_status.sh"
@@ -85,7 +85,7 @@ steps:
 - name: "gcr.io/cloud-builders/bazel"
   id: push-image
   entrypoint: "bash"
-  dir: ${_GOPATH}/src/github.com/GoogleCloudPlatform/${_REPO}
+  dir: ${_GOPATH}/src/github.com/kubernetes-sigs/${_REPO}
   args:
   - "-c"
   - |
