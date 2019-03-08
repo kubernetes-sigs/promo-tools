@@ -44,11 +44,12 @@ type CapturedRequests map[PromotionRequest]int
 
 // SyncContext is the main data structure for performing the promotion.
 type SyncContext struct {
-	Verbosity       int
-	Threads         int
-	DeleteExtraTags bool
-	DryRun          bool
-	Inv             MasterInventory
+	Verbosity         int
+	Threads           int
+	DeleteExtraTags   bool
+	DryRun            bool
+	UseServiceAccount bool
+	Inv               MasterInventory
 }
 
 // MasterInventory stores multiple RegInvImage elements, keyed by RegistryName.

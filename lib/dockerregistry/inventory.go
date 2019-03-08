@@ -35,14 +35,15 @@ import (
 func MakeSyncContext(
 	mi MasterInventory,
 	verbosity, threads int,
-	deleteExtraTags, dryRun bool) SyncContext {
+	deleteExtraTags, dryRun, useSvcAcc bool) SyncContext {
 
 	return SyncContext{
-		Verbosity:       verbosity,
-		Threads:         threads,
-		DeleteExtraTags: deleteExtraTags,
-		DryRun:          dryRun,
-		Inv:             mi}
+		Verbosity:         verbosity,
+		Threads:           threads,
+		DeleteExtraTags:   deleteExtraTags,
+		DryRun:            dryRun,
+		UseServiceAccount: useSvcAcc,
+		Inv:               mi}
 }
 
 // Basic logging.
@@ -1015,10 +1016,25 @@ func (sc *SyncContext) GarbageCollect(
 	}
 }
 
+// MaybeUseServiceAccount injects a '--account=...' argument to the command with
+// the given service account.
+func MaybeUseServiceAccount(
+	serviceAccount string,
+	useServiceAccount bool,
+	cmd []string) []string {
+	if useServiceAccount {
+		cmd = append(cmd, "")
+		copy(cmd[2:], cmd[1:])
+		cmd[1] = fmt.Sprintf("--account=%v", serviceAccount)
+	}
+	return cmd
+}
+
 // GetWriteCmd generates a gcloud command that is used to make modifications to
 // a Docker Registry.
 func GetWriteCmd(
 	serviceAccount string,
+	useServiceAccount bool,
 	srcRegistry RegistryName,
 	destRegistry RegistryName,
 	image ImageName,
@@ -1033,7 +1049,6 @@ func GetWriteCmd(
 		fallthrough
 	case Add:
 		cmd = []string{"gcloud",
-			fmt.Sprintf("--account=%v", serviceAccount),
 			"--quiet",
 			"--verbosity=debug",
 			"container",
@@ -1043,56 +1058,63 @@ func GetWriteCmd(
 			ToPQIN(destRegistry, image, tag)}
 	case Delete:
 		cmd = []string{"gcloud",
-			fmt.Sprintf("--account=%v", serviceAccount),
 			"--quiet",
 			"container",
 			"images",
 			"untag",
 			ToPQIN(destRegistry, image, tag)}
 	}
-	return cmd
+	// Use the service account if it is desired.
+	return MaybeUseServiceAccount(serviceAccount, useServiceAccount, cmd)
 }
 
 // GetDeleteCmd generates the cloud command used to delete images (used for
 // garbage collection).
 func GetDeleteCmd(
 	serviceAccount string,
+	useServiceAccount bool,
 	registryName RegistryName,
 	img ImageName,
 	digest Digest) []string {
 
 	fqin := ToFQIN(registryName, img, digest)
-	return []string{
+	cmd := []string{
 		"gcloud",
-		fmt.Sprintf("--account=%v", serviceAccount),
 		"container",
 		"images",
 		"delete",
 		fqin,
 		"--format=json"}
+	return MaybeUseServiceAccount(serviceAccount, useServiceAccount, cmd)
 }
 
 // GetRegistryListingCmd generates the invocation for retrieving all images in a
 // GCR.
-func GetRegistryListingCmd(serviceAccount, r string) []string {
-	return []string{
+func GetRegistryListingCmd(
+	serviceAccount string,
+	useServiceAccount bool,
+	r string) []string {
+	cmd := []string{
 		"gcloud",
-		fmt.Sprintf("--account=%v", serviceAccount),
 		"container",
 		"images",
 		"list",
 		fmt.Sprintf("--repository=%s", r), "--format=json"}
+	return MaybeUseServiceAccount(serviceAccount, useServiceAccount, cmd)
 }
 
 // GetRegistryListTagsCmd generates the invocation for retrieving all digests
 // (and tags on them) for a given image.
 func GetRegistryListTagsCmd(
-	serviceAccount, registryName string, img string) []string {
-	return []string{
+	serviceAccount string,
+	useServiceAccount bool,
+	registryName string,
+	img string) []string {
+	cmd := []string{
 		"gcloud",
-		fmt.Sprintf("--account=%v", serviceAccount),
 		"container",
 		"images",
 		"list-tags",
 		fmt.Sprintf("%s/%s", registryName, img), "--format=json"}
+	return MaybeUseServiceAccount(serviceAccount, useServiceAccount, cmd)
 }

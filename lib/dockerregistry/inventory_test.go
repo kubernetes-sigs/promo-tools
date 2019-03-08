@@ -300,6 +300,228 @@ func TestParseImageTag(t *testing.T) {
 	}
 }
 
+func TestCommandGeneration(t *testing.T) {
+	svcAcc := "robot"
+	var srcRegName RegistryName = "gcr.io/bar"
+	var destRegName RegistryName = "gcr.io/foo"
+	var imgName ImageName = "baz"
+	var digest Digest = "sha256:000"
+	var tag Tag = "1.0"
+	var tp TagOp
+
+	testName := "GetRegistryListingCmd"
+	got := GetRegistryListingCmd(
+		svcAcc,
+		true,
+		string(destRegName))
+	expected := []string{
+		"gcloud",
+		"--account=robot",
+		"container",
+		"images",
+		"list",
+		fmt.Sprintf("--repository=%s", destRegName),
+		"--format=json"}
+	eqErr := checkEqual(got, expected)
+	checkError(
+		t,
+		eqErr,
+		fmt.Sprintf("Test: %v (cmd string)\n", testName))
+
+	got = GetRegistryListingCmd(
+		svcAcc,
+		false,
+		string(destRegName))
+	expected = []string{
+		"gcloud",
+		"container",
+		"images",
+		"list",
+		fmt.Sprintf("--repository=%s", destRegName),
+		"--format=json"}
+	eqErr = checkEqual(got, expected)
+	checkError(
+		t,
+		eqErr,
+		fmt.Sprintf("Test: %v (cmd string)\n", testName))
+
+	testName = "GetRegistryListTagsCmd"
+	got = GetRegistryListTagsCmd(
+		svcAcc,
+		true,
+		string(destRegName),
+		string(imgName))
+	expected = []string{
+		"gcloud",
+		"--account=robot",
+		"container",
+		"images",
+		"list-tags",
+		fmt.Sprintf("%s/%s", destRegName, imgName),
+		"--format=json"}
+	eqErr = checkEqual(got, expected)
+	checkError(
+		t,
+		eqErr,
+		fmt.Sprintf("Test: %v (cmd string)\n", testName))
+
+	got = GetRegistryListTagsCmd(
+		svcAcc,
+		false,
+		string(destRegName),
+		string(imgName))
+	expected = []string{
+		"gcloud",
+		"container",
+		"images",
+		"list-tags",
+		fmt.Sprintf("%s/%s", destRegName, imgName),
+		"--format=json"}
+	eqErr = checkEqual(got, expected)
+	checkError(
+		t,
+		eqErr,
+		fmt.Sprintf("Test: %v (cmd string)\n", testName))
+
+	testName = "GetDeleteCmd"
+	got = GetDeleteCmd(
+		svcAcc,
+		true,
+		destRegName,
+		imgName,
+		digest)
+	expected = []string{
+		"gcloud",
+		"--account=robot",
+		"container",
+		"images",
+		"delete",
+		ToFQIN(destRegName, imgName, digest),
+		"--format=json"}
+	eqErr = checkEqual(got, expected)
+	checkError(
+		t,
+		eqErr,
+		fmt.Sprintf("Test: %v (cmd string)\n", testName))
+
+	got = GetDeleteCmd(
+		svcAcc,
+		false,
+		destRegName,
+		imgName,
+		digest)
+	expected = []string{
+		"gcloud",
+		"container",
+		"images",
+		"delete",
+		ToFQIN(destRegName, imgName, digest),
+		"--format=json"}
+	eqErr = checkEqual(got, expected)
+	checkError(
+		t,
+		eqErr,
+		fmt.Sprintf("Test: %v (cmd string)\n", testName))
+
+	testName = "GetWriteCmd (Add)"
+	tp = Add
+	got = GetWriteCmd(
+		svcAcc,
+		true,
+		srcRegName,
+		destRegName,
+		imgName,
+		digest,
+		tag,
+		tp)
+	expected = []string{
+		"gcloud",
+		"--account=robot",
+		"--quiet",
+		"--verbosity=debug",
+		"container",
+		"images",
+		"add-tag",
+		ToFQIN(srcRegName, imgName, digest),
+		ToPQIN(destRegName, imgName, tag)}
+	eqErr = checkEqual(got, expected)
+	checkError(
+		t,
+		eqErr,
+		fmt.Sprintf("Test: %v (cmd string)\n", testName))
+
+	got = GetWriteCmd(
+		svcAcc,
+		false,
+		srcRegName,
+		destRegName,
+		imgName,
+		digest,
+		tag,
+		tp)
+	expected = []string{
+		"gcloud",
+		"--quiet",
+		"--verbosity=debug",
+		"container",
+		"images",
+		"add-tag",
+		ToFQIN(srcRegName, imgName, digest),
+		ToPQIN(destRegName, imgName, tag)}
+	eqErr = checkEqual(got, expected)
+	checkError(
+		t,
+		eqErr,
+		fmt.Sprintf("Test: %v (cmd string)\n", testName))
+
+	testName = "GetWriteCmd (Delete)"
+	tp = Delete
+	got = GetWriteCmd(
+		svcAcc,
+		true,
+		srcRegName,
+		destRegName,
+		imgName,
+		digest,
+		tag,
+		tp)
+	expected = []string{
+		"gcloud",
+		"--account=robot",
+		"--quiet",
+		"container",
+		"images",
+		"untag",
+		ToPQIN(destRegName, imgName, tag)}
+	eqErr = checkEqual(got, expected)
+	checkError(
+		t,
+		eqErr,
+		fmt.Sprintf("Test: %v (cmd string)\n", testName))
+
+	got = GetWriteCmd(
+		svcAcc,
+		false,
+		srcRegName,
+		destRegName,
+		imgName,
+		digest,
+		tag,
+		tp)
+	expected = []string{
+		"gcloud",
+		"--quiet",
+		"container",
+		"images",
+		"untag",
+		ToPQIN(destRegName, imgName, tag)}
+	eqErr = checkEqual(got, expected)
+	checkError(
+		t,
+		eqErr,
+		fmt.Sprintf("Test: %v (cmd string)\n", testName))
+}
+
 func TestSyncContext(t *testing.T) {
 	const fakeRegName RegistryName = "gcr.io/foo"
 	var tests = []struct {
