@@ -52,6 +52,9 @@ func main() {
 		false,
 		"print what would have happened by running this tool;"+
 			" do not actually modify any registry (default: false)")
+	noSvcAcc := false
+	flag.BoolVar(&noSvcAcc, "no-service-account", false,
+		"do not pass '--account=...' to all gcloud calls (default: false)")
 	flag.Parse()
 
 	if *dryRunPtr {
@@ -62,13 +65,14 @@ func main() {
 	sc := reg.MakeSyncContext(map[reg.RegistryName]reg.RegInvImage{
 		mfest.Registries.Src:  nil,
 		mfest.Registries.Dest: nil},
-		*verbosityPtr, *threadsPtr, *deleteExtraTags, *dryRunPtr)
+		*verbosityPtr, *threadsPtr, *deleteExtraTags, *dryRunPtr, !noSvcAcc)
 
 	// Read the state of the world; i.e., populate the SyncContext.
 	mkRegistryListingCmd := func(regName reg.RegistryName) stream.Producer {
 		var sp stream.Subprocess
 		sp.CmdInvocation = reg.GetRegistryListingCmd(
 			mfest.ServiceAccount,
+			sc.UseServiceAccount,
 			string(regName))
 		return &sp
 	}
@@ -78,6 +82,7 @@ func main() {
 		var sp stream.Subprocess
 		sp.CmdInvocation = reg.GetRegistryListTagsCmd(
 			mfest.ServiceAccount,
+			sc.UseServiceAccount,
 			string(registryName),
 			string(imgName))
 		return &sp
@@ -95,6 +100,7 @@ func main() {
 		var sp stream.Subprocess
 		sp.CmdInvocation = reg.GetWriteCmd(
 			mfest.ServiceAccount,
+			sc.UseServiceAccount,
 			srcRegistry,
 			destRegistry,
 			imageName,
@@ -118,6 +124,7 @@ func main() {
 			var sp stream.Subprocess
 			sp.CmdInvocation = reg.GetDeleteCmd(
 				mfest.ServiceAccount,
+				sc.UseServiceAccount,
 				destRegistry,
 				imageName,
 				digest)
