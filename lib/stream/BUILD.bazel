@@ -7,6 +7,6 @@ go_library(
         "subprocess.go",
         "types.go",
     ],
-    importpath = "github.com/GoogleCloudPlatform/k8s-container-image-promoter/lib/stream",
+    importpath = "github.com/kubernetes-sigs/k8s-container-image-promoter/lib/stream",
     visibility = ["//visibility:public"],
 )

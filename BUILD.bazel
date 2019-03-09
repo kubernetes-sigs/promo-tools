@@ -9,7 +9,7 @@ load("@io_bazel_rules_docker//container:container.bzl", "container_bundle", "con
 go_image(
     name = "cip-docker-image",
     embed = [":go_default_library"],
-    importpath = "github.com/GoogleCloudPlatform/k8s-container-image-promoter",
+    importpath = "github.com/kubernetes-sigs/k8s-container-image-promoter",
     goarch = "amd64",
     goos = "linux",
     pure = "on",
@@ -44,13 +44,13 @@ container_bundle(
 
 load("@bazel_gazelle//:def.bzl", "gazelle")
 
-# gazelle:prefix github.com/GoogleCloudPlatform/k8s-container-image-promoter
+# gazelle:prefix github.com/kubernetes-sigs/k8s-container-image-promoter
 gazelle(name = "gazelle")
 
 go_library(
     name = "go_default_library",
     srcs = ["cip.go"],
-    importpath = "github.com/GoogleCloudPlatform/k8s-container-image-promoter",
+    importpath = "github.com/kubernetes-sigs/k8s-container-image-promoter",
     visibility = ["//visibility:private"],
     deps = [
         "//lib/dockerregistry:go_default_library",

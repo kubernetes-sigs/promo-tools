@@ -21,8 +21,8 @@ import (
 	"fmt"
 
 	// nolint[lll]
-	reg "github.com/GoogleCloudPlatform/k8s-container-image-promoter/lib/dockerregistry"
-	"github.com/GoogleCloudPlatform/k8s-container-image-promoter/lib/stream"
+	reg "github.com/kubernetes-sigs/k8s-container-image-promoter/lib/dockerregistry"
+	"github.com/kubernetes-sigs/k8s-container-image-promoter/lib/stream"
 )
 
 func main() {
