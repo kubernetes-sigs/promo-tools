@@ -192,7 +192,6 @@ images:
 
 		// Check the error as well (at the very least, we can check that the
 		// error was nil).
-		// TODO: Add tests for purposeful failures (and expected errors).
 		eqErr := checkEqual(err, test.expectedOutput.err)
 		checkError(t, eqErr, fmt.Sprintf("Test: %v (err)\n", test.name))
 
@@ -964,12 +963,7 @@ func TestPromotion(t *testing.T) {
 		expectedReqs CapturedRequests
 	}{
 		{
-			// TODO: Add all test cases. Really interesting case would be using
-			// quickcheck to ensure certain properties.
-
-			// TODO: Add test case where a promotion run fails because of a
-			// missing image (image desired in manifest but not found in src
-			// registry). This probably needs a fake executor.
+			// TODO: Use quickcheck to ensure certain properties.
 			"No promotion",
 			Manifest{},
 			SyncContext{},
