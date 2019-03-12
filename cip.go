@@ -62,28 +62,38 @@ func main() {
 	}
 
 	mfest := reg.ParseManifestFromFile(*manifestPtr)
-	sc := reg.MakeSyncContext(map[reg.RegistryName]reg.RegInvImage{
-		mfest.Registries.Src:  nil,
-		mfest.Registries.Dest: nil},
-		*verbosityPtr, *threadsPtr, *deleteExtraTags, *dryRunPtr, !noSvcAcc)
+
+	mi := map[reg.RegistryName]reg.RegInvImage{}
+	for _, registry := range mfest.Registries {
+		mi[registry.Name] = nil
+	}
+	sc := reg.MakeSyncContext(
+		mi,
+		*verbosityPtr,
+		*threadsPtr,
+		*deleteExtraTags,
+		*dryRunPtr,
+		!noSvcAcc,
+		mfest.Registries)
 
 	// Read the state of the world; i.e., populate the SyncContext.
-	mkRegistryListingCmd := func(regName reg.RegistryName) stream.Producer {
+	mkRegistryListingCmd := func(
+		rc reg.RegistryContext) stream.Producer {
 		var sp stream.Subprocess
 		sp.CmdInvocation = reg.GetRegistryListingCmd(
-			mfest.ServiceAccount,
-			sc.UseServiceAccount,
-			string(regName))
+			rc,
+			sc.UseServiceAccount)
 		return &sp
 	}
+
 	sc.ReadImageNames(mkRegistryListingCmd)
 	mkRegistryListTagsCmd := func(
-		registryName reg.RegistryName, imgName reg.ImageName) stream.Producer {
+		rc reg.RegistryContext, imgName reg.ImageName) stream.Producer {
 		var sp stream.Subprocess
 		sp.CmdInvocation = reg.GetRegistryListTagsCmd(
-			mfest.ServiceAccount,
+			rc.ServiceAccount,
 			sc.UseServiceAccount,
-			string(registryName),
+			string(rc.Name),
 			string(imgName))
 		return &sp
 	}
@@ -93,16 +103,16 @@ func main() {
 
 	// Promote.
 	mkPromotionCmd := func(
-		srcRegistry,
-		destRegistry reg.RegistryName,
+		srcRegistry reg.RegistryName,
+		destRC reg.RegistryContext,
 		imageName reg.ImageName,
 		digest reg.Digest, tag reg.Tag, tp reg.TagOp) stream.Producer {
 		var sp stream.Subprocess
 		sp.CmdInvocation = reg.GetWriteCmd(
-			mfest.ServiceAccount,
+			destRC.ServiceAccount,
 			sc.UseServiceAccount,
 			srcRegistry,
-			destRegistry,
+			destRC.Name,
 			imageName,
 			digest,
 			tag,
@@ -118,14 +128,14 @@ func main() {
 		sc.ReadDigestsAndTags(mkRegistryListTagsCmd)
 		// Garbage-collect all untagged images in dest registry.
 		mkTagDeletionCmd := func(
-			destRegistry reg.RegistryName,
+			dest reg.RegistryContext,
 			imageName reg.ImageName,
 			digest reg.Digest) stream.Producer {
 			var sp stream.Subprocess
 			sp.CmdInvocation = reg.GetDeleteCmd(
-				mfest.ServiceAccount,
+				dest.ServiceAccount,
 				sc.UseServiceAccount,
-				destRegistry,
+				dest.Name,
 				imageName,
 				digest)
 			return &sp
