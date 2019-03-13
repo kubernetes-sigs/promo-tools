@@ -1501,3 +1501,136 @@ func TestGarbageCollection(t *testing.T) {
 		checkError(t, err, fmt.Sprintf("checkError: test: %v\n", test.name))
 	}
 }
+
+func TestGarbageCollectionMulti(t *testing.T) {
+	srcRegName := RegistryName("gcr.io/src")
+	destRegName1 := RegistryName("gcr.io/dest1")
+	destRegName2 := RegistryName("gcr.io/dest2")
+	destRC := RegistryContext{
+		Name:           destRegName1,
+		ServiceAccount: "robotDest1",
+	}
+	destRC2 := RegistryContext{
+		Name:           destRegName2,
+		ServiceAccount: "robotDest2",
+	}
+	srcRC := RegistryContext{
+		Name:           srcRegName,
+		ServiceAccount: "robotSrc",
+	}
+	registries := []RegistryContext{srcRC, destRC, destRC2}
+	var tests = []struct {
+		name         string
+		inputM       Manifest
+		inputSc      SyncContext
+		expectedReqs CapturedRequests
+	}{
+		{
+			// nolint[lll]
+			"Simple garbage collection (delete ALL images in all dests that are untagged))",
+			Manifest{
+				Src:        srcRegName,
+				Registries: registries,
+				Images: []Image{
+					{
+						ImageName: "a",
+						Dmap: DigestTags{
+							"sha256:000": TagSlice{"missing-from-src"},
+							"sha256:333": TagSlice{"0.8"},
+						}},
+					{
+						ImageName: "b",
+						Dmap: DigestTags{
+							"sha256:bbb": TagSlice{"also-missing"}}}}},
+			SyncContext{
+				Inv: MasterInventory{
+					"gcr.io/src": RegInvImage{
+						"c": DigestTags{
+							"sha256:000": nil},
+						"d": DigestTags{
+							"sha256:bbb": nil}},
+					"gcr.io/dest1": RegInvImage{
+						"a": DigestTags{
+							"sha256:111": nil},
+						"z": DigestTags{
+							"sha256:222": nil}},
+					"gcr.io/dest2": RegInvImage{
+						"a": DigestTags{
+							"sha256:123": nil},
+						"b": DigestTags{
+							"sha256:444": nil}},
+				}},
+			CapturedRequests{
+				PromotionRequest{
+					TagOp:          Delete,
+					RegistrySrc:    srcRegName,
+					RegistryDest:   registries[1].Name,
+					ServiceAccount: registries[1].ServiceAccount,
+					ImageName:      "a",
+					Digest:         "sha256:111",
+					Tag:            ""}: 1,
+				PromotionRequest{
+					TagOp:          Delete,
+					RegistrySrc:    srcRegName,
+					RegistryDest:   registries[1].Name,
+					ServiceAccount: registries[1].ServiceAccount,
+					ImageName:      "z",
+					Digest:         "sha256:222",
+					Tag:            ""}: 1,
+				PromotionRequest{
+					TagOp:          Delete,
+					RegistrySrc:    srcRegName,
+					RegistryDest:   registries[2].Name,
+					ServiceAccount: registries[2].ServiceAccount,
+					ImageName:      "a",
+					Digest:         "sha256:123",
+					Tag:            ""}: 1,
+				PromotionRequest{
+					TagOp:          Delete,
+					RegistrySrc:    srcRegName,
+					RegistryDest:   registries[2].Name,
+					ServiceAccount: registries[2].ServiceAccount,
+					ImageName:      "b",
+					Digest:         "sha256:444",
+					Tag:            ""}: 1,
+			},
+		},
+	}
+
+	captured := make(CapturedRequests)
+
+	var processRequestFake ProcessRequest = func(
+		sc *SyncContext,
+		reqs <-chan stream.ExternalRequest,
+		errs chan<- RequestResult,
+		wg *sync.WaitGroup,
+		mutex *sync.Mutex) {
+
+		defer wg.Done()
+		for req := range reqs {
+			pr := req.RequestParams.(PromotionRequest)
+			mutex.Lock()
+			if _, ok := captured[pr]; ok {
+				captured[pr]++
+			} else {
+				captured[pr] = 1
+			}
+			mutex.Unlock()
+		}
+	}
+
+	for _, test := range tests {
+		// Reset captured for each test.
+		captured = make(CapturedRequests)
+		nopStream := func(
+			destRC RegistryContext,
+			imageName ImageName,
+			digest Digest) stream.Producer {
+			return nil
+		}
+		test.inputSc.GarbageCollect(test.inputM, nopStream, &processRequestFake)
+
+		err := checkEqual(captured, test.expectedReqs)
+		checkError(t, err, fmt.Sprintf("checkError: test: %v\n", test.name))
+	}
+}
