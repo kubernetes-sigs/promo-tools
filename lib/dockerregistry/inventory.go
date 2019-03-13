@@ -1119,10 +1119,9 @@ func MaybeUseServiceAccount(
 // GetWriteCmd generates a gcloud command that is used to make modifications to
 // a Docker Registry.
 func GetWriteCmd(
-	serviceAccount string,
+	dest RegistryContext,
 	useServiceAccount bool,
 	srcRegistry RegistryName,
-	destRegistry RegistryName,
 	image ImageName,
 	digest Digest,
 	tag Tag,
@@ -1141,29 +1140,28 @@ func GetWriteCmd(
 			"images",
 			"add-tag",
 			ToFQIN(srcRegistry, image, digest),
-			ToPQIN(destRegistry, image, tag)}
+			ToPQIN(dest.Name, image, tag)}
 	case Delete:
 		cmd = []string{"gcloud",
 			"--quiet",
 			"container",
 			"images",
 			"untag",
-			ToPQIN(destRegistry, image, tag)}
+			ToPQIN(dest.Name, image, tag)}
 	}
 	// Use the service account if it is desired.
-	return MaybeUseServiceAccount(serviceAccount, useServiceAccount, cmd)
+	return MaybeUseServiceAccount(dest.ServiceAccount, useServiceAccount, cmd)
 }
 
 // GetDeleteCmd generates the cloud command used to delete images (used for
 // garbage collection).
 func GetDeleteCmd(
-	serviceAccount string,
+	rc RegistryContext,
 	useServiceAccount bool,
-	registryName RegistryName,
 	img ImageName,
 	digest Digest) []string {
 
-	fqin := ToFQIN(registryName, img, digest)
+	fqin := ToFQIN(rc.Name, img, digest)
 	cmd := []string{
 		"gcloud",
 		"container",
@@ -1171,7 +1169,7 @@ func GetDeleteCmd(
 		"delete",
 		fqin,
 		"--format=json"}
-	return MaybeUseServiceAccount(serviceAccount, useServiceAccount, cmd)
+	return MaybeUseServiceAccount(rc.ServiceAccount, useServiceAccount, cmd)
 }
 
 // GetRegistryListingCmd generates the invocation for retrieving all images in a
@@ -1191,15 +1189,14 @@ func GetRegistryListingCmd(
 // GetRegistryListTagsCmd generates the invocation for retrieving all digests
 // (and tags on them) for a given image.
 func GetRegistryListTagsCmd(
-	serviceAccount string,
+	rc RegistryContext,
 	useServiceAccount bool,
-	registryName string,
 	img string) []string {
 	cmd := []string{
 		"gcloud",
 		"container",
 		"images",
 		"list-tags",
-		fmt.Sprintf("%s/%s", registryName, img), "--format=json"}
-	return MaybeUseServiceAccount(serviceAccount, useServiceAccount, cmd)
+		fmt.Sprintf("%s/%s", rc.Name, img), "--format=json"}
+	return MaybeUseServiceAccount(rc.ServiceAccount, useServiceAccount, cmd)
 }

@@ -91,9 +91,8 @@ func main() {
 		rc reg.RegistryContext, imgName reg.ImageName) stream.Producer {
 		var sp stream.Subprocess
 		sp.CmdInvocation = reg.GetRegistryListTagsCmd(
-			rc.ServiceAccount,
+			rc,
 			sc.UseServiceAccount,
-			string(rc.Name),
 			string(imgName))
 		return &sp
 	}
@@ -109,10 +108,9 @@ func main() {
 		digest reg.Digest, tag reg.Tag, tp reg.TagOp) stream.Producer {
 		var sp stream.Subprocess
 		sp.CmdInvocation = reg.GetWriteCmd(
-			destRC.ServiceAccount,
+			destRC,
 			sc.UseServiceAccount,
 			srcRegistry,
-			destRC.Name,
 			imageName,
 			digest,
 			tag,
@@ -133,9 +131,8 @@ func main() {
 			digest reg.Digest) stream.Producer {
 			var sp stream.Subprocess
 			sp.CmdInvocation = reg.GetDeleteCmd(
-				dest.ServiceAccount,
+				dest,
 				sc.UseServiceAccount,
-				dest.Name,
 				imageName,
 				digest)
 			return &sp

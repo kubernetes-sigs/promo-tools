@@ -380,9 +380,8 @@ func TestCommandGeneration(t *testing.T) {
 
 	testName = "GetRegistryListTagsCmd"
 	got = GetRegistryListTagsCmd(
-		destRC.ServiceAccount,
+		destRC,
 		true,
-		string(destRC.Name),
 		string(imgName))
 	expected = []string{
 		"gcloud",
@@ -399,9 +398,8 @@ func TestCommandGeneration(t *testing.T) {
 		fmt.Sprintf("Test: %v (cmd string)\n", testName))
 
 	got = GetRegistryListTagsCmd(
-		destRC.ServiceAccount,
+		destRC,
 		false,
-		string(destRC.Name),
 		string(imgName))
 	expected = []string{
 		"gcloud",
@@ -418,9 +416,8 @@ func TestCommandGeneration(t *testing.T) {
 
 	testName = "GetDeleteCmd"
 	got = GetDeleteCmd(
-		destRC.ServiceAccount,
+		destRC,
 		true,
-		destRC.Name,
 		imgName,
 		digest)
 	expected = []string{
@@ -438,9 +435,8 @@ func TestCommandGeneration(t *testing.T) {
 		fmt.Sprintf("Test: %v (cmd string)\n", testName))
 
 	got = GetDeleteCmd(
-		destRC.ServiceAccount,
+		destRC,
 		false,
-		destRC.Name,
 		imgName,
 		digest)
 	expected = []string{
@@ -459,10 +455,9 @@ func TestCommandGeneration(t *testing.T) {
 	testName = "GetWriteCmd (Add)"
 	tp = Add
 	got = GetWriteCmd(
-		destRC.ServiceAccount,
+		destRC,
 		true,
 		srcRegName,
-		destRC.Name,
 		imgName,
 		digest,
 		tag,
@@ -484,10 +479,9 @@ func TestCommandGeneration(t *testing.T) {
 		fmt.Sprintf("Test: %v (cmd string)\n", testName))
 
 	got = GetWriteCmd(
-		destRC.ServiceAccount,
+		destRC,
 		false,
 		srcRegName,
-		destRC.Name,
 		imgName,
 		digest,
 		tag,
@@ -510,10 +504,9 @@ func TestCommandGeneration(t *testing.T) {
 	testName = "GetWriteCmd (Delete)"
 	tp = Delete
 	got = GetWriteCmd(
-		destRC.ServiceAccount,
+		destRC,
 		true,
 		srcRegName,
-		destRC.Name,
 		imgName,
 		digest,
 		tag,
@@ -533,10 +526,9 @@ func TestCommandGeneration(t *testing.T) {
 		fmt.Sprintf("Test: %v (cmd string)\n", testName))
 
 	got = GetWriteCmd(
-		destRC.ServiceAccount,
+		destRC,
 		false,
 		srcRegName,
-		destRC.Name,
 		imgName,
 		digest,
 		tag,
