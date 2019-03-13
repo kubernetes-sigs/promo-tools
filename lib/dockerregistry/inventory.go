@@ -177,7 +177,7 @@ func validateTag(tag Tag) error {
 // nolint[gocyclo]
 func validateRequiredComponents(m Manifest) error {
 	errs := make([]string, 0)
-	if len(m.Src) == 0 {
+	if len(m.SrcRegistry) == 0 {
 		errs = append(errs, fmt.Sprintf("'src' field cannot be empty"))
 	}
 	if len(m.Registries) == 0 {
@@ -219,13 +219,13 @@ func validateRequiredComponents(m Manifest) error {
 
 func validateRegistries(m Manifest) error {
 	for _, registry := range m.Registries {
-		if registry.Name == m.Src {
+		if registry.Name == m.SrcRegistry {
 			return nil
 		}
 	}
 	return fmt.Errorf(
 		"registries list does not contain source registry '%s'",
-		m.Src)
+		m.SrcRegistry)
 }
 
 // PrettyValue creates a prettified string representation of MasterInventory.
@@ -598,7 +598,7 @@ func ToPQIN(registryName RegistryName, imageName ImageName, tag Tag) string {
 
 // ShowLostImages logs all images in Manifest which are missing from src.
 func (sc *SyncContext) ShowLostImages(mfest Manifest) {
-	src := sc.Inv[mfest.Src].ToRegInvImageDigest()
+	src := sc.Inv[mfest.SrcRegistry].ToRegInvImageDigest()
 
 	// lost = all images that cannot be found from src.
 	lost := mfest.ToRegInvImageDigest().Minus(src)
@@ -606,10 +606,10 @@ func (sc *SyncContext) ShowLostImages(mfest Manifest) {
 		sc.Errorf(
 			"Lost images (all images in Manifest that cannot be found"+
 				" from src registry %v):\n",
-			mfest.Src)
+			mfest.SrcRegistry)
 		for imageDigest := range lost {
 			fqin := ToFQIN(
-				mfest.Src,
+				mfest.SrcRegistry,
 				imageDigest.ImageName,
 				imageDigest.Digest)
 			sc.Errorf(
@@ -620,7 +620,7 @@ func (sc *SyncContext) ShowLostImages(mfest Manifest) {
 		sc.Infof(
 			"Lost images (all images in Manifest that cannot be found from"+
 				" src registry %v):\n  <none>\n",
-			mfest.Src)
+			mfest.SrcRegistry)
 	}
 }
 
@@ -643,7 +643,7 @@ func (sc *SyncContext) mkPopReq(
 	for imageTag, digest := range thing {
 		var req stream.ExternalRequest
 		req.StreamProducer = mkProducer(
-			mfest.Src,
+			mfest.SrcRegistry,
 			destRC,
 			imageTag.ImageName,
 			digest,
@@ -704,7 +704,7 @@ func (sc *SyncContext) mkPopReq(
 		// HTTP "headers".
 		req.RequestParams = PromotionRequest{
 			tp,
-			mfest.Src,
+			mfest.SrcRegistry,
 			destRC.Name,
 			destRC.ServiceAccount,
 			imageTag.ImageName,
@@ -732,7 +732,7 @@ func mkPopulateRequestsForPromotion(
 ) PopulateRequests {
 	return func(sc *SyncContext, reqs chan<- stream.ExternalRequest) {
 		for _, registry := range mfest.Registries {
-			if registry.Name == mfest.Src {
+			if registry.Name == mfest.SrcRegistry {
 				continue
 			}
 			destIT := sc.Inv[registry.Name].ToRegInvImageTag()
@@ -818,7 +818,7 @@ func mkPopulateRequestsForPromotion(
 func (sc *SyncContext) GetPromotionCandidatesIT(
 	mfest Manifest) RegInvImageTag {
 
-	src := sc.Inv[mfest.Src]
+	src := sc.Inv[mfest.SrcRegistry]
 
 	// promotionCandidates = all images in the manifest that can be found from
 	// src. But, this is filtered later to remove those ones that are already in
@@ -827,7 +827,7 @@ func (sc *SyncContext) GetPromotionCandidatesIT(
 		src.ToRegInvImageDigest())
 	sc.Infof(
 		"To promote (intersection of Manifest and src registry %v):\n%v",
-		mfest.Src,
+		mfest.SrcRegistry,
 		promotionCandidates.PrettyValue())
 
 	if len(promotionCandidates) > 0 {
@@ -1030,7 +1030,7 @@ func (sc *SyncContext) GarbageCollect(
 		reqs chan<- stream.ExternalRequest) {
 
 		for _, registry := range mfest.Registries {
-			if registry.Name == mfest.Src {
+			if registry.Name == mfest.SrcRegistry {
 				continue
 			}
 			for imageName, digestTags := range sc.Inv[registry.Name] {
@@ -1043,7 +1043,7 @@ func (sc *SyncContext) GarbageCollect(
 							digest)
 						req.RequestParams = PromotionRequest{
 							Delete,
-							mfest.Src,
+							mfest.SrcRegistry,
 							registry.Name,
 							registry.ServiceAccount,
 							imageName,

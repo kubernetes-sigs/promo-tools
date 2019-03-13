@@ -144,8 +144,8 @@ type Manifest struct {
 	//
 	// TODO: check that RegistryName is present in a RegistryContext in
 	// Registries.
-	Src    RegistryName
-	Images []Image `yaml:"images,omitempty"`
+	SrcRegistry RegistryName `yaml:"src-registry"`
+	Images      []Image      `yaml:"images,omitempty"`
 }
 
 // Image holds information about an image. It's like an "Object" in the OOP

@@ -146,7 +146,7 @@ func TestParseRegistryManifest(t *testing.T) {
 		{
 			"Basic manifest",
 			// nolint[lll]
-			`src: gcr.io/foo
+			`src-registry: gcr.io/foo
 registries:
 - name: gcr.io/bar
   service-account: foobar@google-containers.iam.gserviceaccount.com
@@ -161,7 +161,7 @@ images:
     "sha256:07353f7b26327f0d933515a22b1de587b040d3d85c464ea299c1b9f242529326": [ "1.8.3" ]  # Branches: ['master']
 `,
 			Manifest{
-				Src: "gcr.io/foo",
+				SrcRegistry: "gcr.io/foo",
 				Registries: []RegistryContext{
 					{
 						Name: "gcr.io/bar",
@@ -195,7 +195,7 @@ images:
 		{
 			"Missing src registry in registries (invalid)",
 			// nolint[lll]
-			`src: gcr.io/alpha
+			`src-registry: gcr.io/alpha
 registries:
 - name: gcr.io/bar
   service-account: foobar@google-containers.iam.gserviceaccount.com
@@ -1012,8 +1012,8 @@ func TestPromotion(t *testing.T) {
 		{
 			"No promotion; tag is already promoted",
 			Manifest{
-				Src:        srcRegName,
-				Registries: registries,
+				SrcRegistry: srcRegName,
+				Registries:  registries,
 				Images: []Image{
 					{
 						ImageName: "a",
@@ -1034,8 +1034,8 @@ func TestPromotion(t *testing.T) {
 		{
 			"Promote 1 tag; image digest does not exist in dest",
 			Manifest{
-				Src:        srcRegName,
-				Registries: registries,
+				SrcRegistry: srcRegName,
+				Registries:  registries,
 				Images: []Image{
 					{
 						ImageName: "a",
@@ -1061,8 +1061,8 @@ func TestPromotion(t *testing.T) {
 		{
 			"Promote 1 tag; image digest already exists in dest",
 			Manifest{
-				Src:        srcRegName,
-				Registries: registries,
+				SrcRegistry: srcRegName,
+				Registries:  registries,
 				Images: []Image{
 					{
 						ImageName: "a",
@@ -1089,8 +1089,8 @@ func TestPromotion(t *testing.T) {
 			// nolint[lll]
 			"Promote 1 tag; tag already exists in dest but is pointing to a different digest (move tag)",
 			Manifest{
-				Src:        srcRegName,
-				Registries: registries,
+				SrcRegistry: srcRegName,
+				Registries:  registries,
 				Images: []Image{
 					{
 						ImageName: "a",
@@ -1118,8 +1118,8 @@ func TestPromotion(t *testing.T) {
 			// nolint[lll]
 			"NOP; dest has extra tag, but NOP because -delete-extra-tags NOT specified",
 			Manifest{
-				Src:        srcRegName,
-				Registries: registries,
+				SrcRegistry: srcRegName,
+				Registries:  registries,
 				Images: []Image{
 					{
 						ImageName: "a",
@@ -1140,8 +1140,8 @@ func TestPromotion(t *testing.T) {
 			// nolint[lll]
 			"Delete 1 tag; dest has extra tag (if -delete-extra-tags specified)",
 			Manifest{
-				Src:        srcRegName,
-				Registries: registries,
+				SrcRegistry: srcRegName,
+				Registries:  registries,
 				Images: []Image{
 					{
 						ImageName: "a",
@@ -1169,8 +1169,8 @@ func TestPromotion(t *testing.T) {
 			// nolint[lll]
 			"NOP (src registry does not have any of the images we want to promote)",
 			Manifest{
-				Src:        srcRegName,
-				Registries: registries,
+				SrcRegistry: srcRegName,
+				Registries:  registries,
 				Images: []Image{
 					{
 						ImageName: "a",
@@ -1254,8 +1254,8 @@ func TestPromotionMulti(t *testing.T) {
 			// nolint[lll]
 			"Add 1 tag for 2 registries",
 			Manifest{
-				Src:        srcRegName,
-				Registries: registries,
+				SrcRegistry: srcRegName,
+				Registries:  registries,
 				Images: []Image{
 					{
 						ImageName: "a",
@@ -1296,8 +1296,8 @@ func TestPromotionMulti(t *testing.T) {
 			// nolint[lll]
 			"Add 1 tag for 1 registry, but remove a tag for another",
 			Manifest{
-				Src:        srcRegName,
-				Registries: registries,
+				SrcRegistry: srcRegName,
+				Registries:  registries,
 				Images: []Image{
 					{
 						ImageName: "a",
@@ -1386,8 +1386,8 @@ func TestGarbageCollection(t *testing.T) {
 		{
 			"No garbage collection (no empty digests)",
 			Manifest{
-				Src:        srcRegName,
-				Registries: registries,
+				SrcRegistry: srcRegName,
+				Registries:  registries,
 				Images: []Image{
 					{
 						ImageName: "a",
@@ -1415,8 +1415,8 @@ func TestGarbageCollection(t *testing.T) {
 			// nolint[lll]
 			"Simple garbage collection (delete ALL images in dest that are untagged))",
 			Manifest{
-				Src:        srcRegName,
-				Registries: registries,
+				SrcRegistry: srcRegName,
+				Registries:  registries,
 				Images: []Image{
 					{
 						ImageName: "a",
@@ -1529,8 +1529,8 @@ func TestGarbageCollectionMulti(t *testing.T) {
 			// nolint[lll]
 			"Simple garbage collection (delete ALL images in all dests that are untagged))",
 			Manifest{
-				Src:        srcRegName,
-				Registries: registries,
+				SrcRegistry: srcRegName,
+				Registries:  registries,
 				Images: []Image{
 					{
 						ImageName: "a",
