@@ -53,11 +53,6 @@ type ParseJSONStreamResult struct {
 	err   error
 }
 
-type ParseRegistryManifestResult struct {
-	imageManifest Manifest
-	err           error
-}
-
 func TestReadJSONStream(t *testing.T) {
 	var tests = []struct {
 		name           string
@@ -137,20 +132,26 @@ func TestParseRegistryManifest(t *testing.T) {
 	var tests = []struct {
 		name           string
 		input          string
-		expectedOutput ParseRegistryManifestResult
+		expectedOutput Manifest
+		expectedError  error
 	}{
 		{
-			"Empty manifest",
+			"Empty manifest (invalid)",
 			``,
-			ParseRegistryManifestResult{Manifest{}, nil},
+			Manifest{},
+			fmt.Errorf(`'src' field cannot be empty
+'registries' field cannot be empty
+'images' field cannot be empty`),
 		},
 		{
 			"Basic manifest",
 			// nolint[lll]
-			`registries:
-  src: gcr.io/foo
-  dest: gcr.io/bar
-service-account: foobar@google-containers.iam.gserviceaccount.com
+			`src: gcr.io/foo
+registries:
+- name: gcr.io/bar
+  service-account: foobar@google-containers.iam.gserviceaccount.com
+- name: gcr.io/foo
+  service-account: src@google-containers.iam.gserviceaccount.com
 images:
 - name: agave
   dmap:
@@ -159,13 +160,20 @@ images:
   dmap:
     "sha256:07353f7b26327f0d933515a22b1de587b040d3d85c464ea299c1b9f242529326": [ "1.8.3" ]  # Branches: ['master']
 `,
-			ParseRegistryManifestResult{Manifest{
-				Registries: RegistryNames{
-					Src:  "gcr.io/foo",
-					Dest: "gcr.io/bar",
+			Manifest{
+				Src: "gcr.io/foo",
+				Registries: []RegistryContext{
+					{
+						Name: "gcr.io/bar",
+						// nolint[lll]
+						ServiceAccount: "foobar@google-containers.iam.gserviceaccount.com",
+					},
+					{
+						Name: "gcr.io/foo",
+						// nolint[lll]
+						ServiceAccount: "src@google-containers.iam.gserviceaccount.com",
+					},
 				},
-				// nolint[lll]
-				ServiceAccount: "foobar@google-containers.iam.gserviceaccount.com",
 
 				Images: []Image{
 					{ImageName: "agave",
@@ -181,7 +189,29 @@ images:
 						},
 					},
 				},
-			}, nil},
+			},
+			nil,
+		},
+		{
+			"Missing src registry in registries (invalid)",
+			// nolint[lll]
+			`src: gcr.io/alpha
+registries:
+- name: gcr.io/bar
+  service-account: foobar@google-containers.iam.gserviceaccount.com
+- name: gcr.io/foo
+  service-account: src@google-containers.iam.gserviceaccount.com
+images:
+- name: agave
+  dmap:
+    "sha256:aab34c5841987a1b133388fa9f27e7960c4b1307e2f9147dca407ba26af48a54": ["latest"]
+- name: banana
+  dmap:
+    "sha256:07353f7b26327f0d933515a22b1de587b040d3d85c464ea299c1b9f242529326": [ "1.8.3" ]  # Branches: ['master']
+`,
+			Manifest{},
+			// nolint[lll]
+			fmt.Errorf("registries list does not contain source registry 'gcr.io/alpha'"),
 		},
 	}
 
@@ -192,16 +222,21 @@ images:
 
 		// Check the error as well (at the very least, we can check that the
 		// error was nil).
-		eqErr := checkEqual(err, test.expectedOutput.err)
-		checkError(t, eqErr, fmt.Sprintf("Test: %v (err)\n", test.name))
+		eqErr := checkEqual(err, test.expectedError)
+		checkError(t, eqErr, fmt.Sprintf("Test: %v (error)\n", test.name))
+
+		// There is nothing more to check if we expected a parse failure.
+		if test.expectedError != nil {
+			continue
+		}
 
 		got := imageManifest
-		expected := test.expectedOutput.imageManifest
+		expected := test.expectedOutput
 		eqErr = checkEqual(got, expected)
 		checkError(
 			t,
 			eqErr,
-			fmt.Sprintf("Test: %v (imageManifest)\n", test.name))
+			fmt.Sprintf("Test: %v (Manifest)\n", test.name))
 	}
 }
 

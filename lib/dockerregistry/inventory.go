@@ -132,7 +132,13 @@ func ParseManifest(bytes []byte) (Manifest, error) {
 // Validate checks for semantic errors in the yaml fields (the structure of the
 // yaml is checked during unmarshaling).
 func (m Manifest) Validate() error {
-	return validateImages(m.Images)
+	if err := validateRequiredComponents(m); err != nil {
+		return err
+	}
+	if err := validateImages(m.Images); err != nil {
+		return err
+	}
+	return validateRegistries(m)
 }
 
 func validateImages(images []Image) error {
@@ -166,6 +172,60 @@ func validateTag(tag Tag) error {
 		return fmt.Errorf("invalid tag: %v", tag)
 	}
 	return nil
+}
+
+// nolint[gocyclo]
+func validateRequiredComponents(m Manifest) error {
+	errs := make([]string, 0)
+	if len(m.Src) == 0 {
+		errs = append(errs, fmt.Sprintf("'src' field cannot be empty"))
+	}
+	if len(m.Registries) == 0 {
+		errs = append(errs, fmt.Sprintf("'registries' field cannot be empty"))
+	}
+	for _, registry := range m.Registries {
+		if len(registry.Name) == 0 {
+			errs = append(
+				errs,
+				fmt.Sprintf("registries: 'name' field cannot be empty"))
+		}
+		if len(registry.ServiceAccount) == 0 {
+			errs = append(
+				errs,
+				fmt.Sprintf(
+					"registries: 'service-account' field cannot be empty"))
+		}
+	}
+	if len(m.Images) == 0 {
+		errs = append(errs, fmt.Sprintf("'images' field cannot be empty"))
+	}
+	for _, image := range m.Images {
+		if len(image.ImageName) == 0 {
+			errs = append(
+				errs,
+				fmt.Sprintf("images: 'name' field cannot be empty"))
+		}
+		if len(image.Dmap) == 0 {
+			errs = append(
+				errs,
+				fmt.Sprintf("images: 'dmap' field cannot be empty"))
+		}
+	}
+	if len(errs) == 0 {
+		return nil
+	}
+	return fmt.Errorf(strings.Join(errs, "\n"))
+}
+
+func validateRegistries(m Manifest) error {
+	for _, registry := range m.Registries {
+		if registry.Name == m.Src {
+			return nil
+		}
+	}
+	return fmt.Errorf(
+		"registries list does not contain source registry '%s'",
+		m.Src)
 }
 
 // PrettyValue creates a prettified string representation of MasterInventory.
