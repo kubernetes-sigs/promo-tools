@@ -18,19 +18,13 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-# Run the promoter (cip) against multiple manifests, with a different service
-# account credential for each. Activate the credential before invoking the
-# promoter (the promoter should not have to worry about credentials --- not yet,
-# at least).
-#
-# NOTE: This script will probably be deprecated once
-# https://github.com/kubernetes-sigs/k8s-container-image-promoter/issues/13#issuecomment-466474754
-# lands and each prod registry gets a service account defined for it.
+# Run the promoter (cip) against multiple manifests, activating credentials
+# before each invocation.
 
 usage()
 {
     echo >&2 "usage: $0 <path/to/cip/binary> [<path/to/manifest.yaml>,<path/to/service-account.json>, ...]"
-    echo >&2 "The 2nd argument onwards are '<manifest>,<service-account>' pairs."
+    echo >&2 "The 2nd argument onwards are '<manifest>,<service-account>,<service-account>...' strings."
     echo >&2
 }
 
@@ -44,24 +38,24 @@ shift
 
 for opts in "$@"; do
     manifest=$(echo "$opts" | cut -d, -f1)
-    service_account_creds=$(echo "$opts" | cut -d, -f2)
-    activated_service_account=0
-
-    # Authenticate as the service account. This allows the promoter to later
-    # call gcloud with the flag `--account=...`. We can allow the service
-    # account creds file to be empty, for testing cip locally (for the case
-    # where the service account creds are already activated).
-    if [[ -f "${service_account_creds}" ]]; then
-        gcloud auth activate-service-account --key-file="${service_account_creds}"
-        activated_service_account=1
-    fi
+    service_accounts=()
+    service_account_keyfiles=()
+    while IFS= read -r keyfile; do
+        service_account_keyfiles+=( "$keyfile" )
+    done < <( echo "$opts" | cut -d, -f2- | tr , '\n' )
+    for keyfile in "${service_account_keyfiles[@]}"; do
+        # Authenticate as the service account. This allows the promoter to later
+        # call gcloud with the flag `--account=...`. We can allow the service
+        # account creds file to be empty, for testing cip locally (for the case
+        # where the service account creds are already activated).
+        gcloud auth activate-service-account --key-file="${keyfile}"
+        service_accounts+=("$(gcloud config get-value account)")
+    done
 
     # Run the promoter against the manifest.
     "${cip}" -verbosity=3 -manifest="${manifest}" ${CIP_OPTS:+$CIP_OPTS}
 
-    # As a safety measure, deactivate the service account which was activated
+    # As a safety measure, deactivate all service accounts which were activated
     # with --key-file.
-    if (( activated_service_account )); then
-        gcloud auth revoke
-    fi
+    gcloud auth revoke "${service_accounts[@]}"
 done
