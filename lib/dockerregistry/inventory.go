@@ -35,7 +35,8 @@ import (
 func MakeSyncContext(
 	mi MasterInventory,
 	verbosity, threads int,
-	deleteExtraTags, dryRun, useSvcAcc bool) SyncContext {
+	deleteExtraTags, dryRun, useSvcAcc bool,
+	rcs []RegistryContext) SyncContext {
 
 	return SyncContext{
 		Verbosity:         verbosity,
@@ -43,7 +44,8 @@ func MakeSyncContext(
 		DeleteExtraTags:   deleteExtraTags,
 		DryRun:            dryRun,
 		UseServiceAccount: useSvcAcc,
-		Inv:               mi}
+		Inv:               mi,
+		RegistryContexts:  rcs}
 }
 
 // Basic logging.
@@ -130,7 +132,13 @@ func ParseManifest(bytes []byte) (Manifest, error) {
 // Validate checks for semantic errors in the yaml fields (the structure of the
 // yaml is checked during unmarshaling).
 func (m Manifest) Validate() error {
-	return validateImages(m.Images)
+	if err := validateRequiredComponents(m); err != nil {
+		return err
+	}
+	if err := validateImages(m.Images); err != nil {
+		return err
+	}
+	return validateRegistries(m)
 }
 
 func validateImages(images []Image) error {
@@ -164,6 +172,60 @@ func validateTag(tag Tag) error {
 		return fmt.Errorf("invalid tag: %v", tag)
 	}
 	return nil
+}
+
+// nolint[gocyclo]
+func validateRequiredComponents(m Manifest) error {
+	errs := make([]string, 0)
+	if len(m.SrcRegistry) == 0 {
+		errs = append(errs, fmt.Sprintf("'src' field cannot be empty"))
+	}
+	if len(m.Registries) == 0 {
+		errs = append(errs, fmt.Sprintf("'registries' field cannot be empty"))
+	}
+	for _, registry := range m.Registries {
+		if len(registry.Name) == 0 {
+			errs = append(
+				errs,
+				fmt.Sprintf("registries: 'name' field cannot be empty"))
+		}
+		if len(registry.ServiceAccount) == 0 {
+			errs = append(
+				errs,
+				fmt.Sprintf(
+					"registries: 'service-account' field cannot be empty"))
+		}
+	}
+	if len(m.Images) == 0 {
+		errs = append(errs, fmt.Sprintf("'images' field cannot be empty"))
+	}
+	for _, image := range m.Images {
+		if len(image.ImageName) == 0 {
+			errs = append(
+				errs,
+				fmt.Sprintf("images: 'name' field cannot be empty"))
+		}
+		if len(image.Dmap) == 0 {
+			errs = append(
+				errs,
+				fmt.Sprintf("images: 'dmap' field cannot be empty"))
+		}
+	}
+	if len(errs) == 0 {
+		return nil
+	}
+	return fmt.Errorf(strings.Join(errs, "\n"))
+}
+
+func validateRegistries(m Manifest) error {
+	for _, registry := range m.Registries {
+		if registry.Name == m.SrcRegistry {
+			return nil
+		}
+	}
+	return fmt.Errorf(
+		"registries list does not contain source registry '%s'",
+		m.SrcRegistry)
 }
 
 // PrettyValue creates a prettified string representation of MasterInventory.
@@ -279,16 +341,16 @@ func getJSONSFromProcess(req stream.ExternalRequest) (json.Objects, Errors) {
 
 // ReadImageNames only works for streams that interpret json.
 func (sc *SyncContext) ReadImageNames(
-	mkProducer func(RegistryName) stream.Producer) {
+	mkProducer func(RegistryContext) stream.Producer) {
 	// Collect all images in sc.Inv (the src and dest reqgistry names found in
 	// the manifest).
 	var populateRequests PopulateRequests = func(
 		sc *SyncContext, reqs chan<- stream.ExternalRequest) {
 
-		for registryName := range sc.Inv {
+		for _, rc := range sc.RegistryContexts {
 			var req stream.ExternalRequest
-			req.RequestParams = registryName
-			req.StreamProducer = mkProducer(registryName)
+			req.RequestParams = rc.Name
+			req.StreamProducer = mkProducer(rc)
 			reqs <- req
 		}
 	}
@@ -340,20 +402,25 @@ func (sc *SyncContext) ReadImageNames(
 // gcr.io/louhi-gke-k8s/etcd --format=json` For each image name, retrieve all
 // digests and corresponding tags (if any).
 func (sc *SyncContext) ReadDigestsAndTags(
-	mkProducer func(RegistryName, ImageName) stream.Producer) {
+	mkProducer func(RegistryContext, ImageName) stream.Producer) {
 
 	var populateRequests PopulateRequests = func(
 		sc *SyncContext,
 		reqs chan<- stream.ExternalRequest) {
 
 		for registryName, imagesMap := range sc.Inv {
-			for imgName := range imagesMap {
-				var req stream.ExternalRequest
-				req.StreamProducer = mkProducer(registryName, imgName)
-				req.RequestParams = DigestTagsContext{
-					ImageName:    imgName,
-					RegistryName: registryName}
-				reqs <- req
+			for _, rc := range sc.RegistryContexts {
+				if registryName == rc.Name {
+					for imgName := range imagesMap {
+						var req stream.ExternalRequest
+						req.StreamProducer = mkProducer(rc, imgName)
+						req.RequestParams = DigestTagsContext{
+							ImageName:    imgName,
+							RegistryName: registryName}
+						reqs <- req
+					}
+					break
+				}
 			}
 		}
 	}
@@ -531,7 +598,7 @@ func ToPQIN(registryName RegistryName, imageName ImageName, tag Tag) string {
 
 // ShowLostImages logs all images in Manifest which are missing from src.
 func (sc *SyncContext) ShowLostImages(mfest Manifest) {
-	src := sc.Inv[mfest.Registries.Src].ToRegInvImageDigest()
+	src := sc.Inv[mfest.SrcRegistry].ToRegInvImageDigest()
 
 	// lost = all images that cannot be found from src.
 	lost := mfest.ToRegInvImageDigest().Minus(src)
@@ -539,10 +606,10 @@ func (sc *SyncContext) ShowLostImages(mfest Manifest) {
 		sc.Errorf(
 			"Lost images (all images in Manifest that cannot be found"+
 				" from src registry %v):\n",
-			mfest.Registries.Src)
+			mfest.SrcRegistry)
 		for imageDigest := range lost {
 			fqin := ToFQIN(
-				mfest.Registries.Src,
+				mfest.SrcRegistry,
 				imageDigest.ImageName,
 				imageDigest.Digest)
 			sc.Errorf(
@@ -553,37 +620,38 @@ func (sc *SyncContext) ShowLostImages(mfest Manifest) {
 		sc.Infof(
 			"Lost images (all images in Manifest that cannot be found from"+
 				" src registry %v):\n  <none>\n",
-			mfest.Registries.Src)
+			mfest.SrcRegistry)
 	}
 }
 
 func (sc *SyncContext) mkPopReq(
 	mfest Manifest, // seems odd
+	destRC RegistryContext,
 	thing RegInvImageTag,
 	tp TagOp,
 	oldDigest Digest,
 	mkProducer func( // seems odd
 		RegistryName,
-		RegistryName,
+		RegistryContext,
 		ImageName,
 		Digest,
 		Tag,
 		TagOp) stream.Producer,
 	reqs chan<- stream.ExternalRequest) {
 
-	dest := sc.Inv[mfest.Registries.Dest]
+	dest := sc.Inv[destRC.Name]
 	for imageTag, digest := range thing {
 		var req stream.ExternalRequest
 		req.StreamProducer = mkProducer(
-			mfest.Registries.Src,
-			mfest.Registries.Dest,
+			mfest.SrcRegistry,
+			destRC,
 			imageTag.ImageName,
 			digest,
 			imageTag.Tag,
 			tp)
 		tpStr := ""
 		fqin := ToFQIN(
-			mfest.Registries.Dest,
+			destRC.Name,
 			imageTag.ImageName,
 			digest)
 		movePointerOnly := false
@@ -614,10 +682,10 @@ func (sc *SyncContext) mkPopReq(
 `,
 				tpStr,
 				imageTag.Tag,
-				mfest.Registries.Dest,
+				destRC.Name,
 				imageTag.ImageName,
 				oldDigest,
-				mfest.Registries.Dest,
+				destRC.Name,
 				imageTag.ImageName, digest)
 			if movePointerOnly {
 				msg += fmt.Sprintf(
@@ -636,7 +704,9 @@ func (sc *SyncContext) mkPopReq(
 		// HTTP "headers".
 		req.RequestParams = PromotionRequest{
 			tp,
-			mfest.Registries,
+			mfest.SrcRegistry,
+			destRC.Name,
+			destRC.ServiceAccount,
 			imageTag.ImageName,
 			digest,
 			oldDigest,
@@ -654,83 +724,91 @@ func mkPopulateRequestsForPromotion(
 	promotionCandidatesIT RegInvImageTag,
 	mkProducer func(
 		RegistryName,
-		RegistryName,
+		RegistryContext,
 		ImageName,
 		Digest,
 		Tag,
 		TagOp) stream.Producer,
 ) PopulateRequests {
 	return func(sc *SyncContext, reqs chan<- stream.ExternalRequest) {
-		destIT := sc.Inv[mfest.Registries.Dest].ToRegInvImageTag()
-		// For all promotionCandidates that are not already in the destination,
-		// their promotion type is "Add".
-		sc.mkPopReq(
-			mfest,
-			promotionCandidatesIT.Minus(destIT),
-			Add,
-			"",
-			mkProducer,
-			reqs)
-		// Audit the intersection (make sure already-existing tags are pointing
-		// to the digest specified in the manifest).
-		toAudit := promotionCandidatesIT.Intersection(destIT)
-		for imageTag, digest := range toAudit {
-			if liveDigest, ok := destIT[imageTag]; ok {
-				// dest has this imageTag already; need to audit.
-				pqin := ToPQIN(
-					mfest.Registries.Dest,
-					imageTag.ImageName,
-					imageTag.Tag)
-				if digest == liveDigest {
-					// NOP if dest's imageTag is already pointing to the same
-					// digest as in the manifest.
-
-					sc.Infof(
-						"skipping: image '%v' already points to the same"+
-							" digest (%v) as in the Manifest\n",
-						pqin,
-						digest)
-					continue
-				} else {
-					// Dest's tag is pointing to the wrong digest! Need to move
-					// the tag.
-					sc.Warnf(
-						"Warning: image '%v' is pointing to the wrong digest"+
-							"\n       got: %v\n  expected: %v\n",
-						pqin,
-						liveDigest,
-						digest)
-					sc.mkPopReq(
-						mfest,
-						RegInvImageTag{imageTag: digest},
-						Move,
-						liveDigest,
-						mkProducer,
-						reqs)
-				}
+		for _, registry := range mfest.Registries {
+			if registry.Name == mfest.SrcRegistry {
+				continue
 			}
-		}
-		mfestIT := mfest.ToRegInvImageTag()
-		if sc.DeleteExtraTags {
+			destIT := sc.Inv[registry.Name].ToRegInvImageTag()
+			// For all promotionCandidates that are not already in the
+			// destination, their promotion type is "Add".
 			sc.mkPopReq(
 				mfest,
-				destIT.Minus(mfestIT),
-				Delete,
+				registry,
+				promotionCandidatesIT.Minus(destIT),
+				Add,
 				"",
 				mkProducer,
 				reqs)
-		} else {
-			// Warn the user about extra tags:
-			xtras := make([]string, 0)
-			for imageTag := range destIT.Minus(promotionCandidatesIT) {
-				xtras = append(xtras, fmt.Sprintf(
-					"%s:%s",
-					imageTag.ImageName,
-					imageTag.Tag))
+			// Audit the intersection (make sure already-existing tags are
+			// pointing to the digest specified in the manifest).
+			toAudit := promotionCandidatesIT.Intersection(destIT)
+			for imageTag, digest := range toAudit {
+				if liveDigest, ok := destIT[imageTag]; ok {
+					// dest has this imageTag already; need to audit.
+					pqin := ToPQIN(
+						registry.Name,
+						imageTag.ImageName,
+						imageTag.Tag)
+					if digest == liveDigest {
+						// NOP if dest's imageTag is already pointing to the
+						// same digest as in the manifest.
+
+						sc.Infof(
+							"skipping: image '%v' already points to the same"+
+								" digest (%v) as in the Manifest\n",
+							pqin,
+							digest)
+						continue
+					} else {
+						// Dest's tag is pointing to the wrong digest! Need to
+						// move the tag.
+						sc.Warnf(
+							"Warning: image '%v' is pointing to the wrong"+
+								" digest\n       got: %v\n  expected: %v\n",
+							pqin,
+							liveDigest,
+							digest)
+						sc.mkPopReq(
+							mfest,
+							registry,
+							RegInvImageTag{imageTag: digest},
+							Move,
+							liveDigest,
+							mkProducer,
+							reqs)
+					}
+				}
 			}
-			sort.Strings(xtras)
-			for _, img := range xtras {
-				sc.Warnf("Warning: extra tag found in dest: %s\n", img)
+			mfestIT := mfest.ToRegInvImageTag()
+			if sc.DeleteExtraTags {
+				sc.mkPopReq(
+					mfest,
+					registry,
+					destIT.Minus(mfestIT),
+					Delete,
+					"",
+					mkProducer,
+					reqs)
+			} else {
+				// Warn the user about extra tags:
+				xtras := make([]string, 0)
+				for imageTag := range destIT.Minus(promotionCandidatesIT) {
+					xtras = append(xtras, fmt.Sprintf(
+						"%s:%s",
+						imageTag.ImageName,
+						imageTag.Tag))
+				}
+				sort.Strings(xtras)
+				for _, img := range xtras {
+					sc.Warnf("Warning: extra tag found in dest: %s\n", img)
+				}
 			}
 		}
 	}
@@ -740,7 +818,7 @@ func mkPopulateRequestsForPromotion(
 func (sc *SyncContext) GetPromotionCandidatesIT(
 	mfest Manifest) RegInvImageTag {
 
-	src := sc.Inv[mfest.Registries.Src]
+	src := sc.Inv[mfest.SrcRegistry]
 
 	// promotionCandidates = all images in the manifest that can be found from
 	// src. But, this is filtered later to remove those ones that are already in
@@ -749,7 +827,7 @@ func (sc *SyncContext) GetPromotionCandidatesIT(
 		src.ToRegInvImageDigest())
 	sc.Infof(
 		"To promote (intersection of Manifest and src registry %v):\n%v",
-		mfest.Registries.Src,
+		mfest.SrcRegistry,
 		promotionCandidates.PrettyValue())
 
 	if len(promotionCandidates) > 0 {
@@ -777,7 +855,7 @@ func (sc *SyncContext) Promote(
 	mfest Manifest,
 	mkProducer func(
 		RegistryName,
-		RegistryName,
+		RegistryContext,
 		ImageName,
 		Digest,
 		Tag,
@@ -901,8 +979,8 @@ func (op *TagOp) PrettyValue() string {
 func (pr *PromotionRequest) PrettyValue() string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "%v -> %v: Tag: '%v' <%v> %v@%v",
-		string(pr.Registries.Src),
-		string(pr.Registries.Dest),
+		string(pr.RegistrySrc),
+		string(pr.RegistryDest),
 		string(pr.Tag),
 		pr.TagOp.PrettyValue(),
 		string(pr.ImageName),
@@ -941,32 +1019,40 @@ func MkRequestCapturer(captured *CapturedRequests) ProcessRequest {
 }
 
 // GarbageCollect deletes all images that are not referenced by Docker tags.
+// nolint[gocyclo]
 func (sc *SyncContext) GarbageCollect(
 	mfest Manifest,
-	mkProducer func(RegistryName, ImageName, Digest) stream.Producer,
+	mkProducer func(RegistryContext, ImageName, Digest) stream.Producer,
 	customProcessRequest *ProcessRequest) {
 
 	var populateRequests PopulateRequests = func(
 		sc *SyncContext,
 		reqs chan<- stream.ExternalRequest) {
 
-		for imageName, digestTags := range sc.Inv[mfest.Registries.Dest] {
-			for digest, tagArray := range digestTags {
-				if len(tagArray) == 0 {
-					var req stream.ExternalRequest
-					req.StreamProducer = mkProducer(
-						mfest.Registries.Dest,
-						imageName,
-						digest)
-					req.RequestParams = PromotionRequest{
-						Delete,
-						mfest.Registries,
-						imageName,
-						digest,
-						"",
-						"",
+		for _, registry := range mfest.Registries {
+			if registry.Name == mfest.SrcRegistry {
+				continue
+			}
+			for imageName, digestTags := range sc.Inv[registry.Name] {
+				for digest, tagArray := range digestTags {
+					if len(tagArray) == 0 {
+						var req stream.ExternalRequest
+						req.StreamProducer = mkProducer(
+							registry,
+							imageName,
+							digest)
+						req.RequestParams = PromotionRequest{
+							Delete,
+							mfest.SrcRegistry,
+							registry.Name,
+							registry.ServiceAccount,
+							imageName,
+							digest,
+							"",
+							"",
+						}
+						reqs <- req
 					}
-					reqs <- req
 				}
 			}
 		}
@@ -1033,10 +1119,9 @@ func MaybeUseServiceAccount(
 // GetWriteCmd generates a gcloud command that is used to make modifications to
 // a Docker Registry.
 func GetWriteCmd(
-	serviceAccount string,
+	dest RegistryContext,
 	useServiceAccount bool,
 	srcRegistry RegistryName,
-	destRegistry RegistryName,
 	image ImageName,
 	digest Digest,
 	tag Tag,
@@ -1055,29 +1140,28 @@ func GetWriteCmd(
 			"images",
 			"add-tag",
 			ToFQIN(srcRegistry, image, digest),
-			ToPQIN(destRegistry, image, tag)}
+			ToPQIN(dest.Name, image, tag)}
 	case Delete:
 		cmd = []string{"gcloud",
 			"--quiet",
 			"container",
 			"images",
 			"untag",
-			ToPQIN(destRegistry, image, tag)}
+			ToPQIN(dest.Name, image, tag)}
 	}
 	// Use the service account if it is desired.
-	return MaybeUseServiceAccount(serviceAccount, useServiceAccount, cmd)
+	return MaybeUseServiceAccount(dest.ServiceAccount, useServiceAccount, cmd)
 }
 
 // GetDeleteCmd generates the cloud command used to delete images (used for
 // garbage collection).
 func GetDeleteCmd(
-	serviceAccount string,
+	rc RegistryContext,
 	useServiceAccount bool,
-	registryName RegistryName,
 	img ImageName,
 	digest Digest) []string {
 
-	fqin := ToFQIN(registryName, img, digest)
+	fqin := ToFQIN(rc.Name, img, digest)
 	cmd := []string{
 		"gcloud",
 		"container",
@@ -1085,36 +1169,34 @@ func GetDeleteCmd(
 		"delete",
 		fqin,
 		"--format=json"}
-	return MaybeUseServiceAccount(serviceAccount, useServiceAccount, cmd)
+	return MaybeUseServiceAccount(rc.ServiceAccount, useServiceAccount, cmd)
 }
 
 // GetRegistryListingCmd generates the invocation for retrieving all images in a
 // GCR.
 func GetRegistryListingCmd(
-	serviceAccount string,
-	useServiceAccount bool,
-	r string) []string {
+	rc RegistryContext,
+	useServiceAccount bool) []string {
 	cmd := []string{
 		"gcloud",
 		"container",
 		"images",
 		"list",
-		fmt.Sprintf("--repository=%s", r), "--format=json"}
-	return MaybeUseServiceAccount(serviceAccount, useServiceAccount, cmd)
+		fmt.Sprintf("--repository=%s", rc.Name), "--format=json"}
+	return MaybeUseServiceAccount(rc.ServiceAccount, useServiceAccount, cmd)
 }
 
 // GetRegistryListTagsCmd generates the invocation for retrieving all digests
 // (and tags on them) for a given image.
 func GetRegistryListTagsCmd(
-	serviceAccount string,
+	rc RegistryContext,
 	useServiceAccount bool,
-	registryName string,
 	img string) []string {
 	cmd := []string{
 		"gcloud",
 		"container",
 		"images",
 		"list-tags",
-		fmt.Sprintf("%s/%s", registryName, img), "--format=json"}
-	return MaybeUseServiceAccount(serviceAccount, useServiceAccount, cmd)
+		fmt.Sprintf("%s/%s", rc.Name, img), "--format=json"}
+	return MaybeUseServiceAccount(rc.ServiceAccount, useServiceAccount, cmd)
 }

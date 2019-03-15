@@ -53,11 +53,6 @@ type ParseJSONStreamResult struct {
 	err   error
 }
 
-type ParseRegistryManifestResult struct {
-	imageManifest Manifest
-	err           error
-}
-
 func TestReadJSONStream(t *testing.T) {
 	var tests = []struct {
 		name           string
@@ -137,20 +132,26 @@ func TestParseRegistryManifest(t *testing.T) {
 	var tests = []struct {
 		name           string
 		input          string
-		expectedOutput ParseRegistryManifestResult
+		expectedOutput Manifest
+		expectedError  error
 	}{
 		{
-			"Empty manifest",
+			"Empty manifest (invalid)",
 			``,
-			ParseRegistryManifestResult{Manifest{}, nil},
+			Manifest{},
+			fmt.Errorf(`'src' field cannot be empty
+'registries' field cannot be empty
+'images' field cannot be empty`),
 		},
 		{
 			"Basic manifest",
 			// nolint[lll]
-			`registries:
-  src: gcr.io/foo
-  dest: gcr.io/bar
-service-account: foobar@google-containers.iam.gserviceaccount.com
+			`src-registry: gcr.io/foo
+registries:
+- name: gcr.io/bar
+  service-account: foobar@google-containers.iam.gserviceaccount.com
+- name: gcr.io/foo
+  service-account: src@google-containers.iam.gserviceaccount.com
 images:
 - name: agave
   dmap:
@@ -159,13 +160,20 @@ images:
   dmap:
     "sha256:07353f7b26327f0d933515a22b1de587b040d3d85c464ea299c1b9f242529326": [ "1.8.3" ]  # Branches: ['master']
 `,
-			ParseRegistryManifestResult{Manifest{
-				Registries: RegistryNames{
-					Src:  "gcr.io/foo",
-					Dest: "gcr.io/bar",
+			Manifest{
+				SrcRegistry: "gcr.io/foo",
+				Registries: []RegistryContext{
+					{
+						Name: "gcr.io/bar",
+						// nolint[lll]
+						ServiceAccount: "foobar@google-containers.iam.gserviceaccount.com",
+					},
+					{
+						Name: "gcr.io/foo",
+						// nolint[lll]
+						ServiceAccount: "src@google-containers.iam.gserviceaccount.com",
+					},
 				},
-				// nolint[lll]
-				ServiceAccount: "foobar@google-containers.iam.gserviceaccount.com",
 
 				Images: []Image{
 					{ImageName: "agave",
@@ -181,7 +189,29 @@ images:
 						},
 					},
 				},
-			}, nil},
+			},
+			nil,
+		},
+		{
+			"Missing src registry in registries (invalid)",
+			// nolint[lll]
+			`src-registry: gcr.io/alpha
+registries:
+- name: gcr.io/bar
+  service-account: foobar@google-containers.iam.gserviceaccount.com
+- name: gcr.io/foo
+  service-account: src@google-containers.iam.gserviceaccount.com
+images:
+- name: agave
+  dmap:
+    "sha256:aab34c5841987a1b133388fa9f27e7960c4b1307e2f9147dca407ba26af48a54": ["latest"]
+- name: banana
+  dmap:
+    "sha256:07353f7b26327f0d933515a22b1de587b040d3d85c464ea299c1b9f242529326": [ "1.8.3" ]  # Branches: ['master']
+`,
+			Manifest{},
+			// nolint[lll]
+			fmt.Errorf("registries list does not contain source registry 'gcr.io/alpha'"),
 		},
 	}
 
@@ -192,16 +222,21 @@ images:
 
 		// Check the error as well (at the very least, we can check that the
 		// error was nil).
-		eqErr := checkEqual(err, test.expectedOutput.err)
-		checkError(t, eqErr, fmt.Sprintf("Test: %v (err)\n", test.name))
+		eqErr := checkEqual(err, test.expectedError)
+		checkError(t, eqErr, fmt.Sprintf("Test: %v (error)\n", test.name))
+
+		// There is nothing more to check if we expected a parse failure.
+		if test.expectedError != nil {
+			continue
+		}
 
 		got := imageManifest
-		expected := test.expectedOutput.imageManifest
+		expected := test.expectedOutput
 		eqErr = checkEqual(got, expected)
 		checkError(
 			t,
 			eqErr,
-			fmt.Sprintf("Test: %v (imageManifest)\n", test.name))
+			fmt.Sprintf("Test: %v (Manifest)\n", test.name))
 	}
 }
 
@@ -300,9 +335,10 @@ func TestParseImageTag(t *testing.T) {
 }
 
 func TestCommandGeneration(t *testing.T) {
-	svcAcc := "robot"
+	destRC := RegistryContext{
+		Name:           "gcr.io/foo",
+		ServiceAccount: "robot"}
 	var srcRegName RegistryName = "gcr.io/bar"
-	var destRegName RegistryName = "gcr.io/foo"
 	var imgName ImageName = "baz"
 	var digest Digest = "sha256:000"
 	var tag Tag = "1.0"
@@ -310,16 +346,15 @@ func TestCommandGeneration(t *testing.T) {
 
 	testName := "GetRegistryListingCmd"
 	got := GetRegistryListingCmd(
-		svcAcc,
-		true,
-		string(destRegName))
+		destRC,
+		true)
 	expected := []string{
 		"gcloud",
 		"--account=robot",
 		"container",
 		"images",
 		"list",
-		fmt.Sprintf("--repository=%s", destRegName),
+		fmt.Sprintf("--repository=%s", destRC.Name),
 		"--format=json"}
 	eqErr := checkEqual(got, expected)
 	checkError(
@@ -328,15 +363,14 @@ func TestCommandGeneration(t *testing.T) {
 		fmt.Sprintf("Test: %v (cmd string)\n", testName))
 
 	got = GetRegistryListingCmd(
-		svcAcc,
-		false,
-		string(destRegName))
+		destRC,
+		false)
 	expected = []string{
 		"gcloud",
 		"container",
 		"images",
 		"list",
-		fmt.Sprintf("--repository=%s", destRegName),
+		fmt.Sprintf("--repository=%s", destRC.Name),
 		"--format=json"}
 	eqErr = checkEqual(got, expected)
 	checkError(
@@ -346,9 +380,8 @@ func TestCommandGeneration(t *testing.T) {
 
 	testName = "GetRegistryListTagsCmd"
 	got = GetRegistryListTagsCmd(
-		svcAcc,
+		destRC,
 		true,
-		string(destRegName),
 		string(imgName))
 	expected = []string{
 		"gcloud",
@@ -356,7 +389,7 @@ func TestCommandGeneration(t *testing.T) {
 		"container",
 		"images",
 		"list-tags",
-		fmt.Sprintf("%s/%s", destRegName, imgName),
+		fmt.Sprintf("%s/%s", destRC.Name, imgName),
 		"--format=json"}
 	eqErr = checkEqual(got, expected)
 	checkError(
@@ -365,16 +398,15 @@ func TestCommandGeneration(t *testing.T) {
 		fmt.Sprintf("Test: %v (cmd string)\n", testName))
 
 	got = GetRegistryListTagsCmd(
-		svcAcc,
+		destRC,
 		false,
-		string(destRegName),
 		string(imgName))
 	expected = []string{
 		"gcloud",
 		"container",
 		"images",
 		"list-tags",
-		fmt.Sprintf("%s/%s", destRegName, imgName),
+		fmt.Sprintf("%s/%s", destRC.Name, imgName),
 		"--format=json"}
 	eqErr = checkEqual(got, expected)
 	checkError(
@@ -384,9 +416,8 @@ func TestCommandGeneration(t *testing.T) {
 
 	testName = "GetDeleteCmd"
 	got = GetDeleteCmd(
-		svcAcc,
+		destRC,
 		true,
-		destRegName,
 		imgName,
 		digest)
 	expected = []string{
@@ -395,7 +426,7 @@ func TestCommandGeneration(t *testing.T) {
 		"container",
 		"images",
 		"delete",
-		ToFQIN(destRegName, imgName, digest),
+		ToFQIN(destRC.Name, imgName, digest),
 		"--format=json"}
 	eqErr = checkEqual(got, expected)
 	checkError(
@@ -404,9 +435,8 @@ func TestCommandGeneration(t *testing.T) {
 		fmt.Sprintf("Test: %v (cmd string)\n", testName))
 
 	got = GetDeleteCmd(
-		svcAcc,
+		destRC,
 		false,
-		destRegName,
 		imgName,
 		digest)
 	expected = []string{
@@ -414,7 +444,7 @@ func TestCommandGeneration(t *testing.T) {
 		"container",
 		"images",
 		"delete",
-		ToFQIN(destRegName, imgName, digest),
+		ToFQIN(destRC.Name, imgName, digest),
 		"--format=json"}
 	eqErr = checkEqual(got, expected)
 	checkError(
@@ -425,10 +455,9 @@ func TestCommandGeneration(t *testing.T) {
 	testName = "GetWriteCmd (Add)"
 	tp = Add
 	got = GetWriteCmd(
-		svcAcc,
+		destRC,
 		true,
 		srcRegName,
-		destRegName,
 		imgName,
 		digest,
 		tag,
@@ -442,7 +471,7 @@ func TestCommandGeneration(t *testing.T) {
 		"images",
 		"add-tag",
 		ToFQIN(srcRegName, imgName, digest),
-		ToPQIN(destRegName, imgName, tag)}
+		ToPQIN(destRC.Name, imgName, tag)}
 	eqErr = checkEqual(got, expected)
 	checkError(
 		t,
@@ -450,10 +479,9 @@ func TestCommandGeneration(t *testing.T) {
 		fmt.Sprintf("Test: %v (cmd string)\n", testName))
 
 	got = GetWriteCmd(
-		svcAcc,
+		destRC,
 		false,
 		srcRegName,
-		destRegName,
 		imgName,
 		digest,
 		tag,
@@ -466,7 +494,7 @@ func TestCommandGeneration(t *testing.T) {
 		"images",
 		"add-tag",
 		ToFQIN(srcRegName, imgName, digest),
-		ToPQIN(destRegName, imgName, tag)}
+		ToPQIN(destRC.Name, imgName, tag)}
 	eqErr = checkEqual(got, expected)
 	checkError(
 		t,
@@ -476,10 +504,9 @@ func TestCommandGeneration(t *testing.T) {
 	testName = "GetWriteCmd (Delete)"
 	tp = Delete
 	got = GetWriteCmd(
-		svcAcc,
+		destRC,
 		true,
 		srcRegName,
-		destRegName,
 		imgName,
 		digest,
 		tag,
@@ -491,7 +518,7 @@ func TestCommandGeneration(t *testing.T) {
 		"container",
 		"images",
 		"untag",
-		ToPQIN(destRegName, imgName, tag)}
+		ToPQIN(destRC.Name, imgName, tag)}
 	eqErr = checkEqual(got, expected)
 	checkError(
 		t,
@@ -499,10 +526,9 @@ func TestCommandGeneration(t *testing.T) {
 		fmt.Sprintf("Test: %v (cmd string)\n", testName))
 
 	got = GetWriteCmd(
-		svcAcc,
+		destRC,
 		false,
 		srcRegName,
-		destRegName,
 		imgName,
 		digest,
 		tag,
@@ -513,7 +539,7 @@ func TestCommandGeneration(t *testing.T) {
 		"container",
 		"images",
 		"untag",
-		ToPQIN(destRegName, imgName, tag)}
+		ToPQIN(destRC.Name, imgName, tag)}
 	eqErr = checkEqual(got, expected)
 	checkError(
 		t,
@@ -613,11 +639,17 @@ func TestSyncContext(t *testing.T) {
 		// Destination registry is a placeholder, because ReadImageNames acts on
 		// 2 registries (src and dest) at once.
 		sc := SyncContext{
+			RegistryContexts: []RegistryContext{
+				{
+					Name:           fakeRegName,
+					ServiceAccount: "robot",
+				},
+			},
 			Inv: map[RegistryName]RegInvImage{fakeRegName: nil}}
 		// test is used to pin the "test" variable from the outer "range"
 		// scope (see scopelint).
 		test := test
-		mkFakeStream1 := func(regName RegistryName) stream.Producer {
+		mkFakeStream1 := func(rc RegistryContext) stream.Producer {
 			var sr stream.Fake
 			sr.Bytes = []byte(test.input)
 			return &sr
@@ -631,11 +663,11 @@ func TestSyncContext(t *testing.T) {
 		// Check 2nd round of API calls to get all digests and tags for each
 		// image.
 		mkFakeStream := func(
-			registryName RegistryName,
+			rc RegistryContext,
 			imgName ImageName) stream.Producer {
 
 			var sr stream.Fake
-			regImage := string(registryName) + "/" + string(imgName)
+			regImage := string(rc.Name) + "/" + string(imgName)
 			// Fetch the "stream" from a predefined set of responses.
 			stream, ok := test.input2[regImage]
 			if ok {
@@ -953,9 +985,17 @@ func TestPromotion(t *testing.T) {
 	//
 	// We could make it even more "powerful" by storing a histogram instead of a
 	// set. Then we can check that all requests were generated exactly 1 time.
-	registries := RegistryNames{
-		Src:  "gcr.io/foo",
-		Dest: "gcr.io/bar"}
+	srcRegName := RegistryName("gcr.io/foo")
+	destRegName := RegistryName("gcr.io/bar")
+	destRC := RegistryContext{
+		Name:           destRegName,
+		ServiceAccount: "robot",
+	}
+	srcRC := RegistryContext{
+		Name:           srcRegName,
+		ServiceAccount: "robot",
+	}
+	registries := []RegistryContext{destRC, srcRC}
 	var tests = []struct {
 		name         string
 		inputM       Manifest
@@ -972,7 +1012,8 @@ func TestPromotion(t *testing.T) {
 		{
 			"No promotion; tag is already promoted",
 			Manifest{
-				Registries: registries,
+				SrcRegistry: srcRegName,
+				Registries:  registries,
 				Images: []Image{
 					{
 						ImageName: "a",
@@ -993,7 +1034,8 @@ func TestPromotion(t *testing.T) {
 		{
 			"Promote 1 tag; image digest does not exist in dest",
 			Manifest{
-				Registries: registries,
+				SrcRegistry: srcRegName,
+				Registries:  registries,
 				Images: []Image{
 					{
 						ImageName: "a",
@@ -1008,16 +1050,19 @@ func TestPromotion(t *testing.T) {
 						"b": DigestTags{
 							"sha256:111": TagSlice{}}}}},
 			CapturedRequests{PromotionRequest{
-				TagOp:      Add,
-				Registries: registries,
-				ImageName:  "a",
-				Digest:     "sha256:000",
-				Tag:        "0.9"}: 1},
+				TagOp:          Add,
+				RegistrySrc:    srcRegName,
+				RegistryDest:   registries[0].Name,
+				ServiceAccount: registries[0].ServiceAccount,
+				ImageName:      "a",
+				Digest:         "sha256:000",
+				Tag:            "0.9"}: 1},
 		},
 		{
 			"Promote 1 tag; image digest already exists in dest",
 			Manifest{
-				Registries: registries,
+				SrcRegistry: srcRegName,
+				Registries:  registries,
 				Images: []Image{
 					{
 						ImageName: "a",
@@ -1032,17 +1077,20 @@ func TestPromotion(t *testing.T) {
 						"a": DigestTags{
 							"sha256:111": TagSlice{}}}}},
 			CapturedRequests{PromotionRequest{
-				TagOp:      Add,
-				Registries: registries,
-				ImageName:  "a",
-				Digest:     "sha256:000",
-				Tag:        "0.9"}: 1},
+				TagOp:          Add,
+				RegistrySrc:    srcRegName,
+				RegistryDest:   registries[0].Name,
+				ServiceAccount: registries[0].ServiceAccount,
+				ImageName:      "a",
+				Digest:         "sha256:000",
+				Tag:            "0.9"}: 1},
 		},
 		{
 			// nolint[lll]
 			"Promote 1 tag; tag already exists in dest but is pointing to a different digest (move tag)",
 			Manifest{
-				Registries: registries,
+				SrcRegistry: srcRegName,
+				Registries:  registries,
 				Images: []Image{
 					{
 						ImageName: "a",
@@ -1057,18 +1105,21 @@ func TestPromotion(t *testing.T) {
 						"a": DigestTags{
 							"sha256:111": TagSlice{"0.9"}}}}},
 			CapturedRequests{PromotionRequest{
-				TagOp:      Move,
-				Registries: registries,
-				ImageName:  "a",
-				Digest:     "sha256:000",
-				DigestOld:  "sha256:111",
-				Tag:        "0.9"}: 1},
+				TagOp:          Move,
+				RegistrySrc:    srcRegName,
+				RegistryDest:   registries[0].Name,
+				ServiceAccount: registries[0].ServiceAccount,
+				ImageName:      "a",
+				Digest:         "sha256:000",
+				DigestOld:      "sha256:111",
+				Tag:            "0.9"}: 1},
 		},
 		{
 			// nolint[lll]
 			"NOP; dest has extra tag, but NOP because -delete-extra-tags NOT specified",
 			Manifest{
-				Registries: registries,
+				SrcRegistry: srcRegName,
+				Registries:  registries,
 				Images: []Image{
 					{
 						ImageName: "a",
@@ -1089,7 +1140,8 @@ func TestPromotion(t *testing.T) {
 			// nolint[lll]
 			"Delete 1 tag; dest has extra tag (if -delete-extra-tags specified)",
 			Manifest{
-				Registries: registries,
+				SrcRegistry: srcRegName,
+				Registries:  registries,
 				Images: []Image{
 					{
 						ImageName: "a",
@@ -1105,17 +1157,20 @@ func TestPromotion(t *testing.T) {
 						"a": DigestTags{
 							"sha256:000": TagSlice{"0.9", "extra-tag"}}}}},
 			CapturedRequests{PromotionRequest{
-				TagOp:      Delete,
-				Registries: registries,
-				ImageName:  "a",
-				Digest:     "sha256:000",
-				Tag:        "extra-tag"}: 1},
+				TagOp:          Delete,
+				RegistrySrc:    srcRegName,
+				RegistryDest:   registries[0].Name,
+				ServiceAccount: registries[0].ServiceAccount,
+				ImageName:      "a",
+				Digest:         "sha256:000",
+				Tag:            "extra-tag"}: 1},
 		},
 		{
 			// nolint[lll]
 			"NOP (src registry does not have any of the images we want to promote)",
 			Manifest{
-				Registries: registries,
+				SrcRegistry: srcRegName,
+				Registries:  registries,
 				Images: []Image{
 					{
 						ImageName: "a",
@@ -1147,7 +1202,149 @@ func TestPromotion(t *testing.T) {
 	processRequestFake := MkRequestCapturer(&captured)
 
 	nopStream := func(
-		srcRegistry, destRegistry RegistryName,
+		srcRegistry RegistryName,
+		rc RegistryContext,
+		imageName ImageName,
+		digest Digest,
+		tag Tag,
+		tp TagOp) stream.Producer {
+
+		// We don't even need a stream producer, because we are not creating
+		// subprocesses that generate JSON or any other output; the vanilla
+		// "mkReq" in Promote() already stores all the info we need to check.
+		return nil
+	}
+
+	for _, test := range tests {
+		// Reset captured for each test.
+		captured = make(CapturedRequests)
+		test.inputSc.Promote(
+			test.inputM,
+			nopStream,
+			&processRequestFake)
+		err := checkEqual(captured, test.expectedReqs)
+		checkError(t, err, fmt.Sprintf("checkError: test: %v\n", test.name))
+	}
+}
+
+func TestPromotionMulti(t *testing.T) {
+	srcRegName := RegistryName("gcr.io/foo")
+	destRegName1 := RegistryName("gcr.io/bar")
+	destRegName2 := RegistryName("gcr.io/qux")
+	destRC := RegistryContext{
+		Name:           destRegName1,
+		ServiceAccount: "robotDest1",
+	}
+	destRC2 := RegistryContext{
+		Name:           destRegName2,
+		ServiceAccount: "robotDest2",
+	}
+	srcRC := RegistryContext{
+		Name:           srcRegName,
+		ServiceAccount: "robotSrc",
+	}
+	registries := []RegistryContext{srcRC, destRC, destRC2}
+	var tests = []struct {
+		name         string
+		inputM       Manifest
+		inputSc      SyncContext
+		expectedReqs CapturedRequests
+	}{
+		{
+			// nolint[lll]
+			"Add 1 tag for 2 registries",
+			Manifest{
+				SrcRegistry: srcRegName,
+				Registries:  registries,
+				Images: []Image{
+					{
+						ImageName: "a",
+						Dmap: DigestTags{
+							"sha256:000": TagSlice{"0.9", "1.0"}}}}},
+			SyncContext{
+				DeleteExtraTags: true,
+				Inv: MasterInventory{
+					"gcr.io/foo": RegInvImage{
+						"a": DigestTags{
+							"sha256:000": TagSlice{"0.9"}}},
+					"gcr.io/bar": RegInvImage{
+						"a": DigestTags{
+							"sha256:000": TagSlice{"0.9"}}},
+					"gcr.io/qux": RegInvImage{
+						"a": DigestTags{
+							"sha256:000": TagSlice{"0.9"}}}}},
+			CapturedRequests{
+				PromotionRequest{
+					TagOp:          Add,
+					RegistrySrc:    srcRegName,
+					RegistryDest:   registries[1].Name,
+					ServiceAccount: registries[1].ServiceAccount,
+					ImageName:      "a",
+					Digest:         "sha256:000",
+					Tag:            "1.0"}: 1,
+				PromotionRequest{
+					TagOp:          Add,
+					RegistrySrc:    srcRegName,
+					RegistryDest:   registries[2].Name,
+					ServiceAccount: registries[2].ServiceAccount,
+					ImageName:      "a",
+					Digest:         "sha256:000",
+					Tag:            "1.0"}: 1,
+			},
+		},
+		{
+			// nolint[lll]
+			"Add 1 tag for 1 registry, but remove a tag for another",
+			Manifest{
+				SrcRegistry: srcRegName,
+				Registries:  registries,
+				Images: []Image{
+					{
+						ImageName: "a",
+						Dmap: DigestTags{
+							"sha256:000": TagSlice{"0.9", "1.0"}}}}},
+			SyncContext{
+				DeleteExtraTags: true,
+				Inv: MasterInventory{
+					"gcr.io/foo": RegInvImage{
+						"a": DigestTags{
+							"sha256:000": TagSlice{"0.9"}}},
+					"gcr.io/bar": RegInvImage{
+						"a": DigestTags{
+							"sha256:000": TagSlice{"0.9"}}},
+					"gcr.io/qux": RegInvImage{
+						"a": DigestTags{
+							"sha256:000": TagSlice{
+								"0.9", "1.0", "extra-tag"}}}}},
+			CapturedRequests{
+				PromotionRequest{
+					TagOp:          Add,
+					RegistrySrc:    srcRegName,
+					RegistryDest:   registries[1].Name,
+					ServiceAccount: registries[1].ServiceAccount,
+					ImageName:      "a",
+					Digest:         "sha256:000",
+					Tag:            "1.0"}: 1,
+				PromotionRequest{
+					TagOp:          Delete,
+					RegistrySrc:    srcRegName,
+					RegistryDest:   registries[2].Name,
+					ServiceAccount: registries[2].ServiceAccount,
+					ImageName:      "a",
+					Digest:         "sha256:000",
+					Tag:            "extra-tag"}: 1,
+			},
+		},
+	}
+
+	// captured is sort of a "global variable" because processRequestFake
+	// closes over it.
+	captured := make(CapturedRequests)
+	processRequestFake := MkRequestCapturer(&captured)
+
+	nopStream := func(
+		srcRegistry RegistryName,
+		rc RegistryContext,
 		imageName ImageName,
 		digest Digest,
 		tag Tag,
@@ -1172,9 +1369,14 @@ func TestPromotion(t *testing.T) {
 }
 
 func TestGarbageCollection(t *testing.T) {
-	registries := RegistryNames{
-		Src:  "gcr.io/foo",
-		Dest: "gcr.io/bar"}
+	srcRegName := RegistryName("gcr.io/foo")
+	destRegName := RegistryName("gcr.io/bar")
+	registries := []RegistryContext{
+		{
+			Name:           destRegName,
+			ServiceAccount: "robot",
+		},
+	}
 	var tests = []struct {
 		name         string
 		inputM       Manifest
@@ -1184,7 +1386,8 @@ func TestGarbageCollection(t *testing.T) {
 		{
 			"No garbage collection (no empty digests)",
 			Manifest{
-				Registries: registries,
+				SrcRegistry: srcRegName,
+				Registries:  registries,
 				Images: []Image{
 					{
 						ImageName: "a",
@@ -1212,7 +1415,8 @@ func TestGarbageCollection(t *testing.T) {
 			// nolint[lll]
 			"Simple garbage collection (delete ALL images in dest that are untagged))",
 			Manifest{
-				Registries: registries,
+				SrcRegistry: srcRegName,
+				Registries:  registries,
 				Images: []Image{
 					{
 						ImageName: "a",
@@ -1241,17 +1445,21 @@ func TestGarbageCollection(t *testing.T) {
 					}}},
 			CapturedRequests{
 				PromotionRequest{
-					TagOp:      Delete,
-					Registries: registries,
-					ImageName:  "a",
-					Digest:     "sha256:111",
-					Tag:        ""}: 1,
+					TagOp:          Delete,
+					RegistrySrc:    srcRegName,
+					RegistryDest:   registries[0].Name,
+					ServiceAccount: registries[0].ServiceAccount,
+					ImageName:      "a",
+					Digest:         "sha256:111",
+					Tag:            ""}: 1,
 				PromotionRequest{
-					TagOp:      Delete,
-					Registries: registries,
-					ImageName:  "z",
-					Digest:     "sha256:000",
-					Tag:        ""}: 1,
+					TagOp:          Delete,
+					RegistrySrc:    srcRegName,
+					RegistryDest:   registries[0].Name,
+					ServiceAccount: registries[0].ServiceAccount,
+					ImageName:      "z",
+					Digest:         "sha256:000",
+					Tag:            ""}: 1,
 			},
 		},
 	}
@@ -1282,7 +1490,140 @@ func TestGarbageCollection(t *testing.T) {
 		// Reset captured for each test.
 		captured = make(CapturedRequests)
 		nopStream := func(
-			destRegistry RegistryName,
+			destRC RegistryContext,
+			imageName ImageName,
+			digest Digest) stream.Producer {
+			return nil
+		}
+		test.inputSc.GarbageCollect(test.inputM, nopStream, &processRequestFake)
+
+		err := checkEqual(captured, test.expectedReqs)
+		checkError(t, err, fmt.Sprintf("checkError: test: %v\n", test.name))
+	}
+}
+
+func TestGarbageCollectionMulti(t *testing.T) {
+	srcRegName := RegistryName("gcr.io/src")
+	destRegName1 := RegistryName("gcr.io/dest1")
+	destRegName2 := RegistryName("gcr.io/dest2")
+	destRC := RegistryContext{
+		Name:           destRegName1,
+		ServiceAccount: "robotDest1",
+	}
+	destRC2 := RegistryContext{
+		Name:           destRegName2,
+		ServiceAccount: "robotDest2",
+	}
+	srcRC := RegistryContext{
+		Name:           srcRegName,
+		ServiceAccount: "robotSrc",
+	}
+	registries := []RegistryContext{srcRC, destRC, destRC2}
+	var tests = []struct {
+		name         string
+		inputM       Manifest
+		inputSc      SyncContext
+		expectedReqs CapturedRequests
+	}{
+		{
+			// nolint[lll]
+			"Simple garbage collection (delete ALL images in all dests that are untagged))",
+			Manifest{
+				SrcRegistry: srcRegName,
+				Registries:  registries,
+				Images: []Image{
+					{
+						ImageName: "a",
+						Dmap: DigestTags{
+							"sha256:000": TagSlice{"missing-from-src"},
+							"sha256:333": TagSlice{"0.8"},
+						}},
+					{
+						ImageName: "b",
+						Dmap: DigestTags{
+							"sha256:bbb": TagSlice{"also-missing"}}}}},
+			SyncContext{
+				Inv: MasterInventory{
+					"gcr.io/src": RegInvImage{
+						"c": DigestTags{
+							"sha256:000": nil},
+						"d": DigestTags{
+							"sha256:bbb": nil}},
+					"gcr.io/dest1": RegInvImage{
+						"a": DigestTags{
+							"sha256:111": nil},
+						"z": DigestTags{
+							"sha256:222": nil}},
+					"gcr.io/dest2": RegInvImage{
+						"a": DigestTags{
+							"sha256:123": nil},
+						"b": DigestTags{
+							"sha256:444": nil}},
+				}},
+			CapturedRequests{
+				PromotionRequest{
+					TagOp:          Delete,
+					RegistrySrc:    srcRegName,
+					RegistryDest:   registries[1].Name,
+					ServiceAccount: registries[1].ServiceAccount,
+					ImageName:      "a",
+					Digest:         "sha256:111",
+					Tag:            ""}: 1,
+				PromotionRequest{
+					TagOp:          Delete,
+					RegistrySrc:    srcRegName,
+					RegistryDest:   registries[1].Name,
+					ServiceAccount: registries[1].ServiceAccount,
+					ImageName:      "z",
+					Digest:         "sha256:222",
+					Tag:            ""}: 1,
+				PromotionRequest{
+					TagOp:          Delete,
+					RegistrySrc:    srcRegName,
+					RegistryDest:   registries[2].Name,
+					ServiceAccount: registries[2].ServiceAccount,
+					ImageName:      "a",
+					Digest:         "sha256:123",
+					Tag:            ""}: 1,
+				PromotionRequest{
+					TagOp:          Delete,
+					RegistrySrc:    srcRegName,
+					RegistryDest:   registries[2].Name,
+					ServiceAccount: registries[2].ServiceAccount,
+					ImageName:      "b",
+					Digest:         "sha256:444",
+					Tag:            ""}: 1,
+			},
+		},
+	}
+
+	captured := make(CapturedRequests)
+
+	var processRequestFake ProcessRequest = func(
+		sc *SyncContext,
+		reqs <-chan stream.ExternalRequest,
+		errs chan<- RequestResult,
+		wg *sync.WaitGroup,
+		mutex *sync.Mutex) {
+
+		defer wg.Done()
+		for req := range reqs {
+			pr := req.RequestParams.(PromotionRequest)
+			mutex.Lock()
+			if _, ok := captured[pr]; ok {
+				captured[pr]++
+			} else {
+				captured[pr] = 1
+			}
+			mutex.Unlock()
+		}
+	}
+
+	for _, test := range tests {
+		// Reset captured for each test.
+		captured = make(CapturedRequests)
+		nopStream := func(
+			destRC RegistryContext,
 			imageName ImageName,
 			digest Digest) stream.Producer {
 			return nil

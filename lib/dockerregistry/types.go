@@ -50,6 +50,7 @@ type SyncContext struct {
 	DryRun            bool
 	UseServiceAccount bool
 	Inv               MasterInventory
+	RegistryContexts  []RegistryContext
 }
 
 // MasterInventory stores multiple RegInvImage elements, keyed by RegistryName.
@@ -120,20 +121,31 @@ const (
 // PromotionRequest contains all the information required for any type of
 // promotion (or demotion!) (involving any TagOp).
 type PromotionRequest struct {
-	TagOp      TagOp
-	Registries RegistryNames
-	ImageName  ImageName
-	Digest     Digest
-	DigestOld  Digest // Only for tag moves.
-	Tag        Tag
+	TagOp          TagOp
+	RegistrySrc    RegistryName
+	RegistryDest   RegistryName
+	ServiceAccount string
+	ImageName      ImageName
+	Digest         Digest
+	DigestOld      Digest // Only for tag moves.
+	Tag            Tag
 }
 
 // Manifest stores the information in a manifest file (describing the
 // desired state of a Docker Registry).
 type Manifest struct {
-	Registries     RegistryNames
-	ServiceAccount string  `yaml:"service-account,omitempty"`
-	Images         []Image `yaml:"images,omitempty"`
+	// Registries contains the source and destination (Src/Dest) registry names.
+	// It is possible that in the future, we support promoting to multiple
+	// registries, in which case we would have more than just Src/Dest.
+	Registries []RegistryContext
+	// Src contains the RegistryName which will be set as the source registry.
+	// All other registries in Registries will be treated as destination
+	// registries.
+	//
+	// TODO: check that RegistryName is present in a RegistryContext in
+	// Registries.
+	SrcRegistry RegistryName `yaml:"src-registry"`
+	Images      []Image      `yaml:"images,omitempty"`
 }
 
 // Image holds information about an image. It's like an "Object" in the OOP
@@ -150,12 +162,11 @@ type Image struct {
 // namespaced by the image name).
 type DigestTags map[Digest]TagSlice
 
-// RegistryNames contains the source and destination (Src/Dest) registry names.
-// It is possible that in the future, we support promoting to multiple
-// registries, in which case we would have more than just Src/Dest.
-type RegistryNames struct {
-	Src  RegistryName
-	Dest RegistryName
+// RegistryContext holds information about a registry, to be written in a
+// manifest file.
+type RegistryContext struct {
+	Name           RegistryName
+	ServiceAccount string `yaml:"service-account,omitempty"`
 }
 
 // RegistryName is the leading part of an image name that includes the domain;
