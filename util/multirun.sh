@@ -45,19 +45,25 @@ for opts in "$@"; do
             service_account_keyfiles+=( "$keyfile" )
         fi
     done < <( echo "$opts" | cut -d, -f2- | tr , '\n' )
-    for keyfile in "${service_account_keyfiles[@]}"; do
-        # Authenticate as the service account. This allows the promoter to later
-        # call gcloud with the flag `--account=...`. We can allow the service
-        # account creds file to be empty, for testing cip locally (for the case
-        # where the service account creds are already activated).
-        gcloud auth activate-service-account --key-file="${keyfile}"
-        service_accounts+=("$(gcloud config get-value account)")
-    done
 
-    # Run the promoter against the manifest.
-    "${cip}" -verbosity=3 -manifest="${manifest}" ${CIP_OPTS:+$CIP_OPTS}
+    # Only activate/deactivate service account files if they were passed in.
+    if (( ${#service_account_keyfiles[@]} )); then
+        for keyfile in "${service_account_keyfiles[@]}"; do
+            # Authenticate as the service account. This allows the promoter to
+            # later call gcloud with the flag `--account=...`. We can allow the
+            # service account creds file to be empty, for testing cip locally (for
+            # the case where the service account creds are already activated).
+            gcloud auth activate-service-account --key-file="${keyfile}"
+            service_accounts+=("$(gcloud config get-value account)")
+        done
 
-    # As a safety measure, deactivate all service accounts which were activated
-    # with --key-file.
-    gcloud auth revoke "${service_accounts[@]}"
+        # Run the promoter against the manifest.
+        "${cip}" -verbosity=3 -manifest="${manifest}" ${CIP_OPTS:+$CIP_OPTS}
+
+        # As a safety measure, deactivate all service accounts which were
+        # activated with --key-file.
+        gcloud auth revoke "${service_accounts[@]}"
+    else
+        "${cip}" -verbosity=3 -manifest="${manifest}" -no-service-account ${CIP_OPTS:+$CIP_OPTS}
+    fi
 done
