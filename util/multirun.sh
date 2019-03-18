@@ -25,6 +25,7 @@ usage()
 {
     echo >&2 "usage: $0 <path/to/cip/binary> [<path/to/manifest.yaml>,<path/to/service-account.json>, ...]"
     echo >&2 "The 2nd argument onwards are '<manifest>,<service-account>,<service-account>...' strings."
+    echo >&2 "If an execution does not require any service account, pass in '<manifest>,' (notice the trailing comma)."
     echo >&2
 }
 
@@ -32,6 +33,14 @@ if (( $# < 2 )); then
     usage
     exit 1
 fi
+
+for opts in "$@"; do
+    if ! [[ "$opts" =~ .*,.* ]]; then
+        echo >&2 "invalid argument: $opts"
+        usage
+        exit 1
+    fi
+done
 
 cip="$1"
 shift
