@@ -41,7 +41,9 @@ for opts in "$@"; do
     service_accounts=()
     service_account_keyfiles=()
     while IFS= read -r keyfile; do
-        service_account_keyfiles+=( "$keyfile" )
+        if [[ -n "$keyfile" ]]; then
+            service_account_keyfiles+=( "$keyfile" )
+        fi
     done < <( echo "$opts" | cut -d, -f2- | tr , '\n' )
     for keyfile in "${service_account_keyfiles[@]}"; do
         # Authenticate as the service account. This allows the promoter to later
