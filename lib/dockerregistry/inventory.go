@@ -801,7 +801,8 @@ func mkPopulateRequestsForPromotion(
 				xtras := make([]string, 0)
 				for imageTag := range destIT.Minus(promotionCandidatesIT) {
 					xtras = append(xtras, fmt.Sprintf(
-						"%s:%s",
+						"%s/%s:%s",
+						registry.Name,
 						imageTag.ImageName,
 						imageTag.Tag))
 				}
