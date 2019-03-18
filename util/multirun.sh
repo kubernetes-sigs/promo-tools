@@ -23,10 +23,41 @@ set -o pipefail
 
 usage()
 {
-    echo >&2 "usage: $0 <path/to/cip/binary> [<path/to/manifest.yaml>,<path/to/service-account.json>, ...]"
-    echo >&2 "The 2nd argument onwards are '<manifest>,<service-account>,<service-account>...' strings."
-    echo >&2 "If an execution does not require any service account, pass in '<manifest>,' (notice the trailing comma)."
-    echo >&2
+cat <<EOF >&2
+usage: $0 <path/to/cip/binary> [<MANIFEST>,<KEYFILE>[,<KEYFILE>,...] ...]
+
+MANIFEST: path/to/manifest.yaml
+KEYFILE: path/to/service-account.json
+
+The 2nd argument onwards are
+
+    '<manifest>,<service-account>,<service-account>...'
+
+strings.
+
+If an execution does not require any service account, pass in '<manifest>,'
+(notice the trailing comma).
+
+If you only want to run against manifests that changed in a Git commitish,
+specify the CIP_GIT_REV and CIP_GIT_DIR environment variables. E.g.,
+CIP_GIT_REV=HEAD
+CIP_GIT_DIR=/path/to/git/repo
+
+EOF
+}
+
+# Filter the given list of files by checking if it is a Manifest file. Files
+# must be absolute paths.
+collect_manifests()
+{
+    local cip="$1"
+    shift 1
+
+    for f in "$@"; do
+        if "$cip" -parse-only -manifest="$f"; then
+            echo "$f"
+        fi
+    done
 }
 
 if (( $# < 2 )); then
@@ -34,26 +65,61 @@ if (( $# < 2 )); then
     exit 1
 fi
 
-for opts in "$@"; do
-    if ! [[ "$opts" =~ .*,.* ]]; then
-        echo >&2 "invalid argument: $opts"
+cip="$1"
+shift
+args=("$@")
+
+for arg in "${args[@]}"; do
+    if ! [[ "$arg" =~ .*,.* ]]; then
+        echo >&2 "invalid argument: $arg"
         usage
         exit 1
     fi
 done
 
-cip="$1"
-shift
+# If we only want to run against changed manifest files, then filter out those
+# files that were not changed since the last commit.
+if [[ "${CIP_GIT_REV:-}" ]]; then
+    if [[ ! -d "${CIP_GIT_DIR:-}" ]]; then
+        echo >&2 "CIP_GIT_DIR not set (must be set if CIP_GIT_REV is set)"
+        usage
+        exit 1
+    fi
+    pushd "${CIP_GIT_DIR}"
+    changed_files=()
+    while IFS= read -r f; do
+        changed_files+=( "$f" )
+    done < <( git diff-tree --no-commit-id --name-only -r "${CIP_GIT_REV}" )
+    popd
 
-for opts in "$@"; do
-    manifest=$(echo "$opts" | cut -d, -f1)
+    changed_manifests=$(collect_manifests "${cip}" "${changed_files[@]}")
+
+    args_filtered=()
+    for arg in "${args[@]}"; do
+        manifest=$(echo "$arg" | cut -d, -f1)
+        manifest_comparable=$(basename "${manifest}")
+        if echo "${changed_manifests[@]}" | grep "${manifest_comparable}"; then
+          args_filtered+=("${arg}")
+        fi
+    done
+
+    if (( "${#args_filtered[@]}" == 0 )); then
+        echo "No manifests were changed in ${CIP_GIT_REV}."
+        exit 0
+    fi
+
+    args=("${args_filtered[@]}")
+fi
+
+for arg in "${args[@]}"; do
+    manifest=$(echo "$arg" | cut -d, -f1)
     service_accounts=()
     service_account_keyfiles=()
     while IFS= read -r keyfile; do
         if [[ -n "$keyfile" ]]; then
             service_account_keyfiles+=( "$keyfile" )
         fi
-    done < <( echo "$opts" | cut -d, -f2- | tr , '\n' )
+    done < <( echo "$arg" | cut -d, -f2- | tr , '\n' )
 
     # Only activate/deactivate service account files if they were passed in.
     if (( ${#service_account_keyfiles[@]} )); then
