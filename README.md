@@ -8,7 +8,7 @@ Registry (src registry) to another (dest registry), by reading a Manifest file
 Example Manifest:
 
 ```
-src: gcr.io/myproject-staging-area
+src-registry: gcr.io/myproject-staging-area
 registries:
 - name: gcr.io/myproject-staging-area
   service-account: foo@google-containers.iam.gserviceaccount.com
