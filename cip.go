@@ -19,6 +19,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log"
 	"os"
 
 	// nolint[lll]
@@ -63,16 +64,17 @@ func main() {
 		"do not pass '--account=...' to all gcloud calls (default: false)")
 	flag.Parse()
 
+	mfest, err := reg.ParseManifestFromFile(*manifestPtr)
+	if err != nil {
+		log.Fatal(err)
+	}
 	if *parseOnlyPtr {
-		reg.ParseManifestFromFile(*manifestPtr)
 		os.Exit(0)
 	}
 
 	if *dryRunPtr {
 		fmt.Println("---------- DRY RUN ----------")
 	}
-
-	mfest := reg.ParseManifestFromFile(*manifestPtr)
 
 	mi := map[reg.RegistryName]reg.RegInvImage{}
 	for _, registry := range mfest.Registries {

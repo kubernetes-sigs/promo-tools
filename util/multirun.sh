@@ -39,25 +39,19 @@ If an execution does not require any service account, pass in '<manifest>,'
 (notice the trailing comma).
 
 If you only want to run against manifests that changed in a Git commitish,
-specify the CIP_GIT_REV and CIP_GIT_DIR environment variables. E.g.,
-CIP_GIT_REV=HEAD
+specify the CIP_GIT_DIR, CIP_GIT_REV_START, and CIP_GIT_REV_END environment
+variables.
+
+E.g.,
 CIP_GIT_DIR=/path/to/git/repo
+CIP_GIT_REV_START=master
+CIP_GIT_REV_END=HEAD
+
+Note that if these variables are defined, the manifest file paths must be
+defined relative to CIP_GIT_DIR; this also means that this script must be
+executed from CIP_GIT_DIR.
 
 EOF
-}
-
-# Filter the given list of files by checking if it is a Manifest file. Files
-# must be absolute paths.
-collect_manifests()
-{
-    local cip="$1"
-    shift 1
-
-    for f in "$@"; do
-        if "$cip" -parse-only -manifest="$f"; then
-            echo "$f"
-        fi
-    done
 }
 
 if (( $# < 2 )); then
@@ -67,59 +61,78 @@ fi
 
 cip="$1"
 shift
-args=("$@")
 
-for arg in "${args[@]}"; do
-    if ! [[ "$arg" =~ .*,.* ]]; then
-        echo >&2 "invalid argument: $arg"
+# If CIP_GIT_REV_{START,END} is defined, remove manifests that are not found as
+# modified files in the commit range. That is, don't look at manifest files that
+# were not modified from CIP_GIT_REV_START to CIP_GIT_REV_END.
+args_final=("$@")
+if [[ -d "${CIP_GIT_DIR:-}" ]]; then
+    if [[ -z "${CIP_GIT_REV_START:-}" ]]; then
+        echo >&2 "CIP_GIT_REV_START not set (must be set if CIP_GIT_DIR is set)"
         usage
         exit 1
     fi
-done
-
-# If we only want to run against changed manifest files, then filter out those
-# files that were not changed since the last commit.
-if [[ "${CIP_GIT_REV:-}" ]]; then
-    if [[ ! -d "${CIP_GIT_DIR:-}" ]]; then
-        echo >&2 "CIP_GIT_DIR not set (must be set if CIP_GIT_REV is set)"
+    if [[ -z "${CIP_GIT_REV_END:-}" ]]; then
+        echo >&2 "CIP_GIT_REV_END not set (must be set if CIP_GIT_DIR is set)"
         usage
         exit 1
     fi
-    pushd "${CIP_GIT_DIR}"
+
     changed_files=()
-    while IFS= read -r f; do
-        changed_files+=( "$f" )
-    done < <( git diff-tree --no-commit-id --name-only -r "${CIP_GIT_REV}" )
-    popd
+    for commit in $(git -C "${CIP_GIT_DIR}" rev-list --ancestry-path "${CIP_GIT_REV_START}".."${CIP_GIT_REV_END}"); do
+      # Get a list of all files that changed in the given commit.
+      # See https://stackoverflow.com/a/424142/437583.
+      while IFS= read -r f; do
+          # No need to dedup changed_files, because we are using it to filter
+          # out final_args.
+          changed_files+=( "$f" )
+      done < <( git -C "${CIP_GIT_DIR}" diff --name-only "${commit}" )
+    done
 
-    changed_manifests=$(collect_manifests "${cip}" "${changed_files[@]}")
-
+    # Filter out those manifests that were not modified. The net effect is that
+    # if this script was invoked with:
+    #
+    #   ... manifest_a.yaml,keyfile_1 manifest_b.yaml,keyfile_2 manifest_c.yaml,keyfile_3
+    #
+    # but only manifest_a.yaml and manifest_c.yaml were changed from
+    # CIP_GIT_REV_START to CIP_GIT_REV_END, the "manifest_b.yaml,keyfile_2"
+    # argument would be removed, thus effectivly changing the invocation to:
+    #
+    #   ... manifest_a.yaml,keyfile_1 manifest_c.yaml,keyfile_3
+    #
+    # Note that this is not fully bullet-proof (it may be that some manifests
+    # changed comment lines or whitespace --- resulting in no semantic change),
+    # but that will change once the promoter understands deltas [1].
+    #
+    # [1]: https://github.com/kubernetes-sigs/k8s-container-image-promoter/issues/10
     args_filtered=()
-    for arg in "${args[@]}"; do
+    for arg; do
         manifest=$(echo "$arg" | cut -d, -f1)
-        manifest_comparable=$(basename "${manifest}")
-        if echo "${changed_manifests[@]}" | grep "${manifest_comparable}"; then
+        if printf '%s\n' "${changed_files[@]}" | grep "${manifest}"; then
           args_filtered+=("${arg}")
         fi
     done
 
     if (( "${#args_filtered[@]}" == 0 )); then
-        echo "No manifests were changed in ${CIP_GIT_REV}."
+        echo "No manifests were changed in ${CIP_GIT_REV_START}..${CIP_GIT_REV_END}."
         exit 0
     fi
 
-    args=("${args_filtered[@]}")
+    args_final=("${args_filtered[@]}")
 fi
 
-for arg in "${args[@]}"; do
-    manifest=$(echo "$arg" | cut -d, -f1)
+for arg in "${args_final[@]}"; do
     service_accounts=()
-    service_account_keyfiles=()
-    while IFS= read -r keyfile; do
-        if [[ -n "$keyfile" ]]; then
-            service_account_keyfiles+=( "$keyfile" )
-        fi
-    done < <( echo "$arg" | cut -d, -f2- | tr , '\n' )
+    # Split a line into an array.
+    # See https://stackoverflow.com/a/45201229/437583.
+    readarray -td, service_account_keyfiles <<< "$arg,"
+    # Trim empty element (due to trailing ',' we pass into the <<< operator).
+    unset 'service_account_keyfiles[-1]'
+
+    # Slurp manifest out of array.
+    manifest="${service_account_keyfiles[0]}"
+    # Trim manifest out of service_account_keyfiles.
+    unset 'service_account_keyfiles[0]'
 
     # Only activate/deactivate service account files if they were passed in.
     if (( ${#service_account_keyfiles[@]} )); then
