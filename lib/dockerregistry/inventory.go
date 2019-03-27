@@ -19,7 +19,6 @@ package inventory
 import (
 	"fmt"
 	"io/ioutil"
-	"log"
 	"regexp"
 	"sort"
 	"strings"
@@ -103,19 +102,18 @@ func (sc *SyncContext) Fatal(v ...interface{}) {
 }
 
 // ParseManifestFromFile parses a Manifest from a filepath.
-func ParseManifestFromFile(filePath string) Manifest {
+func ParseManifestFromFile(filePath string) (Manifest, error) {
+	var mfest Manifest
 	bytes, err := ioutil.ReadFile(filePath)
 	if err != nil {
-		fmt.Printf("Failed to read the manifest at '%v'\n", filePath)
-		log.Fatal(err)
+		return mfest, err
 	}
-	mfest, err := ParseManifest(bytes)
+	mfest, err = ParseManifest(bytes)
 	if err != nil {
-		fmt.Printf("Failed to parse the manifest at '%v'\n", filePath)
-		log.Fatal(err)
+		return mfest, err
 	}
 
-	return mfest
+	return mfest, nil
 }
 
 // ParseManifest parses a Manifest from a byteslice. This function is separate
@@ -801,7 +799,8 @@ func mkPopulateRequestsForPromotion(
 				xtras := make([]string, 0)
 				for imageTag := range destIT.Minus(promotionCandidatesIT) {
 					xtras = append(xtras, fmt.Sprintf(
-						"%s:%s",
+						"%s/%s:%s",
+						registry.Name,
 						imageTag.ImageName,
 						imageTag.Tag))
 				}

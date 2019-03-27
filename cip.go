@@ -19,6 +19,8 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log"
+	"os"
 
 	// nolint[lll]
 	reg "github.com/kubernetes-sigs/k8s-container-image-promoter/lib/dockerregistry"
@@ -47,6 +49,11 @@ func main() {
 		false,
 		"delete tags in the destination registry that are not declared"+
 			" in the Manifest (default: false)")
+	parseOnlyPtr := flag.Bool(
+		"parse-only",
+		false,
+		"only check that the given manifest file is parseable as a Manifest"+
+			" (default: false)")
 	dryRunPtr := flag.Bool(
 		"dry-run",
 		false,
@@ -57,11 +64,17 @@ func main() {
 		"do not pass '--account=...' to all gcloud calls (default: false)")
 	flag.Parse()
 
+	mfest, err := reg.ParseManifestFromFile(*manifestPtr)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if *parseOnlyPtr {
+		os.Exit(0)
+	}
+
 	if *dryRunPtr {
 		fmt.Println("---------- DRY RUN ----------")
 	}
-
-	mfest := reg.ParseManifestFromFile(*manifestPtr)
 
 	mi := map[reg.RegistryName]reg.RegInvImage{}
 	for _, registry := range mfest.Registries {
