@@ -67,6 +67,12 @@ shift
 # were not modified from CIP_GIT_REV_START to CIP_GIT_REV_END.
 args_final=("$@")
 if [[ -d "${CIP_GIT_DIR:-}" ]]; then
+    # We are running inside Prow, set up the CIP_GIT_REV_{START,END} vars
+    # automatically.
+    if [[ -n "${PROW_JOB_ID:-}" ]]; then
+        CIP_GIT_REV_START="${PULL_BASE_SHA}"
+        CIP_GIT_REV_END="${PULL_PULL_SHA}"
+    fi
     if [[ -z "${CIP_GIT_REV_START:-}" ]]; then
         echo >&2 "CIP_GIT_REV_START not set (must be set if CIP_GIT_DIR is set)"
         usage
