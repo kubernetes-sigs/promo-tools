@@ -56,9 +56,9 @@ func main() {
 			" (default: false)")
 	dryRunPtr := flag.Bool(
 		"dry-run",
-		false,
+		true,
 		"print what would have happened by running this tool;"+
-			" do not actually modify any registry (default: false)")
+			" do not actually modify any registry")
 	noSvcAcc := false
 	flag.BoolVar(&noSvcAcc, "no-service-account", false,
 		"do not pass '--account=...' to all gcloud calls (default: false)")
