@@ -1,6 +1,7 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
 load("@io_bazel_rules_docker//go:image.bzl", "go_image")
 load("@io_bazel_rules_docker//container:container.bzl", "container_bundle", "container_image", "container_layer", "container_push")
+load("@io_bazel_rules_docker//contrib:push-all.bzl", "docker_push")
 
 # Go image. "bazel build //:cip-docker-image.tar" results in a tarfile that is
 # "docker load -i"-able, but the image is automatially named
@@ -68,21 +69,7 @@ go_binary(
     },
 )
 
-container_push(
-    name = "push-cip-latest",
-    image = ":cip-with-gcloud",
-    format = "Docker",
-    registry = "{STABLE_IMG_REGISTRY}",
-    # repository should end with the name of the image to use.
-    repository = "{STABLE_IMG_REPOSITORY}/{STABLE_IMG_NAME}",
-    tag = "latest",
-)
-
-container_push(
-    name = "push-cip-tagged",
-    image = ":cip-with-gcloud",
-    format = "Docker",
-    registry = "{STABLE_IMG_REGISTRY}",
-    repository = "{STABLE_IMG_REPOSITORY}/{STABLE_IMG_NAME}",
-    tag = "{IMG_TAG}",
+docker_push(
+    name = "push-cip",
+    bundle = "cip-docker-loadable",
 )
