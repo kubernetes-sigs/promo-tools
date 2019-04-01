@@ -57,16 +57,16 @@ go_library(
         "//lib/dockerregistry:go_default_library",
         "//lib/stream:go_default_library",
     ],
+    x_defs = {
+        "main.GitCommit": "{STABLE_GIT_COMMIT}",
+        "main.GitDescribe": "{STABLE_GIT_DESC}",
+    },
 )
 
 go_binary(
     name = "cip",
     embed = [":go_default_library"],
     visibility = ["//visibility:public"],
-    x_defs = {
-        "main.GitCommit": "{STABLE_GIT_COMMIT}",
-        "main.GitDescribe": "{STABLE_GIT_DESC}",
-    },
 )
 
 docker_push(
