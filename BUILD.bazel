@@ -62,6 +62,10 @@ go_binary(
     name = "cip",
     embed = [":go_default_library"],
     visibility = ["//visibility:public"],
+    x_defs = {
+        "main.GIT_COMMIT": "{STABLE_GIT_COMMIT}",
+        "main.GIT_DESC": "{STABLE_GIT_DESC}",
+    },
 )
 
 container_push(

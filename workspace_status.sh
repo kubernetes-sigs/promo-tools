@@ -20,11 +20,13 @@ p_() {
 }
 
 git_branch="$(git rev-parse --abbrev-ref HEAD)"
-git_desc="$(git describe --always)"
+git_commit="$(git rev-parse HEAD)"
+git_desc="$(git describe --always --dirty)"
 
 p_ STABLE_IMG_REGISTRY gcr.io
 p_ STABLE_IMG_REPOSITORY cip-demo-staging
 p_ STABLE_IMG_NAME cip
 p_ STABLE_IMG_TAG "${git_branch}-${git_desc}"
 p_ STABLE_GIT_BRANCH "${git_branch}"
+p_ STABLE_GIT_COMMIT "${git_commit}"
 p_ STABLE_GIT_DESC "${git_desc}"

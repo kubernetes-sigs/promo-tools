@@ -27,6 +27,9 @@ import (
 	"github.com/kubernetes-sigs/k8s-container-image-promoter/lib/stream"
 )
 
+var GitDescribe string
+var GitCommit string
+
 func main() {
 	manifestPtr := flag.String(
 		"manifest", "manifest.yaml", "the manifest file to load")
@@ -59,10 +62,20 @@ func main() {
 		true,
 		"print what would have happened by running this tool;"+
 			" do not actually modify any registry")
+	versionPtr := flag.Bool(
+		"version",
+		false,
+		"print version")
 	noSvcAcc := false
 	flag.BoolVar(&noSvcAcc, "no-service-account", false,
 		"do not pass '--account=...' to all gcloud calls (default: false)")
 	flag.Parse()
+
+	if *versionPtr {
+		fmt.Printf("Version: %s\n", GitDescribe)
+		fmt.Printf("Commit:  %s\n", GitCommit)
+		os.Exit(0)
+	}
 
 	mfest, err := reg.ParseManifestFromFile(*manifestPtr)
 	if err != nil {
