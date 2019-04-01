@@ -63,8 +63,8 @@ go_binary(
     embed = [":go_default_library"],
     visibility = ["//visibility:public"],
     x_defs = {
-        "main.GIT_COMMIT": "{STABLE_GIT_COMMIT}",
-        "main.GIT_DESC": "{STABLE_GIT_DESC}",
+        "main.GitCommit": "{STABLE_GIT_COMMIT}",
+        "main.GitDescribe": "{STABLE_GIT_DESC}",
     },
 )
 
