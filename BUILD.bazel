@@ -38,7 +38,7 @@ container_bundle(
     name = "cip-docker-loadable",
     images = {
         "{STABLE_IMG_REGISTRY}/{STABLE_IMG_REPOSITORY}/{STABLE_IMG_NAME}:latest": "//:cip-with-gcloud",
-        "{STABLE_IMG_REGISTRY}/{STABLE_IMG_REPOSITORY}/{STABLE_IMG_NAME}:{STABLE_IMG_TAG}": "//:cip-with-gcloud",
+        "{STABLE_IMG_REGISTRY}/{STABLE_IMG_REPOSITORY}/{STABLE_IMG_NAME}:{IMG_TAG}": "//:cip-with-gcloud",
     },
 )
 
@@ -84,5 +84,5 @@ container_push(
     format = "Docker",
     registry = "{STABLE_IMG_REGISTRY}",
     repository = "{STABLE_IMG_REPOSITORY}/{STABLE_IMG_NAME}",
-    tag = "{STABLE_IMG_TAG}",
+    tag = "{IMG_TAG}",
 )

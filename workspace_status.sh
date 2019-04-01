@@ -19,14 +19,14 @@ p_() {
     fi
 }
 
-git_branch="$(git rev-parse --abbrev-ref HEAD)"
 git_commit="$(git rev-parse HEAD)"
-git_desc="$(git describe --always --dirty)"
+git_desc="$(git describe --always --dirty --long)"
+timestamp_utc=$(date --utc +%Y%m%d)
+image_tag="$git_desc"
 
 p_ STABLE_IMG_REGISTRY gcr.io
 p_ STABLE_IMG_REPOSITORY cip-demo-staging
 p_ STABLE_IMG_NAME cip
-p_ STABLE_IMG_TAG "${git_branch}-${git_desc}"
-p_ STABLE_GIT_BRANCH "${git_branch}"
 p_ STABLE_GIT_COMMIT "${git_commit}"
 p_ STABLE_GIT_DESC "${git_desc}"
+p_ IMG_TAG "${timestamp_utc}-${image_tag}"
