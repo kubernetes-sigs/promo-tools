@@ -21,8 +21,8 @@ p_() {
 
 git_commit="$(git rev-parse HEAD)"
 git_desc="$(git describe --always --dirty --long)"
-timestamp_utc=$(date --utc +%Y%m%d)
 timestamp_utc_rfc3339=$(date --utc --rfc-3339=seconds)
+timestamp_utc="${timestamp_utc_rfc3339% *}"
 image_tag="$git_desc"
 
 p_ STABLE_IMG_REGISTRY gcr.io
