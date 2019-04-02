@@ -594,15 +594,16 @@ func ToPQIN(registryName RegistryName, imageName ImageName, tag Tag) string {
 	return string(registryName) + "/" + string(imageName) + ":" + string(tag)
 }
 
-// ShowLostImages logs all images in Manifest which are missing from src.
-func (sc *SyncContext) ShowLostImages(mfest Manifest) {
+// GetLostImages gets all images in Manifest which are missing from src, and
+// also logs them in the process.
+func (sc *SyncContext) GetLostImages(mfest Manifest) RegInvImageDigest {
 	src := sc.Inv[mfest.SrcRegistry].ToRegInvImageDigest()
 
 	// lost = all images that cannot be found from src.
 	lost := mfest.ToRegInvImageDigest().Minus(src)
 	if len(lost) > 0 {
 		sc.Errorf(
-			"Lost images (all images in Manifest that cannot be found"+
+			"ERROR: Lost images (all images in Manifest that cannot be found"+
 				" from src registry %v):\n",
 			mfest.SrcRegistry)
 		for imageDigest := range lost {
@@ -611,15 +612,12 @@ func (sc *SyncContext) ShowLostImages(mfest Manifest) {
 				imageDigest.ImageName,
 				imageDigest.Digest)
 			sc.Errorf(
-				"image %v in manifest is NOT in src registry!\n",
+				"  %v in manifest is NOT in src registry!\n",
 				fqin)
 		}
-	} else {
-		sc.Infof(
-			"Lost images (all images in Manifest that cannot be found from"+
-				" src registry %v):\n  <none>\n",
-			mfest.SrcRegistry)
+		return lost
 	}
+	return nil
 }
 
 func (sc *SyncContext) mkPopReq(
@@ -859,12 +857,18 @@ func (sc *SyncContext) Promote(
 		Digest,
 		Tag,
 		TagOp) stream.Producer,
-	customProcessRequest *ProcessRequest) {
+	customProcessRequest *ProcessRequest) int {
+
+	var exitCode int
 
 	mfestID := (mfest.ToRegInvImageDigest())
 
 	sc.Infof("Desired state:\n%v", mfestID.PrettyValue())
-	sc.ShowLostImages(mfest)
+	lost := sc.GetLostImages(mfest)
+	if len(lost) > 0 {
+		// TODO: Have more meaningful exit codes (use iota?).
+		exitCode = 1
+	}
 
 	promotionCandidatesIT := sc.GetPromotionCandidatesIT(mfest)
 
@@ -936,6 +940,8 @@ func (sc *SyncContext) Promote(
 	if sc.DryRun {
 		sc.PrintCapturedRequests(&captured)
 	}
+
+	return exitCode
 }
 
 // PrintCapturedRequests pretty-prints all given PromotionRequests.

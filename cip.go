@@ -145,7 +145,8 @@ func main() {
 			tp)
 		return &sp
 	}
-	sc.Promote(mfest, mkPromotionCmd, nil)
+
+	exitCode := sc.Promote(mfest, mkPromotionCmd, nil)
 
 	if *garbageCollectPtr {
 		sc.Info("---------- BEGIN GARBAGE COLLECTION ----------")
@@ -167,4 +168,6 @@ func main() {
 		}
 		sc.GarbageCollect(mfest, mkTagDeletionCmd, nil)
 	}
+
+	os.Exit(exitCode)
 }
