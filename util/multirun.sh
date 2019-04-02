@@ -84,16 +84,9 @@ if [[ -d "${CIP_GIT_DIR:-}" ]]; then
         exit 1
     fi
 
-    changed_files=()
-    for commit in $(git -C "${CIP_GIT_DIR}" rev-list --ancestry-path "${CIP_GIT_REV_START}".."${CIP_GIT_REV_END}"); do
-      # Get a list of all files that changed in the given commit.
-      # See https://stackoverflow.com/a/424142/437583.
-      while IFS= read -r f; do
-          # No need to dedup changed_files, because we are using it to filter
-          # out final_args.
-          changed_files+=( "$f" )
-      done < <( git -C "${CIP_GIT_DIR}" diff --name-only "${commit}" )
-    done
+    cmd="git -C ${CIP_GIT_DIR} diff --name-only ${CIP_GIT_REV_START}..${CIP_GIT_REV_END}"
+    echo checking changed files with "${cmd}"
+    readarray -t changed_files < <(${cmd})
 
     # Filter out those manifests that were not modified. The net effect is that
     # if this script was invoked with:
@@ -158,6 +151,6 @@ for arg in "${args_final[@]}"; do
         # activated with --key-file.
         gcloud auth revoke "${service_accounts[@]}"
     else
-        "${cip}" -verbosity=3 -manifest="${manifest}" -no-service-account ${CIP_OPTS:+$CIP_OPTS}
+        "${cip}" -verbosity=3 -manifest="${CIP_GIT_DIR:+$CIP_GIT_DIR/}""${manifest}" -no-service-account ${CIP_OPTS:+$CIP_OPTS}
     fi
 done
