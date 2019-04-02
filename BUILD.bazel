@@ -60,6 +60,7 @@ go_library(
     x_defs = {
         "main.GitCommit": "{STABLE_GIT_COMMIT}",
         "main.GitDescribe": "{STABLE_GIT_DESC}",
+        "main.TimestampUtcRfc3339": "{TIMESTAMP_UTC_RFC3339}",
     },
 )
 

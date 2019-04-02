@@ -29,6 +29,7 @@ import (
 
 var GitDescribe string
 var GitCommit string
+var TimestampUtcRfc3339 string
 
 func main() {
 	manifestPtr := flag.String(
@@ -72,6 +73,7 @@ func main() {
 	flag.Parse()
 
 	if *versionPtr {
+		fmt.Printf("Built:   %s\n", TimestampUtcRfc3339)
 		fmt.Printf("Version: %s\n", GitDescribe)
 		fmt.Printf("Commit:  %s\n", GitCommit)
 		os.Exit(0)
