@@ -27,8 +27,13 @@ import (
 	"github.com/kubernetes-sigs/k8s-container-image-promoter/lib/stream"
 )
 
+// GitDescribe is stamped by bazel.
 var GitDescribe string
+
+// GitCommit is stamped by bazel.
 var GitCommit string
+
+// TimestampUtcRfc3339 is stamped by bazel.
 var TimestampUtcRfc3339 string
 
 func main() {
