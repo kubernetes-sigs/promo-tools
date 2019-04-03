@@ -2163,3 +2163,67 @@ func TestGarbageCollectionMulti(t *testing.T) {
 		checkError(t, err, fmt.Sprintf("checkError: test: %v\n", test.name))
 	}
 }
+
+func TestSyncContext_getImagesFromDestRegistry(t *testing.T) {
+	var tests = []struct {
+		name           string
+		srcRegistry    RegistryName
+		inputSc        SyncContext
+		expectedImages []Image
+	}{
+		{
+			// nolint[lll]
+			"Multiple registries with the same image",
+			RegistryName("gcr.io/foo"),
+			SyncContext{
+				Inv: MasterInventory{
+					"gcr.io/foo": RegInvImage{
+						"baz": DigestTags{
+							"sha256:000": TagSlice{"0.9"}}},
+					"gcr.io/qux": RegInvImage{
+						"baz": DigestTags{
+							"sha256:000": TagSlice{"0.9"}}}}},
+			[]Image{
+				{
+					ImageName: ImageName("baz"),
+					Dmap: DigestTags{
+						"sha256:000": TagSlice{"0.9"},
+					},
+				},
+			},
+		},
+		{
+			// nolint[lll]
+			"Multiple registries with the same image" +
+				" with different tags",
+			RegistryName("gcr.io/foo"),
+			SyncContext{
+				Inv: MasterInventory{
+					"gcr.io/foo": RegInvImage{
+						"baz": DigestTags{
+							"sha256:000": TagSlice{"0.9", "1.2"}}},
+					"gcr.io/qux": RegInvImage{
+						"baz": DigestTags{
+							"sha256:000": TagSlice{"0.9", "1.0", "1.2"}}}}},
+			[]Image{
+				{
+					ImageName: ImageName("baz"),
+					Dmap: DigestTags{
+						"sha256:000": TagSlice{"0.9", "1.0", "1.2"},
+					},
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		gotImages, err := test.inputSc.getImagesFromDestRegistry(
+			test.srcRegistry,
+		)
+		if err != nil {
+			t.Error(err)
+		}
+		err = checkEqual(gotImages, test.expectedImages)
+		checkError(t, err, fmt.Sprintf("checkError: test: %v\n", test.name))
+	}
+}
