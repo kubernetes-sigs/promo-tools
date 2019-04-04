@@ -99,6 +99,7 @@ func main() {
 	// almost never be the case, so given a fully-parsed manifest with 0 images,
 	// treat it as if -parse-only was implied and exit gracefully.
 	if len(mfest.Images) == 0 {
+		fmt.Println("No images in nanifest --- nothing to do.")
 		os.Exit(0)
 	}
 
