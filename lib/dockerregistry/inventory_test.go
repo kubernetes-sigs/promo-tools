@@ -140,8 +140,37 @@ func TestParseRegistryManifest(t *testing.T) {
 			``,
 			Manifest{},
 			fmt.Errorf(`'src' field cannot be empty
-'registries' field cannot be empty
-'images' field cannot be empty`),
+'registries' field cannot be empty`),
+		},
+		{
+			"Stub manifest (`images` field is empty)",
+			// nolint[lll]
+			`src-registry: gcr.io/foo
+registries:
+- name: gcr.io/bar
+  service-account: foobar@google-containers.iam.gserviceaccount.com
+- name: gcr.io/foo
+  service-account: src@google-containers.iam.gserviceaccount.com
+images: []
+`,
+			Manifest{
+				SrcRegistry: "gcr.io/foo",
+				Registries: []RegistryContext{
+					{
+						Name: "gcr.io/bar",
+						// nolint[lll]
+						ServiceAccount: "foobar@google-containers.iam.gserviceaccount.com",
+					},
+					{
+						Name: "gcr.io/foo",
+						// nolint[lll]
+						ServiceAccount: "src@google-containers.iam.gserviceaccount.com",
+					},
+				},
+
+				Images: []Image{},
+			},
+			nil,
 		},
 		{
 			"Basic manifest",

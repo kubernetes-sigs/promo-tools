@@ -194,9 +194,6 @@ func validateRequiredComponents(m Manifest) error {
 					"registries: 'service-account' field cannot be empty"))
 		}
 	}
-	if len(m.Images) == 0 {
-		errs = append(errs, fmt.Sprintf("'images' field cannot be empty"))
-	}
 	for _, image := range m.Images {
 		if len(image.ImageName) == 0 {
 			errs = append(

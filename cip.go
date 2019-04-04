@@ -91,6 +91,16 @@ func main() {
 	if *parseOnlyPtr {
 		os.Exit(0)
 	}
+	// If there are no images in the manifest, it may be a stub manifest file
+	// (such as for brand new registries that would be watched by the promoter
+	// for the very first time). In any case, we do NOT want to process such
+	// manifests, because other logic like garbage collection would think that
+	// the manifest desires a completely blank registry. In practice this would
+	// almost never be the case, so given a fully-parsed manifest with 0 images,
+	// treat it as if -parse-only was implied and exit gracefully.
+	if len(mfest.Images) == 0 {
+		os.Exit(0)
+	}
 
 	if *dryRunPtr {
 		fmt.Println("---------- DRY RUN ----------")
