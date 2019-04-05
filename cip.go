@@ -38,7 +38,7 @@ var TimestampUtcRfc3339 string
 
 func main() {
 	manifestPtr := flag.String(
-		"manifest", "manifest.yaml", "the manifest file to load")
+		"manifest", "", "the manifest file to load (REQUIRED)")
 	garbageCollectPtr := flag.Bool(
 		"garbage-collect",
 		false, "delete all untagged images in the destination registry")
@@ -100,6 +100,9 @@ func main() {
 		os.Exit(0)
 	}
 
+	if *manifestPtr == "" {
+		log.Fatal(fmt.Errorf("-manifest=... flag is required"))
+	}
 	mfest, err := reg.ParseManifestFromFile(*manifestPtr)
 	if err != nil {
 		log.Fatal(err)
