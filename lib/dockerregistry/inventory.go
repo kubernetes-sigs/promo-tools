@@ -831,7 +831,7 @@ func (sc *SyncContext) GetPromotionCandidatesIT(
 			"To promote (after removing already-promoted images):\n%v",
 			promotionCandidates.PrettyValue())
 		if sc.DryRun {
-			sc.Infof("---------- BEGIN PROMOTION DRY RUN: %s ----------\n",
+			sc.Infof("---------- BEGIN PROMOTION (DRY RUN): %s ----------\n",
 				sc.ManifestPath)
 		} else {
 			sc.Infof("---------- BEGIN PROMOTION: %s ----------\n",

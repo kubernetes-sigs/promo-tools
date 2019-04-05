@@ -104,7 +104,7 @@ func main() {
 	}
 
 	if *dryRunPtr {
-		fmt.Printf("---------- DRY RUN: %s ----------\n", *manifestPtr)
+		fmt.Printf("********** START (DRY RUN): %s **********\n", *manifestPtr)
 	} else {
 		fmt.Printf("********** START: %s **********\n", *manifestPtr)
 	}
