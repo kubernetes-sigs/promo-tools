@@ -164,7 +164,7 @@ func main() {
 		return &sp
 	}
 
-	exitCode := sc.Promote(mfest, mkPromotionCmd, nil)
+	exitCode := sc.Promote(*manifestPtr, mfest, mkPromotionCmd, nil)
 
 	if *garbageCollectPtr {
 		sc.Info("---------- BEGIN GARBAGE COLLECTION ----------")

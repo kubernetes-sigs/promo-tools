@@ -810,6 +810,7 @@ func mkPopulateRequestsForPromotion(
 
 // GetPromotionCandidatesIT returns those images that are due for promotion.
 func (sc *SyncContext) GetPromotionCandidatesIT(
+	manifestPath string,
 	mfest Manifest) RegInvImageTag {
 
 	src := sc.Inv[mfest.SrcRegistry]
@@ -828,7 +829,7 @@ func (sc *SyncContext) GetPromotionCandidatesIT(
 		sc.Infof(
 			"To promote (after removing already-promoted images):\n%v",
 			promotionCandidates.PrettyValue())
-		sc.Info("---------- BEGIN PROMOTION ----------")
+		sc.Infof("---------- BEGIN PROMOTION: %s ----------\n", manifestPath)
 	} else {
 		sc.Infof(
 			"To promote (after removing already-promoted images):\n  <none>\n")
@@ -846,6 +847,7 @@ func (sc *SyncContext) GetPromotionCandidatesIT(
 // Promote perferms container image promotion by realizing the intent in the
 // Manifest.
 func (sc *SyncContext) Promote(
+	manifestPath string,
 	mfest Manifest,
 	mkProducer func(
 		RegistryName,
@@ -867,7 +869,7 @@ func (sc *SyncContext) Promote(
 		exitCode = 1
 	}
 
-	promotionCandidatesIT := sc.GetPromotionCandidatesIT(mfest)
+	promotionCandidatesIT := sc.GetPromotionCandidatesIT(manifestPath, mfest)
 
 	var populateRequests = mkPopulateRequestsForPromotion(
 		mfest,
