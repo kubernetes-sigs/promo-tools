@@ -10,8 +10,7 @@ Example Manifest:
 ```
 src-registry: gcr.io/myproject-staging-area
 registries:
-- name: gcr.io/myproject-staging-area
-  service-account: foo@google-containers.iam.gserviceaccount.com
+- name: gcr.io/myproject-staging-area # publicly readable, does not need a service account for access
 - name: gcr.io/myproject-production
   service-account: foo@google-containers.iam.gserviceaccount.com
 images:
@@ -28,9 +27,17 @@ images:
 ```
 
 Here, the Manifest cares about 3 images --- `apple`, `banana`, and `cherry`. The
-promoter will scan `gcr.io/myproject-staging-area` (*src*) as well as `gcr.io/myproject-production`
-(*dest*). If any of the images are missing from *dest*, then they will be copied
-over from *src*.
+`registries` field lists all destination registries and also the source registry
+where the images should be promoted from. To earmark the source registry, it is
+called out on its own under the `src-registry` field. In the Example, the
+promoter will scan `gcr.io/myproject-staging-area` (*src-registry*) and promote
+the images found under `images` to `gcr.io/myproject-production`.
+
+The `src-registry` (staging registry) will always be read-only for the promoter.
+Because of this, it's OK to not provide a `service-account` field for it in
+`registries`. But in the event that you are trying to promote from one private
+registry to another, you would still provide a `service-account` for the staging
+registry.
 
 Currently only Google Container Registry (GCR) is supported.
 
