@@ -167,7 +167,8 @@ func main() {
 	exitCode := sc.Promote(*manifestPtr, mfest, mkPromotionCmd, nil)
 
 	if *garbageCollectPtr {
-		sc.Info("---------- BEGIN GARBAGE COLLECTION ----------")
+		sc.Infof("---------- BEGIN GARBAGE COLLECTION: %s ----------\n",
+			*manifestPtr)
 		// Re-read the state of the world.
 		sc.ReadImageNames(mkRegistryListingCmd)
 		sc.ReadDigestsAndTags(mkRegistryListTagsCmd)
@@ -187,6 +188,6 @@ func main() {
 		sc.GarbageCollect(mfest, mkTagDeletionCmd, nil)
 	}
 
-	fmt.Println("FINISHED")
+	fmt.Printf("********** FINISHED: %s **********\n", *manifestPtr)
 	os.Exit(exitCode)
 }
