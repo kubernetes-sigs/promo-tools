@@ -120,7 +120,15 @@ if [[ -d "${CIP_GIT_DIR:-}" ]]; then
     args_final=("${args_filtered[@]}")
 fi
 
+echo "MULTIRUN: container image promoter version:"
+"${cip}"
+echo "MULTIRUN: gcloud version:"
+gcloud version
+
 for arg in "${args_final[@]}"; do
+    echo
+    echo "MULTIRUN: running against ${CIP_GIT_DIR:+$CIP_GIT_DIR/}${manifest}"
+
     service_accounts=()
     # Split a line into an array.
     # See https://stackoverflow.com/a/45201229/437583.
@@ -140,6 +148,7 @@ for arg in "${args_final[@]}"; do
             # later call gcloud with the flag `--account=...`. We can allow the
             # service account creds file to be empty, for testing cip locally (for
             # the case where the service account creds are already activated).
+            echo "MULTIRUN: activating service account ${keyfile}"
             gcloud auth activate-service-account --key-file="${keyfile}"
             service_accounts+=("$(gcloud config get-value account)")
         done
@@ -149,9 +158,9 @@ for arg in "${args_final[@]}"; do
 
         # As a safety measure, deactivate all service accounts which were
         # activated with --key-file.
+        echo "MULTIRUN: revoking service account(s) ${service_accounts[*]}"
         gcloud auth revoke "${service_accounts[@]}"
     else
-        echo "MULTIRUN: running against ${CIP_GIT_DIR:+$CIP_GIT_DIR/}${manifest}"
         "${cip}" -verbosity=3 -manifest="${CIP_GIT_DIR:+$CIP_GIT_DIR/}""${manifest}" -no-service-account ${CIP_OPTS:+$CIP_OPTS}
     fi
 done
