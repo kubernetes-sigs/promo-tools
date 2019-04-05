@@ -121,7 +121,7 @@ if [[ -d "${CIP_GIT_DIR:-}" ]]; then
 fi
 
 echo "MULTIRUN: container image promoter version:"
-"${cip}"
+"${cip}" -version
 echo "MULTIRUN: gcloud version:"
 gcloud version
 
