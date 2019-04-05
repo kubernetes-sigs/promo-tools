@@ -104,7 +104,9 @@ func main() {
 	}
 
 	if *dryRunPtr {
-		fmt.Println("---------- DRY RUN ----------")
+		fmt.Printf("---------- DRY RUN: %s ----------\n", *manifestPtr)
+	} else {
+		fmt.Printf("********** START: %s **********\n", *manifestPtr)
 	}
 
 	mi := map[reg.RegistryName]reg.RegInvImage{}
