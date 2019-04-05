@@ -189,6 +189,11 @@ func main() {
 		sc.GarbageCollect(mfest, mkTagDeletionCmd, nil)
 	}
 
-	fmt.Printf("********** FINISHED: %s **********\n", *manifestPtr)
+	if *dryRunPtr {
+		fmt.Printf("********** FINISHED (DRY RUN): %s **********\n",
+			*manifestPtr)
+	} else {
+		fmt.Printf("********** FINISHED: %s **********\n", *manifestPtr)
+	}
 	os.Exit(exitCode)
 }
