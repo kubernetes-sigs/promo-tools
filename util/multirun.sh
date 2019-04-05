@@ -151,6 +151,7 @@ for arg in "${args_final[@]}"; do
         # activated with --key-file.
         gcloud auth revoke "${service_accounts[@]}"
     else
+        echo "MULTIRUN: running against ${CIP_GIT_DIR:+$CIP_GIT_DIR/}${manifest}"
         "${cip}" -verbosity=3 -manifest="${CIP_GIT_DIR:+$CIP_GIT_DIR/}""${manifest}" -no-service-account ${CIP_OPTS:+$CIP_OPTS}
     fi
 done
