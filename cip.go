@@ -187,5 +187,6 @@ func main() {
 		sc.GarbageCollect(mfest, mkTagDeletionCmd, nil)
 	}
 
+	fmt.Println("FINISHED")
 	os.Exit(exitCode)
 }
