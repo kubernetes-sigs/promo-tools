@@ -36,6 +36,7 @@ var GitCommit string
 // TimestampUtcRfc3339 is stamped by bazel.
 var TimestampUtcRfc3339 string
 
+// nolint[gocyclo]
 func main() {
 	manifestPtr := flag.String(
 		"manifest", "", "the manifest file to load (REQUIRED)")
