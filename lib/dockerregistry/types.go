@@ -44,6 +44,7 @@ type CapturedRequests map[PromotionRequest]int
 
 // SyncContext is the main data structure for performing the promotion.
 type SyncContext struct {
+	ManifestPath      string
 	Verbosity         int
 	Threads           int
 	DeleteExtraTags   bool

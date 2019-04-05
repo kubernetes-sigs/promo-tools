@@ -114,6 +114,7 @@ func main() {
 		mi[registry.Name] = nil
 	}
 	sc := reg.MakeSyncContext(
+		*manifestPtr,
 		mi,
 		*verbosityPtr,
 		*threadsPtr,
@@ -164,7 +165,7 @@ func main() {
 		return &sp
 	}
 
-	exitCode := sc.Promote(*manifestPtr, mfest, mkPromotionCmd, nil)
+	exitCode := sc.Promote(mfest, mkPromotionCmd, nil)
 
 	if *garbageCollectPtr {
 		sc.Infof("---------- BEGIN GARBAGE COLLECTION: %s ----------\n",

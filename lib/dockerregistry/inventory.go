@@ -32,6 +32,7 @@ import (
 
 // MakeSyncContext creates a SyncContext.
 func MakeSyncContext(
+	manifestPath string,
 	mi MasterInventory,
 	verbosity, threads int,
 	deleteExtraTags, dryRun, useSvcAcc bool,
@@ -41,6 +42,7 @@ func MakeSyncContext(
 		Verbosity:         verbosity,
 		Threads:           threads,
 		DeleteExtraTags:   deleteExtraTags,
+		ManifestPath:      manifestPath,
 		DryRun:            dryRun,
 		UseServiceAccount: useSvcAcc,
 		Inv:               mi,
@@ -810,7 +812,6 @@ func mkPopulateRequestsForPromotion(
 
 // GetPromotionCandidatesIT returns those images that are due for promotion.
 func (sc *SyncContext) GetPromotionCandidatesIT(
-	manifestPath string,
 	mfest Manifest) RegInvImageTag {
 
 	src := sc.Inv[mfest.SrcRegistry]
@@ -830,9 +831,11 @@ func (sc *SyncContext) GetPromotionCandidatesIT(
 			"To promote (after removing already-promoted images):\n%v",
 			promotionCandidates.PrettyValue())
 		if sc.DryRun {
-			sc.Infof("---------- BEGIN PROMOTION DRY RUN: %s ----------\n", manifestPath)
+			sc.Infof("---------- BEGIN PROMOTION DRY RUN: %s ----------\n",
+				sc.ManifestPath)
 		} else {
-			sc.Infof("---------- BEGIN PROMOTION: %s ----------\n", manifestPath)
+			sc.Infof("---------- BEGIN PROMOTION: %s ----------\n",
+				sc.ManifestPath)
 		}
 	} else {
 		sc.Infof(
@@ -851,7 +854,6 @@ func (sc *SyncContext) GetPromotionCandidatesIT(
 // Promote perferms container image promotion by realizing the intent in the
 // Manifest.
 func (sc *SyncContext) Promote(
-	manifestPath string,
 	mfest Manifest,
 	mkProducer func(
 		RegistryName,
@@ -873,7 +875,7 @@ func (sc *SyncContext) Promote(
 		exitCode = 1
 	}
 
-	promotionCandidatesIT := sc.GetPromotionCandidatesIT(manifestPath, mfest)
+	promotionCandidatesIT := sc.GetPromotionCandidatesIT(mfest)
 
 	var populateRequests = mkPopulateRequestsForPromotion(
 		mfest,
