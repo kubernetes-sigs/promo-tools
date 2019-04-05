@@ -49,8 +49,8 @@ container_pull(
     name = "google-sdk-base",
     registry = "index.docker.io",
     repository = "google/cloud-sdk",
-    # Version 234.0.0
-    digest = "sha256:03ac1fb1715bb7a98163ffdc08bc66c57b555e7bfe03a904a9a1ef4be5bb2bd4",
+    # Version 241.0.0
+    digest = "sha256:3b77ee8bfa6a2513fb6343cfad0dd6fd6ddd67d0632908c3a5fb9b57dd68ec1b",
 )
 
 # Maybe use cloud-builders/gcloud, for GCB. But for Prow just use the google-sdk
