@@ -189,12 +189,6 @@ func validateRequiredComponents(m Manifest) error {
 				errs,
 				fmt.Sprintf("registries: 'name' field cannot be empty"))
 		}
-		if len(registry.ServiceAccount) == 0 {
-			errs = append(
-				errs,
-				fmt.Sprintf(
-					"registries: 'service-account' field cannot be empty"))
-		}
 	}
 	for _, image := range m.Images {
 		if len(image.ImageName) == 0 {
@@ -1118,7 +1112,7 @@ func MaybeUseServiceAccount(
 	serviceAccount string,
 	useServiceAccount bool,
 	cmd []string) []string {
-	if useServiceAccount {
+	if useServiceAccount && len(serviceAccount) > 0 {
 		cmd = append(cmd, "")
 		copy(cmd[2:], cmd[1:])
 		cmd[1] = fmt.Sprintf("--account=%v", serviceAccount)
