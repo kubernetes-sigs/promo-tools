@@ -68,6 +68,13 @@ func main() {
 		true,
 		"print what would have happened by running this tool;"+
 			" do not actually modify any registry")
+	// Add in help flag information, because Go's "flag" package automatically
+	// adds it, but for whatever reason does not show it as part of available
+	// options.
+	helpPtr := flag.Bool(
+		"help",
+		false,
+		"print help")
 	versionPtr := flag.Bool(
 		"version",
 		false,
@@ -77,10 +84,19 @@ func main() {
 		"do not pass '--account=...' to all gcloud calls (default: false)")
 	flag.Parse()
 
+	if len(os.Args) == 1 {
+		printVersion()
+		printUsage()
+		os.Exit(0)
+	}
+
+	if *helpPtr {
+		printUsage()
+		os.Exit(0)
+	}
+
 	if *versionPtr {
-		fmt.Printf("Built:   %s\n", TimestampUtcRfc3339)
-		fmt.Printf("Version: %s\n", GitDescribe)
-		fmt.Printf("Commit:  %s\n", GitCommit)
+		printVersion()
 		os.Exit(0)
 	}
 
@@ -196,4 +212,15 @@ func main() {
 		fmt.Printf("********** FINISHED: %s **********\n", *manifestPtr)
 	}
 	os.Exit(exitCode)
+}
+
+func printVersion() {
+	fmt.Printf("Built:   %s\n", TimestampUtcRfc3339)
+	fmt.Printf("Version: %s\n", GitDescribe)
+	fmt.Printf("Commit:  %s\n", GitCommit)
+}
+
+func printUsage() {
+	fmt.Fprintf(os.Stderr, "Usage of %s:\n", os.Args[0])
+	flag.PrintDefaults()
 }
