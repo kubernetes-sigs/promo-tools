@@ -126,9 +126,6 @@ echo "MULTIRUN: gcloud version:"
 gcloud version
 
 for arg in "${args_final[@]}"; do
-    echo
-    echo "MULTIRUN: running against ${CIP_GIT_DIR:+$CIP_GIT_DIR/}${manifest}"
-
     service_accounts=()
     # Split a line into an array.
     # See https://stackoverflow.com/a/45201229/437583.
@@ -140,6 +137,9 @@ for arg in "${args_final[@]}"; do
     manifest="${service_account_keyfiles[0]}"
     # Trim manifest out of service_account_keyfiles.
     unset 'service_account_keyfiles[0]'
+
+    echo
+    echo "MULTIRUN: running against ${CIP_GIT_DIR:+$CIP_GIT_DIR/}${manifest}"
 
     # Only activate/deactivate service account files if they were passed in.
     if (( ${#service_account_keyfiles[@]} )); then
