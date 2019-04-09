@@ -8,9 +8,9 @@ Registry (src registry) to another (dest registry), by reading a Manifest file
 Example Manifest:
 
 ```
-src-registry: gcr.io/myproject-staging-area
 registries:
 - name: gcr.io/myproject-staging-area # publicly readable, does not need a service account for access
+  src: true # mark it as the source registry (required)
 - name: gcr.io/myproject-production
   service-account: foo@google-containers.iam.gserviceaccount.com
 images:

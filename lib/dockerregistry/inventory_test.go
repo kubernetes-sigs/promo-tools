@@ -139,22 +139,21 @@ func TestParseRegistryManifest(t *testing.T) {
 			"Empty manifest (invalid)",
 			``,
 			Manifest{},
-			fmt.Errorf(`'src' field cannot be empty
+			fmt.Errorf(`source registry must be set
 'registries' field cannot be empty`),
 		},
 		{
 			"Stub manifest (`images` field is empty)",
 			// nolint[lll]
-			`src-registry: gcr.io/foo
-registries:
+			`registries:
 - name: gcr.io/bar
   service-account: foobar@google-containers.iam.gserviceaccount.com
 - name: gcr.io/foo
   service-account: src@google-containers.iam.gserviceaccount.com
+  src: true
 images: []
 `,
 			Manifest{
-				SrcRegistry: "gcr.io/foo",
 				Registries: []RegistryContext{
 					{
 						Name: "gcr.io/bar",
@@ -165,6 +164,7 @@ images: []
 						Name: "gcr.io/foo",
 						// nolint[lll]
 						ServiceAccount: "src@google-containers.iam.gserviceaccount.com",
+						Src:            true,
 					},
 				},
 
@@ -175,12 +175,12 @@ images: []
 		{
 			"Basic manifest",
 			// nolint[lll]
-			`src-registry: gcr.io/foo
-registries:
+			`registries:
 - name: gcr.io/bar
   service-account: foobar@google-containers.iam.gserviceaccount.com
 - name: gcr.io/foo
   service-account: src@google-containers.iam.gserviceaccount.com
+  src: true
 images:
 - name: agave
   dmap:
@@ -190,7 +190,6 @@ images:
     "sha256:07353f7b26327f0d933515a22b1de587b040d3d85c464ea299c1b9f242529326": [ "1.8.3" ]  # Branches: ['master']
 `,
 			Manifest{
-				SrcRegistry: "gcr.io/foo",
 				Registries: []RegistryContext{
 					{
 						Name: "gcr.io/bar",
@@ -201,6 +200,7 @@ images:
 						Name: "gcr.io/foo",
 						// nolint[lll]
 						ServiceAccount: "src@google-containers.iam.gserviceaccount.com",
+						Src:            true,
 					},
 				},
 
@@ -224,8 +224,7 @@ images:
 		{
 			"Missing src registry in registries (invalid)",
 			// nolint[lll]
-			`src-registry: gcr.io/alpha
-registries:
+			`registries:
 - name: gcr.io/bar
   service-account: foobar@google-containers.iam.gserviceaccount.com
 - name: gcr.io/foo
@@ -240,7 +239,7 @@ images:
 `,
 			Manifest{},
 			// nolint[lll]
-			fmt.Errorf("registries list does not contain source registry 'gcr.io/alpha'"),
+			fmt.Errorf("source registry must be set"),
 		},
 	}
 
@@ -576,6 +575,7 @@ func TestCommandGeneration(t *testing.T) {
 		fmt.Sprintf("Test: %v (cmd string)\n", testName))
 }
 
+// TestSyncContext tests reading images and tags from a registry.
 func TestSyncContext(t *testing.T) {
 	const fakeRegName RegistryName = "gcr.io/foo"
 	var tests = []struct {
@@ -1023,6 +1023,7 @@ func TestPromotion(t *testing.T) {
 	srcRC := RegistryContext{
 		Name:           srcRegName,
 		ServiceAccount: "robot",
+		Src:            true,
 	}
 	registries := []RegistryContext{destRC, srcRC}
 	var tests = []struct {
@@ -1041,8 +1042,7 @@ func TestPromotion(t *testing.T) {
 		{
 			"No promotion; tag is already promoted",
 			Manifest{
-				SrcRegistry: srcRegName,
-				Registries:  registries,
+				Registries: registries,
 				Images: []Image{
 					{
 						ImageName: "a",
@@ -1063,8 +1063,7 @@ func TestPromotion(t *testing.T) {
 		{
 			"Promote 1 tag; image digest does not exist in dest",
 			Manifest{
-				SrcRegistry: srcRegName,
-				Registries:  registries,
+				Registries: registries,
 				Images: []Image{
 					{
 						ImageName: "a",
@@ -1090,8 +1089,7 @@ func TestPromotion(t *testing.T) {
 		{
 			"Promote 1 tag; image already exists in dest, but digest does not",
 			Manifest{
-				SrcRegistry: srcRegName,
-				Registries:  registries,
+				Registries: registries,
 				Images: []Image{
 					{
 						ImageName: "a",
@@ -1118,8 +1116,7 @@ func TestPromotion(t *testing.T) {
 			// nolint[lll]
 			"Promote 1 tag; tag already exists in dest but is pointing to a different digest (move tag)",
 			Manifest{
-				SrcRegistry: srcRegName,
-				Registries:  registries,
+				Registries: registries,
 				Images: []Image{
 					{
 						ImageName: "a",
@@ -1147,8 +1144,7 @@ func TestPromotion(t *testing.T) {
 			// nolint[lll]
 			"NOP; dest has extra tag, but NOP because -delete-extra-tags NOT specified",
 			Manifest{
-				SrcRegistry: srcRegName,
-				Registries:  registries,
+				Registries: registries,
 				Images: []Image{
 					{
 						ImageName: "a",
@@ -1169,8 +1165,7 @@ func TestPromotion(t *testing.T) {
 			// nolint[lll]
 			"Delete 1 tag; dest has extra tag (if -delete-extra-tags specified)",
 			Manifest{
-				SrcRegistry: srcRegName,
-				Registries:  registries,
+				Registries: registries,
 				Images: []Image{
 					{
 						ImageName: "a",
@@ -1198,8 +1193,7 @@ func TestPromotion(t *testing.T) {
 			// nolint[lll]
 			"NOP (src registry does not have any of the images we want to promote)",
 			Manifest{
-				SrcRegistry: srcRegName,
-				Registries:  registries,
+				Registries: registries,
 				Images: []Image{
 					{
 						ImageName: "a",
@@ -1247,11 +1241,15 @@ func TestPromotion(t *testing.T) {
 	for _, test := range tests {
 		// Reset captured for each test.
 		captured = make(CapturedRequests)
+		srcReg, err := getSrcRegistry(registries)
+		checkError(t, err,
+			fmt.Sprintf("checkError (srcReg): test: %v\n", test.name))
+		test.inputSc.SrcRegistry = srcReg
 		test.inputSc.Promote(
 			test.inputM,
 			nopStream,
 			&processRequestFake)
-		err := checkEqual(captured, test.expectedReqs)
+		err = checkEqual(captured, test.expectedReqs)
 		checkError(t, err, fmt.Sprintf("checkError: test: %v\n", test.name))
 	}
 }
@@ -1271,6 +1269,7 @@ func TestPromotionMulti(t *testing.T) {
 	srcRC := RegistryContext{
 		Name:           srcRegName,
 		ServiceAccount: "robotSrc",
+		Src:            true,
 	}
 	registries := []RegistryContext{srcRC, destRC, destRC2}
 	var tests = []struct {
@@ -1283,8 +1282,7 @@ func TestPromotionMulti(t *testing.T) {
 			// nolint[lll]
 			"Add 1 tag for 2 registries",
 			Manifest{
-				SrcRegistry: srcRegName,
-				Registries:  registries,
+				Registries: registries,
 				Images: []Image{
 					{
 						ImageName: "a",
@@ -1325,8 +1323,7 @@ func TestPromotionMulti(t *testing.T) {
 			// nolint[lll]
 			"Add 1 tag for 1 registry, but remove a tag for another",
 			Manifest{
-				SrcRegistry: srcRegName,
-				Registries:  registries,
+				Registries: registries,
 				Images: []Image{
 					{
 						ImageName: "a",
@@ -1388,11 +1385,15 @@ func TestPromotionMulti(t *testing.T) {
 	for _, test := range tests {
 		// Reset captured for each test.
 		captured = make(CapturedRequests)
+		srcReg, err := getSrcRegistry(registries)
+		checkError(t, err,
+			fmt.Sprintf("checkError (srcReg): test: %v\n", test.name))
+		test.inputSc.SrcRegistry = srcReg
 		test.inputSc.Promote(
 			test.inputM,
 			nopStream,
 			&processRequestFake)
-		err := checkEqual(captured, test.expectedReqs)
+		err = checkEqual(captured, test.expectedReqs)
 		checkError(t, err, fmt.Sprintf("checkError: test: %v\n", test.name))
 	}
 }
@@ -1401,6 +1402,11 @@ func TestGarbageCollection(t *testing.T) {
 	srcRegName := RegistryName("gcr.io/foo")
 	destRegName := RegistryName("gcr.io/bar")
 	registries := []RegistryContext{
+		{
+			Name:           srcRegName,
+			ServiceAccount: "robot",
+			Src:            true,
+		},
 		{
 			Name:           destRegName,
 			ServiceAccount: "robot",
@@ -1415,8 +1421,7 @@ func TestGarbageCollection(t *testing.T) {
 		{
 			"No garbage collection (no empty digests)",
 			Manifest{
-				SrcRegistry: srcRegName,
-				Registries:  registries,
+				Registries: registries,
 				Images: []Image{
 					{
 						ImageName: "a",
@@ -1444,8 +1449,7 @@ func TestGarbageCollection(t *testing.T) {
 			// nolint[lll]
 			"Simple garbage collection (delete ALL images in dest that are untagged))",
 			Manifest{
-				SrcRegistry: srcRegName,
-				Registries:  registries,
+				Registries: registries,
 				Images: []Image{
 					{
 						ImageName: "a",
@@ -1476,16 +1480,16 @@ func TestGarbageCollection(t *testing.T) {
 				PromotionRequest{
 					TagOp:          Delete,
 					RegistrySrc:    srcRegName,
-					RegistryDest:   registries[0].Name,
-					ServiceAccount: registries[0].ServiceAccount,
+					RegistryDest:   registries[1].Name,
+					ServiceAccount: registries[1].ServiceAccount,
 					ImageName:      "a",
 					Digest:         "sha256:111",
 					Tag:            ""}: 1,
 				PromotionRequest{
 					TagOp:          Delete,
 					RegistrySrc:    srcRegName,
-					RegistryDest:   registries[0].Name,
-					ServiceAccount: registries[0].ServiceAccount,
+					RegistryDest:   registries[1].Name,
+					ServiceAccount: registries[1].ServiceAccount,
 					ImageName:      "z",
 					Digest:         "sha256:000",
 					Tag:            ""}: 1,
@@ -1524,9 +1528,13 @@ func TestGarbageCollection(t *testing.T) {
 			digest Digest) stream.Producer {
 			return nil
 		}
+		srcReg, err := getSrcRegistry(registries)
+		checkError(t, err,
+			fmt.Sprintf("checkError (srcReg): test: %v\n", test.name))
+		test.inputSc.SrcRegistry = srcReg
 		test.inputSc.GarbageCollect(test.inputM, nopStream, &processRequestFake)
 
-		err := checkEqual(captured, test.expectedReqs)
+		err = checkEqual(captured, test.expectedReqs)
 		checkError(t, err, fmt.Sprintf("checkError: test: %v\n", test.name))
 	}
 }
@@ -1546,6 +1554,7 @@ func TestGarbageCollectionMulti(t *testing.T) {
 	srcRC := RegistryContext{
 		Name:           srcRegName,
 		ServiceAccount: "robotSrc",
+		Src:            true,
 	}
 	registries := []RegistryContext{srcRC, destRC, destRC2}
 	var tests = []struct {
@@ -1558,8 +1567,7 @@ func TestGarbageCollectionMulti(t *testing.T) {
 			// nolint[lll]
 			"Simple garbage collection (delete ALL images in all dests that are untagged))",
 			Manifest{
-				SrcRegistry: srcRegName,
-				Registries:  registries,
+				Registries: registries,
 				Images: []Image{
 					{
 						ImageName: "a",
@@ -1657,9 +1665,13 @@ func TestGarbageCollectionMulti(t *testing.T) {
 			digest Digest) stream.Producer {
 			return nil
 		}
+		srcReg, err := getSrcRegistry(registries)
+		checkError(t, err,
+			fmt.Sprintf("checkError (srcReg): test: %v\n", test.name))
+		test.inputSc.SrcRegistry = srcReg
 		test.inputSc.GarbageCollect(test.inputM, nopStream, &processRequestFake)
 
-		err := checkEqual(captured, test.expectedReqs)
+		err = checkEqual(captured, test.expectedReqs)
 		checkError(t, err, fmt.Sprintf("checkError: test: %v\n", test.name))
 	}
 }

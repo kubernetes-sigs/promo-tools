@@ -133,7 +133,7 @@ func main() {
 	for _, registry := range mfest.Registries {
 		mi[registry.Name] = nil
 	}
-	sc := reg.MakeSyncContext(
+	sc, err := reg.MakeSyncContext(
 		*manifestPtr,
 		mi,
 		*verbosityPtr,
@@ -142,6 +142,9 @@ func main() {
 		*dryRunPtr,
 		!noSvcAcc,
 		mfest.Registries)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	// Read the state of the world; i.e., populate the SyncContext.
 	mkRegistryListingCmd := func(

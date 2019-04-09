@@ -52,6 +52,7 @@ type SyncContext struct {
 	UseServiceAccount bool
 	Inv               MasterInventory
 	RegistryContexts  []RegistryContext
+	SrcRegistry       *RegistryContext
 }
 
 // MasterInventory stores multiple RegInvImage elements, keyed by RegistryName.
@@ -139,14 +140,7 @@ type Manifest struct {
 	// It is possible that in the future, we support promoting to multiple
 	// registries, in which case we would have more than just Src/Dest.
 	Registries []RegistryContext
-	// Src contains the RegistryName which will be set as the source registry.
-	// All other registries in Registries will be treated as destination
-	// registries.
-	//
-	// TODO: check that RegistryName is present in a RegistryContext in
-	// Registries.
-	SrcRegistry RegistryName `yaml:"src-registry"`
-	Images      []Image      `yaml:"images,omitempty"`
+	Images     []Image `yaml:"images,omitempty"`
 }
 
 // Image holds information about an image. It's like an "Object" in the OOP
@@ -168,6 +162,7 @@ type DigestTags map[Digest]TagSlice
 type RegistryContext struct {
 	Name           RegistryName
 	ServiceAccount string `yaml:"service-account,omitempty"`
+	Src            bool   `yaml:"src,omitempty"`
 }
 
 // RegistryName is the leading part of an image name that includes the domain;
