@@ -43,26 +43,24 @@ func getSrcRegistry(rcs []RegistryContext) (*RegistryContext, error) {
 // MakeSyncContext creates a SyncContext.
 func MakeSyncContext(
 	manifestPath string,
+	rcs []RegistryContext,
+	rd RenamesDenormalized,
+	srcRegistry *RegistryContext,
 	mi MasterInventory,
 	verbosity, threads int,
-	deleteExtraTags, dryRun, useSvcAcc bool,
-	rcs []RegistryContext) (SyncContext, error) {
-
-	srcRegistry, err := getSrcRegistry(rcs)
-	if err != nil {
-		return SyncContext{}, err
-	}
+	deleteExtraTags, dryRun, useSvcAcc bool) (SyncContext, error) {
 
 	return SyncContext{
-		Verbosity:         verbosity,
-		Threads:           threads,
-		DeleteExtraTags:   deleteExtraTags,
-		ManifestPath:      manifestPath,
-		DryRun:            dryRun,
-		UseServiceAccount: useSvcAcc,
-		Inv:               mi,
-		SrcRegistry:       srcRegistry,
-		RegistryContexts:  rcs}, nil
+		Verbosity:           verbosity,
+		Threads:             threads,
+		DeleteExtraTags:     deleteExtraTags,
+		ManifestPath:        manifestPath,
+		DryRun:              dryRun,
+		UseServiceAccount:   useSvcAcc,
+		Inv:                 mi,
+		RenamesDenormalized: rd,
+		SrcRegistry:         srcRegistry,
+		RegistryContexts:    rcs}, nil
 }
 
 // Basic logging.
@@ -120,18 +118,33 @@ func (sc *SyncContext) Fatal(v ...interface{}) {
 }
 
 // ParseManifestFromFile parses a Manifest from a filepath.
-func ParseManifestFromFile(filePath string) (Manifest, error) {
+func ParseManifestFromFile(
+	filePath string) (Manifest, RenamesDenormalized, *RegistryContext, error) {
+
 	var mfest Manifest
+	var rd RenamesDenormalized
+	var srcRegistry *RegistryContext
 	bytes, err := ioutil.ReadFile(filePath)
 	if err != nil {
-		return mfest, err
+		return mfest, rd, srcRegistry, err
 	}
 	mfest, err = ParseManifest(bytes)
 	if err != nil {
-		return mfest, err
+		return mfest, rd, srcRegistry, err
 	}
 
-	return mfest, nil
+	// Perform semantic checks (beyond just YAML validation).
+	srcRegistry, err = getSrcRegistry(mfest.Registries)
+	if err != nil {
+		return mfest, rd, srcRegistry, err
+	}
+
+	rd, err = DenormalizeRenames(mfest, srcRegistry.Name)
+	if err != nil {
+		return mfest, rd, srcRegistry, err
+	}
+
+	return mfest, rd, srcRegistry, nil
 }
 
 // ParseManifest parses a Manifest from a byteslice. This function is separate
@@ -187,6 +200,16 @@ func validateTag(tag Tag) error {
 	return nil
 }
 
+func validateRegistryImagePath(rip RegistryImagePath) error {
+	validRegistryImagePath := regexp.MustCompile(
+		// \w is [0-9a-zA-Z_]
+		`^[\w-]+(\.[\w-]+)+(/[\w-]+)+$`)
+	if !validRegistryImagePath.Match([]byte(rip)) {
+		return fmt.Errorf("invalid registry image path: %v", rip)
+	}
+	return nil
+}
+
 func (m Manifest) srcRegistryCount() int {
 	var count int
 	for _, registry := range m.Registries {
@@ -197,14 +220,29 @@ func (m Manifest) srcRegistryCount() int {
 	return count
 }
 
+func (m Manifest) srcRegistryName() RegistryName {
+	for _, registry := range m.Registries {
+		if registry.Src {
+			return registry.Name
+		}
+	}
+	return RegistryName("")
+}
+
 // nolint[gocyclo]
 func validateRequiredComponents(m Manifest) error {
 	errs := make([]string, 0)
-	if m.srcRegistryCount() == 0 {
-		errs = append(errs, fmt.Sprintf("source registry must be set"))
-	} else if m.srcRegistryCount() > 1 {
-		errs = append(errs, fmt.Sprintf("cannot have more than 1 source registry"))
+	srcRegistryName := RegistryName("")
+	if len(m.Registries) > 0 {
+		if m.srcRegistryCount() > 1 {
+			errs = append(errs, fmt.Sprintf("cannot have more than 1 source registry"))
+		}
+		srcRegistryName = m.srcRegistryName()
+		if len(srcRegistryName) == 0 {
+			errs = append(errs, fmt.Sprintf("source registry must be set"))
+		}
 	}
+
 	if len(m.Registries) == 0 {
 		errs = append(errs, fmt.Sprintf("'registries' field cannot be empty"))
 	}
@@ -226,6 +264,74 @@ func validateRequiredComponents(m Manifest) error {
 				errs,
 				fmt.Sprintf("images: 'dmap' field cannot be empty"))
 		}
+	}
+
+	for _, rename := range m.Renames {
+		// The names must be valid paths.
+		// Each name must be the registry+pathname, *without* a trailing slash.
+		if len(rename) < 2 {
+			// nolint[lll]
+			errs = append(errs,
+				fmt.Sprintf("a rename entry must have at least 2 paths, one for the source, another for at least 1 dest registry"))
+		}
+
+		// Make sure there is only 1 rename per registry, and that there is 1
+		// entry for the source registry..
+		var srcOriginal RegistryImagePath
+		seenRegistries := make(map[RegistryName]ImageName)
+		for _, registryImagePath := range rename {
+			// nolint[lll]
+			registryName, imageName, err := splitRegistryImagePath(registryImagePath)
+			if err != nil {
+				errs = append(errs, err.Error())
+			}
+
+			if _, ok := seenRegistries[registryName]; ok {
+				// nolint[lll]
+				errs = append(errs, fmt.Sprintf("multiple renames found for registry '%v' in 'renames', for image %v",
+					registryName,
+					imageName))
+			} else {
+				seenRegistries[registryName] = imageName
+			}
+
+			if err = validateRegistryImagePath(registryImagePath); err != nil {
+				errs = append(errs, err.Error())
+			}
+
+			// Check if the registry is found in the outer `registries` field.
+			found := false
+			for _, rc := range m.Registries {
+				if rc.Name == registryName {
+					found = true
+				}
+			}
+			if !found {
+				// nolint[lll]
+				errs = append(errs, fmt.Sprintf("unknown registry '%v' in 'renames' (not defined in 'registries')", registryName))
+			}
+
+			if registryName == srcRegistryName {
+				srcOriginal = registryImagePath
+			}
+		}
+
+		if len(m.Registries) > 0 && len(srcOriginal) == 0 {
+			errs = append(errs, fmt.Sprintf("could not find source registry in '%v'",
+				rename))
+		}
+
+		registryNameSrc, imageNameSrc, _ := splitRegistryImagePath(srcOriginal)
+		for _, registryImagePath := range rename {
+			registryName, imageName, _ := splitRegistryImagePath(registryImagePath)
+			if registryName != registryNameSrc {
+				if imageName == imageNameSrc {
+					errs = append(errs, fmt.Sprintf("redundant rename for %s",
+						rename))
+				}
+			}
+		}
+
 	}
 	if len(errs) == 0 {
 		return nil
@@ -601,6 +707,13 @@ func ToPQIN(registryName RegistryName, imageName ImageName, tag Tag) string {
 	return string(registryName) + "/" + string(imageName) + ":" + string(tag)
 }
 
+// ToLQIN converts a RegistryName and ImangeName to form a loosely-qualified
+// image name (LQIN). Notice that it is missing tag information --- hence
+// "loosely-qualified".
+func ToLQIN(registryName RegistryName, imageName ImageName) string {
+	return string(registryName) + "/" + string(imageName)
+}
+
 // GetLostImages gets all images in Manifest which are missing from src, and
 // also logs them in the process.
 func (sc *SyncContext) GetLostImages(mfest Manifest) RegInvImageDigest {
@@ -627,25 +740,58 @@ func (sc *SyncContext) GetLostImages(mfest Manifest) RegInvImageDigest {
 	return nil
 }
 
+// NOTE: the issue with renaming an image is that we still need to know the
+// original (source) image path because we need to use it in the actual call to
+// add-tag during promotion. This means the request population logic must be
+// aware of both the original and renamed version of the image name.
+//
+// By the time the mkPopReq is called, we are dealing with renamed inventory
+// (riit). We need to detect this case from within this function and create the
+// correct request populator --- namely, the source registry/Manifest's original
+// image name must be used as the reference.
+//
+// The Manifest houses `registries` which contain the registry names. The
+// RenamesDenormalized map will contain bidirectional entries for the rename.
+// Since we already have the dest registry, we can just look up the destRegistry
+// name + (renamed) image name in the RenamesDenormalized map; if we find an
+// entry, then we just need to pick out the one for the source registry (it is
+// guaranteed to be there). Now we have the source registry name in sc, so we
+// can use that and the image name associated with the source registry to use as
+// the source destination reg+image name.
 func (sc *SyncContext) mkPopReq(
 	destRC RegistryContext,
-	thing RegInvImageTag,
+	riit RegInvImageTag,
 	tp TagOp,
 	oldDigest Digest,
-	mkProducer func( // seems odd
-		RegistryName,
-		RegistryContext,
-		ImageName,
-		Digest,
-		Tag,
-		TagOp) stream.Producer,
+	mkProducer PromotionContext,
 	reqs chan<- stream.ExternalRequest) {
 
 	dest := sc.Inv[destRC.Name]
-	for imageTag, digest := range thing {
+	for imageTag, digest := range riit {
 		var req stream.ExternalRequest
+
+		// Get original image name, if we detect a rename.
+		srcImageName := imageTag.ImageName
+		registryImagePath := RegistryImagePath(
+			ToLQIN(destRC.Name, imageTag.ImageName))
+		if renameMap, ok := sc.RenamesDenormalized[registryImagePath]; ok {
+			if origImageName, ok := renameMap[sc.SrcRegistry.Name]; ok {
+				srcImageName = origImageName
+			} else {
+				// This should never happen, as the src registry is guaranteed
+				// (during manifest parsing and renames denormalization) to
+				// exist as a key for every map in RenamesDenormalized.
+				//
+				// nolint[lll]
+				sc.Warnf("could not find src registry in renameMap for image '%v'\n", imageTag.ImageName)
+				continue
+			}
+		}
+
 		req.StreamProducer = mkProducer(
+			// We need to populate from the source to the dest.
 			sc.SrcRegistry.Name,
+			srcImageName,
 			destRC,
 			imageTag.ImageName,
 			digest,
@@ -674,7 +820,7 @@ func (sc *SyncContext) mkPopReq(
 		}
 		// Display msg when promoting.
 		msg := fmt.Sprintf(
-			"%s tag: %s -> %s\n", tpStr, imageTag.Tag, fqin)
+			"mkPopReq: %s tag: %s -> %s\n", tpStr, imageTag.Tag, fqin)
 		// For moving tags, display a more verbose message (show the
 		// what the tag currently points to).
 		if tp == Move {
@@ -709,6 +855,7 @@ func (sc *SyncContext) mkPopReq(
 			sc.SrcRegistry.Name,
 			destRC.Name,
 			destRC.ServiceAccount,
+			srcImageName,
 			imageTag.ImageName,
 			digest,
 			oldDigest,
@@ -719,6 +866,115 @@ func (sc *SyncContext) mkPopReq(
 
 }
 
+func splitRegistryImagePath(
+	registryImagePath RegistryImagePath) (RegistryName, ImageName, error) {
+
+	pathSlice := strings.SplitAfterN(string(registryImagePath), "/", 2)
+	if len(pathSlice) != 2 {
+		goto error
+	}
+
+	// For "gcr.io/a/b/c", the registry name is "gcr.io/a", not "gcr.io/". So
+	// fix it.
+
+	if pathSlice[0] == "gcr.io/" {
+		pathSliceGCR := strings.SplitAfterN(pathSlice[1], "/", 2)
+		if len(pathSliceGCR) != 2 {
+			goto error
+		}
+		projectName := pathSliceGCR[0]
+		return RegistryName(pathSlice[0] + projectName[0:len(projectName)-1]),
+			ImageName(pathSliceGCR[1]),
+			nil
+	}
+
+	return RegistryName(pathSlice[0]), ImageName(pathSlice[1]), nil
+
+error:
+	return RegistryName(""),
+		ImageName(""),
+		// nolint[lll]
+		fmt.Errorf("invalid loosely-qualified image name '%v'", registryImagePath)
+}
+
+// DenormalizeRenames coverts the nested list of rename strings in the
+// Manifest's `renames` field into a more query-friendly nested map (easier to
+// perform lookups).
+//
+// It also checks the `renames` field in Manifest for errors.
+// nolint[gocyclo]
+func DenormalizeRenames(
+	mfest Manifest,
+	srcRegistryName RegistryName) (RenamesDenormalized, error) {
+
+	rd := make(RenamesDenormalized)
+	for _, rename := range mfest.Renames {
+		// Create "directed edges" that go in both directions --- from Src
+		// to Dest, and Dest to Src. Because there can be multiple
+		// destinations, we have to use a nested loop.
+		for i, registryImagePathA := range rename {
+			_, _, err := splitRegistryImagePath(registryImagePathA)
+			if err != nil {
+				return nil, err
+			}
+
+			// Create the directed edge targets.
+			directedEdges := make(map[RegistryName]ImageName)
+			for j, registryImagePathB := range rename {
+				if j == i {
+					continue
+				}
+
+				registryNameB, imageNameB, err := splitRegistryImagePath(registryImagePathB)
+				if err != nil {
+					return nil, err
+				}
+				directedEdges[registryNameB] = imageNameB
+			}
+
+			// Assign all targets to the starting point, registryImagePathA.
+			rd[registryImagePathA] = directedEdges
+		}
+	}
+	return rd, nil
+}
+
+func getRenameMap(
+	lqin string,
+	rd RenamesDenormalized) map[RegistryName]ImageName {
+
+	m, ok := rd[RegistryImagePath(lqin)]
+	if ok {
+		return m
+	}
+	return nil
+}
+
+// applyRenames takes a given RegInvImageTag (riit) and converts it to a new
+// RegInvImageTag (riitRenamed), by using information in RenamesDenormalized
+// (rd).
+func (riit *RegInvImageTag) applyRenames(
+	srcReg RegistryName,
+	destReg RegistryName,
+	rd RenamesDenormalized) RegInvImageTag {
+
+	riitRenamed := RegInvImageTag{}
+	for imageTag, digest := range *riit {
+		lqin := ToLQIN(srcReg, imageTag.ImageName)
+		m := getRenameMap(lqin, rd)
+		newName, ok := m[destReg]
+		// Only rename if this dest registry requires renaming.
+		if m != nil && ok {
+			imageTagRenamed := imageTag
+			imageTagRenamed.ImageName = newName
+			riitRenamed[imageTagRenamed] = digest
+		} else {
+			riitRenamed[imageTag] = digest
+		}
+	}
+	return riitRenamed
+}
+
 // mkPopulateRequestsForPromotion creates all requests necessary to reconcile
 // the Manifest against the state of the world.
 //
@@ -726,14 +982,7 @@ func (sc *SyncContext) mkPopReq(
 func mkPopulateRequestsForPromotion(
 	mfest Manifest,
 	promotionCandidatesIT RegInvImageTag,
-	mkProducer func(
-		RegistryName,
-		RegistryContext,
-		ImageName,
-		Digest,
-		Tag,
-		TagOp) stream.Producer,
-) PopulateRequests {
+	mkProducer PromotionContext) PopulateRequests {
 	return func(sc *SyncContext, reqs chan<- stream.ExternalRequest) {
 		for _, registry := range mfest.Registries {
 			if registry.Src {
@@ -742,7 +991,19 @@ func mkPopulateRequestsForPromotion(
 
 			// Promote images that are not in the destination registry.
 			destIT := sc.Inv[registry.Name].ToRegInvImageTag()
-			promotionFiltered := promotionCandidatesIT.Minus(destIT)
+
+			// For this dest registry, check if there are any renamings that
+			// must occur. If so, modify the promotionCandidatesIT so that they
+			// use the renamed versions. This is because destIT already has the
+			// renamed versions (easier for set difference). We could go the
+			// other way and rename the pertinent images in destIT to match the
+			// naming scheme of the source registry (i.e., the raw `images`
+			// field in the Manifest) --- one way is not obviously superior over
+			// the other.
+			promotionCandidatesITRenamed := promotionCandidatesIT.applyRenames(
+				sc.SrcRegistry.Name, registry.Name, sc.RenamesDenormalized)
+
+			promotionFiltered := promotionCandidatesITRenamed.Minus(destIT)
 			promotionFilteredID := promotionFiltered.ToRegInvImageDigest()
 
 			if len(promotionFilteredID) > 0 {
@@ -758,11 +1019,11 @@ func mkPopulateRequestsForPromotion(
 						sc.ManifestPath)
 				}
 			} else {
-				sc.Infof("Nothing to promote.\n")
+				sc.Infof("Nothing to promote for %s.\n", registry.Name)
 			}
 
 			sc.mkPopReq(
-				registry,
+				registry, // destRegistry
 				promotionFiltered,
 				Add,
 				"",
@@ -772,7 +1033,7 @@ func mkPopulateRequestsForPromotion(
 			// Audit the intersection (make sure already-existing tags in the
 			// destination are pointing to the digest specified in the
 			// manifest).
-			toAudit := promotionCandidatesIT.Intersection(destIT)
+			toAudit := promotionCandidatesITRenamed.Intersection(destIT)
 			for imageTag, digest := range toAudit {
 				if liveDigest, ok := destIT[imageTag]; ok {
 					// dest has this imageTag already; need to audit.
@@ -824,7 +1085,7 @@ func mkPopulateRequestsForPromotion(
 			} else {
 				// Warn the user about extra tags:
 				xtras := make([]string, 0)
-				for imageTag := range destIT.Minus(promotionCandidatesIT) {
+				for imageTag := range destIT.Minus(promotionCandidatesITRenamed) {
 					xtras = append(xtras, fmt.Sprintf(
 						"%s/%s:%s",
 						registry.Name,
@@ -865,6 +1126,7 @@ func (sc *SyncContext) Promote(
 	mfest Manifest,
 	mkProducer func(
 		RegistryName,
+		ImageName,
 		RegistryContext,
 		ImageName,
 		Digest,
@@ -972,7 +1234,7 @@ func (sc *SyncContext) PrintCapturedRequests(capReqs *CapturedRequests) {
 	})
 	if len(prs) > 0 {
 		for _, pr := range prs {
-			fmt.Printf("%v\n", pr.PrettyValue())
+			fmt.Printf("captured req: %v\n", pr.PrettyValue())
 		}
 	} else {
 		fmt.Println("No requests generated.")
@@ -996,12 +1258,11 @@ func (op *TagOp) PrettyValue() string {
 // PrettyValue is a prettified string representation of a PromotionRequest.
 func (pr *PromotionRequest) PrettyValue() string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "%v -> %v: Tag: '%v' <%v> %v@%v",
-		string(pr.RegistrySrc),
-		string(pr.RegistryDest),
+	fmt.Fprintf(&b, "%v -> %v: Tag: '%v' <%v> %v",
+		ToLQIN(pr.RegistrySrc, pr.ImageNameSrc),
+		ToLQIN(pr.RegistryDest, pr.ImageNameDest),
 		string(pr.Tag),
 		pr.TagOp.PrettyValue(),
-		string(pr.ImageName),
 		string(pr.Digest))
 	if len(pr.DigestOld) > 0 {
 		fmt.Fprintf(&b, " (move from '%v')", string(pr.DigestOld))
@@ -1064,6 +1325,12 @@ func (sc *SyncContext) GarbageCollect(
 							sc.SrcRegistry.Name,
 							registry.Name,
 							registry.ServiceAccount,
+
+							// No source image name, because tag deletions
+							// should only delete the what's in the
+							// destination registry
+							ImageName(""),
+
 							imageName,
 							digest,
 							"",
@@ -1140,7 +1407,8 @@ func GetWriteCmd(
 	dest RegistryContext,
 	useServiceAccount bool,
 	srcRegistry RegistryName,
-	image ImageName,
+	srcImageName ImageName,
+	destImageName ImageName,
 	digest Digest,
 	tag Tag,
 	tp TagOp) []string {
@@ -1157,15 +1425,15 @@ func GetWriteCmd(
 			"container",
 			"images",
 			"add-tag",
-			ToFQIN(srcRegistry, image, digest),
-			ToPQIN(dest.Name, image, tag)}
+			ToFQIN(srcRegistry, srcImageName, digest),
+			ToPQIN(dest.Name, destImageName, tag)}
 	case Delete:
 		cmd = []string{"gcloud",
 			"--quiet",
 			"container",
 			"images",
 			"untag",
-			ToPQIN(dest.Name, image, tag)}
+			ToPQIN(dest.Name, destImageName, tag)}
 	}
 	// Use the service account if it is desired.
 	return MaybeUseServiceAccount(dest.ServiceAccount, useServiceAccount, cmd)

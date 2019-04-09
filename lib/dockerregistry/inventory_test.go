@@ -139,8 +139,7 @@ func TestParseRegistryManifest(t *testing.T) {
 			"Empty manifest (invalid)",
 			``,
 			Manifest{},
-			fmt.Errorf(`source registry must be set
-'registries' field cannot be empty`),
+			fmt.Errorf(`'registries' field cannot be empty`),
 		},
 		{
 			"Stub manifest (`images` field is empty)",
@@ -243,6 +242,7 @@ images:
 		},
 	}
 
+	// nolint[lll]
 	// Test only the JSON unmarshalling logic.
 	for _, test := range tests {
 		bytes := []byte(test.input)
@@ -265,6 +265,78 @@ images:
 			t,
 			eqErr,
 			fmt.Sprintf("Test: %v (Manifest)\n", test.name))
+
+		// Perform some extra testing for the `renames` field.
+		if test.name == "Basic manifest" {
+			shouldBeValid := []string{
+				// Change the image path.
+				`renames:
+- ["gcr.io/foo/banana", "gcr.io/bar/some/subdir/banana"]`,
+				// Change the base image name. This is allowed.
+				`renames:
+- ["gcr.io/foo/banana", "gcr.io/bar/carrot"]`,
+			}
+			for _, validInput := range shouldBeValid {
+				bytes := []byte(test.input + validInput)
+				_, err := ParseManifest(bytes)
+				checkError(
+					t,
+					err,
+					fmt.Sprintf(
+						"Test: %v: (renames field parse failure (should be valid)\n",
+						test.name+": "+validInput))
+			}
+
+			// nolint[lll]
+			shouldBeInvalid := []struct {
+				name  string
+				input string
+				err   error
+			}{
+				{
+					name: "Only 1 path (need at least 2)",
+					input: `renames:
+- ["gcr.io/foo/banana"]`,
+					err: fmt.Errorf("a rename entry must have at least 2 paths, one for the source, another for at least 1 dest registry"),
+				},
+				{
+					name: "Multiple renames for a single registry",
+					input: `renames:
+- ["gcr.io/foo/banana", "gcr.io/bar/subdir/A/banana", "gcr.io/bar/subdir/B/banana"]`,
+					err: fmt.Errorf("multiple renames found for registry 'gcr.io/bar' in 'renames', for image subdir/B/banana"),
+				},
+				{
+					name: "Unknown registry",
+					input: `renames:
+- ["gcr.io/foo/banana", "gcr.io/cat/subdir/A/banana"]`,
+					err: fmt.Errorf("unknown registry 'gcr.io/cat' in 'renames' (not defined in 'registries')"),
+				},
+				{
+					name: "No source registry",
+					input: `renames:
+- ["gcr.io/bar/banana", "gcr.io/cat/subdir/A/banana"]`,
+					err: fmt.Errorf(`unknown registry 'gcr.io/cat' in 'renames' (not defined in 'registries')
+could not find source registry in '[gcr.io/bar/banana gcr.io/cat/subdir/A/banana]'`),
+				},
+				{
+					name: "Redundant rename",
+					input: `renames:
+- ["gcr.io/bar/banana", "gcr.io/foo/banana"]`,
+					err: fmt.Errorf(`redundant rename for [gcr.io/bar/banana gcr.io/foo/banana]`),
+				},
+			}
+			for _, invalid := range shouldBeInvalid {
+				bytes := []byte(test.input + invalid.input)
+				_, got := ParseManifest(bytes)
+				eqErr := checkEqual(got, invalid.err)
+				checkError(
+					t,
+					eqErr,
+					fmt.Sprintf(
+						"Test: %v: (renames field parse failure)\n",
+						test.name+": "+invalid.name))
+			}
+		}
 	}
 }
 
@@ -362,12 +434,68 @@ func TestParseImageTag(t *testing.T) {
 	}
 }
 
+func TestValidateRegistryImagePath(t *testing.T) {
+	//func validateRegistryImagePath(rip RegistryImagePath) error {
+	// nolint[lll]
+	var shouldBeValid = []string{
+		`gcr.io/foo/bar`,
+		`k8s.gcr.io/foo`,
+		`staging-k8s.gcr.io/foo`,
+		`staging-k8s.gcr.io/foo/bar/nested/path/image`,
+	}
+
+	for _, testInput := range shouldBeValid {
+		rip := RegistryImagePath(testInput)
+		got := validateRegistryImagePath(rip)
+		eqErr := checkEqual(got, nil)
+		checkError(
+			t,
+			eqErr,
+			fmt.Sprintf("Test: `%v' should be valid\n", testInput))
+	}
+
+	// nolint[lll]
+	var shouldBeInvalid = []string{
+		// Empty.
+		``,
+		// No dot.
+		`gcrio`,
+		// Too many dots.
+		`gcr..io`,
+		// Leading dot.
+		`.gcr.io`,
+		// Trailing dot.
+		`gcr.io.`,
+		// Too many slashes.
+		`gcr.io//foo`,
+		// Leading slash.
+		`/gcr.io`,
+		// Trailing slash (1).
+		`gcr.io/`,
+		// Trailing slash (2).
+		`gcr.io/foo/`,
+	}
+
+	for _, testInput := range shouldBeInvalid {
+		rip := RegistryImagePath(testInput)
+		got := validateRegistryImagePath(rip)
+		eqErr := checkEqual(
+			got, fmt.Errorf("invalid registry image path: %v", rip))
+		checkError(
+			t,
+			eqErr,
+			fmt.Sprintf("Test: `%v' should be invalid\n", testInput))
+	}
+
+}
+
 func TestCommandGeneration(t *testing.T) {
 	destRC := RegistryContext{
 		Name:           "gcr.io/foo",
 		ServiceAccount: "robot"}
 	var srcRegName RegistryName = "gcr.io/bar"
-	var imgName ImageName = "baz"
+	var srcImageName ImageName = "baz"
+	var destImageName ImageName = "baz" // simple case (no rename)
 	var digest Digest = "sha256:000"
 	var tag Tag = "1.0"
 	var tp TagOp
@@ -410,14 +538,14 @@ func TestCommandGeneration(t *testing.T) {
 	got = GetRegistryListTagsCmd(
 		destRC,
 		true,
-		string(imgName))
+		string(destImageName))
 	expected = []string{
 		"gcloud",
 		"--account=robot",
 		"container",
 		"images",
 		"list-tags",
-		fmt.Sprintf("%s/%s", destRC.Name, imgName),
+		fmt.Sprintf("%s/%s", destRC.Name, destImageName),
 		"--format=json"}
 	eqErr = checkEqual(got, expected)
 	checkError(
@@ -428,13 +556,13 @@ func TestCommandGeneration(t *testing.T) {
 	got = GetRegistryListTagsCmd(
 		destRC,
 		false,
-		string(imgName))
+		string(destImageName))
 	expected = []string{
 		"gcloud",
 		"container",
 		"images",
 		"list-tags",
-		fmt.Sprintf("%s/%s", destRC.Name, imgName),
+		fmt.Sprintf("%s/%s", destRC.Name, destImageName),
 		"--format=json"}
 	eqErr = checkEqual(got, expected)
 	checkError(
@@ -446,7 +574,7 @@ func TestCommandGeneration(t *testing.T) {
 	got = GetDeleteCmd(
 		destRC,
 		true,
-		imgName,
+		destImageName,
 		digest)
 	expected = []string{
 		"gcloud",
@@ -454,7 +582,7 @@ func TestCommandGeneration(t *testing.T) {
 		"container",
 		"images",
 		"delete",
-		ToFQIN(destRC.Name, imgName, digest),
+		ToFQIN(destRC.Name, destImageName, digest),
 		"--format=json"}
 	eqErr = checkEqual(got, expected)
 	checkError(
@@ -465,14 +593,14 @@ func TestCommandGeneration(t *testing.T) {
 	got = GetDeleteCmd(
 		destRC,
 		false,
-		imgName,
+		destImageName,
 		digest)
 	expected = []string{
 		"gcloud",
 		"container",
 		"images",
 		"delete",
-		ToFQIN(destRC.Name, imgName, digest),
+		ToFQIN(destRC.Name, destImageName, digest),
 		"--format=json"}
 	eqErr = checkEqual(got, expected)
 	checkError(
@@ -486,7 +614,8 @@ func TestCommandGeneration(t *testing.T) {
 		destRC,
 		true,
 		srcRegName,
-		imgName,
+		srcImageName,
+		destImageName,
 		digest,
 		tag,
 		tp)
@@ -498,8 +627,8 @@ func TestCommandGeneration(t *testing.T) {
 		"container",
 		"images",
 		"add-tag",
-		ToFQIN(srcRegName, imgName, digest),
-		ToPQIN(destRC.Name, imgName, tag)}
+		ToFQIN(srcRegName, destImageName, digest),
+		ToPQIN(destRC.Name, destImageName, tag)}
 	eqErr = checkEqual(got, expected)
 	checkError(
 		t,
@@ -510,7 +639,8 @@ func TestCommandGeneration(t *testing.T) {
 		destRC,
 		false,
 		srcRegName,
-		imgName,
+		srcImageName,
+		destImageName,
 		digest,
 		tag,
 		tp)
@@ -521,8 +651,8 @@ func TestCommandGeneration(t *testing.T) {
 		"container",
 		"images",
 		"add-tag",
-		ToFQIN(srcRegName, imgName, digest),
-		ToPQIN(destRC.Name, imgName, tag)}
+		ToFQIN(srcRegName, destImageName, digest),
+		ToPQIN(destRC.Name, destImageName, tag)}
 	eqErr = checkEqual(got, expected)
 	checkError(
 		t,
@@ -535,7 +665,8 @@ func TestCommandGeneration(t *testing.T) {
 		destRC,
 		true,
 		srcRegName,
-		imgName,
+		srcImageName,
+		destImageName,
 		digest,
 		tag,
 		tp)
@@ -546,7 +677,7 @@ func TestCommandGeneration(t *testing.T) {
 		"container",
 		"images",
 		"untag",
-		ToPQIN(destRC.Name, imgName, tag)}
+		ToPQIN(destRC.Name, destImageName, tag)}
 	eqErr = checkEqual(got, expected)
 	checkError(
 		t,
@@ -557,7 +688,8 @@ func TestCommandGeneration(t *testing.T) {
 		destRC,
 		false,
 		srcRegName,
-		imgName,
+		srcImageName,
+		destImageName,
 		digest,
 		tag,
 		tp)
@@ -567,7 +699,7 @@ func TestCommandGeneration(t *testing.T) {
 		"container",
 		"images",
 		"untag",
-		ToPQIN(destRC.Name, imgName, tag)}
+		ToPQIN(destRC.Name, destImageName, tag)}
 	eqErr = checkEqual(got, expected)
 	checkError(
 		t,
@@ -824,6 +956,89 @@ func TestSetManipulationsRegistryInventories(t *testing.T) {
 	}
 }
 
+func TestDenormalizeRenames(t *testing.T) {
+	srcRegName := RegistryName("gcr.io/foo")
+	destRegName := RegistryName("gcr.io/bar")
+	destRegName2 := RegistryName("gcr.io/cat")
+	destRC := RegistryContext{
+		Name:           destRegName,
+		ServiceAccount: "robot",
+	}
+	destRC2 := RegistryContext{
+		Name:           destRegName2,
+		ServiceAccount: "robot",
+	}
+	srcRC := RegistryContext{
+		Name:           srcRegName,
+		ServiceAccount: "robot",
+		Src:            true,
+	}
+	registries := []RegistryContext{srcRC, destRC, destRC2}
+	var tests = []struct {
+		name           string
+		input          Manifest
+		expectedOutput RenamesDenormalized
+	}{
+		{
+			"Simple case: 1 rename",
+			Manifest{
+				Registries: registries,
+				Images: []Image{
+					{
+						ImageName: "a",
+						Dmap: DigestTags{
+							"sha256:000": TagSlice{"0.9"}}}},
+				Renames: []Rename{
+					[]RegistryImagePath{
+						"gcr.io/foo/a",
+						"gcr.io/bar/some/subdir/a"}}},
+			RenamesDenormalized{
+				"gcr.io/foo/a": map[RegistryName]ImageName{
+					"gcr.io/bar": "some/subdir/a"},
+				"gcr.io/bar/some/subdir/a": map[RegistryName]ImageName{
+					"gcr.io/foo": "a"}},
+		},
+		{
+			"2 renames, 2 different dest repos",
+			Manifest{
+				Registries: registries,
+				Images: []Image{
+					{
+						ImageName: "a",
+						Dmap: DigestTags{
+							"sha256:000": TagSlice{"0.9"}}}},
+				Renames: []Rename{
+					[]RegistryImagePath{
+						"gcr.io/foo/a",
+						"gcr.io/bar/some/subdir/a",
+						"gcr.io/cat/different/path/a",
+					}}},
+			RenamesDenormalized{
+				"gcr.io/foo/a": map[RegistryName]ImageName{
+					"gcr.io/bar": "some/subdir/a",
+					"gcr.io/cat": "different/path/a"},
+				"gcr.io/bar/some/subdir/a": map[RegistryName]ImageName{
+					"gcr.io/foo": "a",
+					"gcr.io/cat": "different/path/a",
+				},
+				"gcr.io/cat/different/path/a": map[RegistryName]ImageName{
+					"gcr.io/foo": "a",
+					"gcr.io/bar": "some/subdir/a",
+				}},
+		},
+	}
+
+	for _, test := range tests {
+		got, err := DenormalizeRenames(test.input, srcRegName)
+		checkError(t, err, fmt.Sprintf(
+			"Test (denormalization): %v\n", test.name))
+		expected := test.expectedOutput
+		err = checkEqual(got, expected)
+		checkError(t, err, fmt.Sprintf(
+			"Test (equality): %v\n", test.name))
+	}
+}
+
 func TestSetManipulationsTags(t *testing.T) {
 	var tests = []struct {
 		name           string
@@ -1016,8 +1231,13 @@ func TestPromotion(t *testing.T) {
 	// set. Then we can check that all requests were generated exactly 1 time.
 	srcRegName := RegistryName("gcr.io/foo")
 	destRegName := RegistryName("gcr.io/bar")
+	destRegName2 := RegistryName("gcr.io/cat")
 	destRC := RegistryContext{
 		Name:           destRegName,
+		ServiceAccount: "robot",
+	}
+	destRC2 := RegistryContext{
+		Name:           destRegName2,
 		ServiceAccount: "robot",
 	}
 	srcRC := RegistryContext{
@@ -1025,7 +1245,8 @@ func TestPromotion(t *testing.T) {
 		ServiceAccount: "robot",
 		Src:            true,
 	}
-	registries := []RegistryContext{destRC, srcRC}
+	registries := []RegistryContext{destRC, srcRC, destRC2}
+	// nolint[dup]
 	var tests = []struct {
 		name         string
 		inputM       Manifest
@@ -1057,7 +1278,10 @@ func TestPromotion(t *testing.T) {
 						"a": DigestTags{
 							"sha256:000": TagSlice{"0.9"}},
 						"b": DigestTags{
-							"sha256:111": TagSlice{}}}}},
+							"sha256:111": TagSlice{}}},
+					"gcr.io/cat": RegInvImage{
+						"a": DigestTags{
+							"sha256:000": TagSlice{"0.9"}}}}},
 			CapturedRequests{},
 		},
 		{
@@ -1076,13 +1300,17 @@ func TestPromotion(t *testing.T) {
 							"sha256:000": TagSlice{"0.9"}}},
 					"gcr.io/bar": RegInvImage{
 						"b": DigestTags{
-							"sha256:111": TagSlice{}}}}},
+							"sha256:111": TagSlice{}}},
+					"gcr.io/cat": RegInvImage{
+						"a": DigestTags{
+							"sha256:000": TagSlice{"0.9"}}}}},
 			CapturedRequests{PromotionRequest{
 				TagOp:          Add,
 				RegistrySrc:    srcRegName,
 				RegistryDest:   registries[0].Name,
 				ServiceAccount: registries[0].ServiceAccount,
-				ImageName:      "a",
+				ImageNameSrc:   "a",
+				ImageNameDest:  "a",
 				Digest:         "sha256:000",
 				Tag:            "0.9"}: 1},
 		},
@@ -1102,13 +1330,17 @@ func TestPromotion(t *testing.T) {
 							"sha256:000": TagSlice{"0.9"}}},
 					"gcr.io/bar": RegInvImage{
 						"a": DigestTags{
-							"sha256:111": TagSlice{}}}}},
+							"sha256:111": TagSlice{}}},
+					"gcr.io/cat": RegInvImage{
+						"a": DigestTags{
+							"sha256:000": TagSlice{"0.9"}}}}},
 			CapturedRequests{PromotionRequest{
 				TagOp:          Add,
 				RegistrySrc:    srcRegName,
 				RegistryDest:   registries[0].Name,
 				ServiceAccount: registries[0].ServiceAccount,
-				ImageName:      "a",
+				ImageNameSrc:   "a",
+				ImageNameDest:  "a",
 				Digest:         "sha256:000",
 				Tag:            "0.9"}: 1},
 		},
@@ -1129,16 +1361,137 @@ func TestPromotion(t *testing.T) {
 							"sha256:000": TagSlice{"0.9"}}},
 					"gcr.io/bar": RegInvImage{
 						"a": DigestTags{
-							"sha256:111": TagSlice{"0.9"}}}}},
+							"sha256:111": TagSlice{"0.9"}}},
+					"gcr.io/cat": RegInvImage{
+						"a": DigestTags{
+							"sha256:000": TagSlice{"0.9"}}}}},
 			CapturedRequests{PromotionRequest{
 				TagOp:          Move,
 				RegistrySrc:    srcRegName,
 				RegistryDest:   registries[0].Name,
 				ServiceAccount: registries[0].ServiceAccount,
-				ImageName:      "a",
+				ImageNameSrc:   "a",
+				ImageNameDest:  "a",
 				Digest:         "sha256:000",
 				DigestOld:      "sha256:111",
 				Tag:            "0.9"}: 1},
+		},
+		{
+			// nolint[lll]
+			"Promote 1 tag via rename",
+			Manifest{
+				Registries: registries,
+				Images: []Image{
+					{
+						ImageName: "a",
+						Dmap: DigestTags{
+							"sha256:000": TagSlice{"0.9"}}}},
+				Renames: []Rename{
+					[]RegistryImagePath{
+						"gcr.io/foo/a",
+						"gcr.io/bar/some/subdir/path/a"}}},
+			SyncContext{
+				Inv: MasterInventory{
+					"gcr.io/foo": RegInvImage{
+						"a": DigestTags{
+							"sha256:000": TagSlice{"0.9"}}},
+					"gcr.io/bar": RegInvImage{
+						"some/subdir/path/a": DigestTags{
+							"sha256:111": TagSlice{"0.8"}}},
+					"gcr.io/cat": RegInvImage{
+						"a": DigestTags{
+							"sha256:000": TagSlice{"0.9"}}}}},
+			CapturedRequests{PromotionRequest{
+				TagOp:          Add,
+				RegistrySrc:    srcRegName,
+				RegistryDest:   registries[0].Name,
+				ServiceAccount: registries[0].ServiceAccount,
+				ImageNameSrc:   "a",
+				ImageNameDest:  "some/subdir/path/a",
+				Digest:         "sha256:000",
+				Tag:            "0.9"}: 1},
+		},
+		{
+			// nolint[lll]
+			"Promote 1 tag via rename (move image)",
+			Manifest{
+				Registries: registries,
+				Images: []Image{
+					{
+						ImageName: "a",
+						Dmap: DigestTags{
+							"sha256:000": TagSlice{"0.9"}}}},
+				Renames: []Rename{
+					[]RegistryImagePath{
+						"gcr.io/foo/a",
+						"gcr.io/bar/some/subdir/path/a"}}},
+			SyncContext{
+				Inv: MasterInventory{
+					"gcr.io/foo": RegInvImage{
+						"a": DigestTags{
+							"sha256:000": TagSlice{"0.9"}}},
+					"gcr.io/bar": RegInvImage{
+						"some/subdir/path/a": DigestTags{
+							"sha256:111": TagSlice{"0.9"}}},
+					"gcr.io/cat": RegInvImage{
+						"a": DigestTags{
+							"sha256:000": TagSlice{"0.9"}}}}},
+			CapturedRequests{PromotionRequest{
+				TagOp:          Move,
+				RegistrySrc:    srcRegName,
+				RegistryDest:   registries[0].Name,
+				ServiceAccount: registries[0].ServiceAccount,
+				ImageNameSrc:   "a",
+				ImageNameDest:  "some/subdir/path/a",
+				Digest:         "sha256:000",
+				DigestOld:      "sha256:111",
+				Tag:            "0.9"}: 1},
+		},
+		{
+			// nolint[lll]
+			"Promote 1 tag via rename (1 dest should be renamed, another should share the same name as src)",
+			Manifest{
+				Registries: registries,
+				Images: []Image{
+					{
+						ImageName: "a",
+						Dmap: DigestTags{
+							"sha256:000": TagSlice{"0.9"}}}},
+				Renames: []Rename{
+					[]RegistryImagePath{
+						"gcr.io/foo/a",
+						"gcr.io/bar/some/subdir/path/a"}}},
+			SyncContext{
+				Inv: MasterInventory{
+					"gcr.io/foo": RegInvImage{
+						"a": DigestTags{
+							"sha256:000": TagSlice{"0.9"}}},
+					"gcr.io/bar": RegInvImage{
+						"some/subdir/path/a": DigestTags{
+							"sha256:111": TagSlice{"0.8"}}},
+					"gcr.io/cat": RegInvImage{
+						"b": DigestTags{
+							"sha256:000": TagSlice{"0.9"}}}}},
+			CapturedRequests{
+				PromotionRequest{
+					TagOp:          Add,
+					RegistrySrc:    srcRegName,
+					RegistryDest:   registries[0].Name,
+					ServiceAccount: registries[0].ServiceAccount,
+					ImageNameSrc:   "a",
+					ImageNameDest:  "some/subdir/path/a",
+					Digest:         "sha256:000",
+					Tag:            "0.9"}: 1,
+				PromotionRequest{
+					TagOp:          Add,
+					RegistrySrc:    srcRegName,
+					RegistryDest:   registries[2].Name,
+					ServiceAccount: registries[2].ServiceAccount,
+					ImageNameSrc:   "a",
+					ImageNameDest:  "a",
+					Digest:         "sha256:000",
+					Tag:            "0.9"}: 1,
+			},
 		},
 		{
 			// nolint[lll]
@@ -1158,7 +1511,10 @@ func TestPromotion(t *testing.T) {
 							"sha256:000": TagSlice{"0.9"}}},
 					"gcr.io/bar": RegInvImage{
 						"a": DigestTags{
-							"sha256:000": TagSlice{"0.9", "extra-tag"}}}}},
+							"sha256:000": TagSlice{"0.9", "extra-tag"}}},
+					"gcr.io/cat": RegInvImage{
+						"a": DigestTags{
+							"sha256:000": TagSlice{"0.9"}}}}},
 			CapturedRequests{},
 		},
 		{
@@ -1179,13 +1535,17 @@ func TestPromotion(t *testing.T) {
 							"sha256:000": TagSlice{"0.9"}}},
 					"gcr.io/bar": RegInvImage{
 						"a": DigestTags{
-							"sha256:000": TagSlice{"0.9", "extra-tag"}}}}},
+							"sha256:000": TagSlice{"0.9", "extra-tag"}}},
+					"gcr.io/cat": RegInvImage{
+						"a": DigestTags{
+							"sha256:000": TagSlice{"0.9"}}}}},
 			CapturedRequests{PromotionRequest{
 				TagOp:          Delete,
 				RegistrySrc:    srcRegName,
 				RegistryDest:   registries[0].Name,
 				ServiceAccount: registries[0].ServiceAccount,
-				ImageName:      "a",
+				ImageNameSrc:   "a",
+				ImageNameDest:  "a",
 				Digest:         "sha256:000",
 				Tag:            "extra-tag"}: 1},
 		},
@@ -1226,8 +1586,9 @@ func TestPromotion(t *testing.T) {
 
 	nopStream := func(
 		srcRegistry RegistryName,
+		srcImageName ImageName,
 		rc RegistryContext,
-		imageName ImageName,
+		destImageName ImageName,
 		digest Digest,
 		tag Tag,
 		tp TagOp) stream.Producer {
@@ -1239,11 +1600,16 @@ func TestPromotion(t *testing.T) {
 	}
 
 	for _, test := range tests {
+
 		// Reset captured for each test.
 		captured = make(CapturedRequests)
 		srcReg, err := getSrcRegistry(registries)
 		checkError(t, err,
 			fmt.Sprintf("checkError (srcReg): test: %v\n", test.name))
+		rd, err := DenormalizeRenames(test.inputM, srcReg.Name)
+		checkError(t, err,
+			fmt.Sprintf("checkError (rd): test: %v\n", test.name))
+		test.inputSc.RenamesDenormalized = rd
 		test.inputSc.SrcRegistry = srcReg
 		test.inputSc.Promote(
 			test.inputM,
@@ -1306,7 +1672,8 @@ func TestPromotionMulti(t *testing.T) {
 					RegistrySrc:    srcRegName,
 					RegistryDest:   registries[1].Name,
 					ServiceAccount: registries[1].ServiceAccount,
-					ImageName:      "a",
+					ImageNameSrc:   "a",
+					ImageNameDest:  "a",
 					Digest:         "sha256:000",
 					Tag:            "1.0"}: 1,
 				PromotionRequest{
@@ -1314,7 +1681,8 @@ func TestPromotionMulti(t *testing.T) {
 					RegistrySrc:    srcRegName,
 					RegistryDest:   registries[2].Name,
 					ServiceAccount: registries[2].ServiceAccount,
-					ImageName:      "a",
+					ImageNameSrc:   "a",
+					ImageNameDest:  "a",
 					Digest:         "sha256:000",
 					Tag:            "1.0"}: 1,
 			},
@@ -1348,7 +1716,8 @@ func TestPromotionMulti(t *testing.T) {
 					RegistrySrc:    srcRegName,
 					RegistryDest:   registries[1].Name,
 					ServiceAccount: registries[1].ServiceAccount,
-					ImageName:      "a",
+					ImageNameSrc:   "a",
+					ImageNameDest:  "a",
 					Digest:         "sha256:000",
 					Tag:            "1.0"}: 1,
 				PromotionRequest{
@@ -1356,7 +1725,8 @@ func TestPromotionMulti(t *testing.T) {
 					RegistrySrc:    srcRegName,
 					RegistryDest:   registries[2].Name,
 					ServiceAccount: registries[2].ServiceAccount,
-					ImageName:      "a",
+					ImageNameSrc:   "a",
+					ImageNameDest:  "a",
 					Digest:         "sha256:000",
 					Tag:            "extra-tag"}: 1,
 			},
@@ -1370,8 +1740,9 @@ func TestPromotionMulti(t *testing.T) {
 
 	nopStream := func(
 		srcRegistry RegistryName,
+		srcImageName ImageName,
 		rc RegistryContext,
-		imageName ImageName,
+		destImageName ImageName,
 		digest Digest,
 		tag Tag,
 		tp TagOp) stream.Producer {
@@ -1401,6 +1772,7 @@ func TestPromotionMulti(t *testing.T) {
 func TestGarbageCollection(t *testing.T) {
 	srcRegName := RegistryName("gcr.io/foo")
 	destRegName := RegistryName("gcr.io/bar")
+	destRegName2 := RegistryName("gcr.io/cat")
 	registries := []RegistryContext{
 		{
 			Name:           srcRegName,
@@ -1409,6 +1781,10 @@ func TestGarbageCollection(t *testing.T) {
 		},
 		{
 			Name:           destRegName,
+			ServiceAccount: "robot",
+		},
+		{
+			Name:           destRegName2,
 			ServiceAccount: "robot",
 		},
 	}
@@ -1482,7 +1858,8 @@ func TestGarbageCollection(t *testing.T) {
 					RegistrySrc:    srcRegName,
 					RegistryDest:   registries[1].Name,
 					ServiceAccount: registries[1].ServiceAccount,
-					ImageName:      "a",
+					ImageNameSrc:   "",
+					ImageNameDest:  "a",
 					Digest:         "sha256:111",
 					Tag:            ""}: 1,
 				PromotionRequest{
@@ -1490,8 +1867,81 @@ func TestGarbageCollection(t *testing.T) {
 					RegistrySrc:    srcRegName,
 					RegistryDest:   registries[1].Name,
 					ServiceAccount: registries[1].ServiceAccount,
-					ImageName:      "z",
+					ImageNameSrc:   "",
+					ImageNameDest:  "z",
 					Digest:         "sha256:000",
+					Tag:            ""}: 1,
+			},
+		},
+		{
+			// nolint[lll]
+			"Garbage collection with renames present (only garbage-collect *renamed* paths in dest)",
+			Manifest{
+				Registries: registries,
+				Images: []Image{
+					{
+						ImageName: "a",
+						Dmap: DigestTags{
+							"sha256:000": TagSlice{"000"},
+							"sha256:333": TagSlice{"333"},
+						}},
+					{
+						ImageName: "b",
+						Dmap: DigestTags{
+							"sha256:bbb": TagSlice{"bbb"}}}},
+				Renames: []Rename{
+					[]RegistryImagePath{
+						"gcr.io/foo/a",
+						"gcr.io/bar/some/subdir/path/a"}}},
+			SyncContext{
+				Inv: MasterInventory{
+					// Source repo has both images accounted for in the manifest
+					// but also images extraneouc of the manifest. These
+					// extraneous images should not affect garbage-collection at
+					// all.
+					"gcr.io/foo": RegInvImage{
+						"a": DigestTags{
+							"sha256:000": nil,
+							"sha256:333": nil,
+						},
+						"b": DigestTags{
+							"sha256:bbb": nil},
+						"c": DigestTags{
+							"sha256:000": nil},
+						"d": DigestTags{
+							"sha256:bbb": nil}},
+					"gcr.io/bar": RegInvImage{
+						"some/subdir/path/a": DigestTags{
+							"sha256:000": TagSlice{"000"},
+							"sha256:111": nil,
+						},
+						"b": DigestTags{
+							"sha256:333": TagSlice{"bbb"}}},
+					"gcr.io/cat": RegInvImage{
+						"a": DigestTags{
+							"sha256:fff": nil},
+						"b": DigestTags{
+							"sha256:bbb": TagSlice{"bbb"}}}}},
+			CapturedRequests{
+				// Delete an extra tag from the renamed path.
+				PromotionRequest{
+					TagOp:          Delete,
+					RegistrySrc:    srcRegName,
+					RegistryDest:   registries[1].Name,
+					ServiceAccount: registries[1].ServiceAccount,
+					ImageNameSrc:   "",
+					ImageNameDest:  "some/subdir/path/a",
+					Digest:         "sha256:111",
+					Tag:            ""}: 1,
+				// Delete a tag on a non-renamed  path (different dest)}.
+				PromotionRequest{
+					TagOp:          Delete,
+					RegistrySrc:    srcRegName,
+					RegistryDest:   registries[2].Name,
+					ServiceAccount: registries[2].ServiceAccount,
+					ImageNameSrc:   "",
+					ImageNameDest:  "a",
+					Digest:         "sha256:fff",
 					Tag:            ""}: 1,
 			},
 		},
@@ -1603,7 +2053,8 @@ func TestGarbageCollectionMulti(t *testing.T) {
 					RegistrySrc:    srcRegName,
 					RegistryDest:   registries[1].Name,
 					ServiceAccount: registries[1].ServiceAccount,
-					ImageName:      "a",
+					ImageNameSrc:   "",
+					ImageNameDest:  "a",
 					Digest:         "sha256:111",
 					Tag:            ""}: 1,
 				PromotionRequest{
@@ -1611,7 +2062,8 @@ func TestGarbageCollectionMulti(t *testing.T) {
 					RegistrySrc:    srcRegName,
 					RegistryDest:   registries[1].Name,
 					ServiceAccount: registries[1].ServiceAccount,
-					ImageName:      "z",
+					ImageNameSrc:   "",
+					ImageNameDest:  "z",
 					Digest:         "sha256:222",
 					Tag:            ""}: 1,
 				PromotionRequest{
@@ -1619,7 +2071,8 @@ func TestGarbageCollectionMulti(t *testing.T) {
 					RegistrySrc:    srcRegName,
 					RegistryDest:   registries[2].Name,
 					ServiceAccount: registries[2].ServiceAccount,
-					ImageName:      "a",
+					ImageNameSrc:   "",
+					ImageNameDest:  "a",
 					Digest:         "sha256:123",
 					Tag:            ""}: 1,
 				PromotionRequest{
@@ -1627,7 +2080,8 @@ func TestGarbageCollectionMulti(t *testing.T) {
 					RegistrySrc:    srcRegName,
 					RegistryDest:   registries[2].Name,
 					ServiceAccount: registries[2].ServiceAccount,
-					ImageName:      "b",
+					ImageNameSrc:   "",
+					ImageNameDest:  "b",
 					Digest:         "sha256:444",
 					Tag:            ""}: 1,
 			},

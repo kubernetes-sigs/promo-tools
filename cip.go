@@ -104,13 +104,34 @@ func main() {
 	if *manifestPtr == "" {
 		log.Fatal(fmt.Errorf("-manifest=... flag is required"))
 	}
-	mfest, err := reg.ParseManifestFromFile(*manifestPtr)
+	mfest, rd, srcRegistry, err := reg.ParseManifestFromFile(*manifestPtr)
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	mi := map[reg.RegistryName]reg.RegInvImage{}
+	for _, registry := range mfest.Registries {
+		mi[registry.Name] = nil
+	}
+	sc, err := reg.MakeSyncContext(
+		*manifestPtr,
+		mfest.Registries,
+		rd,
+		srcRegistry,
+		mi,
+		*verbosityPtr,
+		*threadsPtr,
+		*deleteExtraTags,
+		*dryRunPtr,
+		!noSvcAcc)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	if *parseOnlyPtr {
 		os.Exit(0)
 	}
+
 	// If there are no images in the manifest, it may be a stub manifest file
 	// (such as for brand new registries that would be watched by the promoter
 	// for the very first time). In any case, we do NOT want to process such
@@ -127,23 +148,6 @@ func main() {
 		fmt.Printf("********** START (DRY RUN): %s **********\n", *manifestPtr)
 	} else {
 		fmt.Printf("********** START: %s **********\n", *manifestPtr)
-	}
-
-	mi := map[reg.RegistryName]reg.RegInvImage{}
-	for _, registry := range mfest.Registries {
-		mi[registry.Name] = nil
-	}
-	sc, err := reg.MakeSyncContext(
-		*manifestPtr,
-		mi,
-		*verbosityPtr,
-		*threadsPtr,
-		*deleteExtraTags,
-		*dryRunPtr,
-		!noSvcAcc,
-		mfest.Registries)
-	if err != nil {
-		log.Fatal(err)
 	}
 
 	// Read the state of the world; i.e., populate the SyncContext.
@@ -173,6 +177,7 @@ func main() {
 	// Promote.
 	mkPromotionCmd := func(
 		srcRegistry reg.RegistryName,
+		srcImageName reg.ImageName,
 		destRC reg.RegistryContext,
 		imageName reg.ImageName,
 		digest reg.Digest, tag reg.Tag, tp reg.TagOp) stream.Producer {
@@ -181,6 +186,7 @@ func main() {
 			destRC,
 			sc.UseServiceAccount,
 			srcRegistry,
+			srcImageName,
 			imageName,
 			digest,
 			tag,

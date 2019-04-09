@@ -44,15 +44,16 @@ type CapturedRequests map[PromotionRequest]int
 
 // SyncContext is the main data structure for performing the promotion.
 type SyncContext struct {
-	ManifestPath      string
-	Verbosity         int
-	Threads           int
-	DeleteExtraTags   bool
-	DryRun            bool
-	UseServiceAccount bool
-	Inv               MasterInventory
-	RegistryContexts  []RegistryContext
-	SrcRegistry       *RegistryContext
+	ManifestPath        string
+	Verbosity           int
+	Threads             int
+	DeleteExtraTags     bool
+	DryRun              bool
+	UseServiceAccount   bool
+	Inv                 MasterInventory
+	RegistryContexts    []RegistryContext
+	SrcRegistry         *RegistryContext
+	RenamesDenormalized RenamesDenormalized
 }
 
 // MasterInventory stores multiple RegInvImage elements, keyed by RegistryName.
@@ -127,7 +128,8 @@ type PromotionRequest struct {
 	RegistrySrc    RegistryName
 	RegistryDest   RegistryName
 	ServiceAccount string
-	ImageName      ImageName
+	ImageNameSrc   ImageName
+	ImageNameDest  ImageName
 	Digest         Digest
 	DigestOld      Digest // Only for tag moves.
 	Tag            Tag
@@ -141,7 +143,38 @@ type Manifest struct {
 	// registries, in which case we would have more than just Src/Dest.
 	Registries []RegistryContext
 	Images     []Image `yaml:"images,omitempty"`
+	// A rename list can contain a list of paths, where each path is a string.
+	//
+	// - A rename entry must have at least 2 paths, one for the source, another
+	// for at least 1 dest registry.
+	//
+	// - Any unknown registry entries in here will be considered a parsing
+	// error.
+	//
+	// - Any redundant entries in here will be considered a parsing error. E.g.,
+	// "gcr.io/louhi-qa/glbc:gcr.io/louhi-gke-k8s/glbc" is redunant as it is
+	// implied already.
+	//
+	// - The names must be valid paths (no errant punctuation, etc.).
+	//
+	// - No self-loops allowed (a registry must not appear more than 1 time).
+	//
+	// - Each name must be the registry+pathname, *without* a trailing slash.
+	//
+	// Just before the promotion, each rename entry is processed, to update the
+	// master inventory entries for the *renamed* images.
+	//
+	// When fetching data from a renamed image's repository, they are
+	// "normalized" to the path as seen in the source registry for that image
+	// --- this is so that the set difference logic can be used as-is. Only when
+	// the promotion itself is performed, do we "denormalize" at the very last
+	// moment by modifying the argument to each destination path.
+	Renames []Rename `yaml:"renames,omitempty"`
 }
+
+// RenamesDenormalized is a lookup-optimized data structure of rename
+// information.
+type RenamesDenormalized map[RegistryImagePath]map[RegistryName]ImageName
 
 // Image holds information about an image. It's like an "Object" in the OOP
 // sense, and holds all the information relating to a particular image that we
@@ -150,6 +183,14 @@ type Image struct {
 	ImageName ImageName `yaml:"name"`
 	Dmap      DigestTags
 }
+
+// Rename is list of paths, where each path is full
+// image name (registry + image name, without the tag).
+type Rename []RegistryImagePath
+
+// RegistryImagePath is the registry name and image name, without the tag. E.g.
+// "gcr.io/foo/bar/baz/image".
+type RegistryImagePath string
 
 // DigestTags is a map where each digest is associated with a TagSlice. It is
 // associated with a TagSlice because an image digest can have more than 1 tag
@@ -212,6 +253,17 @@ type ProcessRequest func(
 	chan<- RequestResult,
 	*sync.WaitGroup,
 	*sync.Mutex)
+
+// PromotionContext holds all info required to create a stream that would
+// produce a stream.Producer, as it relates to an intent to promote an image.
+type PromotionContext func(
+	RegistryName, // srcRegisttry
+	ImageName, // srcImage
+	RegistryContext, // destRegistryContext (need service acc)
+	ImageName, // destImage
+	Digest,
+	Tag,
+	TagOp) stream.Producer
 
 // Various conversion functions.
 
