@@ -289,3 +289,21 @@ func (riid RegInvImageDigest) ToRegInvImageTag() RegInvImageTag {
 	}
 	return riit
 }
+
+// ToRegInvImageDigest converts a RegInvImageTag to a RegInvImageDigest.
+func (riit RegInvImageTag) ToRegInvImageDigest() RegInvImageDigest {
+	riid := make(RegInvImageDigest)
+	for imageTag, digest := range riit {
+		id := ImageDigest{}
+		id.ImageName = imageTag.ImageName
+		id.Digest = digest
+
+		tagSlice, ok := riid[id]
+		if ok {
+			riid[id] = append(tagSlice, imageTag.Tag)
+		} else {
+			riid[id] = TagSlice{imageTag.Tag}
+		}
+	}
+	return riid
+}

@@ -721,6 +721,8 @@ func (sc *SyncContext) mkPopReq(
 
 // mkPopulateRequestsForPromotion creates all requests necessary to reconcile
 // the Manifest against the state of the world.
+//
+// nolint[gocyclo]
 func mkPopulateRequestsForPromotion(
 	mfest Manifest,
 	promotionCandidatesIT RegInvImageTag,
@@ -734,21 +736,42 @@ func mkPopulateRequestsForPromotion(
 ) PopulateRequests {
 	return func(sc *SyncContext, reqs chan<- stream.ExternalRequest) {
 		for _, registry := range mfest.Registries {
-			if registry.Name == sc.SrcRegistry.Name {
+			if registry.Src {
 				continue
 			}
+
+			// Promote images that are not in the destination registry.
 			destIT := sc.Inv[registry.Name].ToRegInvImageTag()
-			// For all promotionCandidates that are not already in the
-			// destination, their promotion type is "Add".
+			promotionFiltered := promotionCandidatesIT.Minus(destIT)
+			promotionFilteredID := promotionFiltered.ToRegInvImageDigest()
+
+			if len(promotionFilteredID) > 0 {
+				sc.Infof(
+					"To promote (after removing already-promoted images):\n%v",
+					promotionFilteredID.PrettyValue())
+				if sc.DryRun {
+					sc.Infof(
+						"---------- BEGIN PROMOTION (DRY RUN): %s ----------\n",
+						sc.ManifestPath)
+				} else {
+					sc.Infof("---------- BEGIN PROMOTION: %s ----------\n",
+						sc.ManifestPath)
+				}
+			} else {
+				sc.Infof("Nothing to promote.\n")
+			}
+
 			sc.mkPopReq(
 				registry,
-				promotionCandidatesIT.Minus(destIT),
+				promotionFiltered,
 				Add,
 				"",
 				mkProducer,
 				reqs)
-			// Audit the intersection (make sure already-existing tags are
-			// pointing to the digest specified in the manifest).
+
+			// Audit the intersection (make sure already-existing tags in the
+			// destination are pointing to the digest specified in the
+			// manifest).
 			toAudit := promotionCandidatesIT.Intersection(destIT)
 			for imageTag, digest := range toAudit {
 				if liveDigest, ok := destIT[imageTag]; ok {
@@ -786,6 +809,9 @@ func mkPopulateRequestsForPromotion(
 					}
 				}
 			}
+
+			// Either delete extraneous tags in the destination, or warn about
+			// them (hinges on sc.DeleteExtraTags).
 			mfestIT := mfest.ToRegInvImageTag()
 			if sc.DeleteExtraTags {
 				sc.mkPopReq(
@@ -830,29 +856,7 @@ func (sc *SyncContext) GetPromotionCandidatesIT(
 		sc.SrcRegistry.Name,
 		promotionCandidates.PrettyValue())
 
-	if len(promotionCandidates) > 0 {
-		sc.Infof(
-			"To promote (after removing already-promoted images):\n%v",
-			promotionCandidates.PrettyValue())
-		if sc.DryRun {
-			sc.Infof("---------- BEGIN PROMOTION (DRY RUN): %s ----------\n",
-				sc.ManifestPath)
-		} else {
-			sc.Infof("---------- BEGIN PROMOTION: %s ----------\n",
-				sc.ManifestPath)
-		}
-	} else {
-		sc.Infof(
-			"To promote (after removing already-promoted images):\n  <none>\n")
-	}
-
-	promotionCandidatesIT := promotionCandidates.ToRegInvImageTag()
-
-	if len(promotionCandidatesIT) == 0 {
-		fmt.Println("Nothing to promote.")
-	}
-
-	return promotionCandidatesIT
+	return promotionCandidates.ToRegInvImageTag()
 }
 
 // Promote perferms container image promotion by realizing the intent in the
