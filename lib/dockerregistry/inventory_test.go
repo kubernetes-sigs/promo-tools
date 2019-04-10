@@ -1088,7 +1088,7 @@ func TestPromotion(t *testing.T) {
 				Tag:            "0.9"}: 1},
 		},
 		{
-			"Promote 1 tag; image digest already exists in dest",
+			"Promote 1 tag; image already exists in dest, but digest does not",
 			Manifest{
 				SrcRegistry: srcRegName,
 				Registries:  registries,
