@@ -20,6 +20,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 
 	// nolint[lll]
@@ -109,7 +110,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	mi := map[reg.RegistryName]reg.RegInvImage{}
+	mi := make(reg.MasterInventory)
 	for _, registry := range mfest.Registries {
 		mi[registry.Name] = nil
 	}
@@ -150,27 +151,33 @@ func main() {
 		fmt.Printf("********** START: %s **********\n", *manifestPtr)
 	}
 
-	// Read the state of the world; i.e., populate the SyncContext.
-	mkRegistryListingCmd := func(
-		rc reg.RegistryContext) stream.Producer {
-		var sp stream.Subprocess
-		sp.CmdInvocation = reg.GetRegistryListingCmd(
-			rc,
-			sc.UseServiceAccount)
-		return &sp
+	// Populate access tokens for all registries listed in the manifest.
+	err = sc.PopulateTokens()
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	sc.ReadImageNames(mkRegistryListingCmd)
-	mkRegistryListTagsCmd := func(
-		rc reg.RegistryContext, imgName reg.ImageName) stream.Producer {
-		var sp stream.Subprocess
-		sp.CmdInvocation = reg.GetRegistryListTagsCmd(
-			rc,
-			sc.UseServiceAccount,
-			string(imgName))
-		return &sp
+	mkReadRepositoryCmd := func(
+		rc reg.RegistryContext) stream.Producer {
+		var sh stream.HTTP
+
+		tokenKey, domain, repoPath := reg.GetTokenKeyDomainRepoPath(rc.Name)
+
+		httpReq, err := http.NewRequest(
+			"GET",
+			fmt.Sprintf("https://%s/v2/%s/tags/list", domain, repoPath),
+			nil)
+
+		if err != nil {
+			log.Fatalf("could not create HTTP request for '%s/%s'", domain, repoPath)
+		}
+		rc.Token = sc.Tokens[reg.RootRepo(tokenKey)]
+		httpReq.SetBasicAuth("oauth2accesstoken", string(rc.Token))
+		sh.Req = httpReq
+
+		return &sh
 	}
-	sc.ReadDigestsAndTags(mkRegistryListTagsCmd)
+	sc.ReadRepository(mkReadRepositoryCmd)
 
 	sc.Info(sc.Inv.PrettyValue())
 
@@ -200,8 +207,7 @@ func main() {
 		sc.Infof("---------- BEGIN GARBAGE COLLECTION: %s ----------\n",
 			*manifestPtr)
 		// Re-read the state of the world.
-		sc.ReadImageNames(mkRegistryListingCmd)
-		sc.ReadDigestsAndTags(mkRegistryListTagsCmd)
+		sc.ReadRepository(mkReadRepositoryCmd)
 		// Garbage-collect all untagged images in dest registry.
 		mkTagDeletionCmd := func(
 			dest reg.RegistryContext,

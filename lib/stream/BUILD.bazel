@@ -4,6 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "fake.go",
+        "http.go",
         "subprocess.go",
         "types.go",
     ],

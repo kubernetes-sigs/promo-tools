@@ -500,83 +500,13 @@ func TestCommandGeneration(t *testing.T) {
 	var tag Tag = "1.0"
 	var tp TagOp
 
-	testName := "GetRegistryListingCmd"
-	got := GetRegistryListingCmd(
-		destRC,
-		true)
-	expected := []string{
-		"gcloud",
-		"--account=robot",
-		"container",
-		"images",
-		"list",
-		fmt.Sprintf("--repository=%s", destRC.Name),
-		"--format=json"}
-	eqErr := checkEqual(got, expected)
-	checkError(
-		t,
-		eqErr,
-		fmt.Sprintf("Test: %v (cmd string)\n", testName))
-
-	got = GetRegistryListingCmd(
-		destRC,
-		false)
-	expected = []string{
-		"gcloud",
-		"container",
-		"images",
-		"list",
-		fmt.Sprintf("--repository=%s", destRC.Name),
-		"--format=json"}
-	eqErr = checkEqual(got, expected)
-	checkError(
-		t,
-		eqErr,
-		fmt.Sprintf("Test: %v (cmd string)\n", testName))
-
-	testName = "GetRegistryListTagsCmd"
-	got = GetRegistryListTagsCmd(
-		destRC,
-		true,
-		string(destImageName))
-	expected = []string{
-		"gcloud",
-		"--account=robot",
-		"container",
-		"images",
-		"list-tags",
-		fmt.Sprintf("%s/%s", destRC.Name, destImageName),
-		"--format=json"}
-	eqErr = checkEqual(got, expected)
-	checkError(
-		t,
-		eqErr,
-		fmt.Sprintf("Test: %v (cmd string)\n", testName))
-
-	got = GetRegistryListTagsCmd(
-		destRC,
-		false,
-		string(destImageName))
-	expected = []string{
-		"gcloud",
-		"container",
-		"images",
-		"list-tags",
-		fmt.Sprintf("%s/%s", destRC.Name, destImageName),
-		"--format=json"}
-	eqErr = checkEqual(got, expected)
-	checkError(
-		t,
-		eqErr,
-		fmt.Sprintf("Test: %v (cmd string)\n", testName))
-
-	testName = "GetDeleteCmd"
-	got = GetDeleteCmd(
+	testName := "GetDeleteCmd"
+	got := GetDeleteCmd(
 		destRC,
 		true,
 		destImageName,
 		digest)
-	expected = []string{
+	expected := []string{
 		"gcloud",
 		"--account=robot",
 		"container",
@@ -584,7 +514,7 @@ func TestCommandGeneration(t *testing.T) {
 		"delete",
 		ToFQIN(destRC.Name, destImageName, digest),
 		"--format=json"}
-	eqErr = checkEqual(got, expected)
+	eqErr := checkEqual(got, expected)
 	checkError(
 		t,
 		eqErr,
@@ -707,86 +637,77 @@ func TestCommandGeneration(t *testing.T) {
 		fmt.Sprintf("Test: %v (cmd string)\n", testName))
 }
 
-// TestSyncContext tests reading images and tags from a registry.
-func TestSyncContext(t *testing.T) {
+// TestReadRepository tests reading images and tags from a registry.
+func TestReadRepository(t *testing.T) {
 	const fakeRegName RegistryName = "gcr.io/foo"
+
 	var tests = []struct {
-		name            string
-		input           string
-		expectedOutput  RegInvImage
-		input2          map[string]string
-		expectedOutput2 RegInvImage
+		name           string
+		input          map[string]string
+		expectedOutput RegInvImage
 	}{
 		{
-			"Blank inputs",
-			`[]`,
-			RegInvImage{},
-			nil,
-			RegInvImage{},
-		},
-		{
-			"Simple case",
-			fmt.Sprintf(`[
-  {
-    "name": "%s/addon-resizer"
-  },
-  {
-    "name": "%s/pause"
-  }
-]`, fakeRegName, fakeRegName),
-			RegInvImage{"addon-resizer": nil, "pause": nil},
-			// nolint[lll]
-			map[string]string{string(fakeRegName) + "/addon-resizer": `[
-  {
-    "digest": "sha256:b5b2d91319f049143806baeacc886f82f621e9a2550df856b11b5c22db4570a7",
-    "tags": [
-      "latest"
-    ],
-    "timestamp": {
-      "datetime": "2018-06-22 12:43:21-07:00",
-      "day": 22,
-      "hour": 12,
-      "microsecond": 0,
-      "minute": 43,
-      "month": 6,
-      "second": 21,
-      "year": 2018
+			"Only toplevel repos (no child repos)",
+			map[string]string{
+				"gcr.io/foo": `{
+  "child": [
+    "addon-resizer",
+    "pause"
+  ],
+  "manifest": {},
+  "name": "foo",
+  "tags": []
+}`,
+				"gcr.io/foo/addon-resizer": `{
+  "child": [],
+  "manifest": {
+    "sha256:b5b2d91319f049143806baeacc886f82f621e9a2550df856b11b5c22db4570a7": {
+      "imageSizeBytes": "12875324",
+      "layerId": "",
+      "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+      "tag": [
+        "latest"
+      ],
+      "timeCreatedMs": "1501774217070",
+      "timeUploadedMs": "1552917295327"
+    },
+    "sha256:0519a83e8f217e33dd06fe7a7347444cfda5e2e29cf52aaa24755999cb104a4d": {
+      "imageSizeBytes": "12875324",
+      "layerId": "",
+      "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+      "tag": [
+        "1.0"
+      ],
+      "timeCreatedMs": "1501774217070",
+      "timeUploadedMs": "1552917295327"
     }
   },
-  {
-    "digest": "sha256:0519a83e8f217e33dd06fe7a7347444cfda5e2e29cf52aaa24755999cb104a4d",
-    "tags": [
-      "1.0"
-    ],
-    "timestamp": {
-      "datetime": "2018-06-22 11:56:13-07:00",
-      "day": 22,
-      "hour": 11,
-      "microsecond": 0,
-      "minute": 56,
-      "month": 6,
-      "second": 13,
-      "year": 2018
+  "name": "foo/addon-resizer",
+  "tags": [
+    "latest",
+    "1.0"
+  ]
+}`,
+				"gcr.io/foo/pause": `{
+  "child": [],
+  "manifest": {
+    "sha256:06fdf10aae2eeeac5a82c213e4693f82ab05b3b09b820fce95a7cac0bbdad534": {
+      "imageSizeBytes": "12875324",
+      "layerId": "",
+      "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+      "tag": [
+        "v1.2.3"
+      ],
+      "timeCreatedMs": "1501774217070",
+      "timeUploadedMs": "1552917295327"
     }
-  }
-]`, string(fakeRegName) + "/pause": `[
-  {
-    "digest": "sha256:06fdf10aae2eeeac5a82c213e4693f82ab05b3b09b820fce95a7cac0bbdad534",
-    "tags": [
-      "v1.2.3"
-    ],
-    "timestamp": {
-      "datetime": "2018-06-22 09:55:34-07:00",
-      "day": 22,
-      "hour": 9,
-      "microsecond": 0,
-      "minute": 55,
-      "month": 6,
-      "second": 34,
-      "year": 2018
-    }
-  }
-]`},
+  },
+  "name": "foo/pause",
+  "tags": [
+    "v1.2.3"
+  ]
+}`,
+			},
 			// nolint[lll]
 			RegInvImage{
 				"addon-resizer": DigestTags{
@@ -794,6 +715,122 @@ func TestSyncContext(t *testing.T) {
 					"sha256:0519a83e8f217e33dd06fe7a7347444cfda5e2e29cf52aaa24755999cb104a4d": {"1.0"}},
 				"pause": DigestTags{
 					"sha256:06fdf10aae2eeeac5a82c213e4693f82ab05b3b09b820fce95a7cac0bbdad534": {"v1.2.3"}}},
+		},
+		{
+			"Recursive repos (child repos)",
+			map[string]string{
+				"gcr.io/foo": `{
+  "child": [
+    "addon-resizer",
+    "pause"
+  ],
+  "manifest": {},
+  "name": "foo",
+  "tags": []
+}`,
+				"gcr.io/foo/addon-resizer": `{
+  "child": [],
+  "manifest": {
+    "sha256:b5b2d91319f049143806baeacc886f82f621e9a2550df856b11b5c22db4570a7": {
+      "imageSizeBytes": "12875324",
+      "layerId": "",
+      "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+      "tag": [
+        "latest"
+      ],
+      "timeCreatedMs": "1501774217070",
+      "timeUploadedMs": "1552917295327"
+    },
+    "sha256:0519a83e8f217e33dd06fe7a7347444cfda5e2e29cf52aaa24755999cb104a4d": {
+      "imageSizeBytes": "12875324",
+      "layerId": "",
+      "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+      "tag": [
+        "1.0"
+      ],
+      "timeCreatedMs": "1501774217070",
+      "timeUploadedMs": "1552917295327"
+    }
+  },
+  "name": "foo/addon-resizer",
+  "tags": [
+    "latest",
+    "1.0"
+  ]
+}`,
+				"gcr.io/foo/pause": `{
+  "child": [
+    "childLevel1"
+  ],
+  "manifest": {
+    "sha256:06fdf10aae2eeeac5a82c213e4693f82ab05b3b09b820fce95a7cac0bbdad534": {
+      "imageSizeBytes": "12875324",
+      "layerId": "",
+      "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+      "tag": [
+        "v1.2.3"
+      ],
+      "timeCreatedMs": "1501774217070",
+      "timeUploadedMs": "1552917295327"
+    }
+  },
+  "name": "foo/pause",
+  "tags": [
+    "v1.2.3"
+  ]
+}`,
+				"gcr.io/foo/pause/childLevel1": `{
+  "child": [
+    "childLevel2"
+  ],
+  "manifest": {
+    "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": {
+      "imageSizeBytes": "12875324",
+      "layerId": "",
+      "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+      "tag": [
+        "aaa"
+      ],
+      "timeCreatedMs": "1501774217070",
+      "timeUploadedMs": "1552917295327"
+    }
+  },
+  "name": "foo/pause/childLevel1",
+  "tags": [
+    "aaa"
+  ]
+}`,
+				"gcr.io/foo/pause/childLevel1/childLevel2": `{
+  "child": [],
+  "manifest": {
+    "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff": {
+      "imageSizeBytes": "12875324",
+      "layerId": "",
+      "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+      "tag": [
+        "fff"
+      ],
+      "timeCreatedMs": "1501774217070",
+      "timeUploadedMs": "1552917295327"
+    }
+  },
+  "name": "foo/pause/childLevel1/childLevel2",
+  "tags": [
+    "fff"
+  ]
+}`,
+			},
+			// nolint[lll]
+			RegInvImage{
+				"addon-resizer": DigestTags{
+					"sha256:b5b2d91319f049143806baeacc886f82f621e9a2550df856b11b5c22db4570a7": {"latest"},
+					"sha256:0519a83e8f217e33dd06fe7a7347444cfda5e2e29cf52aaa24755999cb104a4d": {"1.0"}},
+				"pause": DigestTags{
+					"sha256:06fdf10aae2eeeac5a82c213e4693f82ab05b3b09b820fce95a7cac0bbdad534": {"v1.2.3"}},
+				"pause/childLevel1": DigestTags{
+					"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": {"aaa"}},
+				"pause/childLevel1/childLevel2": DigestTags{
+					"sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff": {"fff"}}},
 		},
 	}
 	for _, test := range tests {
@@ -812,83 +849,20 @@ func TestSyncContext(t *testing.T) {
 		test := test
 		mkFakeStream1 := func(rc RegistryContext) stream.Producer {
 			var sr stream.Fake
-			sr.Bytes = []byte(test.input)
-			return &sr
-		}
-		sc.ReadImageNames(mkFakeStream1)
-		got := sc.Inv[fakeRegName]
-		expected := test.expectedOutput
-		err := checkEqual(got, expected)
-		checkError(t, err, fmt.Sprintf("Test: %v (1/2)\n", test.name))
 
-		// Check 2nd round of API calls to get all digests and tags for each
-		// image.
-		mkFakeStream := func(
-			rc RegistryContext,
-			imgName ImageName) stream.Producer {
-
-			var sr stream.Fake
-			regImage := string(rc.Name) + "/" + string(imgName)
-			// Fetch the "stream" from a predefined set of responses.
-			stream, ok := test.input2[regImage]
-			if ok {
-				sr.Bytes = []byte(stream)
-				return &sr
+			_, domain, repoPath := GetTokenKeyDomainRepoPath(rc.Name)
+			fakeHTTPBody, ok := test.input[domain+"/"+repoPath]
+			if !ok {
+				checkError(
+					t,
+					fmt.Errorf("could not read fakeHTTPBody"),
+					fmt.Sprintf("Test: %v\n", test.name))
 			}
-			t.Errorf(
-				"Image %v needs a predefined stream to test against.\n",
-				imgName)
+			sr.Bytes = []byte(fakeHTTPBody)
 			return &sr
 		}
-		sc.ReadDigestsAndTags(mkFakeStream)
-		got = sc.Inv[fakeRegName]
-		expected = test.expectedOutput2
-		err = checkEqual(got, expected)
-		checkError(t, err, fmt.Sprintf("Test: %v (2/2)\n", test.name))
-	}
-}
-
-func TestExtractDigestTags(t *testing.T) {
-	var tests = []struct {
-		name           string
-		input          json.Object
-		expectedOutput DigestTags
-	}{
-		{
-			"Blank data",
-			json.Object{},
-			nil,
-		},
-		{
-			"No tags",
-			json.Object{
-				"digest": "x",
-				"tags":   []interface{}{},
-			},
-			DigestTags{"x": nil},
-		},
-		{
-			"Simple case",
-			json.Object{
-				"digest": "x",
-				"tags":   []interface{}{"a", "b"},
-				"timestamp": json.Object{
-					"datetime":    "2018-06-22 09:55:34-07:00",
-					"day":         22,
-					"hour":        9,
-					"microsecond": 0,
-					"minute":      55,
-					"month":       6,
-					"second":      34,
-					"year":        2018,
-				},
-			},
-			DigestTags{"x": []Tag{"a", "b"}},
-		},
-	}
-
-	for _, test := range tests {
-		got, _ := extractDigestTags(test.input)
+		sc.ReadRepository(mkFakeStream1)
+		got := sc.Inv[fakeRegName]
 		expected := test.expectedOutput
 		err := checkEqual(got, expected)
 		checkError(t, err, fmt.Sprintf("Test: %v\n", test.name))
@@ -1951,12 +1925,11 @@ func TestGarbageCollection(t *testing.T) {
 
 	var processRequestFake ProcessRequest = func(
 		sc *SyncContext,
-		reqs <-chan stream.ExternalRequest,
+		reqs chan stream.ExternalRequest,
 		errs chan<- RequestResult,
 		wg *sync.WaitGroup,
 		mutex *sync.Mutex) {
 
-		defer wg.Done()
 		for req := range reqs {
 			pr := req.RequestParams.(PromotionRequest)
 			mutex.Lock()
@@ -1966,6 +1939,7 @@ func TestGarbageCollection(t *testing.T) {
 				captured[pr] = 1
 			}
 			mutex.Unlock()
+			wg.Add(-1)
 		}
 	}
 
@@ -2092,12 +2066,11 @@ func TestGarbageCollectionMulti(t *testing.T) {
 
 	var processRequestFake ProcessRequest = func(
 		sc *SyncContext,
-		reqs <-chan stream.ExternalRequest,
+		reqs chan stream.ExternalRequest,
 		errs chan<- RequestResult,
 		wg *sync.WaitGroup,
 		mutex *sync.Mutex) {
 
-		defer wg.Done()
 		for req := range reqs {
 			pr := req.RequestParams.(PromotionRequest)
 			mutex.Lock()
@@ -2107,6 +2080,7 @@ func TestGarbageCollectionMulti(t *testing.T) {
 				captured[pr] = 1
 			}
 			mutex.Unlock()
+			wg.Add(-1)
 		}
 	}
 

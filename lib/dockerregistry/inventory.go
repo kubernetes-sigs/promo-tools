@@ -17,7 +17,9 @@ limitations under the License.
 package inventory
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"regexp"
 	"sort"
@@ -26,7 +28,8 @@ import (
 
 	yaml "gopkg.in/yaml.v2"
 
-	json "github.com/kubernetes-sigs/k8s-container-image-promoter/lib/json"
+	"github.com/google/go-containerregistry/pkg/v1/google"
+	cipJson "github.com/kubernetes-sigs/k8s-container-image-promoter/lib/json"
 	"github.com/kubernetes-sigs/k8s-container-image-promoter/lib/stream"
 )
 
@@ -58,6 +61,7 @@ func MakeSyncContext(
 		DryRun:              dryRun,
 		UseServiceAccount:   useSvcAcc,
 		Inv:                 mi,
+		Tokens:              make(map[RootRepo]Token),
 		RenamesDenormalized: rd,
 		SrcRegistry:         srcRegistry,
 		RegistryContexts:    rcs}, nil
@@ -415,8 +419,27 @@ func (riid *RegInvImageDigest) PrettyValue() string {
 	return b.String()
 }
 
-func getJSONSFromProcess(req stream.ExternalRequest) (json.Objects, Errors) {
-	var jsons json.Objects
+func getRegistryTagsFrom(req stream.ExternalRequest) (*google.Tags, Errors) {
+	errors := make(Errors, 0)
+	reader, _, err := req.StreamProducer.Produce()
+	if err != nil {
+		errors = append(errors, Error{
+			Context: "processing request",
+			Error:   err})
+	}
+
+	tags, err := extractRegistryTags(reader)
+	if err != nil {
+		errors = append(errors, Error{
+			Context: "parsing JSON",
+			Error:   err})
+	}
+
+	return tags, errors
+}
+
+func getJSONSFromProcess(req stream.ExternalRequest) (cipJson.Objects, Errors) {
+	var jsons cipJson.Objects
 	errors := make(Errors, 0)
 	stdoutReader, stderrReader, err := req.StreamProducer.Produce()
 	if err != nil {
@@ -424,7 +447,7 @@ func getJSONSFromProcess(req stream.ExternalRequest) (json.Objects, Errors) {
 			Context: "running process",
 			Error:   err})
 	}
-	jsons, err = json.Consume(stdoutReader)
+	jsons, err = cipJson.Consume(stdoutReader)
 	if err != nil {
 		errors = append(errors, Error{
 			Context: "parsing JSON",
@@ -450,160 +473,209 @@ func getJSONSFromProcess(req stream.ExternalRequest) (json.Objects, Errors) {
 	return jsons, errors
 }
 
-// ReadImageNames only works for streams that interpret json.
-func (sc *SyncContext) ReadImageNames(
+// PopulateTokens populates the SyncContext's Tokens map with actual usable
+// access tokens.
+func (sc *SyncContext) PopulateTokens() error {
+	for _, rc := range sc.RegistryContexts {
+		var sp stream.Subprocess
+		cmd := []string{
+			"gcloud",
+			"auth",
+			"print-access-token",
+		}
+		sp.CmdInvocation = MaybeUseServiceAccount(
+			rc.ServiceAccount, sc.UseServiceAccount, cmd)
+		sout, _, err := sp.Produce()
+		if err != nil {
+			return err
+		}
+		token, err := ioutil.ReadAll(sout)
+		// Do not log the token (sout) that failed to be read, because it could
+		// be that the token was valid, but that ioutl.ReadAll() failed for
+		// other reasons. NEVER print the token as part of an error message!
+		if err != nil {
+			return fmt.Errorf(
+				"could not read access token for '%s'", rc.ServiceAccount)
+		}
+		tokenName := RootRepo(string(rc.Name))
+		tokenVal := Token(strings.TrimSpace(string(token)))
+		sc.Tokens[tokenName] = tokenVal
+		if err = sp.Close(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// GetTokenKeyDomainRepoPath splits a string by '/'. It's OK to do this because
+// the RegistryName is already parsed against a Regex. (Maybe we should store
+// the repo path separately when we do the initial parse...)
+func GetTokenKeyDomainRepoPath(
+	registryName RegistryName) (string, string, string) {
+
+	s := string(registryName)
+	i := strings.IndexByte(s, '/')
+	key := ""
+	if strings.Count(s, "/") < 2 {
+		key = s
+	} else {
+		key = strings.Join(strings.Split(s, "/")[0:2], "/")
+	}
+	// key, domain, repository path
+	return key, s[:i], s[i+1:]
+}
+
+// ReadRepository takes a Repository endpoint, and lists all images at that
+// path. A repository is recursive.
+//
+// To summarize: a docker *registry* is a set of *repositories*. It just so
+// happens that to end-users, repositores resemble a tree structure because they
+// are delineated by familiar filesystem-like "directory" paths.
+//
+// We use the term "registry" to mean the "root repository" in this program, but
+// to be technically correct, for gcr.io/google-containers/foo/bar/baz:
+//
+//  - gcr.io is the registry
+//  - gcr.io/google-containers is the toplevel repository (or "root" repo)
+//  - gcr.io/google-containers/foo is a child repository
+//  - gcr.io/google-containers/foo/bar is a child repository
+//  - gcr.io/google-containers/foo/bar/baz is a child repository
+//
+// It may or may not be the case that the child repository is empty. E.g., if
+// only one image gcr.io/google-containers/foo/bar/baz:1.0 exists in the entire
+// registry, the foo/ and bar/ subdirs are empty repositories.
+//
+// The root repo, or "registry" in the loose sense, is what we care about. This
+// is because in GCR, each root repo is given its own service account and
+// credentials that extend to all child repos. And also in GCR, the name of the
+// root repo is the same as the name of the GCP project that hosts it.
+//
+// NOTE: Repository names may overlap with image names. E.g., it may be in the
+// example above that there are images named gcr.io/google-containers/foo:2.0
+// and gcr.io/google-containers/foo/baz:2.0.
+func (sc *SyncContext) ReadRepository(
 	mkProducer func(RegistryContext) stream.Producer) {
-	// Collect all images in sc.Inv (the src and dest reqgistry names found in
+	// Collect all images in sc.Inv (the src and dest registry names found in
 	// the manifest).
 	var populateRequests PopulateRequests = func(
-		sc *SyncContext, reqs chan<- stream.ExternalRequest) {
+		sc *SyncContext,
+		reqs chan<- stream.ExternalRequest,
+		wg *sync.WaitGroup) {
 
+		// For each registry, start the very first root "repo" read call.
 		for _, rc := range sc.RegistryContexts {
+			// Create the request.
 			var req stream.ExternalRequest
-			req.RequestParams = rc.Name
+			req.RequestParams = rc
 			req.StreamProducer = mkProducer(rc)
+			// Load request into the channel.
+			wg.Add(1)
 			reqs <- req
 		}
 	}
 	var processRequest ProcessRequest = func(
 		sc *SyncContext,
-		reqs <-chan stream.ExternalRequest,
+		reqs chan stream.ExternalRequest,
 		requestResults chan<- RequestResult,
 		wg *sync.WaitGroup,
 		mutex *sync.Mutex) {
 
-		defer wg.Done()
 		for req := range reqs {
 			reqRes := RequestResult{Context: req}
-			jsons, errors := getJSONSFromProcess(req)
+
+			// Now run the request (make network HTTP call).
+			tagsStruct, errors := getRegistryTagsFrom(req)
 			if len(errors) > 0 {
 				// Skip this request if it has errors.
 				reqRes.Errors = errors
 				requestResults <- reqRes
+				wg.Add(-1)
 				continue
 			}
-			extendMe := make(RegInvImage)
-			for _, json := range jsons {
-				imageName, err := extractImageName(
-					json,
-					req.RequestParams.(RegistryName))
+			// Process the current repo.
+			rName := req.RequestParams.(RegistryContext).Name
+			digestTags := make(DigestTags)
 
-				if err != nil {
-					// Record any errors while parsing each JSON.
-					errors = append(errors, Error{
-						Context: fmt.Sprintf(
-							"extractImageName (skipping): %v",
-							json),
-						Error: err})
-					continue
+			for digest, mfestInfo := range tagsStruct.Manifests {
+				tagSlice := TagSlice{}
+				for _, tag := range mfestInfo.Tags {
+					tagSlice = append(tagSlice, Tag(tag))
 				}
-				extendMe[imageName] = nil
+				digestTags[Digest(digest)] = tagSlice
 			}
-			reqRes.Errors = errors
-			requestResults <- reqRes
-			mutex.Lock()
-			sc.Inv[req.RequestParams.(RegistryName)] = extendMe
-			mutex.Unlock()
-		}
-	}
-	sc.ExecRequests(populateRequests, processRequest)
-}
 
-// ReadDigestsAndTags runs `gcloud container images list-tags
-// gcr.io/louhi-gke-k8s/etcd --format=json` For each image name, retrieve all
-// digests and corresponding tags (if any).
-func (sc *SyncContext) ReadDigestsAndTags(
-	mkProducer func(RegistryContext, ImageName) stream.Producer) {
+			// Only write an entry into our inventory if the entry has some
+			// non-nil value for digestTags. This is because we only want to
+			// populate the inventory with image names that have digests in
+			// them, and exclude any image paths that are actually just folder
+			// names without any images in them.
+			if len(digestTags) > 0 {
+				tokenKey, _, repoPath := GetTokenKeyDomainRepoPath(rName)
 
-	var populateRequests PopulateRequests = func(
-		sc *SyncContext,
-		reqs chan<- stream.ExternalRequest) {
-
-		for registryName, imagesMap := range sc.Inv {
-			for _, rc := range sc.RegistryContexts {
-				if registryName == rc.Name {
-					for imgName := range imagesMap {
-						var req stream.ExternalRequest
-						req.StreamProducer = mkProducer(rc, imgName)
-						req.RequestParams = DigestTagsContext{
-							ImageName:    imgName,
-							RegistryName: registryName}
-						reqs <- req
-					}
-					break
+				// If there is no slash in the repoPath, it is a toplevel
+				// imageName, and we can use tagsStruct.Name as-is. E.g.,
+				// "gcr.io/foo/bar" will have ""
+				var imageName ImageName
+				if strings.Count(repoPath, "/") == 0 {
+					imageName = ImageName(tagsStruct.Name)
+				} else {
+					upto := strings.IndexByte(repoPath, '/')
+					imageName = ImageName(
+						strings.TrimPrefix(
+							tagsStruct.Name,
+							(tagsStruct.Name[:upto])+"/"))
 				}
-			}
-		}
-	}
-	var processRequest ProcessRequest = func(
-		sc *SyncContext,
-		reqs <-chan stream.ExternalRequest,
-		requestResults chan<- RequestResult,
-		wg *sync.WaitGroup,
-		mutex *sync.Mutex) {
 
-		defer wg.Done()
-		for req := range reqs {
-			reqRes := RequestResult{Context: req}
-			jsons, errors := getJSONSFromProcess(req)
-			if len(errors) > 0 {
-				// Skip this request if it has errors.
-				reqRes.Errors = errors
-				requestResults <- reqRes
-				continue
-			}
-			extendMe := make(DigestTags)
-			for _, json := range jsons {
-				digestTags, err := extractDigestTags(json)
-				if err != nil {
-					// Record any errors while parsing each JSON.
-					errors = append(errors, Error{
-						Context: fmt.Sprintf(
-							"extractDigestTags (skipping): %v", json),
-						Error: err})
-					continue
-				}
-				extendMe.Overwrite(digestTags)
-				t := req.RequestParams.(DigestTagsContext)
+				currentRepo := make(RegInvImage)
+				currentRepo[imageName] = digestTags
+
 				mutex.Lock()
-				sc.Inv[t.RegistryName][t.ImageName] = extendMe
+				existingRegEntry := sc.Inv[RegistryName(tokenKey)]
+				if len(existingRegEntry) == 0 {
+					sc.Inv[RegistryName(tokenKey)] = currentRepo
+				} else {
+					sc.Inv[RegistryName(tokenKey)][imageName] = digestTags
+				}
 				mutex.Unlock()
 			}
+
 			reqRes.Errors = errors
 			requestResults <- reqRes
+
+			// Process child repos.
+			for _, childRepoName := range tagsStruct.Children {
+				parentRC, _ := req.RequestParams.(RegistryContext)
+
+				childRc := RegistryContext{
+					Name: RegistryName(
+						string(parentRC.Name) + "/" + childRepoName),
+					// Inherit the service account used at the parent
+					// (cascades down from toplevel to all subrepos). In the
+					// future if the token exchange fails, we can refresh
+					// the token here instead of using the one we inherit
+					// below.
+					ServiceAccount: parentRC.ServiceAccount,
+					// Inherit the token as well.
+					Token: parentRC.Token,
+					// Don't need src, because we are just reading data
+					// (don't care if it's the source reg or not).
+				}
+
+				var childReq stream.ExternalRequest
+				childReq.RequestParams = childRc
+				childReq.StreamProducer = mkProducer(childRc)
+
+				// Every time we "descend" into child nodes, increment the
+				// semaphore.
+				wg.Add(1)
+				reqs <- childReq
+			}
+			// When we're done processing this node (req), decrement the
+			// semaphore.
+			wg.Add(-1)
 		}
 	}
 	sc.ExecRequests(populateRequests, processRequest)
-}
-
-// Do some sanitizing. For instance, remove the unnecessary
-// "timpstamp" information that GCR gives us.
-func extractDigestTags(json json.Object) (DigestTags, error) {
-	var digest Digest
-	var tags TagSlice
-	for k, v := range json {
-		switch k {
-		case "timestamp":
-			continue
-		case "digest":
-			digestStr := v.(string)
-			digest = Digest(digestStr)
-		case "tags":
-			// Need to json-decode this inner interface{} value.
-			tagsInter := v.([]interface{})
-			for _, tagInter := range tagsInter {
-				tagStr := tagInter.(string)
-				tags = append(tags, Tag(tagStr))
-			}
-		default:
-			// Skip unknown tags.
-			continue
-		}
-	}
-	if digest == "" {
-		return nil, fmt.Errorf("could not extract DigestTags: %v", json)
-	}
-	return DigestTags{digest: tags}, nil
 }
 
 // ExecRequests uses the Worker Pool pattern, where MaxConcurrentRequests
@@ -635,14 +707,18 @@ func (sc *SyncContext) ExecRequests(
 			}
 		}
 	}()
-	wg.Add(MaxConcurrentRequests)
 	for w := 0; w < MaxConcurrentRequests; w++ {
 		go processRequest(sc, reqs, requestResults, wg, mutex)
 	}
-	populateRequests(sc, reqs)
-	close(reqs)
+	// This can't be a goroutine, because the semaphore could be 0 by the time
+	// wg.Wait() is called. So we need to block against the initial "seeding" of
+	// workloads into the reqs channel.
+	populateRequests(sc, reqs, wg)
+
 	// Wait for all workers to finish draining the jobs.
 	wg.Wait()
+	close(reqs)
+
 	// Close requestResults channel because no more new jobs are being created
 	// (it's OK to close a channel even if it has nonzero length). On the other
 	// hand, we cannot close the channel before we Wait() for the workers to
@@ -659,29 +735,20 @@ func (sc *SyncContext) ExecRequests(
 	close(requestResults)
 }
 
-// extractImageName gets the image name from a raw JSON object. The interesting
-// thing it does is it strips the leading registry name if it exists.
-func extractImageName(
-	json json.Object,
-	registryName RegistryName) (ImageName, error) {
-
-	var imageName ImageName
-	for k, v := range json {
-		switch k {
-		case "name":
-			imageNameStr := v.(string)
-			registryPrefix := string(registryName) + "/"
-			imageNameOnly := strings.TrimPrefix(imageNameStr, registryPrefix)
-			imageName = ImageName(imageNameOnly)
-		default:
-			// Skip unknown tags.
-			continue
+func extractRegistryTags(reader io.Reader) (*google.Tags, error) {
+	tags := google.Tags{}
+	decoder := json.NewDecoder(reader)
+	for {
+		err := decoder.Decode(&tags)
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			fmt.Println("DECODING ERROR:", err)
+			return nil, err
 		}
 	}
-	if imageName != "" {
-		return imageName, nil
-	}
-	return "", fmt.Errorf("could not extract image name: %v", json)
+	return &tags, nil
 }
 
 // Overwrite insert's b's values into a.
@@ -764,7 +831,8 @@ func (sc *SyncContext) mkPopReq(
 	tp TagOp,
 	oldDigest Digest,
 	mkProducer PromotionContext,
-	reqs chan<- stream.ExternalRequest) {
+	reqs chan<- stream.ExternalRequest,
+	wg *sync.WaitGroup) {
 
 	dest := sc.Inv[destRC.Name]
 	for imageTag, digest := range riit {
@@ -861,6 +929,7 @@ func (sc *SyncContext) mkPopReq(
 			oldDigest,
 			imageTag.Tag,
 		}
+		wg.Add(1)
 		reqs <- req
 	}
 
@@ -983,7 +1052,7 @@ func mkPopulateRequestsForPromotion(
 	mfest Manifest,
 	promotionCandidatesIT RegInvImageTag,
 	mkProducer PromotionContext) PopulateRequests {
-	return func(sc *SyncContext, reqs chan<- stream.ExternalRequest) {
+	return func(sc *SyncContext, reqs chan<- stream.ExternalRequest, wg *sync.WaitGroup) {
 		for _, registry := range mfest.Registries {
 			if registry.Src {
 				continue
@@ -1030,7 +1099,8 @@ func mkPopulateRequestsForPromotion(
 				Add,
 				"",
 				mkProducer,
-				reqs)
+				reqs,
+				wg)
 
 			// Audit the intersection (make sure already-existing tags in the
 			// destination are pointing to the digest specified in the
@@ -1068,7 +1138,8 @@ func mkPopulateRequestsForPromotion(
 							Move,
 							liveDigest,
 							mkProducer,
-							reqs)
+							reqs,
+							wg)
 					}
 				}
 			}
@@ -1083,7 +1154,8 @@ func mkPopulateRequestsForPromotion(
 					Delete,
 					"",
 					mkProducer,
-					reqs)
+					reqs,
+					wg)
 			} else {
 				// Warn the user about extra tags:
 				xtras := make([]string, 0)
@@ -1157,12 +1229,11 @@ func (sc *SyncContext) Promote(
 	var processRequest ProcessRequest
 	var processRequestReal ProcessRequest = func(
 		sc *SyncContext,
-		reqs <-chan stream.ExternalRequest,
+		reqs chan stream.ExternalRequest,
 		requestResults chan<- RequestResult,
 		wg *sync.WaitGroup,
 		mutex *sync.Mutex) {
 
-		defer wg.Done()
 		for req := range reqs {
 			reqRes := RequestResult{Context: req}
 			errors := make(Errors, 0)
@@ -1197,6 +1268,7 @@ func (sc *SyncContext) Promote(
 			}
 			reqRes.Errors = errors
 			requestResults <- reqRes
+			wg.Add(-1)
 		}
 	}
 
@@ -1283,12 +1355,10 @@ func (pr *PromotionRequest) PrettyValue() string {
 func MkRequestCapturer(captured *CapturedRequests) ProcessRequest {
 	return func(
 		sc *SyncContext,
-		reqs <-chan stream.ExternalRequest,
+		reqs chan stream.ExternalRequest,
 		errs chan<- RequestResult,
 		wg *sync.WaitGroup,
 		mutex *sync.Mutex) {
-
-		defer wg.Done()
 
 		for req := range reqs {
 			pr := req.RequestParams.(PromotionRequest)
@@ -1299,6 +1369,7 @@ func MkRequestCapturer(captured *CapturedRequests) ProcessRequest {
 				(*captured)[pr] = 1
 			}
 			mutex.Unlock()
+			wg.Add(-1)
 		}
 	}
 }
@@ -1312,7 +1383,8 @@ func (sc *SyncContext) GarbageCollect(
 
 	var populateRequests PopulateRequests = func(
 		sc *SyncContext,
-		reqs chan<- stream.ExternalRequest) {
+		reqs chan<- stream.ExternalRequest,
+		wg *sync.WaitGroup) {
 
 		for _, registry := range mfest.Registries {
 			if registry.Name == sc.SrcRegistry.Name {
@@ -1342,6 +1414,7 @@ func (sc *SyncContext) GarbageCollect(
 							"",
 							"",
 						}
+						wg.Add(1)
 						reqs <- req
 					}
 				}
@@ -1352,12 +1425,11 @@ func (sc *SyncContext) GarbageCollect(
 	var processRequest ProcessRequest
 	var processRequestReal ProcessRequest = func(
 		sc *SyncContext,
-		reqs <-chan stream.ExternalRequest,
+		reqs chan stream.ExternalRequest,
 		requestResults chan<- RequestResult,
 		wg *sync.WaitGroup,
 		mutex *sync.Mutex) {
 
-		defer wg.Done()
 		for req := range reqs {
 			reqRes := RequestResult{Context: req}
 			jsons, errors := getJSONSFromProcess(req)
@@ -1371,6 +1443,7 @@ func (sc *SyncContext) GarbageCollect(
 			}
 			reqRes.Errors = errors
 			requestResults <- reqRes
+			wg.Add(-1)
 		}
 	}
 
@@ -1461,34 +1534,5 @@ func GetDeleteCmd(
 		"delete",
 		fqin,
 		"--format=json"}
-	return MaybeUseServiceAccount(rc.ServiceAccount, useServiceAccount, cmd)
-}
-
-// GetRegistryListingCmd generates the invocation for retrieving all images in a
-// GCR.
-func GetRegistryListingCmd(
-	rc RegistryContext,
-	useServiceAccount bool) []string {
-	cmd := []string{
-		"gcloud",
-		"container",
-		"images",
-		"list",
-		fmt.Sprintf("--repository=%s", rc.Name), "--format=json"}
-	return MaybeUseServiceAccount(rc.ServiceAccount, useServiceAccount, cmd)
-}
-
-// GetRegistryListTagsCmd generates the invocation for retrieving all digests
-// (and tags on them) for a given image.
-func GetRegistryListTagsCmd(
-	rc RegistryContext,
-	useServiceAccount bool,
-	img string) []string {
-	cmd := []string{
-		"gcloud",
-		"container",
-		"images",
-		"list-tags",
-		fmt.Sprintf("%s/%s", rc.Name, img), "--format=json"}
 	return MaybeUseServiceAccount(rc.ServiceAccount, useServiceAccount, cmd)
 }
