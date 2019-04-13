@@ -1,0 +1,20 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "anon.go",
+        "auth.go",
+        "authn.go",
+        "basic.go",
+        "bearer.go",
+        "doc.go",
+        "helper.go",
+        "keychain.go",
+        "multikeychain.go",
+    ],
+    importmap = "github.com/kubernetes-sigs/k8s-container-image-promoter/vendor/github.com/google/go-containerregistry/pkg/authn",
+    importpath = "github.com/google/go-containerregistry/pkg/authn",
+    visibility = ["//visibility:public"],
+    deps = ["//vendor/github.com/google/go-containerregistry/pkg/name:go_default_library"],
+)
