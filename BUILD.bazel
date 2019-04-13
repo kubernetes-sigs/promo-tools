@@ -20,7 +20,10 @@ go_image(
 container_image(
     name = "cip-with-gcloud",
     base = ":cip-docker-image",
-    entrypoint = ["/bin/bash", "-c"],
+    entrypoint = [
+        "/bin/bash",
+        "-c",
+    ],
     layers = [":cip-util"],
     env = {"PATH": "/cip:/cip/util:${PATH}"},
     symlinks = {"/cip/cip": "/app/cip-docker-image.binary"},
@@ -53,15 +56,15 @@ go_library(
     srcs = ["cip.go"],
     importpath = "github.com/kubernetes-sigs/k8s-container-image-promoter",
     visibility = ["//visibility:private"],
-    deps = [
-        "//lib/dockerregistry:go_default_library",
-        "//lib/stream:go_default_library",
-    ],
     x_defs = {
         "main.GitCommit": "{STABLE_GIT_COMMIT}",
         "main.GitDescribe": "{STABLE_GIT_DESC}",
         "main.TimestampUtcRfc3339": "{TIMESTAMP_UTC_RFC3339}",
     },
+    deps = [
+        "//lib/dockerregistry:go_default_library",
+        "//lib/stream:go_default_library",
+    ],
 )
 
 go_binary(

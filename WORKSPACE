@@ -37,12 +37,6 @@ load(
 
 _go_image_repos()
 
-go_repository(
-    name = "in_gopkg_yaml_v2",
-    commit = "51d6538a90f86fe93ac480b35f37b2be17fef232",
-    importpath = "gopkg.in/yaml.v2",
-)
-
 load("@io_bazel_rules_docker//container:container.bzl", "container_pull")
 
 container_pull(
