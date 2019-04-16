@@ -55,7 +55,7 @@ renames:
 
 Each entry in the `renames` field is a list of image paths; all images in the
 list are treated as "equal". The only requirement is that each list must contain
-at least 1 item that points to a staging registry (in this case,
+at least 1 item that points to a source registry (in this case,
 `gcr.io/myproject-staging-area`).
 
 # Install
