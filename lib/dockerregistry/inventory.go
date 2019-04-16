@@ -1012,11 +1012,13 @@ func mkPopulateRequestsForPromotion(
 					promotionFilteredID.PrettyValue())
 				if sc.DryRun {
 					sc.Infof(
-						"---------- BEGIN PROMOTION (DRY RUN): %s ----------\n",
-						sc.ManifestPath)
+						"---------- BEGIN PROMOTION (DRY RUN): %s: %s ----------\n",
+						sc.ManifestPath,
+						registry.Name)
 				} else {
-					sc.Infof("---------- BEGIN PROMOTION: %s ----------\n",
-						sc.ManifestPath)
+					sc.Infof("---------- BEGIN PROMOTION: %s: %s ----------\n",
+						sc.ManifestPath,
+						registry.Name)
 				}
 			} else {
 				sc.Infof("Nothing to promote for %s.\n", registry.Name)
@@ -1233,11 +1235,15 @@ func (sc *SyncContext) PrintCapturedRequests(capReqs *CapturedRequests) {
 		return prs[i].PrettyValue() < prs[j].PrettyValue()
 	})
 	if len(prs) > 0 {
+		fmt.Println("")
+		fmt.Println("captured reqs summary:")
+		fmt.Println("")
 		for _, pr := range prs {
-			fmt.Printf("captured req: %v\n", pr.PrettyValue())
+			fmt.Printf("captured req: %v", pr.PrettyValue())
 		}
+		fmt.Println("")
 	} else {
-		fmt.Println("No requests generated.")
+		fmt.Println("No requests captured.")
 	}
 }
 
