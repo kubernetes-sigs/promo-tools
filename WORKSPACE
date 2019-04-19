@@ -56,3 +56,63 @@ container_pull(
 #    # Version 232.0.0
 #    digest = "sha256:6e6b1e2fd53cb94c4dc2af8381ef50bf4c7ac49bc5c728efda4ab15b41d0b510",
 #)
+
+go_repository(
+    name = "com_github_golang_protobuf",
+    importpath = "github.com/golang/protobuf",
+    tag = "v1.2.0",
+)
+
+go_repository(
+    name = "com_github_google_go_containerregistry",
+    commit = "1d38b9cfdb9d",
+    importpath = "github.com/google/go-containerregistry",
+)
+
+go_repository(
+    name = "com_google_cloud_go",
+    importpath = "cloud.google.com/go",
+    tag = "v0.34.0",
+)
+
+go_repository(
+    name = "in_gopkg_check_v1",
+    commit = "20d25e280405",
+    importpath = "gopkg.in/check.v1",
+)
+
+go_repository(
+    name = "in_gopkg_yaml_v2",
+    importpath = "gopkg.in/yaml.v2",
+    tag = "v2.2.2",
+)
+
+go_repository(
+    name = "org_golang_google_appengine",
+    importpath = "google.golang.org/appengine",
+    tag = "v1.4.0",
+)
+
+go_repository(
+    name = "org_golang_x_net",
+    commit = "1e06a53dbb7e",
+    importpath = "golang.org/x/net",
+)
+
+go_repository(
+    name = "org_golang_x_oauth2",
+    commit = "9f3314589c9a",
+    importpath = "golang.org/x/oauth2",
+)
+
+go_repository(
+    name = "org_golang_x_sync",
+    commit = "37e7f081c4d4",
+    importpath = "golang.org/x/sync",
+)
+
+go_repository(
+    name = "org_golang_x_text",
+    importpath = "golang.org/x/text",
+    tag = "v0.3.0",
+)
