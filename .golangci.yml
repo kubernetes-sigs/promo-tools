@@ -65,16 +65,7 @@ linters-settings:
 linters:
   enable-all: true
   disable:
-    # NOTE: Currently, megacheck and typecheck will both fail if you don't have
-    # ~/go/src/gopkg.in/yaml.v2 (e.g. by running `go get gopkg.in/yaml.v2`). The
-    # bug for this is
-    # https://github.com/golangci/golangci-lint/issues/312#issuecomment-449569082.
-    # The workaround for now when using golangci-lint is to get external
-    # packages populated in the current Go workspace, with 'dep' first.
-    - maligned
-    - prealloc
-    - gosec
-    - gochecknoglobals
+  - gochecknoglobals
 
 issues:
   exclude-use-default: false
