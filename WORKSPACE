@@ -116,3 +116,9 @@ go_repository(
     importpath = "golang.org/x/text",
     tag = "v0.3.0",
 )
+
+go_repository(
+    name = "com_github_google_go_cmp",
+    importpath = "github.com/google/go-cmp",
+    tag = "v0.2.0",
+)
