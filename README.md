@@ -64,10 +64,8 @@ at least 1 item that points to a source registry (in this case,
 2. Run the steps below:
 
 ```
-cip_path=$(go env GOPATH)/src/github.com/kubernetes-sigs/k8s-container-image-promoter
-git clone https://github.com/kubernetes-sigs/k8s-container-image-promoter \
-    $cip_path
-cd $cip_path
+go get github.com/kubernetes-sigs/k8s-container-image-promoter
+cd $GOPATH/src/github.com/kubernetes-sigs/k8s-container-image-promoter
 make build
 ```
 
