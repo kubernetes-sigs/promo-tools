@@ -247,6 +247,7 @@ func validateRequiredComponents(m Manifest) error {
 		}
 	}
 
+	knownRegistries := make([]RegistryName, 0)
 	if len(m.Registries) == 0 {
 		errs = append(errs, fmt.Sprintf("'registries' field cannot be empty"))
 	}
@@ -256,6 +257,7 @@ func validateRequiredComponents(m Manifest) error {
 				errs,
 				fmt.Sprintf("registries: 'name' field cannot be empty"))
 		}
+		knownRegistries = append(knownRegistries, registry.Name)
 	}
 	for _, image := range m.Images {
 		if len(image.ImageName) == 0 {
@@ -285,7 +287,7 @@ func validateRequiredComponents(m Manifest) error {
 		seenRegistries := make(map[RegistryName]ImageName)
 		for _, registryImagePath := range rename {
 			// nolint[lll]
-			registryName, imageName, err := splitRegistryImagePath(registryImagePath)
+			registryName, imageName, err := splitRegistryImagePath(registryImagePath, knownRegistries)
 			if err != nil {
 				errs = append(errs, err.Error())
 			}
@@ -325,9 +327,9 @@ func validateRequiredComponents(m Manifest) error {
 				rename))
 		}
 
-		registryNameSrc, imageNameSrc, _ := splitRegistryImagePath(srcOriginal)
+		registryNameSrc, imageNameSrc, _ := splitRegistryImagePath(srcOriginal, knownRegistries)
 		for _, registryImagePath := range rename {
-			registryName, imageName, _ := splitRegistryImagePath(registryImagePath)
+			registryName, imageName, _ := splitRegistryImagePath(registryImagePath, knownRegistries)
 			if registryName != registryNameSrc {
 				if imageName == imageNameSrc {
 					errs = append(errs, fmt.Sprintf("redundant rename for %s",
@@ -936,34 +938,19 @@ func (sc *SyncContext) mkPopReq(
 }
 
 func splitRegistryImagePath(
-	registryImagePath RegistryImagePath) (RegistryName, ImageName, error) {
+	registryImagePath RegistryImagePath,
+	knownRegistries []RegistryName) (RegistryName, ImageName, error) {
 
-	pathSlice := strings.SplitAfterN(string(registryImagePath), "/", 2)
-	if len(pathSlice) != 2 {
-		goto error
-	}
-
-	// For "gcr.io/a/b/c", the registry name is "gcr.io/a", not "gcr.io/". So
-	// fix it.
-
-	if pathSlice[0] == "gcr.io/" {
-		pathSliceGCR := strings.SplitAfterN(pathSlice[1], "/", 2)
-		if len(pathSliceGCR) != 2 {
-			goto error
+	for _, rName := range knownRegistries {
+		if strings.HasPrefix(string(registryImagePath), string(rName)) {
+			return rName, ImageName(registryImagePath[len(rName)+1:]), nil
 		}
-		projectName := pathSliceGCR[0]
-		return RegistryName(pathSlice[0] + projectName[0:len(projectName)-1]),
-			ImageName(pathSliceGCR[1]),
-			nil
 	}
 
-	return RegistryName(pathSlice[0]), ImageName(pathSlice[1]), nil
-
-error:
 	return RegistryName(""),
 		ImageName(""),
 		// nolint[lll]
-		fmt.Errorf("invalid loosely-qualified image name '%v'", registryImagePath)
+		fmt.Errorf("could not determine registry name for '%v'", registryImagePath)
 }
 
 // DenormalizeRenames coverts the nested list of rename strings in the
@@ -976,13 +963,18 @@ func DenormalizeRenames(
 	mfest Manifest,
 	srcRegistryName RegistryName) (RenamesDenormalized, error) {
 
+	knownRegistries := make([]RegistryName, 0)
+	for _, r := range mfest.Registries {
+		knownRegistries = append(knownRegistries, r.Name)
+	}
+
 	rd := make(RenamesDenormalized)
 	for _, rename := range mfest.Renames {
 		// Create "directed edges" that go in both directions --- from Src
 		// to Dest, and Dest to Src. Because there can be multiple
 		// destinations, we have to use a nested loop.
 		for i, registryImagePathA := range rename {
-			_, _, err := splitRegistryImagePath(registryImagePathA)
+			_, _, err := splitRegistryImagePath(registryImagePathA, knownRegistries)
 			if err != nil {
 				return nil, err
 			}
@@ -994,7 +986,7 @@ func DenormalizeRenames(
 					continue
 				}
 
-				registryNameB, imageNameB, err := splitRegistryImagePath(registryImagePathB)
+				registryNameB, imageNameB, err := splitRegistryImagePath(registryImagePathB, knownRegistries)
 				if err != nil {
 					return nil, err
 				}

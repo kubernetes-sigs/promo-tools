@@ -309,13 +309,15 @@ images:
 					name: "Unknown registry",
 					input: `renames:
 - ["gcr.io/foo/banana", "gcr.io/cat/subdir/A/banana"]`,
-					err: fmt.Errorf("unknown registry 'gcr.io/cat' in 'renames' (not defined in 'registries')"),
+					err: fmt.Errorf(`could not determine registry name for 'gcr.io/cat/subdir/A/banana'
+unknown registry '' in 'renames' (not defined in 'registries')`),
 				},
 				{
 					name: "No source registry",
 					input: `renames:
 - ["gcr.io/bar/banana", "gcr.io/cat/subdir/A/banana"]`,
-					err: fmt.Errorf(`unknown registry 'gcr.io/cat' in 'renames' (not defined in 'registries')
+					err: fmt.Errorf(`could not determine registry name for 'gcr.io/cat/subdir/A/banana'
+unknown registry '' in 'renames' (not defined in 'registries')
 could not find source registry in '[gcr.io/bar/banana gcr.io/cat/subdir/A/banana]'`),
 				},
 				{
@@ -487,6 +489,64 @@ func TestValidateRegistryImagePath(t *testing.T) {
 			fmt.Sprintf("Test: `%v' should be invalid\n", testInput))
 	}
 
+}
+
+func TestSplitRegistryImagePath(t *testing.T) {
+	// nolint[lll]
+	knownRegistryNames := []RegistryName{
+		`gcr.io/foo`,
+		`us.gcr.io/foo`,
+		`k8s.gcr.io`,
+	}
+
+	var tests = []struct {
+		name                 string
+		input                RegistryImagePath
+		expectedRegistryName RegistryName
+		expectedImageName    ImageName
+		expectedErr          error
+	}{
+		{
+			`basic gcr.io`,
+			`gcr.io/foo/a/b/c`,
+			`gcr.io/foo`,
+			`a/b/c`,
+			nil,
+		},
+		{
+			`regional GCR`,
+			`us.gcr.io/foo/a/b/c`,
+			`us.gcr.io/foo`,
+			`a/b/c`,
+			nil,
+		},
+		{
+			`vanity GCR`,
+			`k8s.gcr.io/a/b/c`,
+			`k8s.gcr.io`,
+			`a/b/c`,
+			nil,
+		},
+	}
+	// nolint[lll]
+	for _, test := range tests {
+		rName, iName, err := splitRegistryImagePath(test.input, knownRegistryNames)
+		eqErr := checkEqual(rName, test.expectedRegistryName)
+		checkError(
+			t,
+			eqErr,
+			fmt.Sprintf("Test: `%v' failure (registry name mismatch)\n", test.input))
+		eqErr = checkEqual(iName, test.expectedImageName)
+		checkError(
+			t,
+			eqErr,
+			fmt.Sprintf("Test: `%v' failure (image name mismatch)\n", test.input))
+		eqErr = checkEqual(err, test.expectedErr)
+		checkError(
+			t,
+			eqErr,
+			fmt.Sprintf("Test: `%v' failure (error mismatch)\n", test.input))
+	}
 }
 
 func TestCommandGeneration(t *testing.T) {
