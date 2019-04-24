@@ -128,11 +128,11 @@ func ParseManifestFromFile(
 	var mfest Manifest
 	var rd RenamesDenormalized
 	var srcRegistry *RegistryContext
-	bytes, err := ioutil.ReadFile(filePath)
+	b, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		return mfest, rd, srcRegistry, err
 	}
-	mfest, err = ParseManifest(bytes)
+	mfest, err = ParseManifest(b)
 	if err != nil {
 		return mfest, rd, srcRegistry, err
 	}
@@ -153,9 +153,9 @@ func ParseManifestFromFile(
 
 // ParseManifest parses a Manifest from a byteslice. This function is separate
 // from ParseManifestFromFile() so that it can be tested independently.
-func ParseManifest(bytes []byte) (Manifest, error) {
+func ParseManifest(b []byte) (Manifest, error) {
 	var m Manifest
-	if err := yaml.UnmarshalStrict(bytes, &m); err != nil {
+	if err := yaml.UnmarshalStrict(b, &m); err != nil {
 		return m, err
 	}
 
