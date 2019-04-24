@@ -8,6 +8,6 @@ go_library(
         "subprocess.go",
         "types.go",
     ],
-    importpath = "github.com/kubernetes-sigs/k8s-container-image-promoter/lib/stream",
+    importpath = "sigs.k8s.io/k8s-container-image-promoter/lib/stream",
     visibility = ["//visibility:public"],
 )

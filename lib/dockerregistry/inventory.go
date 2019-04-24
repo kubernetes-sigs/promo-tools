@@ -29,8 +29,8 @@ import (
 	yaml "gopkg.in/yaml.v2"
 
 	"github.com/google/go-containerregistry/pkg/v1/google"
-	cipJson "github.com/kubernetes-sigs/k8s-container-image-promoter/lib/json"
-	"github.com/kubernetes-sigs/k8s-container-image-promoter/lib/stream"
+	cipJson "sigs.k8s.io/k8s-container-image-promoter/lib/json"
+	"sigs.k8s.io/k8s-container-image-promoter/lib/stream"
 )
 
 func getSrcRegistry(rcs []RegistryContext) (*RegistryContext, error) {

@@ -1,4 +1,4 @@
-module github.com/kubernetes-sigs/k8s-container-image-promoter
+module sigs.k8s.io/k8s-container-image-promoter
 
 require (
 	github.com/google/go-cmp v0.2.0 // indirect

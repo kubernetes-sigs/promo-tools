@@ -64,8 +64,8 @@ at least 1 item that points to a source registry (in this case,
 2. Run the steps below:
 
 ```
-go get github.com/kubernetes-sigs/k8s-container-image-promoter
-cd $GOPATH/src/github.com/kubernetes-sigs/k8s-container-image-promoter
+go get sigs.k8s.io/k8s-container-image-promoter
+cd $GOPATH/src/sigs.k8s.io/k8s-container-image-promoter
 make build
 ```
 

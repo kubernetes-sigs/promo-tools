@@ -24,8 +24,8 @@ import (
 	"os"
 
 	// nolint[lll]
-	reg "github.com/kubernetes-sigs/k8s-container-image-promoter/lib/dockerregistry"
-	"github.com/kubernetes-sigs/k8s-container-image-promoter/lib/stream"
+	reg "sigs.k8s.io/k8s-container-image-promoter/lib/dockerregistry"
+	"sigs.k8s.io/k8s-container-image-promoter/lib/stream"
 )
 
 // GitDescribe is stamped by bazel.

@@ -19,7 +19,7 @@ package inventory
 import (
 	"sync"
 
-	"github.com/kubernetes-sigs/k8s-container-image-promoter/lib/stream"
+	"sigs.k8s.io/k8s-container-image-promoter/lib/stream"
 )
 
 // RequestResult contains information about the result of running a request

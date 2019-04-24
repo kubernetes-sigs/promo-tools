@@ -7,7 +7,7 @@ go_library(
         "set.go",
         "types.go",
     ],
-    importpath = "github.com/kubernetes-sigs/k8s-container-image-promoter/lib/dockerregistry",
+    importpath = "sigs.k8s.io/k8s-container-image-promoter/lib/dockerregistry",
     visibility = ["//visibility:public"],
     deps = [
         "//lib/container:go_default_library",

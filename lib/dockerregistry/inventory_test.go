@@ -23,8 +23,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/kubernetes-sigs/k8s-container-image-promoter/lib/json"
-	"github.com/kubernetes-sigs/k8s-container-image-promoter/lib/stream"
+	"sigs.k8s.io/k8s-container-image-promoter/lib/json"
+	"sigs.k8s.io/k8s-container-image-promoter/lib/stream"
 )
 
 func checkEqual(got, expected interface{}) error {
