@@ -103,7 +103,7 @@ if [[ -d "${CIP_GIT_DIR:-}" ]]; then
     # changed comment lines or whitespace --- resulting in no semantic change),
     # but that will change once the promoter understands deltas [1].
     #
-    # [1]: https://github.com/kubernetes-sigs/k8s-container-image-promoter/issues/10
+    # [1]: https://sigs.k8s.io/k8s-container-image-promoter/issues/10
     args_filtered=()
     for arg; do
         manifest=$(echo "$arg" | cut -d, -f1)
