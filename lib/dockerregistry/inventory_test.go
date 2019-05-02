@@ -245,8 +245,8 @@ images:
 	// nolint[lll]
 	// Test only the JSON unmarshalling logic.
 	for _, test := range tests {
-		bytes := []byte(test.input)
-		imageManifest, err := ParseManifest(bytes)
+		b := []byte(test.input)
+		imageManifest, err := ParseManifest(b)
 
 		// Check the error as well (at the very least, we can check that the
 		// error was nil).
@@ -277,8 +277,8 @@ images:
 - ["gcr.io/foo/banana", "gcr.io/bar/carrot"]`,
 			}
 			for _, validInput := range shouldBeValid {
-				bytes := []byte(test.input + validInput)
-				_, err := ParseManifest(bytes)
+				b := []byte(test.input + validInput)
+				_, err := ParseManifest(b)
 				checkError(
 					t,
 					err,
@@ -328,8 +328,8 @@ could not find source registry in '[gcr.io/bar/banana gcr.io/cat/subdir/A/banana
 				},
 			}
 			for _, invalid := range shouldBeInvalid {
-				bytes := []byte(test.input + invalid.input)
-				_, got := ParseManifest(bytes)
+				b := []byte(test.input + invalid.input)
+				_, got := ParseManifest(b)
 				eqErr := checkEqual(got, invalid.err)
 				checkError(
 					t,
