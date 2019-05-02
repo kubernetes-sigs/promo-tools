@@ -18,10 +18,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-# See
-# https://stackoverflow.com/questions/59895/getting-the-source-directory-of-a-bash-script-from-within#comment49538168_246128
-# and https://gist.github.com/tvlooy/cbfbdb111a4ebad8b93e.
-SCRIPT_ROOT="$(dirname "$(readlink -f "$0")")"
+SCRIPT_ROOT=$(dirname "${BASH_SOURCE[0]}")
 
 echo "=== Linting ==="
 cd "${SCRIPT_ROOT}"
