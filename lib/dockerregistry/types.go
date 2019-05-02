@@ -152,8 +152,8 @@ type Manifest struct {
 	// Registries contains the source and destination (Src/Dest) registry names.
 	// It is possible that in the future, we support promoting to multiple
 	// registries, in which case we would have more than just Src/Dest.
-	Registries []RegistryContext
-	Images     []Image `yaml:"images,omitempty"`
+	Registries []RegistryContext `yaml:"registries,omitempty"`
+	Images     []Image           `yaml:"images,omitempty"`
 	// A rename list can contain a list of paths, where each path is a string.
 	//
 	// - A rename entry must have at least 2 paths, one for the source, another
@@ -191,8 +191,8 @@ type RenamesDenormalized map[RegistryImagePath]map[RegistryName]ImageName
 // sense, and holds all the information relating to a particular image that we
 // care about.
 type Image struct {
-	ImageName ImageName `yaml:"name"`
-	Dmap      DigestTags
+	ImageName ImageName  `yaml:"name"`
+	Dmap      DigestTags `yaml:"dmap,omitempty"`
 }
 
 // Rename is list of paths, where each path is full
@@ -212,10 +212,10 @@ type DigestTags map[Digest]TagSlice
 // RegistryContext holds information about a registry, to be written in a
 // manifest file.
 type RegistryContext struct {
-	Name           RegistryName
-	ServiceAccount string `yaml:"service-account,omitempty"`
-	Token          Token  `yaml:"-"`
-	Src            bool   `yaml:"src,omitempty"`
+	Name           RegistryName `yaml:"name,omitempty"`
+	ServiceAccount string       `yaml:"service-account,omitempty"`
+	Token          Token        `yaml:"-"`
+	Src            bool         `yaml:"src,omitempty"`
 }
 
 // RegistryName is the leading part of an image name that includes the domain;
