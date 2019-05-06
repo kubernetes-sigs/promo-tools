@@ -7,6 +7,8 @@ image:
 	bazel build $(BAZEL_BUILD_OPTS) //:cip-docker-loadable.tar
 image-load: image
 	docker load -i bazel-bin/cip-docker-loadable.tar
+image-push: image
+	bazel run $(BAZEL_BUILD_OPTS) :push-cip
 lint:
 	@./lint.sh
 test:
@@ -23,4 +25,4 @@ update:
 	rm -rf vendor
 	GO111MODULE=on go mod vendor
 
-.PHONY: build image image-load lint test update
+.PHONY: build image image-load image-push lint test update
