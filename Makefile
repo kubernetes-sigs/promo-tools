@@ -17,7 +17,7 @@ update:
 	GO111MODULE=on go mod tidy
 
 	# Update bazel rules to use these new dependencies.
-	bazel run //:gazelle -- update-repos -from_file=go.mod
+	bazel run $(BAZEL_BUILD_OPTS) //:gazelle -- update-repos -from_file=go.mod
 
 	# Fixup vendor/ folder to make golangci-lint happy.
 	rm -rf vendor
