@@ -87,6 +87,40 @@ from running `make build`, and then invoking it with the correct path under
 `./bazel-bin`. For example, if you are on a Linux machine, running `make build`
 will output a binary at `./bazel-bin/linux_amd64_stripped/cip`.
 
+# How it works
+
+At a high level, the promoter simply performs set operations ("set" as in
+mathematics, like in Venn diagrams). It first creates the set of all images in
+the destination registry (let's call it `D`). It also creates the set of all
+images defined in the promoter manifest as "promotion candidates in the
+manifest" (call it `M`).
+
+Given the above, we get the following results:
+
+- `M ∩ D` = images that have already been promoted (NOP)
+- `M \ D` = images that must be promoted
+- `D \ M` = images that are extraneous to the manifest (can be deleted with `-delete-extra-tags` flag)
+
+If there are multiple destination registries, the above calculation is repeated
+for each destination registry. The promoter also prints warnings about images in
+`M` that cannot be found in the source registry (call it `S`):
+
+- `D \ S` = images that are lost (no way to promote it because it cannot be found!)
+
+## Server-side operations
+
+During the promtion process, all data resides on the server (currently, Google
+Container Registry for images). That is, no images get pulled and pushed back
+up. There are two reasons why it does things entirely server-side:
+
+1. Performance. Images can be gigabytes in size and it would take forever to
+   pull/push images in their entirety for every promotion.
+1. Digest preservation. Pulling/pushing the images can change their digest
+   (sha256sum) because layers might get gzipped differently when they are pushed
+   back up. Doing things entirely server-side preserves the digest, which is
+   important for declaratively recording the images by their digest in the
+   promoter manifest.
+
 # Maintenance
 
 ## Linting
