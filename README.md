@@ -87,4 +87,112 @@ from running `make build`, and then invoking it with the correct path under
 `./bazel-bin`. For example, if you are on a Linux machine, running `make build`
 will output a binary at `./bazel-bin/linux_amd64_stripped/cip`.
 
+# Maintenance
+
+## Linting
+
+We use [golangci-lint](https://github.com/golangci/golangci-lint); please
+install it and run `make lint` to check for linting errors. There should be 0
+linting errors; if any should be ignored, add a line ignoring the error with a
+`//nolint[:linter1,linter2,...]`
+[directitve](https://github.com/golangci/golangci-lint#false-positives). Grep
+for `nolint` in this repo for examples.
+
+## Testing
+
+Run `make test`; this will invoke a bazel rule to run all unit tests.
+
+Every critical piece has a unit test --- unit tests complete nearly instantly,
+so you should *always* add unit tests where possible, and also run them before
+submitting a new PR. There is an open issue to make
+[linting](https://github.com/kubernetes-sigs/k8s-container-image-promoter/issues/36)
+and
+[unit/e2e](https://github.com/kubernetes-sigs/k8s-container-image-promoter/issues/8)
+tests part of a Prow job, to guard against human error in this area.
+
+### Faking http calls and shell processes
+
+As the promoter uses a combination of network API calls and shell-instantiated
+processes, we have to fake them for the unit tests. To make this happen, these
+mechanisms all use a `stream.Producer` [interface](lib/stream/types.go). The
+real-world code uses either the [http](lib/stream/http.go) or
+[subprocess](lib/stream/subprocess.go) implementations of this interface to
+create streams of data (JSON or not) which we can interpret and use.
+
+For tests, the [fake](lib/stream/fake.go) implementation is used instead, which
+predefines how that stream will behave, for the purposes of each unit test. A
+good example of this is the [`TestReadRepository`
+test](lib/dockerregistry/inventory_test.go).
+
+## Updating Prow Jobs
+
+Currently there are 3 Prow jobs that use the promoter Docker images. All of
+these jobs watch the promoter manifests that live in the [k8s.io
+repo](https://github.com/kubernetes/k8s.io/tree/master/k8s.gcr.io). They are:
+
+1. [presubmit job][prow-presubmit-definition] (there is no testgrid entry for this job)
+1. [postsubmit job][prow-trusted-definitions] (grep for `post-k8sio-cip`)
+1. [daily job][prow-trusted-definitions] (grep for `ci-k8sio-cip`)
+
+The postsubmit and daily jobs also have testgrid entries
+([postsubmit](https://k8s-testgrid.appspot.com/sig-release-misc#post-k8sio-cip),
+[daily](https://k8s-testgrid.appspot.com/sig-release-misc#ci-k8sio-cip)).
+
+Every time a PR lands against one of the promoter manifests in the
+`kubernetes/k8.sio` repo, the presubmit runs, followed by the postsubmit if the
+PR gets merged. The daily job (`ci-k8sio-cip`) runs every day as a sanity check
+to make sure that both the promoter configuration is correct in the Prow job,
+and that the registries have not been tampered with independent of the image
+promotion process (e.g., if an image gets promoted out-of-band, then the
+promoter will print a warning about it being present).
+
+### Running the multirun.sh script locally (dry run mode)
+
+The promoter does not yet accept more than 1 promoter manifest per invocation.
+In order to handle changes to multiple promoter manifests inside a single PR,
+the `util/multirun.sh` script accepts paths/secrets to multiple manifests to run
+them serially.
+
+The presubmit job can be "faked" locally for testing in a dry-run mode, by just
+building the image with `make image-load` and then invoking:
+
+```
+read -r -d '' command << EOM
+multirun.sh /cip/cip \
+/go/src/github.com/kubernetes/k8s.io/k8s.gcr.io/k8s-staging-cluster-api/manifest.yaml \
+/go/src/github.com/kubernetes/k8s.io/k8s.gcr.io/k8s-staging-coredns/manifest.yaml \
+/go/src/github.com/kubernetes/k8s.io/k8s.gcr.io/k8s-staging-csi/manifest.yaml
+EOM
+
+docker run --rm -it \
+    -v $HOME/go:/go \
+    gcr.io/cip-demo-staging/cip:latest \
+    "${command}"
+```
+
+This basically runs a dry run of the presubmit job.
+
+# Releasing
+
+We follow [Semver](https://semver.org/) for versioning. For each new release,
+create a new release on GitHub with:
+
+- Update VERSION file to bump the semver version (e.g., `1.0.0`)
+- Create a new commit for the 1-liner change above with this command with `git commit -m "cip 1.0.0"`
+- Create an annotated tag at this point with `git tag -a "v1.0.0" -m "cip 1.0.0"`
+- Push this version to the `master` branch (requires write access)
+
+We also have to publish the Docker images. Currently they are pushed up to the
+`gcr.io/cip-demo-staging` registry (the home will [change to a more official
+place](https://github.com/kubernetes-sigs/k8s-container-image-promoter/issues/49)
+in the future). To publish them into `gcr.io/cip-demo-staging`, run
+
+- `make image-push` (requires push access to gcr.io/cip-demo-staging)
+
+Once the images are published, you should bump the image tags as they are
+referenced in the Prow Jobs by making a PR against the
+[test-infra](https://github.com/kubernetes/test-infra/) repo.
+
 [bazel]:https://bazel.build/
+[prow-presubmit-definition]:https://github.com/kubernetes/test-infra/blob/master/config/jobs/kubernetes/sig-release/cip/container-image-promoter.yaml
+[prow-trusted-definitions]:https://github.com/kubernetes/test-infra/blob/master/config/jobs/kubernetes/test-infra/test-infra-trusted.yaml
