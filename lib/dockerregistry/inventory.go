@@ -776,6 +776,70 @@ func ToPQIN(registryName RegistryName, imageName ImageName, tag Tag) string {
 	return string(registryName) + "/" + string(imageName) + ":" + string(tag)
 }
 
+func getImagesSliceFromMap(images map[ImageName]DigestTags) []Image {
+	var result []Image
+
+	for name, dmap := range images {
+		result = append(result, Image{
+			ImageName: name,
+			Dmap:      dmap,
+		})
+	}
+
+	return result
+}
+
+// getImagesFromDestRegistry returns all images from not src repository
+func (sc *SyncContext) getImagesFromDestRegistry(
+	srcRegistryName RegistryName,
+) ([]Image, error) {
+	var registries []RegInvImage
+
+	for registryName, images := range sc.Inv {
+		// Ignore src registry
+		if registryName == srcRegistryName {
+			continue
+		}
+
+		registries = append(registries, images)
+	}
+
+	if len(registries) != 1 {
+		return nil, fmt.Errorf("more than 1 destination repository" +
+			" is currently not supported")
+	}
+
+	return getImagesSliceFromMap(registries[0]), nil
+}
+
+func getSrcRegistryFromManifest(manifest Manifest) RegistryContext {
+	var srcRegistry RegistryContext
+	for _, registry := range manifest.Registries {
+		if registry.Src {
+			srcRegistry = registry
+		}
+	}
+	return srcRegistry
+}
+
+// GenImages will get images from dest registries and generate
+// new manifest file which will be displayed on stdout or saved to a file
+func (sc *SyncContext) GenImages(manifest Manifest) error {
+	images, err := sc.getImagesFromDestRegistry(getSrcRegistryFromManifest(manifest).Name)
+	if err != nil {
+		return err
+	}
+
+	bs, err := yaml.Marshal(images)
+	if err != nil {
+		return fmt.Errorf("cannot serialize manifest to yaml: %s", err)
+	}
+
+	fmt.Println(string(bs))
+
+	return nil
+}
+
 // ToLQIN converts a RegistryName and ImangeName to form a loosely-qualified
 // image name (LQIN). Notice that it is missing tag information --- hence
 // "loosely-qualified".

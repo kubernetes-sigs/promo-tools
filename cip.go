@@ -81,6 +81,11 @@ func main() {
 		"version",
 		false,
 		"print version")
+	genImagesPtr := flag.Bool(
+		"gen-images",
+		false,
+		"generating all images in destination"+
+			" repository instead of promoting images")
 	noSvcAcc := false
 	flag.BoolVar(&noSvcAcc, "no-service-account", false,
 		"do not pass '--account=...' to all gcloud calls (default: false)")
@@ -178,6 +183,17 @@ func main() {
 		return &sh
 	}
 	sc.ReadRepository(mkReadRepositoryCmd)
+
+	if *genImagesPtr {
+		if err := sc.GenImages(mfest); err != nil {
+			fmt.Fprintln(
+				os.Stderr,
+				fmt.Errorf("cannot create manifest: %s", err))
+			os.Exit(1)
+		}
+
+		os.Exit(0)
+	}
 
 	sc.Info(sc.Inv.PrettyValue())
 
