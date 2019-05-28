@@ -17,10 +17,12 @@ limitations under the License.
 package inventory
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"os/exec"
 	"regexp"
 	"sort"
 	"strings"
@@ -477,34 +479,28 @@ func getJSONSFromProcess(req stream.ExternalRequest) (cipJson.Objects, Errors) {
 
 // GetServiceAccountToken calls gcloud to get an access token for the specified service account
 func GetServiceAccountToken(serviceAccount string, useServiceAccount bool) (Token, error) {
-	var sp stream.Subprocess
-	cmd := []string{
-		"gcloud",
+	args := []string{
 		"auth",
 		"print-access-token",
 	}
-	sp.CmdInvocation = MaybeUseServiceAccount(
-		serviceAccount, useServiceAccount, cmd)
-	sout, _, err := sp.Produce()
-	if err != nil {
-		return "", err
-	}
-	token, err := ioutil.ReadAll(sout)
-	// Do not log the token (sout) that failed to be read, because it could
-	// be that the token was valid, but that ioutl.ReadAll() failed for
+	args = MaybeUseServiceAccount(serviceAccount, useServiceAccount, args)
+
+	cmd := exec.Command("gcloud", args...)
+
+	var stdout bytes.Buffer
+	cmd.Stdout = &stdout
+
+	// Do not log the token (stdout) on error, because it could
+	// be that the token was valid, but that Run() failed for
 	// other reasons. NEVER print the token as part of an error message!
-	if err != nil {
-		return "", fmt.Errorf(
-			"could not read access token for '%s'", serviceAccount)
-	}
-	tokenVal := Token(strings.TrimSpace(string(token)))
 
-	// TODO: Defer?
-	if err = sp.Close(); err != nil {
+	err := cmd.Run()
+	if err != nil {
 		return "", err
 	}
 
-	return tokenVal, nil
+	token := Token(strings.TrimSpace(stdout.String()))
+	return token, nil
 }
 
 // PopulateTokens populates the SyncContext's Tokens map with actual usable
