@@ -475,36 +475,48 @@ func getJSONSFromProcess(req stream.ExternalRequest) (cipJson.Objects, Errors) {
 	return jsons, errors
 }
 
+// GetServiceAccountToken calls gcloud to get an access token for the specified service account
+func GetServiceAccountToken(serviceAccount string, useServiceAccount bool) (Token, error) {
+	var sp stream.Subprocess
+	cmd := []string{
+		"gcloud",
+		"auth",
+		"print-access-token",
+	}
+	sp.CmdInvocation = MaybeUseServiceAccount(
+		serviceAccount, useServiceAccount, cmd)
+	sout, _, err := sp.Produce()
+	if err != nil {
+		return "", err
+	}
+	token, err := ioutil.ReadAll(sout)
+	// Do not log the token (sout) that failed to be read, because it could
+	// be that the token was valid, but that ioutl.ReadAll() failed for
+	// other reasons. NEVER print the token as part of an error message!
+	if err != nil {
+		return "", fmt.Errorf(
+			"could not read access token for '%s'", serviceAccount)
+	}
+	tokenVal := Token(strings.TrimSpace(string(token)))
+
+	// TODO: Defer?
+	if err = sp.Close(); err != nil {
+		return "", err
+	}
+
+	return tokenVal, nil
+}
+
 // PopulateTokens populates the SyncContext's Tokens map with actual usable
 // access tokens.
 func (sc *SyncContext) PopulateTokens() error {
 	for _, rc := range sc.RegistryContexts {
-		var sp stream.Subprocess
-		cmd := []string{
-			"gcloud",
-			"auth",
-			"print-access-token",
-		}
-		sp.CmdInvocation = MaybeUseServiceAccount(
-			rc.ServiceAccount, sc.UseServiceAccount, cmd)
-		sout, _, err := sp.Produce()
+		token, err := GetServiceAccountToken(rc.ServiceAccount, sc.UseServiceAccount)
 		if err != nil {
 			return err
-		}
-		token, err := ioutil.ReadAll(sout)
-		// Do not log the token (sout) that failed to be read, because it could
-		// be that the token was valid, but that ioutl.ReadAll() failed for
-		// other reasons. NEVER print the token as part of an error message!
-		if err != nil {
-			return fmt.Errorf(
-				"could not read access token for '%s'", rc.ServiceAccount)
 		}
 		tokenName := RootRepo(string(rc.Name))
-		tokenVal := Token(strings.TrimSpace(string(token)))
-		sc.Tokens[tokenName] = tokenVal
-		if err = sp.Close(); err != nil {
-			return err
-		}
+		sc.Tokens[tokenName] = token
 	}
 	return nil
 }
