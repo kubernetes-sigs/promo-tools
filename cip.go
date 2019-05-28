@@ -19,11 +19,11 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 
 	// nolint[lll]
+	"k8s.io/klog"
 	reg "sigs.k8s.io/k8s-container-image-promoter/lib/dockerregistry"
 	"sigs.k8s.io/k8s-container-image-promoter/lib/stream"
 )
@@ -39,6 +39,8 @@ var TimestampUtcRfc3339 string
 
 // nolint[gocyclo]
 func main() {
+	klog.InitFlags(nil)
+
 	manifestPtr := flag.String(
 		"manifest", "", "the manifest file to load (REQUIRED)")
 	garbageCollectPtr := flag.Bool(
@@ -108,11 +110,11 @@ func main() {
 	}
 
 	if *manifestPtr == "" {
-		log.Fatal(fmt.Errorf("-manifest=... flag is required"))
+		klog.Fatal(fmt.Errorf("-manifest=... flag is required"))
 	}
 	mfest, rd, srcRegistry, err := reg.ParseManifestFromFile(*manifestPtr)
 	if err != nil {
-		log.Fatal(err)
+		klog.Fatal(err)
 	}
 
 	mi := make(reg.MasterInventory)
@@ -131,7 +133,7 @@ func main() {
 		*dryRunPtr,
 		!noSvcAcc)
 	if err != nil {
-		log.Fatal(err)
+		klog.Fatal(err)
 	}
 
 	if *parseOnlyPtr {
@@ -159,7 +161,7 @@ func main() {
 	// Populate access tokens for all registries listed in the manifest.
 	err = sc.PopulateTokens()
 	if err != nil {
-		log.Fatal(err)
+		klog.Fatal(err)
 	}
 
 	mkReadRepositoryCmd := func(
@@ -174,7 +176,7 @@ func main() {
 			nil)
 
 		if err != nil {
-			log.Fatalf("could not create HTTP request for '%s/%s'", domain, repoPath)
+			klog.Fatalf("could not create HTTP request for '%s/%s'", domain, repoPath)
 		}
 		rc.Token = sc.Tokens[reg.RootRepo(tokenKey)]
 		httpReq.SetBasicAuth("oauth2accesstoken", string(rc.Token))
