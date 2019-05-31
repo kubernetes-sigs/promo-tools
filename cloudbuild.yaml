@@ -9,28 +9,7 @@ steps:
   entrypoint: "bash"
   args:
   - "-c"
-  - |
-    set -o errexit
-    set -o nounset
-    set -o pipefail
-    set -o xtrace
-
-    shopt -s dotglob
-    # Remove the git archive that GCB auto-injects to /workspace, because it's
-    # not a real Git repository (it's just a tarball). This is required because
-    # we want to make use of git commands such as git-describe later on.
-    rm -rf /workspace/*
-
-    git \
-      clone https://sigs.k8s.io/${_REPO} \
-      --depth 1 \
-      --branch $BRANCH_NAME \
-      ${_GOPATH}/src/sigs.k8s.io/${_REPO}
-
-    # Get golangci-lint; install into /workspace/bin/golangci-lint.
-    pushd go
-    curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh \
-      | sh -s ${_GOLANGCI_LINT_VERSION}
+  - "./util/setup.bash"
 
 # We have to use go:debian, not go[:latest], because the latter is based on
 # alpine and does not have bash.
@@ -44,19 +23,7 @@ steps:
   dir: ${_GOPATH}/src/sigs.k8s.io/${_REPO}
   args:
   - "-c"
-  - |
-    set -o errexit
-    set -o nounset
-    set -o pipefail
-    set -o xtrace
-
-    # Lint with golangci-lint. Because megacheck/typecheck linters require the
-    # `~/go/src/gopkg.in/yaml.v2` (external dependency) to be populated in the
-    # current GOPATH, we have to bring those in.
-    go get -u github.com/golang/dep/cmd/dep
-    export PATH=${_GOPATH}/bin:$$PATH
-    dep ensure
-    ./lint.sh
+  - "./util/lint.bash"
 
 - name: "gcr.io/cloud-builders/bazel"
   id: test
@@ -66,13 +33,7 @@ steps:
   dir: ${_GOPATH}/src/sigs.k8s.io/${_REPO}
   args:
   - "-c"
-  - |
-    set -o errexit
-    set -o nounset
-    set -o pipefail
-    set -o xtrace
-
-    bazel test --test_output=all //lib/...
+  - "./util/test.bash"
 
 - name: "gcr.io/cloud-builders/bazel"
   id: build-image
@@ -88,11 +49,4 @@ steps:
   dir: ${_GOPATH}/src/sigs.k8s.io/${_REPO}
   args:
   - "-c"
-  - |
-    set -o errexit
-    set -o nounset
-    set -o pipefail
-    set -o xtrace
-
-    bazel run --workspace_status_command=$${PWD}/workspace_status.sh :push-cip-latest
-    bazel run --workspace_status_command=$${PWD}/workspace_status.sh :push-cip-tagged
+  - "./util/cloudbuild/push-image.bash"
