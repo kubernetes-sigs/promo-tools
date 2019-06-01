@@ -197,7 +197,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	sc.Info(sc.Inv.PrettyValue())
+	klog.Info(sc.Inv.PrettyValue())
 
 	// Promote.
 	mkPromotionCmd := func(
@@ -222,7 +222,7 @@ func main() {
 	exitCode := sc.Promote(mfest, mkPromotionCmd, nil)
 
 	if *garbageCollectPtr {
-		sc.Infof("---------- BEGIN GARBAGE COLLECTION: %s ----------\n",
+		klog.Infof("---------- BEGIN GARBAGE COLLECTION: %s ----------\n",
 			*manifestPtr)
 		// Re-read the state of the world.
 		sc.ReadRepository(mkReadRepositoryCmd)
