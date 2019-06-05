@@ -39,12 +39,37 @@ _go_image_repos()
 
 load("@io_bazel_rules_docker//container:container.bzl", "container_pull")
 
+# Image Promoter Base Image
 container_pull(
     name = "google-sdk-base",
     registry = "index.docker.io",
     repository = "google/cloud-sdk",
     # Version 241.0.0
     digest = "sha256:3b77ee8bfa6a2513fb6343cfad0dd6fd6ddd67d0632908c3a5fb9b57dd68ec1b",
+)
+
+# Cloud Build Setup Base Image
+container_pull(
+    name = "cloud-builder-git",
+    registry = "gcr.io",
+    repository = "cloud-builders/git"
+    tag = "latest"
+)
+
+# Cloud Build Lint Base Image
+container_pull(
+    name = "cloud-builder-go",
+    registry = "gcr.io",
+    repository = "cloud-builders/go"
+    tag = "debian"
+)
+
+# Cloud Build Test, Build Image, and Push Image Base Images
+container_pull(
+    name = "cloud-builder-bazel",
+    registry = "gcr.io",
+    repository = "cloud-builders/go"
+    tag = "latest"
 )
 
 # Maybe use cloud-builders/gcloud, for GCB. But for Prow just use the google-sdk
@@ -122,3 +147,4 @@ go_repository(
     importpath = "github.com/google/go-cmp",
     tag = "v0.2.0",
 )
+

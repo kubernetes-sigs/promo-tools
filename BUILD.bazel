@@ -3,6 +3,10 @@ load("@io_bazel_rules_docker//go:image.bzl", "go_image")
 load("@io_bazel_rules_docker//container:container.bzl", "container_bundle", "container_image", "container_layer", "container_push")
 load("@io_bazel_rules_docker//contrib:push-all.bzl", "docker_push")
 
+########################
+# Image Promoter Image #
+########################
+
 # Go image. "bazel build //:cip-docker-image.tar" results in a tarfile that is
 # "docker load -i"-able, but the image is automatially named
 # "bazel:cip-docker-image". To get around this, we use the container_bundle rule
@@ -35,6 +39,54 @@ container_layer(
     files = ["util/multirun.sh"],
 )
 
+######################
+# Cloud Build Images #
+######################
+
+# Cloud Build Setup
+container_image(
+    name = "cip-cloud-builder-git",
+    base = "@cloud-builder-git//image",
+    layers = [":cip-cloud-builder-scripts"],
+    env = {"PATH": "/cip:/cip/util/cloudbuild:${PATH}"},
+    symlinks = {"/cip/cloudbuild/git": "/app/cip-cloudbuild-git-image.binary"},
+)
+
+# Cloud Build Lint
+container_image(
+    name = "cip-cloud-builder-go",
+    base = "@cloud-builder-go//image",
+    layers = [":cip-cloud-builder-scripts],
+    env = {"PATH": "/cip:/cip/util/cloudbuild:${PATH}"},
+    symlinks = {"/cip/cloudbuild/go": "/app/cip-cloudbuild-go-image.binary"},
+)
+
+# Cloud Build Test, Build Image, and Push Image
+container_image(
+    name = "cip-cloud-builder-bazel",
+    base = "@cloud-builder-bazel//image",
+    layers = [":cip-cloud-builder-scripts],
+    env = {"PATH": "/cip:/cip/util/cloudbuild:${PATH}"},
+    symlinks = {"/cip/cloudbuild/bazel": "/app/cip-cloudbuild-bazel-image.binary"},
+)
+
+# Cloud Build Scripts
+container_layer(
+    name = "cip-cloud-builder-scripts"
+    directory = "/cip/cloudbuild"
+    files = [
+        "util/cloudbuild/setup.bash",
+        "util/cloudbuild/lint.bash",
+        "util/cloudbuild/test.bash",
+        "util/cloudbuild/push-image.bash",
+        "workspace_status.sh",
+    ]
+)
+
+###############
+# Load Images #
+###############
+
 # Invoke with "bazel build //:cip-docker-loadable.tar". Then you can run "docker
 # load -i bazel-bin/cip-docker-loadable.tar" to load it into the local Docker
 # daemon.
@@ -43,6 +95,9 @@ container_bundle(
     images = {
         "{STABLE_IMG_REGISTRY}/{STABLE_IMG_REPOSITORY}/{STABLE_IMG_NAME}:latest": "//:cip-with-gcloud",
         "{STABLE_IMG_REGISTRY}/{STABLE_IMG_REPOSITORY}/{STABLE_IMG_NAME}:{IMG_TAG}": "//:cip-with-gcloud",
+        "{CLOUD_BUILD_IMG_REGISTRY}/{CLOUD_BUILD_IMG_REPOSITORY}/{CLOUD_BUILD_GIT_IMG_NAME}:{CLOUD_BUILD_GIT_IMG_TAG}": "//:cip-cloud-builder-git",
+        "{CLOUD_BUILD_IMG_REGISTRY}/{CLOUD_BUILD_IMG_REPOSITORY}/{CLOUD_BUILD_GO_IMG_NAME}:{CLOUD_BUILD_GO_IMG_TAG}": "//:cip-cloud-builder-go",
+        "{CLOUD_BUILD_IMG_REGISTRY}/{CLOUD_BUILD_IMG_REPOSITORY}/{CLOUD_BUILD_BAZEL_IMG_NAME}:{CLOUD_BUILD_BAZEL_IMG_TAG}": "//:cip-cloud-builder-bazel",
     },
 )
 
