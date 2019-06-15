@@ -122,3 +122,9 @@ go_repository(
     importpath = "github.com/google/go-cmp",
     tag = "v0.2.0",
 )
+
+go_repository(
+    name = "io_k8s_klog",
+    importpath = "k8s.io/klog",
+    tag = "v0.3.1",
+)
