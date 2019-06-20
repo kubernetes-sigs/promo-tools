@@ -19,6 +19,8 @@ package inventory
 import (
 	"sync"
 
+	cr "github.com/google/go-containerregistry/pkg/v1/types"
+
 	"sigs.k8s.io/k8s-container-image-promoter/lib/stream"
 )
 
@@ -55,6 +57,7 @@ type SyncContext struct {
 	SrcRegistry         *RegistryContext
 	Tokens              map[RootRepo]Token
 	RenamesDenormalized RenamesDenormalized
+	DigestMediaType     DigestMediaType
 }
 
 // RootRepo is the toplevel Docker repository (e.g., gcr.io/foo (GCR domain name
@@ -227,6 +230,9 @@ type RegistryName string
 // "gcr.io/k8s-image-staging/addon-builder") or the prefix + name
 // ("foo/bar/baz/quux" in "gcr.io/hello/foo/bar/baz/quux").
 type ImageName string
+
+// DigestMediaType holds media information about a Digest.
+type DigestMediaType map[Digest]cr.MediaType
 
 // Digest is a string that contains the SHA256 hash of a Docker container image.
 type Digest string

@@ -1,0 +1,87 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+load("@io_bazel_rules_docker//go:image.bzl", "go_image")
+load("@io_bazel_rules_docker//container:container.bzl", "container_bundle", "container_image", "container_layer", "container_push")
+load("@io_bazel_rules_docker//contrib:push-all.bzl", "docker_push")
+
+go_library(
+    name = "go_default_library",
+    srcs = ["e2e.go"],
+    deps = [
+        "//lib/dockerregistry:go_default_library",
+        "//lib/stream:go_default_library",
+        "@in_gopkg_yaml_v2//:go_default_library",
+        "@io_k8s_klog//:go_default_library",
+    ],
+    importpath = "sigs.k8s.io/k8s-container-image-promoter/test",
+    visibility = ["//visibility:public"],
+)
+
+go_binary(
+    name = "e2e",
+    embed = [":go_default_library"],
+    visibility = ["//visibility:public"],
+)
+
+go_image(
+    name = "e2e-image",
+    embed = [":go_default_library"],
+    importpath = "sigs.k8s.io/k8s-container-image-promoter/e2e",
+    base = "@distroless-base//image",
+)
+
+# NOTE: Bazel's docker rules do not support building manifest lists (aka "fat"
+# manifests); tracking issue:
+# https://github.com/bazelbuild/rules_docker/issues/300
+#
+# Because of this, the deterministic images for fat manifests have to be
+# generated and pushed outside of bazel. So the Prowjob definition has to be
+# run using a bazel + docker image.
+#
+# Additional notes: The 'docker manifest annotate' command can set all the
+# os/arch metadata [1]. So we build pure data containers (text files) with
+# different names for each os/arch, and then stitch them up together after
+# docker-load-ing them with docker-manifest outside of bazel (because bazel's
+# rules don't support creating Docker manifests yet:
+# https://github.com/bazelbuild/rules_docker/issues/300).
+#
+# [1] https://docs.docker.com/engine/reference/commandline/manifest_annotate/.
+
+# FIXME: We should be using some custom Bazel rule that can just for-loop
+# across the different os/arch combinations.
+
+# linux_amd64
+container_layer(
+    name = "golden-layer-linux_amd64",
+    directory = "/golden/linux_amd64",
+    files = ["golden/linux_amd64.txt"],
+)
+container_image(
+    name = "golden-image-linux_amd64",
+    # No base image to simulate 'scratch' image.
+    layers = [":golden-layer-linux_amd64"],
+)
+
+# linux_s390x
+container_layer(
+    name = "golden-layer-linux_s390x",
+    directory = "/golden/linux_s390x",
+    files = ["golden/linux_s390x.txt"],
+)
+container_image(
+    name = "golden-image-linux_s390x",
+    # No base image to simulate 'scratch' image.
+    layers = [":golden-layer-linux_s390x"],
+)
+
+container_bundle(
+    name = "golden-images-loadable",
+    images = {
+        "{STABLE_TEST_STAGING_IMG_REPOSITORY}/golden:1.0-linux_amd64": "//test:golden-image-linux_amd64",
+        "{STABLE_TEST_STAGING_IMG_REPOSITORY}/golden:1.0-linux_s390x": "//test:golden-image-linux_s390x",
+    },
+)
+
+docker_push(
+    name = "push-golden",
+    bundle = "golden-images-loadable",
+)

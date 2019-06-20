@@ -26,6 +26,7 @@ timestamp_utc_date_dashes="${timestamp_utc_rfc3339% *}"
 timestamp_utc_date_no_dashes="${timestamp_utc_date_dashes//-/}"
 image_tag="$git_desc"
 
+p_ STABLE_TEST_STAGING_IMG_REPOSITORY gcr.io/k8s-staging-cip-test
 p_ STABLE_IMG_REGISTRY gcr.io
 p_ STABLE_IMG_REPOSITORY cip-demo-staging
 p_ STABLE_IMG_NAME cip

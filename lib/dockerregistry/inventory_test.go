@@ -565,7 +565,8 @@ func TestCommandGeneration(t *testing.T) {
 		destRC,
 		true,
 		destImageName,
-		digest)
+		digest,
+		false)
 	expected := []string{
 		"gcloud",
 		"--account=robot",
@@ -584,7 +585,8 @@ func TestCommandGeneration(t *testing.T) {
 		destRC,
 		false,
 		destImageName,
-		digest)
+		digest,
+		false)
 	expected = []string{
 		"gcloud",
 		"container",
@@ -903,11 +905,12 @@ func TestReadRepository(t *testing.T) {
 					ServiceAccount: "robot",
 				},
 			},
-			Inv: map[RegistryName]RegInvImage{fakeRegName: nil}}
+			Inv:             map[RegistryName]RegInvImage{fakeRegName: nil},
+			DigestMediaType: make(DigestMediaType)}
 		// test is used to pin the "test" variable from the outer "range"
 		// scope (see scopelint).
 		test := test
-		mkFakeStream1 := func(rc RegistryContext) stream.Producer {
+		mkFakeStream1 := func(sc *SyncContext, rc RegistryContext) stream.Producer {
 			var sr stream.Fake
 
 			_, domain, repoPath := GetTokenKeyDomainRepoPath(rc.Name)
