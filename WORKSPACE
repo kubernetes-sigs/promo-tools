@@ -3,17 +3,17 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 # You *must* import the Go rules before setting up the go_image rules.
 http_archive(
     name = "io_bazel_rules_go",
-    urls = ["https://github.com/bazelbuild/rules_go/releases/download/0.16.6/rules_go-0.16.6.tar.gz"],
-    sha256 = "ade51a315fa17347e5c31201fdc55aa5ffb913377aa315dceb56ee9725e620ee",
+    urls = ["https://github.com/bazelbuild/rules_go/releases/download/0.18.6/rules_go-0.18.6.tar.gz"],
+    sha256 = "f04d2373bcaf8aa09bccb08a98a57e721306c8f6043a2a0ee610fd6853dcde3d",
 )
 
 http_archive(
     name = "bazel_gazelle",
-    urls = ["https://github.com/bazelbuild/bazel-gazelle/releases/download/0.16.0/bazel-gazelle-0.16.0.tar.gz"],
-    sha256 = "7949fc6cc17b5b191103e97481cf8889217263acf52e00b560683413af204fcb",
+    urls = ["https://github.com/bazelbuild/bazel-gazelle/releases/download/0.17.0/bazel-gazelle-0.17.0.tar.gz"],
+    sha256 = "3c681998538231a2d24d0c07ed5a7658cb72bfb5fd4bf9911157c0e9ac6a2687",
 )
 
-load("@io_bazel_rules_go//go:def.bzl", "go_register_toolchains", "go_rules_dependencies")
+load("@io_bazel_rules_go//go:deps.bzl", "go_register_toolchains", "go_rules_dependencies")
 
 go_rules_dependencies()
 
@@ -65,7 +65,7 @@ go_repository(
 
 go_repository(
     name = "com_github_google_go_containerregistry",
-    commit = "1d38b9cfdb9d",
+    commit = "abf9ef06abd9",
     importpath = "github.com/google/go-containerregistry",
 )
 
@@ -101,7 +101,7 @@ go_repository(
 
 go_repository(
     name = "org_golang_x_oauth2",
-    commit = "9f3314589c9a",
+    commit = "0f29369cfe45",
     importpath = "golang.org/x/oauth2",
 )
 
@@ -120,11 +120,11 @@ go_repository(
 go_repository(
     name = "com_github_google_go_cmp",
     importpath = "github.com/google/go-cmp",
-    tag = "v0.2.0",
+    tag = "v0.3.0",
 )
 
 go_repository(
     name = "io_k8s_klog",
     importpath = "k8s.io/klog",
-    tag = "v0.3.1",
+    tag = "v0.3.3",
 )
