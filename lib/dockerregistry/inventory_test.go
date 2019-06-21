@@ -2164,66 +2164,43 @@ func TestGarbageCollectionMulti(t *testing.T) {
 	}
 }
 
-func TestSyncContext_getImagesFromDestRegistry(t *testing.T) {
+func TestSnapshot(t *testing.T) {
 	var tests = []struct {
-		name           string
-		srcRegistry    RegistryName
-		inputSc        SyncContext
-		expectedImages []Image
+		name     string
+		input    RegInvImage
+		expected string
 	}{
 		{
-			// nolint[lll]
-			"Multiple registries with the same image",
-			RegistryName("gcr.io/foo"),
-			SyncContext{
-				Inv: MasterInventory{
-					"gcr.io/foo": RegInvImage{
-						"baz": DigestTags{
-							"sha256:000": TagSlice{"0.9"}}},
-					"gcr.io/qux": RegInvImage{
-						"baz": DigestTags{
-							"sha256:000": TagSlice{"0.9"}}}}},
-			[]Image{
-				{
-					ImageName: ImageName("baz"),
-					Dmap: DigestTags{
-						"sha256:000": TagSlice{"0.9"},
-					},
+			"Basic",
+			RegInvImage{
+				"foo": DigestTags{
+					"sha256:fff": TagSlice{"0.9", "0.5"},
+					"sha256:abc": TagSlice{"0.3", "0.2"},
 				},
+				"bar": DigestTags{
+					"sha256:000": TagSlice{"0.8", "0.5", "0.9"}},
 			},
-		},
-		{
-			// nolint[lll]
-			"Multiple registries with the same image" +
-				" with different tags",
-			RegistryName("gcr.io/foo"),
-			SyncContext{
-				Inv: MasterInventory{
-					"gcr.io/foo": RegInvImage{
-						"baz": DigestTags{
-							"sha256:000": TagSlice{"0.9", "1.2"}}},
-					"gcr.io/qux": RegInvImage{
-						"baz": DigestTags{
-							"sha256:000": TagSlice{"0.9", "1.0", "1.2"}}}}},
-			[]Image{
-				{
-					ImageName: ImageName("baz"),
-					Dmap: DigestTags{
-						"sha256:000": TagSlice{"0.9", "1.0", "1.2"},
-					},
-				},
-			},
+			`- name: bar
+  dmap:
+    sha256:000:
+    - 0.5
+    - 0.8
+    - 0.9
+- name: foo
+  dmap:
+    sha256:abc:
+    - 0.2
+    - 0.3
+    sha256:fff:
+    - 0.5
+    - 0.9
+`,
 		},
 	}
 
 	for _, test := range tests {
-		gotImages, err := test.inputSc.getImagesFromDestRegistry(
-			test.srcRegistry,
-		)
-		if err != nil {
-			t.Error(err)
-		}
-		err = checkEqual(gotImages, test.expectedImages)
+		gotYAML := test.input.ToYAML()
+		err := checkEqual(gotYAML, test.expected)
 		checkError(t, err, fmt.Sprintf("checkError: test: %v\n", test.name))
 	}
 }

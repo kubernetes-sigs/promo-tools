@@ -784,68 +784,69 @@ func ToPQIN(registryName RegistryName, imageName ImageName, tag Tag) string {
 	return string(registryName) + "/" + string(imageName) + ":" + string(tag)
 }
 
-func getImagesSliceFromMap(images map[ImageName]DigestTags) []Image {
-	var result []Image
+// ToYAML displays a RegInvImage as YAML, but with the map items sorted
+// alphabetically.
+func (rii *RegInvImage) ToYAML() string {
+	// Temporary structs that have slices, not maps.
+	type digest struct {
+		hash string
+		tags []string
+	}
 
-	for name, dmap := range images {
-		result = append(result, Image{
-			ImageName: name,
-			Dmap:      dmap,
+	type image struct {
+		name    string
+		digests []digest
+	}
+
+	var images []image
+
+	for name, dmap := range *rii {
+		var digests []digest
+		for k, v := range dmap {
+			var tags []string
+			for _, tag := range v {
+				tags = append(tags, string(tag))
+			}
+
+			sort.Strings(tags)
+
+			digests = append(digests, digest{
+				hash: string(k),
+				tags: tags,
+			})
+		}
+		sort.Slice(digests, func(i, j int) bool {
+			return digests[i].hash < digests[j].hash
+		})
+
+		images = append(images, image{
+			name:    string(name),
+			digests: digests,
 		})
 	}
 
-	return result
-}
+	sort.Slice(images, func(i, j int) bool {
+		return images[i].name < images[j].name
+	})
 
-// getImagesFromDestRegistry returns all images from not src repository
-func (sc *SyncContext) getImagesFromDestRegistry(
-	srcRegistryName RegistryName,
-) ([]Image, error) {
-	var registries []RegInvImage
-
-	for registryName, images := range sc.Inv {
-		// Ignore src registry
-		if registryName == srcRegistryName {
-			continue
-		}
-
-		registries = append(registries, images)
-	}
-
-	if len(registries) != 1 {
-		return nil, fmt.Errorf("more than 1 destination repository" +
-			" is currently not supported")
-	}
-
-	return getImagesSliceFromMap(registries[0]), nil
-}
-
-func getSrcRegistryFromManifest(manifest Manifest) RegistryContext {
-	var srcRegistry RegistryContext
-	for _, registry := range manifest.Registries {
-		if registry.Src {
-			srcRegistry = registry
+	var b strings.Builder
+	for _, image := range images {
+		fmt.Fprintf(&b, "- name: %s\n", image.name)
+		fmt.Fprintf(&b, "  dmap:\n")
+		for _, digestEntry := range image.digests {
+			fmt.Fprintf(&b, "    %s:", digestEntry.hash)
+			if len(digestEntry.tags) > 0 {
+				fmt.Fprintf(&b, "\n")
+				for _, tag := range digestEntry.tags {
+					fmt.Fprintf(&b, "    - %s\n", tag)
+				}
+			} else {
+				fmt.Fprintf(&b, " []\n")
+			}
 		}
 	}
-	return srcRegistry
-}
 
-// GenImages will get images from dest registries and generate
-// new manifest file which will be displayed on stdout or saved to a file
-func (sc *SyncContext) GenImages(manifest Manifest) error {
-	images, err := sc.getImagesFromDestRegistry(getSrcRegistryFromManifest(manifest).Name)
-	if err != nil {
-		return err
-	}
-
-	bs, err := yaml.Marshal(images)
-	if err != nil {
-		return fmt.Errorf("cannot serialize manifest to yaml: %s", err)
-	}
-
-	fmt.Println(string(bs))
-
-	return nil
+	return b.String()
 }
 
 // ToLQIN converts a RegistryName and ImangeName to form a loosely-qualified
