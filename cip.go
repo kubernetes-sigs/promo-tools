@@ -83,11 +83,14 @@ func main() {
 		"version",
 		false,
 		"print version")
-	genImagesPtr := flag.Bool(
-		"gen-images",
-		false,
-		"generating all images in destination"+
-			" repository instead of promoting images")
+	snapshotPtr := flag.String(
+		"snapshot",
+		"",
+		"read all images in a repository and print to stdout")
+	snapshotSvcAccPtr := flag.String(
+		"snapshot-service-account",
+		"",
+		"service account to use for -snapshot")
 	noSvcAcc := false
 	flag.BoolVar(&noSvcAcc, "no-service-account", false,
 		"do not pass '--account=...' to all gcloud calls (default: false)")
@@ -109,12 +112,31 @@ func main() {
 		os.Exit(0)
 	}
 
-	if *manifestPtr == "" {
-		klog.Fatal(fmt.Errorf("-manifest=... flag is required"))
-	}
-	mfest, rd, srcRegistry, err := reg.ParseManifestFromFile(*manifestPtr)
-	if err != nil {
-		klog.Fatal(err)
+	var mfest reg.Manifest
+	var rd reg.RenamesDenormalized
+	var srcRegistry *reg.RegistryContext
+	var err error
+	if len(*snapshotPtr) > 0 {
+		srcRegistry = &reg.RegistryContext{
+			Name:           reg.RegistryName(*snapshotPtr),
+			ServiceAccount: *snapshotSvcAccPtr,
+			Src:            true,
+		}
+		mfest = reg.Manifest{
+			Registries: []reg.RegistryContext{
+				*srcRegistry,
+			},
+
+			Images: []reg.Image{},
+		}
+	} else {
+		if *manifestPtr == "" {
+			klog.Fatal(fmt.Errorf("-manifest=... flag is required"))
+		}
+		mfest, rd, srcRegistry, err = reg.ParseManifestFromFile(*manifestPtr)
+		if err != nil {
+			klog.Fatal(err)
+		}
 	}
 
 	mi := make(reg.MasterInventory)
@@ -147,17 +169,18 @@ func main() {
 	// the manifest desires a completely blank registry. In practice this would
 	// almost never be the case, so given a fully-parsed manifest with 0 images,
 	// treat it as if -parse-only was implied and exit gracefully.
-	if len(mfest.Images) == 0 {
-		fmt.Println("No images in manifest --- nothing to do.")
-		os.Exit(0)
-	}
+	if len(*snapshotPtr) == 0 {
+		if len(mfest.Images) == 0 {
+			fmt.Println("No images in manifest --- nothing to do.")
+			os.Exit(0)
+		}
 
-	if *dryRunPtr {
-		fmt.Printf("********** START (DRY RUN): %s **********\n", *manifestPtr)
-	} else {
-		fmt.Printf("********** START: %s **********\n", *manifestPtr)
+		if *dryRunPtr {
+			fmt.Printf("********** START (DRY RUN): %s **********\n", *manifestPtr)
+		} else {
+			fmt.Printf("********** START: %s **********\n", *manifestPtr)
+		}
 	}
-
 	// Populate access tokens for all registries listed in the manifest.
 	err = sc.PopulateTokens()
 	if err != nil {
@@ -186,14 +209,10 @@ func main() {
 	}
 	sc.ReadRepository(mkReadRepositoryCmd)
 
-	if *genImagesPtr {
-		if err := sc.GenImages(mfest); err != nil {
-			fmt.Fprintln(
-				os.Stderr,
-				fmt.Errorf("cannot create manifest: %s", err))
-			os.Exit(1)
-		}
-
+	if len(*snapshotPtr) > 0 {
+		rii := sc.Inv[mfest.Registries[0].Name]
+		snapshot := rii.ToYAML()
+		fmt.Print(snapshot)
 		os.Exit(0)
 	}
 
