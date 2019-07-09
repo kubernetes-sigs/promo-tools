@@ -17,12 +17,14 @@ limitations under the License.
 package inventory
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"reflect"
 	"sync"
 	"testing"
 
+	"github.com/google/go-containerregistry/pkg/v1/google"
 	"sigs.k8s.io/k8s-container-image-promoter/lib/json"
 	"sigs.k8s.io/k8s-container-image-promoter/lib/stream"
 )
@@ -910,9 +912,7 @@ func TestReadRepository(t *testing.T) {
 		// test is used to pin the "test" variable from the outer "range"
 		// scope (see scopelint).
 		test := test
-		mkFakeStream1 := func(sc *SyncContext, rc RegistryContext) stream.Producer {
-			var sr stream.Fake
-
+		tagFetcherFake := func(sc *SyncContext, rc RegistryContext) (*google.Tags, error) {
 			_, domain, repoPath := GetTokenKeyDomainRepoPath(rc.Name)
 			fakeHTTPBody, ok := test.input[domain+"/"+repoPath]
 			if !ok {
@@ -921,10 +921,19 @@ func TestReadRepository(t *testing.T) {
 					fmt.Errorf("could not read fakeHTTPBody"),
 					fmt.Sprintf("Test: %v\n", test.name))
 			}
-			sr.Bytes = []byte(fakeHTTPBody)
-			return &sr
+
+			r := bytes.NewReader([]byte(fakeHTTPBody))
+			tags, err := extractRegistryTags(r)
+			if err != nil {
+				return nil, err
+			}
+			return tags, nil
+
 		}
-		sc.ReadRepository(mkFakeStream1)
+		if err := sc.ReadRepository(tagFetcherFake); err != nil {
+			t.Fatalf("error reading from repository: %v", err)
+		}
+
 		got := sc.Inv[fakeRegName]
 		expected := test.expectedOutput
 		err := checkEqual(got, expected)

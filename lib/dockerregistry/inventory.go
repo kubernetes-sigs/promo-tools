@@ -28,6 +28,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	yaml "gopkg.in/yaml.v2"
 	"k8s.io/klog"
@@ -427,23 +428,25 @@ func (riid *RegInvImageDigest) PrettyValue() string {
 	return b.String()
 }
 
-func getRegistryTagsFrom(req stream.ExternalRequest) (*google.Tags, Errors) {
-	errors := make(Errors, 0)
-	reader, _, err := req.StreamProducer.Produce()
-	if err != nil {
-		errors = append(errors, Error{
-			Context: "processing request",
-			Error:   err})
+func getRegistryTagsFrom(req *http.Request) (*google.Tags, error) {
+	client := http.Client{
+		Timeout: time.Second * 3, // 3-second timeout
 	}
 
-	tags, err := extractRegistryTags(reader)
+	klog.Infof("Doing %s %s", req.Method, req.URL)
+
+	res, err := client.Do(req)
 	if err != nil {
-		errors = append(errors, Error{
-			Context: "parsing JSON",
-			Error:   err})
+		return nil, fmt.Errorf("error querying for tags from %s: %v", req.URL, err)
+	}
+	defer res.Body.Close()
+
+	tags, err := extractRegistryTags(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing tags from %s: %v", req.URL, err)
 	}
 
-	return tags, errors
+	return tags, nil
 }
 
 func getJSONSFromProcess(req stream.ExternalRequest) (cipJson.Objects, Errors) {
@@ -567,48 +570,29 @@ func GetTokenKeyDomainRepoPath(
 // NOTE: Repository names may overlap with image names. E.g., it may be in the
 // example above that there are images named gcr.io/google-containers/foo:2.0
 // and gcr.io/google-containers/foo/baz:2.0.
-func (sc *SyncContext) ReadRepository(
-	mkProducer func(*SyncContext, RegistryContext) stream.Producer) {
+func (sc *SyncContext) ReadRepository(tagFetcher func(sc *SyncContext, rc RegistryContext) (*google.Tags, error)) error {
 	// Collect all images in sc.Inv (the src and dest registry names found in
 	// the manifest).
-	var populateRequests PopulateRequests = func(
-		sc *SyncContext,
-		reqs chan<- stream.ExternalRequest,
-		wg *sync.WaitGroup) {
 
-		// For each registry, start the very first root "repo" read call.
-		for _, rc := range sc.RegistryContexts {
-			// Create the request.
-			var req stream.ExternalRequest
-			req.RequestParams = rc
-			req.StreamProducer = mkProducer(sc, rc)
-			// Load request into the channel.
-			wg.Add(1)
-			reqs <- req
-		}
-	}
-	var processRequest ProcessRequest = func(
-		sc *SyncContext,
-		reqs chan stream.ExternalRequest,
-		requestResults chan<- RequestResult,
-		wg *sync.WaitGroup,
-		mutex *sync.Mutex) {
+	var queue []RegistryContext
+	queue = append(queue, sc.RegistryContexts...)
 
-		for req := range reqs {
-			reqRes := RequestResult{Context: req}
-
-			// Now run the request (make network HTTP call).
-			tagsStruct, errors := getRegistryTagsFrom(req)
-			if len(errors) > 0 {
-				// Skip this request if it has errors.
-				reqRes.Errors = errors
-				requestResults <- reqRes
-				wg.Add(-1)
-				continue
+	{
+		for {
+			if len(queue) == 0 {
+				break
 			}
+			rc := queue[0]
+			queue = queue[1:]
+
 			// Process the current repo.
-			rName := req.RequestParams.(RegistryContext).Name
+			rName := rc.Name
 			digestTags := make(DigestTags)
+
+			tagsStruct, err := tagFetcher(sc, rc)
+			if err != nil {
+				return err
+			}
 
 			for digest, mfestInfo := range tagsStruct.Manifests {
 				tagSlice := TagSlice{}
@@ -618,13 +602,11 @@ func (sc *SyncContext) ReadRepository(
 				digestTags[Digest(digest)] = tagSlice
 
 				// Store MediaType.
-				mutex.Lock()
 				mediaType, err := supportedMediaType(mfestInfo.MediaType)
 				if err != nil {
 					fmt.Printf("digest %s: %s\n", digest, err)
 				}
 				sc.DigestMediaType[Digest(digest)] = mediaType
-				mutex.Unlock()
 			}
 
 			// Only write an entry into our inventory if the entry has some
@@ -652,22 +634,17 @@ func (sc *SyncContext) ReadRepository(
 				currentRepo := make(RegInvImage)
 				currentRepo[imageName] = digestTags
 
-				mutex.Lock()
 				existingRegEntry := sc.Inv[RegistryName(tokenKey)]
 				if len(existingRegEntry) == 0 {
 					sc.Inv[RegistryName(tokenKey)] = currentRepo
 				} else {
 					sc.Inv[RegistryName(tokenKey)][imageName] = digestTags
 				}
-				mutex.Unlock()
 			}
-
-			reqRes.Errors = errors
-			requestResults <- reqRes
 
 			// Process child repos.
 			for _, childRepoName := range tagsStruct.Children {
-				parentRC, _ := req.RequestParams.(RegistryContext)
+				parentRC := rc
 
 				childRc := RegistryContext{
 					Name: RegistryName(
@@ -684,30 +661,18 @@ func (sc *SyncContext) ReadRepository(
 					// (don't care if it's the source reg or not).
 				}
 
-				var childReq stream.ExternalRequest
-				childReq.RequestParams = childRc
-				childReq.StreamProducer = mkProducer(sc, childRc)
-
-				// Every time we "descend" into child nodes, increment the
-				// semaphore.
-				wg.Add(1)
-				reqs <- childReq
+				queue = append(queue, childRc)
 			}
-			// When we're done processing this node (req), decrement the
-			// semaphore.
-			wg.Add(-1)
 		}
 	}
-	sc.ExecRequests(populateRequests, processRequest)
+
+	return nil
 }
 
-// MkReadRepositoryCmdReal creates a stream.Producer which makes a real call
-// over the network.
-func MkReadRepositoryCmdReal(
+// FetchTags queries the registry to get the tags.
+func FetchTags(
 	sc *SyncContext,
-	rc RegistryContext) stream.Producer {
-
-	var sh stream.HTTP
+	rc RegistryContext) (*google.Tags, error) {
 
 	tokenKey, domain, repoPath := GetTokenKeyDomainRepoPath(rc.Name)
 
@@ -717,16 +682,16 @@ func MkReadRepositoryCmdReal(
 		nil)
 
 	if err != nil {
-		klog.Fatalf(
-			"could not create HTTP request for '%s/%s'",
-			domain,
-			repoPath)
+		return nil, fmt.Errorf("could not create HTTP request for '%s/%s': %v", domain, repoPath, err)
 	}
 	rc.Token = sc.Tokens[RootRepo(tokenKey)]
 	httpReq.SetBasicAuth("oauth2accesstoken", string(rc.Token))
-	sh.Req = httpReq
 
-	return &sh
+	tags, err := getRegistryTagsFrom(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	return tags, nil
 }
 
 // ExecRequests uses the Worker Pool pattern, where MaxConcurrentRequests

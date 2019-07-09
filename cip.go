@@ -188,7 +188,9 @@ func main() {
 		klog.Fatal(err)
 	}
 
-	sc.ReadRepository(reg.MkReadRepositoryCmdReal)
+	if err := sc.ReadRepository(reg.FetchTags); err != nil {
+		klog.Fatalf("error reading repository: %v", err)
+	}
 
 	if len(*snapshotPtr) > 0 {
 		rii := sc.Inv[mfest.Registries[0].Name]
@@ -242,7 +244,10 @@ func main() {
 		sc.Infof("---------- BEGIN GARBAGE COLLECTION: %s ----------\n",
 			*manifestPtr)
 		// Re-read the state of the world.
-		sc.ReadRepository(reg.MkReadRepositoryCmdReal)
+		if err := sc.ReadRepository(reg.FetchTags); err != nil {
+			klog.Fatalf("error reading repository: %v", err)
+		}
+
 		// Garbage-collect all untagged images in dest registry.
 		mkTagDeletionCmd := func(
 			dest reg.RegistryContext,

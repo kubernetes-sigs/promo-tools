@@ -165,7 +165,9 @@ func testSetup(cwd string, mfest reg.Manifest) error {
 		klog.Fatal(err)
 	}
 
-	sc.ReadRepository(reg.MkReadRepositoryCmdReal)
+	if err := sc.ReadRepository(reg.FetchTags); err != nil {
+		klog.Fatalf("error reading repository: %v", err)
+	}
 
 	// Clear ALL registries in the test manifest. Blank slate!
 	for _, rc := range mfest.Registries {
