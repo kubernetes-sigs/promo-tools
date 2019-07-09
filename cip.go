@@ -87,6 +87,8 @@ func main() {
 		"snapshot",
 		"",
 		"read all images in a repository and print to stdout")
+	snapshotTag := ""
+	flag.StringVar(&snapshotTag, "snapshot-tag", snapshotTag, "only snapshot images with the given tag")
 	snapshotSvcAccPtr := flag.String(
 		"snapshot-service-account",
 		"",
@@ -211,6 +213,23 @@ func main() {
 
 	if len(*snapshotPtr) > 0 {
 		rii := sc.Inv[mfest.Registries[0].Name]
+		if snapshotTag != "" {
+			filtered := make(reg.RegInvImage)
+			for imageName, digestTags := range rii {
+				for digest, tags := range digestTags {
+					for _, tag := range tags {
+						if string(tag) == snapshotTag {
+							if filtered[imageName] == nil {
+								filtered[imageName] = make(reg.DigestTags)
+							}
+							filtered[imageName][digest] = append(filtered[imageName][digest], tag)
+						}
+					}
+				}
+			}
+			rii = filtered
+		}
+
 		snapshot := rii.ToYAML()
 		fmt.Print(snapshot)
 		os.Exit(0)
