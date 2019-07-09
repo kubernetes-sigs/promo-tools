@@ -4,6 +4,7 @@ BAZEL_BUILD_OPTS:=--workspace_status_command=$(REPO_ROOT)/workspace_status.sh --
 all: test build
 build:
 	bazel build $(BAZEL_BUILD_OPTS) //:cip
+	bazel build $(BAZEL_BUILD_OPTS) //test:e2e
 image:
 	bazel build $(BAZEL_BUILD_OPTS) //:cip-docker-loadable.tar
 image-load: image

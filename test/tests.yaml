@@ -1,0 +1,37 @@
+# TODO: Add more nuanced promotion cases, such as:
+#
+# - renames
+# - tag restoration (move tag back from one Digest to another)
+- name: "sanity (basic promotion)"
+  manifest:
+    registries:
+    - name: gcr.io/k8s-staging-cip-test
+      # FIXME: Use a new service account. Give this SA "Storage Admin" and
+      # "Storage Object Admin" creds to the test-only GCR.
+      service-account: k8s-infra-gcr-promoter@k8s-artifacts-prod.iam.gserviceaccount.com
+      src: true
+    - name: us.gcr.io/k8s-cip-test-prod
+      service-account: k8s-infra-gcr-promoter@k8s-artifacts-prod.iam.gserviceaccount.com
+    - name: eu.gcr.io/k8s-cip-test-prod
+      service-account: k8s-infra-gcr-promoter@k8s-artifacts-prod.iam.gserviceaccount.com
+    - name: asia.gcr.io/k8s-cip-test-prod
+      service-account: k8s-infra-gcr-promoter@k8s-artifacts-prod.iam.gserviceaccount.com
+    images: &golden-images
+    - name: golden
+      dmap:
+        sha256:5587f8edeb8ebe3b25617f97d262d62d5d2c662a76b13550d5828d1abb0e59da:
+        - 1.0-linux_amd64
+        sha256:cf856619c44270ef9fdf9b6915ae14e392af735ec06ccf2c1951cac4b4e28590:
+        - 1.0
+        sha256:d6dd6eed79ac51e53e6133e9c7d080b5f8a82263096f4b48d0727fa09f73abd5:
+        - 1.0-linux_s390x
+  snapshots:
+  - name: us.gcr.io/k8s-cip-test-prod
+    before: []
+    after: *golden-images
+  - name: eu.gcr.io/k8s-cip-test-prod
+    before: []
+    after: *golden-images
+  - name: asia.gcr.io/k8s-cip-test-prod
+    before: []
+    after: *golden-images

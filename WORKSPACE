@@ -57,6 +57,14 @@ container_pull(
 #    digest = "sha256:6e6b1e2fd53cb94c4dc2af8381ef50bf4c7ac49bc5c728efda4ab15b41d0b510",
 #)
 
+container_pull(
+    name = "distroless-base",
+    registry = "gcr.io",
+    repository = "distroless/base",
+    # Version 241.0.0
+    digest = "sha256:edc3643ddf96d75032a55e240900b68b335186f1e5fea0a95af3b4cc96020b77",
+)
+
 go_repository(
     name = "com_github_golang_protobuf",
     importpath = "github.com/golang/protobuf",

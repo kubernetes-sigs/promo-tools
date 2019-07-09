@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net/http"
 	"os/exec"
 	"regexp"
 	"sort"
@@ -29,8 +30,10 @@ import (
 	"sync"
 
 	yaml "gopkg.in/yaml.v2"
+	"k8s.io/klog"
 
 	"github.com/google/go-containerregistry/pkg/v1/google"
+	cr "github.com/google/go-containerregistry/pkg/v1/types"
 	cipJson "sigs.k8s.io/k8s-container-image-promoter/lib/json"
 	"sigs.k8s.io/k8s-container-image-promoter/lib/stream"
 )
@@ -66,7 +69,8 @@ func MakeSyncContext(
 		Tokens:              make(map[RootRepo]Token),
 		RenamesDenormalized: rd,
 		SrcRegistry:         srcRegistry,
-		RegistryContexts:    rcs}, nil
+		RegistryContexts:    rcs,
+		DigestMediaType:     make(DigestMediaType)}, nil
 }
 
 // Basic logging.
@@ -564,7 +568,7 @@ func GetTokenKeyDomainRepoPath(
 // example above that there are images named gcr.io/google-containers/foo:2.0
 // and gcr.io/google-containers/foo/baz:2.0.
 func (sc *SyncContext) ReadRepository(
-	mkProducer func(RegistryContext) stream.Producer) {
+	mkProducer func(*SyncContext, RegistryContext) stream.Producer) {
 	// Collect all images in sc.Inv (the src and dest registry names found in
 	// the manifest).
 	var populateRequests PopulateRequests = func(
@@ -577,7 +581,7 @@ func (sc *SyncContext) ReadRepository(
 			// Create the request.
 			var req stream.ExternalRequest
 			req.RequestParams = rc
-			req.StreamProducer = mkProducer(rc)
+			req.StreamProducer = mkProducer(sc, rc)
 			// Load request into the channel.
 			wg.Add(1)
 			reqs <- req
@@ -612,6 +616,15 @@ func (sc *SyncContext) ReadRepository(
 					tagSlice = append(tagSlice, Tag(tag))
 				}
 				digestTags[Digest(digest)] = tagSlice
+
+				// Store MediaType.
+				mutex.Lock()
+				mediaType, err := supportedMediaType(mfestInfo.MediaType)
+				if err != nil {
+					fmt.Printf("digest %s: %s\n", digest, err)
+				}
+				sc.DigestMediaType[Digest(digest)] = mediaType
+				mutex.Unlock()
 			}
 
 			// Only write an entry into our inventory if the entry has some
@@ -673,7 +686,7 @@ func (sc *SyncContext) ReadRepository(
 
 				var childReq stream.ExternalRequest
 				childReq.RequestParams = childRc
-				childReq.StreamProducer = mkProducer(childRc)
+				childReq.StreamProducer = mkProducer(sc, childRc)
 
 				// Every time we "descend" into child nodes, increment the
 				// semaphore.
@@ -686,6 +699,34 @@ func (sc *SyncContext) ReadRepository(
 		}
 	}
 	sc.ExecRequests(populateRequests, processRequest)
+}
+
+// MkReadRepositoryCmdReal creates a stream.Producer which makes a real call
+// over the network.
+func MkReadRepositoryCmdReal(
+	sc *SyncContext,
+	rc RegistryContext) stream.Producer {
+
+	var sh stream.HTTP
+
+	tokenKey, domain, repoPath := GetTokenKeyDomainRepoPath(rc.Name)
+
+	httpReq, err := http.NewRequest(
+		"GET",
+		fmt.Sprintf("https://%s/v2/%s/tags/list", domain, repoPath),
+		nil)
+
+	if err != nil {
+		klog.Fatalf(
+			"could not create HTTP request for '%s/%s'",
+			domain,
+			repoPath)
+	}
+	rc.Token = sc.Tokens[RootRepo(tokenKey)]
+	httpReq.SetBasicAuth("oauth2accesstoken", string(rc.Token))
+	sh.Req = httpReq
+
+	return &sh
 }
 
 // ExecRequests uses the Worker Pool pattern, where MaxConcurrentRequests
@@ -1531,6 +1572,152 @@ func (sc *SyncContext) GarbageCollect(
 	}
 }
 
+func supportedMediaType(v string) (cr.MediaType, error) {
+	switch cr.MediaType(v) {
+	case cr.DockerManifestList:
+		return cr.DockerManifestList, nil
+	case cr.DockerManifestSchema1:
+		return cr.DockerManifestSchema1, nil
+	case cr.DockerManifestSchema1Signed:
+		return cr.DockerManifestSchema1Signed, nil
+	case cr.DockerManifestSchema2:
+		return cr.DockerManifestSchema2, nil
+	default:
+		return cr.MediaType(""), fmt.Errorf("unsupported MediaType %s", v)
+	}
+}
+
+// ClearRepository wipes out all Docker images from a registry! Use with caution.
+// nolint[gocyclo]
+//
+// TODO: Maybe split this into 2 parts, so that each part can be unit-tested
+// separately (deletion of manifest lists vs deletion of other media types).
+func (sc *SyncContext) ClearRepository(
+	regName RegistryName,
+	mfest Manifest,
+	mkProducer func(RegistryContext, ImageName, Digest) stream.Producer,
+	customProcessRequest *ProcessRequest) {
+
+	// deleteRequestsPopulator returns a PopulateRequests that
+	// varies by a predicate. Closure city!
+	var deleteRequestsPopulator func(func(cr.MediaType) bool) PopulateRequests = func(predicate func(cr.MediaType) bool) PopulateRequests {
+
+		var populateRequests PopulateRequests = func(
+			sc *SyncContext,
+			reqs chan<- stream.ExternalRequest,
+			wg *sync.WaitGroup) {
+
+			for _, registry := range mfest.Registries {
+				// Skip over any registry that does not match the regName we want to
+				// wipe.
+				if registry.Name != regName {
+					continue
+				}
+				for imageName, digestTags := range sc.Inv[registry.Name] {
+					for digest, _ := range digestTags {
+						mediaType, ok := sc.DigestMediaType[digest]
+						if !ok {
+							fmt.Println("could not detect MediaType of digest", digest)
+							continue
+						}
+						if !predicate(mediaType) {
+							fmt.Printf("skipping digest %s mediaType %s\n", digest, mediaType)
+							continue
+						}
+						var req stream.ExternalRequest
+						req.StreamProducer = mkProducer(
+							registry,
+							imageName,
+							digest)
+						req.RequestParams = PromotionRequest{
+							Delete,
+							"",
+							registry.Name,
+							registry.ServiceAccount,
+
+							// No source image name, because tag deletions
+							// should only delete the what's in the
+							// destination registry
+							ImageName(""),
+
+							imageName,
+							digest,
+							"",
+							"",
+						}
+						wg.Add(1)
+						reqs <- req
+					}
+				}
+			}
+		}
+		return populateRequests
+	}
+
+	var processRequest ProcessRequest
+	var processRequestReal ProcessRequest = func(
+		sc *SyncContext,
+		reqs chan stream.ExternalRequest,
+		requestResults chan<- RequestResult,
+		wg *sync.WaitGroup,
+		mutex *sync.Mutex) {
+
+		for req := range reqs {
+			reqRes := RequestResult{Context: req}
+			jsons, errors := getJSONSFromProcess(req)
+			if len(errors) > 0 {
+				reqRes.Errors = errors
+				requestResults <- reqRes
+				// Don't skip over this request, because stderr here is ignorable.
+				// continue
+			}
+			for _, json := range jsons {
+				sc.Info("DELETED image:", json)
+			}
+			reqRes.Errors = errors
+			requestResults <- reqRes
+			wg.Add(-1)
+		}
+	}
+
+	captured := make(CapturedRequests)
+
+	if sc.DryRun {
+		processRequestDryRun := MkRequestCapturer(&captured)
+		processRequest = processRequestDryRun
+	} else {
+		processRequest = processRequestReal
+	}
+
+	if customProcessRequest != nil {
+		processRequest = *customProcessRequest
+	}
+
+	var isEqualTo (func(cr.MediaType) func(cr.MediaType) bool) = func(want cr.MediaType) func(cr.MediaType) bool {
+		return func(got cr.MediaType) bool {
+			return want == got
+		}
+	}
+
+	var isNotEqualTo (func(cr.MediaType) func(cr.MediaType) bool) = func(want cr.MediaType) func(cr.MediaType) bool {
+		return func(got cr.MediaType) bool {
+			return want != got
+		}
+	}
+
+	// Avoid the GCR error that complains if you try to delete an image which is
+	// referenced by a DockerManifestList, by first deleting all such manifest
+	// lists.
+	deleteManifestLists := deleteRequestsPopulator(isEqualTo(cr.DockerManifestList))
+	sc.ExecRequests(deleteManifestLists, processRequest)
+	deleteOthers := deleteRequestsPopulator(isNotEqualTo(cr.DockerManifestList))
+	sc.ExecRequests(deleteOthers, processRequest)
+
+	if sc.DryRun {
+		sc.PrintCapturedRequests(&captured)
+	}
+}
+
 // MaybeUseServiceAccount injects a '--account=...' argument to the command with
 // the given service account.
 func MaybeUseServiceAccount(
@@ -1589,7 +1776,8 @@ func GetDeleteCmd(
 	rc RegistryContext,
 	useServiceAccount bool,
 	img ImageName,
-	digest Digest) []string {
+	digest Digest,
+	force bool) []string {
 
 	fqin := ToFQIN(rc.Name, img, digest)
 	cmd := []string{
@@ -1599,5 +1787,9 @@ func GetDeleteCmd(
 		"delete",
 		fqin,
 		"--format=json"}
+	if force {
+		cmd = append(cmd, "--force-delete-tags")
+		cmd = append(cmd, "--quiet")
+	}
 	return MaybeUseServiceAccount(rc.ServiceAccount, useServiceAccount, cmd)
 }

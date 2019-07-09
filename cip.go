@@ -19,7 +19,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"net/http"
 	"os"
 
 	// nolint[lll]
@@ -187,27 +186,7 @@ func main() {
 		klog.Fatal(err)
 	}
 
-	mkReadRepositoryCmd := func(
-		rc reg.RegistryContext) stream.Producer {
-		var sh stream.HTTP
-
-		tokenKey, domain, repoPath := reg.GetTokenKeyDomainRepoPath(rc.Name)
-
-		httpReq, err := http.NewRequest(
-			"GET",
-			fmt.Sprintf("https://%s/v2/%s/tags/list", domain, repoPath),
-			nil)
-
-		if err != nil {
-			klog.Fatalf("could not create HTTP request for '%s/%s'", domain, repoPath)
-		}
-		rc.Token = sc.Tokens[reg.RootRepo(tokenKey)]
-		httpReq.SetBasicAuth("oauth2accesstoken", string(rc.Token))
-		sh.Req = httpReq
-
-		return &sh
-	}
-	sc.ReadRepository(mkReadRepositoryCmd)
+	sc.ReadRepository(reg.MkReadRepositoryCmdReal)
 
 	if len(*snapshotPtr) > 0 {
 		rii := sc.Inv[mfest.Registries[0].Name]
@@ -244,7 +223,7 @@ func main() {
 		sc.Infof("---------- BEGIN GARBAGE COLLECTION: %s ----------\n",
 			*manifestPtr)
 		// Re-read the state of the world.
-		sc.ReadRepository(mkReadRepositoryCmd)
+		sc.ReadRepository(reg.MkReadRepositoryCmdReal)
 		// Garbage-collect all untagged images in dest registry.
 		mkTagDeletionCmd := func(
 			dest reg.RegistryContext,
@@ -255,7 +234,8 @@ func main() {
 				dest,
 				sc.UseServiceAccount,
 				imageName,
-				digest)
+				digest,
+				false)
 			return &sp
 		}
 		sc.GarbageCollect(mfest, mkTagDeletionCmd, nil)
