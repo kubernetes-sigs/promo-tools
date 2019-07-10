@@ -73,60 +73,6 @@ func MakeSyncContext(
 		DigestMediaType:     make(DigestMediaType)}, nil
 }
 
-// Basic logging.
-
-// Infof logs at INFO level.
-func (sc *SyncContext) Infof(s string, v ...interface{}) {
-	if sc.Verbosity > 2 {
-		fmt.Printf(s, v...)
-	}
-}
-
-// Warnf logs at WARN level.
-func (sc *SyncContext) Warnf(s string, v ...interface{}) {
-	if sc.Verbosity > 1 {
-		fmt.Printf(s, v...)
-	}
-}
-
-// Errorf logs at ERROR level.
-func (sc *SyncContext) Errorf(s string, v ...interface{}) {
-	if sc.Verbosity > 0 {
-		fmt.Printf(s, v...)
-	}
-}
-
-// Fatalf logs at FATAL level.
-func (sc *SyncContext) Fatalf(s string, v ...interface{}) {
-	fmt.Printf(s, v...)
-}
-
-// Info logs at INFO level.
-func (sc *SyncContext) Info(v ...interface{}) {
-	if sc.Verbosity > 2 {
-		fmt.Println(v...)
-	}
-}
-
-// Warn logs at WARN level.
-func (sc *SyncContext) Warn(v ...interface{}) {
-	if sc.Verbosity > 1 {
-		fmt.Println(v...)
-	}
-}
-
-// Error logs at ERROR level.
-func (sc *SyncContext) Error(v ...interface{}) {
-	if sc.Verbosity > 0 {
-		fmt.Println(v...)
-	}
-}
-
-// Fatal logs at FATAL level.
-func (sc *SyncContext) Fatal(v ...interface{}) {
-	fmt.Println(v...)
-}
-
 // ParseManifestFromFile parses a Manifest from a filepath.
 func ParseManifestFromFile(
 	filePath string) (Manifest, RenamesDenormalized, *RegistryContext, error) {
@@ -749,12 +695,12 @@ func (sc *SyncContext) ExecRequests(
 	go func() {
 		for reqRes := range requestResults {
 			if len(reqRes.Errors) > 0 {
-				sc.Errorf(
+				klog.Errorf(
 					"Request %v: error(s) encountered: %v\n",
 					reqRes.Context,
 					reqRes.Errors)
 			} else {
-				sc.Infof("Request %v: OK\n", reqRes.Context.RequestParams)
+				klog.Infof("Request %v: OK\n", reqRes.Context.RequestParams)
 			}
 		}
 	}()
@@ -905,7 +851,7 @@ func (sc *SyncContext) GetLostImages(mfest Manifest) RegInvImageDigest {
 	// lost = all images that cannot be found from src.
 	lost := mfest.ToRegInvImageDigest().Minus(src)
 	if len(lost) > 0 {
-		sc.Errorf(
+		klog.Errorf(
 			"ERROR: Lost images (all images in Manifest that cannot be found"+
 				" from src registry %v):\n",
 			sc.SrcRegistry.Name)
@@ -914,7 +860,7 @@ func (sc *SyncContext) GetLostImages(mfest Manifest) RegInvImageDigest {
 				sc.SrcRegistry.Name,
 				imageDigest.ImageName,
 				imageDigest.Digest)
-			sc.Errorf(
+			klog.Errorf(
 				"  %v in manifest is NOT in src registry!\n",
 				fqin)
 		}
@@ -967,7 +913,7 @@ func (sc *SyncContext) mkPopReq(
 				// exist as a key for every map in RenamesDenormalized.
 				//
 				// nolint[lll]
-				sc.Warnf("could not find src registry in renameMap for image '%v'\n", imageTag.ImageName)
+				klog.Warningf("could not find src registry in renameMap for image '%v'\n", imageTag.ImageName)
 				continue
 			}
 		}
@@ -1030,7 +976,7 @@ func (sc *SyncContext) mkPopReq(
 					digest)
 			}
 		}
-		sc.Info(msg)
+		klog.Info(msg)
 
 		// Save some information about this request. It's a bit like
 		// HTTP "headers".
@@ -1182,21 +1128,21 @@ func mkPopulateRequestsForPromotion(
 			promotionFilteredID := promotionFiltered.ToRegInvImageDigest()
 
 			if len(promotionFilteredID) > 0 {
-				sc.Infof(
+				klog.Infof(
 					"To promote (after removing already-promoted images):\n%v",
 					promotionFilteredID.PrettyValue())
 				if sc.DryRun {
-					sc.Infof(
+					klog.Infof(
 						"---------- BEGIN PROMOTION (DRY RUN): %s: %s ----------\n",
 						sc.ManifestPath,
 						registry.Name)
 				} else {
-					sc.Infof("---------- BEGIN PROMOTION: %s: %s ----------\n",
+					klog.Infof("---------- BEGIN PROMOTION: %s: %s ----------\n",
 						sc.ManifestPath,
 						registry.Name)
 				}
 			} else {
-				sc.Infof("Nothing to promote for %s.\n", registry.Name)
+				klog.Infof("Nothing to promote for %s.\n", registry.Name)
 			}
 
 			sc.mkPopReq(
@@ -1223,7 +1169,7 @@ func mkPopulateRequestsForPromotion(
 						// NOP if dest's imageTag is already pointing to the
 						// same digest as in the manifest.
 
-						sc.Infof(
+						klog.Infof(
 							"skipping: image '%v' already points to the same"+
 								" digest (%v) as in the Manifest\n",
 							pqin,
@@ -1232,12 +1178,13 @@ func mkPopulateRequestsForPromotion(
 					} else {
 						// Dest's tag is pointing to the wrong digest! Need to
 						// move the tag.
-						sc.Warnf(
+						klog.Warningf(
 							"Warning: image '%v' is pointing to the wrong"+
 								" digest\n       got: %v\n  expected: %v\n",
 							pqin,
 							liveDigest,
 							digest)
+
 						sc.mkPopReq(
 							registry,
 							RegInvImageTag{imageTag: digest},
@@ -1274,7 +1221,7 @@ func mkPopulateRequestsForPromotion(
 				}
 				sort.Strings(xtras)
 				for _, img := range xtras {
-					sc.Warnf("Warning: extra tag found in dest: %s\n", img)
+					klog.Warningf("Warning: extra tag found in dest: %s\n", img)
 				}
 			}
 		}
@@ -1292,7 +1239,7 @@ func (sc *SyncContext) GetPromotionCandidatesIT(
 	// dest (see mkPopulateRequestsForPromotion).
 	promotionCandidates := mfest.ToRegInvImageDigest().Intersection(
 		src.ToRegInvImageDigest())
-	sc.Infof(
+	klog.Infof(
 		"To promote (intersection of Manifest and src registry %v):\n%v",
 		sc.SrcRegistry.Name,
 		promotionCandidates.PrettyValue())
@@ -1318,7 +1265,7 @@ func (sc *SyncContext) Promote(
 
 	mfestID := (mfest.ToRegInvImageDigest())
 
-	sc.Infof("Desired state:\n%v", mfestID.PrettyValue())
+	klog.Infof("Desired state:\n%v", mfestID.PrettyValue())
 	lost := sc.GetLostImages(mfest)
 	if len(lost) > 0 {
 		// TODO: Have more meaningful exit codes (use iota?).
@@ -1364,8 +1311,8 @@ func (sc *SyncContext) Promote(
 			// The add-tag has stderr; it uses stderr for debug messages, so
 			// don't count it as an error. Instead just print it out as extra
 			// info.
-			sc.Infof("process stdout:\n%v\n", string(b))
-			sc.Infof("process stderr:\n%v\n", string(be))
+			klog.Infof("process stdout:\n%v\n", string(b))
+			klog.Infof("process stderr:\n%v\n", string(be))
 			err = req.StreamProducer.Close()
 			if err != nil {
 				errors = append(errors, Error{
@@ -1545,7 +1492,7 @@ func (sc *SyncContext) GarbageCollect(
 				continue
 			}
 			for _, json := range jsons {
-				sc.Info("DELETED image:", json)
+				klog.Info("DELETED image:", json)
 			}
 			reqRes.Errors = errors
 			requestResults <- reqRes
@@ -1672,7 +1619,7 @@ func (sc *SyncContext) ClearRepository(
 				// continue
 			}
 			for _, json := range jsons {
-				sc.Info("DELETED image:", json)
+				klog.Info("DELETED image:", json)
 			}
 			reqRes.Errors = errors
 			requestResults <- reqRes
