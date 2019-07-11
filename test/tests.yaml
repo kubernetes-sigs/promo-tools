@@ -6,16 +6,14 @@
   manifest:
     registries:
     - name: gcr.io/k8s-staging-cip-test
-      # FIXME: Use a new service account. Give this SA "Storage Admin" and
-      # "Storage Object Admin" creds to the test-only GCR.
-      service-account: k8s-infra-gcr-promoter@k8s-artifacts-prod.iam.gserviceaccount.com
+      service-account: k8s-infra-gcr-promoter@k8s-cip-test-prod.iam.gserviceaccount.com
       src: true
     - name: us.gcr.io/k8s-cip-test-prod
-      service-account: k8s-infra-gcr-promoter@k8s-artifacts-prod.iam.gserviceaccount.com
+      service-account: k8s-infra-gcr-promoter@k8s-cip-test-prod.iam.gserviceaccount.com
     - name: eu.gcr.io/k8s-cip-test-prod
-      service-account: k8s-infra-gcr-promoter@k8s-artifacts-prod.iam.gserviceaccount.com
+      service-account: k8s-infra-gcr-promoter@k8s-cip-test-prod.iam.gserviceaccount.com
     - name: asia.gcr.io/k8s-cip-test-prod
-      service-account: k8s-infra-gcr-promoter@k8s-artifacts-prod.iam.gserviceaccount.com
+      service-account: k8s-infra-gcr-promoter@k8s-cip-test-prod.iam.gserviceaccount.com
     images: &golden-images
     - name: golden
       dmap:
