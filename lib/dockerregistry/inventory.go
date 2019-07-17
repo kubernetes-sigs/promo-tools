@@ -374,6 +374,8 @@ func (riid *RegInvImageDigest) PrettyValue() string {
 }
 
 func getRegistryTagsFrom(req stream.ExternalRequest) (*google.Tags, Errors) {
+	defer req.StreamProducer.Close()
+
 	errors := make(Errors, 0)
 	reader, _, err := req.StreamProducer.Produce()
 	if err != nil {

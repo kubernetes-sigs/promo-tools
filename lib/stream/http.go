@@ -41,6 +41,8 @@ type HTTP struct {
 // Produce runs the external process and returns two io.Readers (to stdout and
 // stderr). In this case we equate the http.Respose "Body" with stdout.
 func (h *HTTP) Produce() (io.Reader, io.Reader, error) {
+	defer h.Close()
+
 	client := http.Client{
 		Timeout: time.Second * 3, // 3-second timeout
 	}
