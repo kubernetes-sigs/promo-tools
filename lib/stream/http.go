@@ -45,14 +45,14 @@ func (h *HTTP) Produce() (io.Reader, io.Reader, error) {
 		Timeout: time.Second * 3, // 3-second timeout
 	}
 
-	res, err := client.Do(h.Req)
+	var err error
+
+	h.Res, err = client.Do(h.Req)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	h.Res = res
-
-	return res.Body, nil, nil
+	return h.Res.Body, nil, nil
 }
 
 // Close closes the http request. This is required because otherwise there will
