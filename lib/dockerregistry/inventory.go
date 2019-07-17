@@ -380,6 +380,10 @@ func getRegistryTagsFrom(req stream.ExternalRequest) (*google.Tags, Errors) {
 		errors = append(errors, Error{
 			Context: "processing request",
 			Error:   err})
+
+		// Skip google.Tags JSON parsing if there were errors reading from the
+		// HTTP stream.
+		return nil, errors
 	}
 
 	tags, err := extractRegistryTags(reader)
