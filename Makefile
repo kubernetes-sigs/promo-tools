@@ -19,12 +19,7 @@ update:
 	# Update go modules (source of truth!).
 	GO111MODULE=on go mod verify
 	GO111MODULE=on go mod tidy
-
 	# Update bazel rules to use these new dependencies.
 	bazel run $(BAZEL_BUILD_OPTS) //:gazelle -- update-repos -from_file=go.mod
-
-	# Fixup vendor/ folder to make golangci-lint happy.
-	rm -rf vendor
-	GO111MODULE=on go mod vendor
-
+	bazel run //:gazelle
 .PHONY: build image image-load image-push lint test update
