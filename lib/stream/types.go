@@ -18,6 +18,9 @@ package stream
 
 import (
 	"io"
+	"time"
+
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 // Producer is an interface for anything that can generate an io.Reader from
@@ -42,4 +45,13 @@ type Consumer interface {
 type ExternalRequest struct {
 	RequestParams  interface{}
 	StreamProducer Producer
+}
+
+// BackoffDefault is the default Backoff behavior for network call retries.
+var BackoffDefault = wait.Backoff{
+	Duration: time.Second / 2, // 500ms
+	Factor:   1.618,
+	Jitter:   0.1,
+	Steps:    10,
+	Cap:      time.Second * 30,
 }
