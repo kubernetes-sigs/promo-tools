@@ -10,4 +10,5 @@ go_library(
     ],
     importpath = "sigs.k8s.io/k8s-container-image-promoter/lib/stream",
     visibility = ["//visibility:public"],
+    deps = ["@io_k8s_apimachinery//pkg/util/wait:go_default_library"],
 )

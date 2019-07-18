@@ -30,6 +30,7 @@ import (
 	"sync"
 
 	yaml "gopkg.in/yaml.v2"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog"
 
 	"github.com/google/go-containerregistry/pkg/v1/google"
@@ -373,23 +374,57 @@ func (riid *RegInvImageDigest) PrettyValue() string {
 	return b.String()
 }
 
-func getRegistryTagsFrom(req stream.ExternalRequest) (*google.Tags, Errors) {
-	errors := make(Errors, 0)
+func getRegistryTagsWrapper(req stream.ExternalRequest) (*google.Tags, error) {
+
+	var googleTags *google.Tags
+
+	var getRegistryTagsCondition wait.ConditionFunc = func() (bool, error) {
+		var err error
+
+		googleTags, err = getRegistryTagsFrom(req)
+
+		// We never return an error (err) in the second part of our return
+		// argument, because we don't want to prematurely stop the
+		// ExponentialBackoff() loop; we want it to continue looping until
+		// either we get a well-formed tags value, or until it hits
+		// ErrWaitTimeout. This is how ExponentialBackoff() uses the
+		// ConditionFunc type.
+		if err == nil && googleTags != nil {
+			return true, nil
+		}
+		return false, nil
+	}
+
+	err := wait.ExponentialBackoff(
+		stream.BackoffDefault,
+		getRegistryTagsCondition)
+
+	if err != nil {
+		klog.Error(err)
+		return nil, err
+	}
+
+	return googleTags, nil
+}
+
+func getRegistryTagsFrom(req stream.ExternalRequest) (*google.Tags, error) {
+	defer req.StreamProducer.Close()
+
 	reader, _, err := req.StreamProducer.Produce()
 	if err != nil {
-		errors = append(errors, Error{
-			Context: "processing request",
-			Error:   err})
+		klog.Warning("error reading from stream:", err)
+		// Skip google.Tags JSON parsing if there were errors reading from the
+		// HTTP stream.
+		return nil, err
 	}
 
 	tags, err := extractRegistryTags(reader)
 	if err != nil {
-		errors = append(errors, Error{
-			Context: "parsing JSON",
-			Error:   err})
+		klog.Warning("error parsing *google.Tags from io.Reader handle:", err)
+		return nil, err
 	}
 
-	return tags, errors
+	return tags, nil
 }
 
 func getJSONSFromProcess(req stream.ExternalRequest) (cipJson.Objects, Errors) {
@@ -543,11 +578,22 @@ func (sc *SyncContext) ReadRepository(
 		for req := range reqs {
 			reqRes := RequestResult{Context: req}
 
-			// Now run the request (make network HTTP call).
-			tagsStruct, errors := getRegistryTagsFrom(req)
-			if len(errors) > 0 {
-				// Skip this request if it has errors.
-				reqRes.Errors = errors
+			// Now run the request (make network HTTP call with
+			// ExponentialBackoff()).
+			tagsStruct, err := getRegistryTagsWrapper(req)
+			if err != nil {
+				// Skip this request if it has unrecoverable errors (even after
+				// ExponentialBackoff).
+				//
+				// TODO: Invalidate promotion conservatively for the subset of
+				// images that touch this network request. So if we have a
+				// problem reading from gcr.io/foo/bar/baz, then delete all such
+				// gcr.io/foo/bar/baz entries from every data structure in the
+				// SyncContext.
+				reqRes.Errors = Errors{
+					Error{
+						Context: "getRegistryTagsWrapper",
+						Error:   err}}
 				requestResults <- reqRes
 				wg.Add(-1)
 				continue
@@ -608,7 +654,7 @@ func (sc *SyncContext) ReadRepository(
 				mutex.Unlock()
 			}
 
-			reqRes.Errors = errors
+			reqRes.Errors = Errors{}
 			requestResults <- reqRes
 
 			// Process child repos.
