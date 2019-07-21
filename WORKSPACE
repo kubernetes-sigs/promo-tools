@@ -1,4 +1,11 @@
+load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+
+git_repository(
+    name = "bazel_skylib",
+    remote = "https://github.com/bazelbuild/bazel-skylib.git",
+    tag = "0.9.0"
+)
 
 # You *must* import the Go rules before setting up the go_image rules.
 http_archive(
@@ -7,17 +14,22 @@ http_archive(
     sha256 = "f04d2373bcaf8aa09bccb08a98a57e721306c8f6043a2a0ee610fd6853dcde3d",
 )
 
+# Invoke go_rules_dependencies depending on host platform.
+# See https://github.com/tweag/rules_purescript/commit/730d38ddb9db63f1e674715b54f813a9a9765b36
+local_repository(
+    name = "go_sdk_repo",
+    path = "tools/go_sdk",
+)
+load("@go_sdk_repo//:sdk.bzl", "gen_imports")
+gen_imports(name = "go_sdk_imports")
+load("@go_sdk_imports//:imports.bzl", "load_go_sdk")
+load_go_sdk()
+
 http_archive(
     name = "bazel_gazelle",
     urls = ["https://github.com/bazelbuild/bazel-gazelle/releases/download/0.17.0/bazel-gazelle-0.17.0.tar.gz"],
     sha256 = "3c681998538231a2d24d0c07ed5a7658cb72bfb5fd4bf9911157c0e9ac6a2687",
 )
-
-load("@io_bazel_rules_go//go:deps.bzl", "go_register_toolchains", "go_rules_dependencies")
-
-go_rules_dependencies()
-
-go_register_toolchains()
 
 load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies", "go_repository")
 
