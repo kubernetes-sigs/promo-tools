@@ -53,6 +53,7 @@ type SyncContext struct {
 	DryRun              bool
 	UseServiceAccount   bool
 	Inv                 MasterInventory
+	InvIgnore           []ImageName
 	RegistryContexts    []RegistryContext
 	SrcRegistry         *RegistryContext
 	Tokens              map[RootRepo]Token

@@ -67,6 +67,7 @@ func MakeSyncContext(
 		DryRun:              dryRun,
 		UseServiceAccount:   useSvcAcc,
 		Inv:                 mi,
+		InvIgnore:           []ImageName{},
 		Tokens:              make(map[RootRepo]Token),
 		RenamesDenormalized: rd,
 		SrcRegistry:         srcRegistry,
@@ -462,6 +463,58 @@ func getJSONSFromProcess(req stream.ExternalRequest) (cipJson.Objects, Errors) {
 	return jsons, errors
 }
 
+// IgnoreFromPromotion works by building up a new Inv type of those images that
+// should NOT be bothered to be Promoted; these get ignored in the Promote()
+// step later down the pipeline.
+func (sc *SyncContext) IgnoreFromPromotion(regName RegistryName) {
+	// regName will look like gcr.io/foo/bar/baz. We then look for the key
+	// "foo/bar/baz".
+	_, imgName, err := ParseContainerParts(string(regName))
+	if err != nil {
+		klog.Errorf("unable to ignore from promotion: %s\n", err)
+	}
+
+	klog.Errorf("ignoring from promotion: %s\n", err)
+
+	sc.InvIgnore = append(sc.InvIgnore, ImageName(imgName))
+}
+
+// ParseContainerParts registry
+func ParseContainerParts(s string) (string, string, error) {
+	parts := strings.Split(s, "/")
+	if len(parts) <= 1 {
+		goto error
+	}
+	// String may not have a double slash, or a trailing slash (which would
+	// result in an empty substring).
+	for _, part := range parts {
+		if len(part) == 0 {
+			goto error
+		}
+	}
+	switch parts[0] {
+	case "gcr.io":
+		fallthrough
+	case "asia.gcr.io":
+		fallthrough
+	case "eu.gcr.io":
+		fallthrough
+	case "us.gcr.io":
+		if len(parts) == 2 {
+			goto error
+		}
+		return strings.Join(parts[0:2], "/"), strings.Join(parts[2:], "/"), nil
+	case "k8s.gcr.io":
+		fallthrough
+	case "staging-k8s.gcr.io":
+		fallthrough
+	default:
+		return parts[0], strings.Join(parts[1:], "/"), nil
+	}
+error:
+	return "", "", fmt.Errorf("invalid string '%s'", s)
+}
+
 // GetServiceAccountToken calls gcloud to get an access token for the specified service account
 func GetServiceAccountToken(serviceAccount string, useServiceAccount bool) (Token, error) {
 	args := []string{
@@ -584,18 +637,21 @@ func (sc *SyncContext) ReadRepository(
 			if err != nil {
 				// Skip this request if it has unrecoverable errors (even after
 				// ExponentialBackoff).
-				//
-				// TODO: Invalidate promotion conservatively for the subset of
-				// images that touch this network request. So if we have a
-				// problem reading from gcr.io/foo/bar/baz, then delete all such
-				// gcr.io/foo/bar/baz entries from every data structure in the
-				// SyncContext.
 				reqRes.Errors = Errors{
 					Error{
 						Context: "getRegistryTagsWrapper",
 						Error:   err}}
 				requestResults <- reqRes
 				wg.Add(-1)
+
+				// Invalidate promotion conservatively for the subset of images
+				// that touch this network request. If we have trouble reading
+				// "foo" from a destination registry, do not bother trying to
+				// promote it for all registries
+				mutex.Lock()
+				sc.IgnoreFromPromotion(req.RequestParams.(RegistryContext).Name)
+				mutex.Unlock()
+
 				continue
 			}
 			// Process the current repo.
@@ -894,8 +950,23 @@ func ToLQIN(registryName RegistryName, imageName ImageName) string {
 func (sc *SyncContext) GetLostImages(mfest Manifest) RegInvImageDigest {
 	src := sc.Inv[sc.SrcRegistry.Name].ToRegInvImageDigest()
 
+	// If we had trouble reading from any of the images in the src registry,
+	// remove them from the manifest to ignore them, so that we don't create any
+	// false positives about lost images.
+	klog.Warningf("removing images from the manifest that could not be read from the src registry: %s\n", sc.InvIgnore)
+	mfestImagesFinal := []Image{}
+	for _, image := range mfest.Images {
+		for _, ignoreMe := range sc.InvIgnore {
+			if image.ImageName != ignoreMe {
+				mfestImagesFinal = append(mfestImagesFinal, image)
+			}
+		}
+	}
+	mfest.Images = mfestImagesFinal
+
 	// lost = all images that cannot be found from src.
 	lost := mfest.ToRegInvImageDigest().Minus(src)
+
 	if len(lost) > 0 {
 		klog.Errorf(
 			"ERROR: Lost images (all images in Manifest that cannot be found"+
@@ -1278,13 +1349,21 @@ func mkPopulateRequestsForPromotion(
 func (sc *SyncContext) GetPromotionCandidatesIT(
 	mfest Manifest) RegInvImageTag {
 
-	src := sc.Inv[sc.SrcRegistry.Name]
+	srcRegName := sc.SrcRegistry.Name
+	src := sc.Inv[srcRegName]
+
+	// If we had trouble reading from any of the images in the src/dest
+	// registries, remove them from src to simulate them being missing; this has
+	// the effect of removing from the act of promotion.
+	for _, imgName := range sc.InvIgnore {
+		delete(src, imgName)
+	}
 
 	// promotionCandidates = all images in the manifest that can be found from
 	// src. But, this is filtered later to remove those ones that are already in
 	// dest (see mkPopulateRequestsForPromotion).
-	promotionCandidates := mfest.ToRegInvImageDigest().Intersection(
-		src.ToRegInvImageDigest())
+	promotionCandidates := mfest.ToRegInvImageDigest().Intersection(src.ToRegInvImageDigest())
+
 	klog.Infof(
 		"To promote (intersection of Manifest and src registry %v):\n%v",
 		sc.SrcRegistry.Name,
