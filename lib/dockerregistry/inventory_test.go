@@ -1296,7 +1296,8 @@ func TestPromotion(t *testing.T) {
 					{
 						ImageName: "a",
 						Dmap: DigestTags{
-							"sha256:000": TagSlice{"0.9"}}}}},
+							"sha256:000": TagSlice{"0.9"}}}},
+				srcRegistry: &srcRC},
 			SyncContext{
 				Inv: MasterInventory{
 					"gcr.io/foo": RegInvImage{
@@ -1325,7 +1326,8 @@ func TestPromotion(t *testing.T) {
 					{
 						ImageName: "b",
 						Dmap: DigestTags{
-							"sha256:111": TagSlice{"0.9"}}}}},
+							"sha256:111": TagSlice{"0.9"}}}},
+				srcRegistry: &srcRC},
 			SyncContext{
 				Inv: MasterInventory{
 					"gcr.io/foo": RegInvImage{
@@ -1345,7 +1347,8 @@ func TestPromotion(t *testing.T) {
 					{
 						ImageName: "a",
 						Dmap: DigestTags{
-							"sha256:000": TagSlice{"0.9"}}}}},
+							"sha256:000": TagSlice{"0.9"}}}},
+				srcRegistry: &srcRC},
 			SyncContext{
 				Inv: MasterInventory{
 					"gcr.io/foo": RegInvImage{
@@ -1376,7 +1379,8 @@ func TestPromotion(t *testing.T) {
 					{
 						ImageName: "a",
 						Dmap: DigestTags{
-							"sha256:000": TagSlice{"0.9"}}}}},
+							"sha256:000": TagSlice{"0.9"}}}},
+				srcRegistry: &srcRC},
 			SyncContext{
 				Inv: MasterInventory{
 					"gcr.io/foo": RegInvImage{
@@ -1407,7 +1411,8 @@ func TestPromotion(t *testing.T) {
 					{
 						ImageName: "a",
 						Dmap: DigestTags{
-							"sha256:000": TagSlice{"0.9"}}}}},
+							"sha256:000": TagSlice{"0.9"}}}},
+				srcRegistry: &srcRC},
 			SyncContext{
 				Inv: MasterInventory{
 					"gcr.io/foo": RegInvImage{
@@ -1443,7 +1448,8 @@ func TestPromotion(t *testing.T) {
 				Renames: []Rename{
 					[]RegistryImagePath{
 						"gcr.io/foo/a",
-						"gcr.io/bar/some/subdir/path/a"}}},
+						"gcr.io/bar/some/subdir/path/a"}},
+				srcRegistry: &srcRC},
 			SyncContext{
 				Inv: MasterInventory{
 					"gcr.io/foo": RegInvImage{
@@ -1478,7 +1484,8 @@ func TestPromotion(t *testing.T) {
 				Renames: []Rename{
 					[]RegistryImagePath{
 						"gcr.io/foo/a",
-						"gcr.io/bar/some/subdir/path/a"}}},
+						"gcr.io/bar/some/subdir/path/a"}},
+				srcRegistry: &srcRC},
 			SyncContext{
 				Inv: MasterInventory{
 					"gcr.io/foo": RegInvImage{
@@ -1514,7 +1521,8 @@ func TestPromotion(t *testing.T) {
 				Renames: []Rename{
 					[]RegistryImagePath{
 						"gcr.io/foo/a",
-						"gcr.io/bar/some/subdir/path/a"}}},
+						"gcr.io/bar/some/subdir/path/a"}},
+				srcRegistry: &srcRC},
 			SyncContext{
 				Inv: MasterInventory{
 					"gcr.io/foo": RegInvImage{
@@ -1556,7 +1564,8 @@ func TestPromotion(t *testing.T) {
 					{
 						ImageName: "a",
 						Dmap: DigestTags{
-							"sha256:000": TagSlice{"0.9"}}}}},
+							"sha256:000": TagSlice{"0.9"}}}},
+				srcRegistry: &srcRC},
 			SyncContext{
 				Inv: MasterInventory{
 					"gcr.io/foo": RegInvImage{
@@ -1585,7 +1594,8 @@ func TestPromotion(t *testing.T) {
 					{
 						ImageName: "b",
 						Dmap: DigestTags{
-							"sha256:bbb": TagSlice{"also-missing"}}}}},
+							"sha256:bbb": TagSlice{"also-missing"}}}},
+				srcRegistry: &srcRC},
 			SyncContext{
 				Inv: MasterInventory{
 					"gcr.io/foo": RegInvImage{
@@ -1631,7 +1641,7 @@ func TestPromotion(t *testing.T) {
 		rd, err := DenormalizeRenames(test.inputM, srcReg.Name)
 		checkError(t, err,
 			fmt.Sprintf("checkError (rd): test: %v\n", test.name))
-		test.inputSc.RenamesDenormalized = rd
+		test.inputM.renamesDenormalized = rd
 		test.inputSc.SrcRegistry = srcReg
 
 		// Simulate bad network conditions.
@@ -1642,7 +1652,7 @@ func TestPromotion(t *testing.T) {
 		}
 
 		test.inputSc.Promote(
-			test.inputM,
+			[]Manifest{test.inputM},
 			nopStream,
 			&processRequestFake)
 
@@ -1683,7 +1693,8 @@ func TestPromotionMulti(t *testing.T) {
 					{
 						ImageName: "a",
 						Dmap: DigestTags{
-							"sha256:000": TagSlice{"0.9", "1.0"}}}}},
+							"sha256:000": TagSlice{"0.9", "1.0"}}}},
+				srcRegistry: &srcRC},
 			SyncContext{
 				Inv: MasterInventory{
 					"gcr.io/foo": RegInvImage{
@@ -1724,7 +1735,8 @@ func TestPromotionMulti(t *testing.T) {
 					{
 						ImageName: "a",
 						Dmap: DigestTags{
-							"sha256:000": TagSlice{"0.9", "1.0"}}}}},
+							"sha256:000": TagSlice{"0.9", "1.0"}}}},
+				srcRegistry: &srcRC},
 			SyncContext{
 				Inv: MasterInventory{
 					"gcr.io/foo": RegInvImage{
@@ -1779,7 +1791,7 @@ func TestPromotionMulti(t *testing.T) {
 			fmt.Sprintf("checkError (srcReg): test: %v\n", test.name))
 		test.inputSc.SrcRegistry = srcReg
 		test.inputSc.Promote(
-			test.inputM,
+			[]Manifest{test.inputM},
 			nopStream,
 			&processRequestFake)
 		err = checkEqual(captured, test.expectedReqs)
