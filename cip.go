@@ -114,7 +114,6 @@ func main() {
 	}
 
 	var mfest reg.Manifest
-	var rd reg.RenamesDenormalized
 	var srcRegistry *reg.RegistryContext
 	var err error
 	if len(*snapshotPtr) > 0 {
@@ -134,7 +133,7 @@ func main() {
 		if *manifestPtr == "" {
 			klog.Fatal(fmt.Errorf("-manifest=... flag is required"))
 		}
-		mfest, rd, srcRegistry, err = reg.ParseManifestFromFile(*manifestPtr)
+		mfest, err = reg.ParseManifestFromFile(*manifestPtr)
 		if err != nil {
 			klog.Fatal(err)
 		}
@@ -145,10 +144,8 @@ func main() {
 		mi[registry.Name] = nil
 	}
 	sc, err := reg.MakeSyncContext(
-		*manifestPtr,
-		mfest.Registries,
-		rd,
-		srcRegistry,
+		mfest.Filepath(),
+		mfest,
 		mi,
 		*verbosityPtr,
 		*threadsPtr,

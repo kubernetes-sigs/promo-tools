@@ -144,12 +144,7 @@ func testSetup(cwd string, mfest reg.Manifest) error {
 
 	sc, err := reg.MakeSyncContext(
 		"(tmp Manifest path)",
-		mfest.Registries,
-		// No renames needed for clearing a repo.
-		nil,
-		// The srcRegistry field here is a bit silly, because we will be
-		// clearing a repository (that's all --- no syncing from src to dst).
-		nil,
+		mfest,
 		mi,
 		2,
 		10,

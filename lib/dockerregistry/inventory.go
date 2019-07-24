@@ -52,9 +52,7 @@ func getSrcRegistry(rcs []RegistryContext) (*RegistryContext, error) {
 // MakeSyncContext creates a SyncContext.
 func MakeSyncContext(
 	manifestPath string,
-	rcs []RegistryContext,
-	rd RenamesDenormalized,
-	srcRegistry *RegistryContext,
+	mfest Manifest,
 	mi MasterInventory,
 	verbosity, threads int,
 	deleteExtraTags, dryRun, useSvcAcc bool) (SyncContext, error) {
@@ -69,40 +67,44 @@ func MakeSyncContext(
 		Inv:                 mi,
 		InvIgnore:           []ImageName{},
 		Tokens:              make(map[RootRepo]Token),
-		RenamesDenormalized: rd,
-		SrcRegistry:         srcRegistry,
-		RegistryContexts:    rcs,
+		RenamesDenormalized: mfest.renamesDenormalized,
+		SrcRegistry:         mfest.srcRegistry,
+		RegistryContexts:    mfest.Registries,
 		DigestMediaType:     make(DigestMediaType)}, nil
 }
 
 // ParseManifestFromFile parses a Manifest from a filepath.
 func ParseManifestFromFile(
-	filePath string) (Manifest, RenamesDenormalized, *RegistryContext, error) {
+	filePath string) (Manifest, error) {
 
 	var mfest Manifest
 	var rd RenamesDenormalized
 	var srcRegistry *RegistryContext
 	b, err := ioutil.ReadFile(filePath)
 	if err != nil {
-		return mfest, rd, srcRegistry, err
+		return mfest, err
 	}
+	mfest.filepath = filePath
+
 	mfest, err = ParseManifest(b)
 	if err != nil {
-		return mfest, rd, srcRegistry, err
+		return mfest, err
 	}
 
 	// Perform semantic checks (beyond just YAML validation).
 	srcRegistry, err = getSrcRegistry(mfest.Registries)
 	if err != nil {
-		return mfest, rd, srcRegistry, err
+		return mfest, err
 	}
+	mfest.srcRegistry = srcRegistry
 
 	rd, err = DenormalizeRenames(mfest, srcRegistry.Name)
 	if err != nil {
-		return mfest, rd, srcRegistry, err
+		return mfest, err
 	}
+	mfest.renamesDenormalized = rd
 
-	return mfest, rd, srcRegistry, nil
+	return mfest, nil
 }
 
 // ParseManifest parses a Manifest from a byteslice. This function is separate
