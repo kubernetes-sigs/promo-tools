@@ -86,7 +86,7 @@ func ParseManifestFromFile(
 	}
 	mfest.filepath = filePath
 
-	mfest, err = ParseManifest(b)
+	mfest, err = ParseManifestYAML(b)
 	if err != nil {
 		return mfest, err
 	}
@@ -107,9 +107,9 @@ func ParseManifestFromFile(
 	return mfest, nil
 }
 
-// ParseManifest parses a Manifest from a byteslice. This function is separate
-// from ParseManifestFromFile() so that it can be tested independently.
-func ParseManifest(b []byte) (Manifest, error) {
+// ParseManifestYAML parses a Manifest from a byteslice. This function is
+// separate from ParseManifestFromFile() so that it can be tested independently.
+func ParseManifestYAML(b []byte) (Manifest, error) {
 	var m Manifest
 	if err := yaml.UnmarshalStrict(b, &m); err != nil {
 		return m, err
