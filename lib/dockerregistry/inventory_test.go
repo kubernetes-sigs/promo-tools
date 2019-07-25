@@ -1288,6 +1288,7 @@ func TestPromotion(t *testing.T) {
 		name         string
 		inputM       Manifest
 		inputSc      SyncContext
+		badReads     []RegistryName
 		expectedReqs CapturedRequests
 	}{
 		{
@@ -1295,6 +1296,7 @@ func TestPromotion(t *testing.T) {
 			"No promotion",
 			Manifest{},
 			SyncContext{},
+			nil,
 			CapturedRequests{},
 		},
 		{
@@ -1319,6 +1321,31 @@ func TestPromotion(t *testing.T) {
 					"gcr.io/cat": RegInvImage{
 						"a": DigestTags{
 							"sha256:000": TagSlice{"0.9"}}}}},
+			nil,
+			CapturedRequests{},
+		},
+		{
+			"No promotion; network errors reading from src registry for all images",
+			Manifest{
+				Registries: registries,
+				Images: []Image{
+					{
+						ImageName: "a",
+						Dmap: DigestTags{
+							"sha256:000": TagSlice{"0.9"}}},
+					{
+						ImageName: "b",
+						Dmap: DigestTags{
+							"sha256:111": TagSlice{"0.9"}}}}},
+			SyncContext{
+				Inv: MasterInventory{
+					"gcr.io/foo": RegInvImage{
+						"a": DigestTags{
+							"sha256:000": TagSlice{"0.9"}},
+						"b": DigestTags{
+							"sha256:111": TagSlice{"0.9"}}}},
+				InvIgnore: []ImageName{}},
+			[]RegistryName{"gcr.io/foo/a", "gcr.io/foo/b", "gcr.io/foo/c"},
 			CapturedRequests{},
 		},
 		{
@@ -1341,6 +1368,7 @@ func TestPromotion(t *testing.T) {
 					"gcr.io/cat": RegInvImage{
 						"a": DigestTags{
 							"sha256:000": TagSlice{"0.9"}}}}},
+			nil,
 			CapturedRequests{PromotionRequest{
 				TagOp:          Add,
 				RegistrySrc:    srcRegName,
@@ -1371,6 +1399,7 @@ func TestPromotion(t *testing.T) {
 					"gcr.io/cat": RegInvImage{
 						"a": DigestTags{
 							"sha256:000": TagSlice{"0.9"}}}}},
+			nil,
 			CapturedRequests{PromotionRequest{
 				TagOp:          Add,
 				RegistrySrc:    srcRegName,
@@ -1402,6 +1431,7 @@ func TestPromotion(t *testing.T) {
 					"gcr.io/cat": RegInvImage{
 						"a": DigestTags{
 							"sha256:000": TagSlice{"0.9"}}}}},
+			nil,
 			CapturedRequests{PromotionRequest{
 				TagOp:          Move,
 				RegistrySrc:    srcRegName,
@@ -1438,6 +1468,7 @@ func TestPromotion(t *testing.T) {
 					"gcr.io/cat": RegInvImage{
 						"a": DigestTags{
 							"sha256:000": TagSlice{"0.9"}}}}},
+			nil,
 			CapturedRequests{PromotionRequest{
 				TagOp:          Add,
 				RegistrySrc:    srcRegName,
@@ -1473,6 +1504,7 @@ func TestPromotion(t *testing.T) {
 					"gcr.io/cat": RegInvImage{
 						"a": DigestTags{
 							"sha256:000": TagSlice{"0.9"}}}}},
+			nil,
 			CapturedRequests{PromotionRequest{
 				TagOp:          Move,
 				RegistrySrc:    srcRegName,
@@ -1509,6 +1541,7 @@ func TestPromotion(t *testing.T) {
 					"gcr.io/cat": RegInvImage{
 						"b": DigestTags{
 							"sha256:000": TagSlice{"0.9"}}}}},
+			nil,
 			CapturedRequests{
 				PromotionRequest{
 					TagOp:          Add,
@@ -1552,6 +1585,7 @@ func TestPromotion(t *testing.T) {
 					"gcr.io/cat": RegInvImage{
 						"a": DigestTags{
 							"sha256:000": TagSlice{"0.9"}}}}},
+			nil,
 			CapturedRequests{},
 		},
 		{
@@ -1576,6 +1610,7 @@ func TestPromotion(t *testing.T) {
 					"gcr.io/cat": RegInvImage{
 						"a": DigestTags{
 							"sha256:000": TagSlice{"0.9"}}}}},
+			nil,
 			CapturedRequests{PromotionRequest{
 				TagOp:          Delete,
 				RegistrySrc:    srcRegName,
@@ -1612,6 +1647,7 @@ func TestPromotion(t *testing.T) {
 					"gcr.io/bar": RegInvImage{
 						"a": DigestTags{
 							"sha256:333": TagSlice{"0.8"}}}}},
+			nil,
 			CapturedRequests{},
 		},
 	}
@@ -1648,10 +1684,19 @@ func TestPromotion(t *testing.T) {
 			fmt.Sprintf("checkError (rd): test: %v\n", test.name))
 		test.inputSc.RenamesDenormalized = rd
 		test.inputSc.SrcRegistry = srcReg
+
+		// Simulate bad network conditions.
+		if test.badReads != nil {
+			for _, badRead := range test.badReads {
+				test.inputSc.IgnoreFromPromotion(badRead)
+			}
+		}
+
 		test.inputSc.Promote(
 			test.inputM,
 			nopStream,
 			&processRequestFake)
+
 		err = checkEqual(captured, test.expectedReqs)
 		checkError(t, err, fmt.Sprintf("checkError: test: %v\n", test.name))
 	}
@@ -2205,5 +2250,131 @@ func TestSnapshot(t *testing.T) {
 		gotYAML := test.input.ToYAML()
 		err := checkEqual(gotYAML, test.expected)
 		checkError(t, err, fmt.Sprintf("checkError: test: %v\n", test.name))
+	}
+}
+
+func TestParseContainerParts(t *testing.T) {
+	type ContainerParts struct {
+		registry   string
+		repository string
+		err        error
+	}
+
+	var shouldBeValid = []struct {
+		input    string
+		expected ContainerParts
+	}{
+		{
+			"gcr.io/google-containers/foo",
+			ContainerParts{
+				"gcr.io/google-containers",
+				"foo",
+				nil,
+			},
+		},
+		{
+			"us.gcr.io/google-containers/foo",
+			ContainerParts{
+				"us.gcr.io/google-containers",
+				"foo",
+				nil,
+			},
+		},
+		{
+			"us.gcr.io/google-containers/foo/bar",
+			ContainerParts{
+				"us.gcr.io/google-containers",
+				"foo/bar",
+				nil,
+			},
+		},
+		{
+			"k8s.gcr.io/a/b/c",
+			ContainerParts{
+				"k8s.gcr.io",
+				"a/b/c",
+				nil,
+			},
+		},
+	}
+
+	for _, test := range shouldBeValid {
+		registry, repository, err := ParseContainerParts(test.input)
+		got := ContainerParts{
+			registry,
+			repository,
+			err}
+		errEqual := checkEqual(got, test.expected)
+		checkError(t, errEqual, "checkError: test: shouldBeValid\n")
+	}
+
+	var shouldBeInValid = []struct {
+		input    string
+		expected ContainerParts
+	}{
+		{
+			// Blank string.
+			"",
+			ContainerParts{
+				"",
+				"",
+				fmt.Errorf("invalid string '%s'", ""),
+			},
+		},
+		{
+			// Bare domain..
+			"gcr.io",
+			ContainerParts{
+				"",
+				"",
+				fmt.Errorf("invalid string '%s'", "gcr.io"),
+			},
+		},
+		{
+			// Another top-level name (missing image name).
+			"gcr.io/google-containers",
+			ContainerParts{
+				"",
+				"",
+				fmt.Errorf("invalid string '%s'", "gcr.io/google-containers"),
+			},
+		},
+		{
+			// Naked vanity domain (missing image name).
+			"k8s.gcr.io",
+			ContainerParts{
+				"",
+				"",
+				fmt.Errorf("invalid string '%s'", "k8s.gcr.io"),
+			},
+		},
+		{
+			// Double slash.
+			"k8s.gcr.io//a/b",
+			ContainerParts{
+				"",
+				"",
+				fmt.Errorf("invalid string '%s'", "k8s.gcr.io//a/b"),
+			},
+		},
+		{
+			// Trailing slash.
+			"k8s.gcr.io/a/b/",
+			ContainerParts{
+				"",
+				"",
+				fmt.Errorf("invalid string '%s'", "k8s.gcr.io/a/b/"),
+			},
+		},
+	}
+
+	for _, test := range shouldBeInValid {
+		registry, repository, err := ParseContainerParts(test.input)
+		got := ContainerParts{
+			registry,
+			repository,
+			err}
+		errEqual := checkEqual(got, test.expected)
+		checkError(t, errEqual, "checkError: test: shouldBeInValid\n")
 	}
 }
