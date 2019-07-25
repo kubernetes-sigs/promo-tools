@@ -155,7 +155,7 @@ create streams of data (JSON or not) which we can interpret and use.
 
 For tests, the [fake](lib/stream/fake.go) implementation is used instead, which
 predefines how that stream will behave, for the purposes of each unit test. A
-good example of this is the [`TestReadRepository`
+good example of this is the [`TestReadAllRegistries`
 test](lib/dockerregistry/inventory_test.go).
 
 ## Updating Prow Jobs

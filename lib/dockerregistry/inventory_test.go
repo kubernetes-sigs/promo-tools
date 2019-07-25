@@ -699,8 +699,8 @@ func TestCommandGeneration(t *testing.T) {
 		fmt.Sprintf("Test: %v (cmd string)\n", testName))
 }
 
-// TestReadRepository tests reading images and tags from a registry.
-func TestReadRepository(t *testing.T) {
+// TestReadAllRegistries tests reading images and tags from a registry.
+func TestReadAllRegistries(t *testing.T) {
 	const fakeRegName RegistryName = "gcr.io/foo"
 
 	var tests = []struct {
@@ -924,7 +924,7 @@ func TestReadRepository(t *testing.T) {
 			sr.Bytes = []byte(fakeHTTPBody)
 			return &sr
 		}
-		sc.ReadRepository(mkFakeStream1)
+		sc.ReadAllRegistries(mkFakeStream1)
 		got := sc.Inv[fakeRegName]
 		expected := test.expectedOutput
 		err := checkEqual(got, expected)

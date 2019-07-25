@@ -575,8 +575,8 @@ func GetTokenKeyDomainRepoPath(
 	return key, s[:i], s[i+1:]
 }
 
-// ReadRepository takes a Repository endpoint, and lists all images at that
-// path. A repository is recursive.
+// ReadAllRegistries reads all images in all registries in the SyncContext Each
+// registry is composed of a image repositories, which can be recursive.
 //
 // To summarize: a docker *registry* is a set of *repositories*. It just so
 // happens that to end-users, repositores resemble a tree structure because they
@@ -603,7 +603,7 @@ func GetTokenKeyDomainRepoPath(
 // NOTE: Repository names may overlap with image names. E.g., it may be in the
 // example above that there are images named gcr.io/google-containers/foo:2.0
 // and gcr.io/google-containers/foo/baz:2.0.
-func (sc *SyncContext) ReadRepository(
+func (sc *SyncContext) ReadAllRegistries(
 	mkProducer func(*SyncContext, RegistryContext) stream.Producer) {
 	// Collect all images in sc.Inv (the src and dest registry names found in
 	// the manifest).

@@ -185,7 +185,7 @@ func main() {
 		klog.Fatal(err)
 	}
 
-	sc.ReadRepository(reg.MkReadRepositoryCmdReal)
+	sc.ReadAllRegistries(reg.MkReadRepositoryCmdReal)
 
 	if len(*snapshotPtr) > 0 {
 		rii := sc.Inv[mfest.Registries[0].Name]
@@ -239,7 +239,7 @@ func main() {
 		klog.Infof("---------- BEGIN GARBAGE COLLECTION: %s ----------\n",
 			*manifestPtr)
 		// Re-read the state of the world.
-		sc.ReadRepository(reg.MkReadRepositoryCmdReal)
+		sc.ReadAllRegistries(reg.MkReadRepositoryCmdReal)
 		// Garbage-collect all untagged images in dest registry.
 		mkTagDeletionCmd := func(
 			dest reg.RegistryContext,
