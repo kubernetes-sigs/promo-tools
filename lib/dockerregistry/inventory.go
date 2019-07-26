@@ -473,10 +473,10 @@ func (sc *SyncContext) IgnoreFromPromotion(regName RegistryName) {
 	_, imgName, err := ParseContainerParts(string(regName))
 	if err != nil {
 		klog.Errorf("unable to ignore from promotion: %s\n", err)
+		return
 	}
 
-	klog.Errorf("ignoring from promotion: %s\n", err)
-
+	klog.Infof("ignoring from promotion: %s\n", imgName)
 	sc.InvIgnore = append(sc.InvIgnore, ImageName(imgName))
 }
 
