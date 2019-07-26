@@ -42,9 +42,6 @@ func main() {
 
 	manifestPtr := flag.String(
 		"manifest", "", "the manifest file to load (REQUIRED)")
-	garbageCollectPtr := flag.Bool(
-		"garbage-collect",
-		false, "delete all untagged images in the destination registry")
 	threadsPtr := flag.Int(
 		"threads",
 		10, "number of concurrent goroutines to use when talking to GCR")
@@ -234,28 +231,6 @@ func main() {
 	}
 
 	exitCode := sc.Promote(mfest, mkPromotionCmd, nil)
-
-	if *garbageCollectPtr {
-		klog.Infof("---------- BEGIN GARBAGE COLLECTION: %s ----------\n",
-			*manifestPtr)
-		// Re-read the state of the world.
-		sc.ReadAllRegistries(reg.MkReadRepositoryCmdReal)
-		// Garbage-collect all untagged images in dest registry.
-		mkTagDeletionCmd := func(
-			dest reg.RegistryContext,
-			imageName reg.ImageName,
-			digest reg.Digest) stream.Producer {
-			var sp stream.Subprocess
-			sp.CmdInvocation = reg.GetDeleteCmd(
-				dest,
-				sc.UseServiceAccount,
-				imageName,
-				digest,
-				false)
-			return &sp
-		}
-		sc.GarbageCollect(mfest, mkTagDeletionCmd, nil)
-	}
 
 	if *dryRunPtr {
 		fmt.Printf("********** FINISHED (DRY RUN): %s **********\n",
