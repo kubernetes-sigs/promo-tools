@@ -49,7 +49,6 @@ type SyncContext struct {
 	ManifestPath        string
 	Verbosity           int
 	Threads             int
-	DeleteExtraTags     bool
 	DryRun              bool
 	UseServiceAccount   bool
 	Inv                 MasterInventory

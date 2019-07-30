@@ -149,7 +149,6 @@ func testSetup(cwd string, mfest reg.Manifest) error {
 		2,
 		10,
 		false,
-		false,
 		true)
 	if err != nil {
 		klog.Fatal(err)

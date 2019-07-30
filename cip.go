@@ -53,11 +53,6 @@ func main() {
 			" 1 = fatal + errors,"+
 			" 2 = fatal + errors + warnings,"+
 			" 3 = fatal + errors + warnings + informational (everything)")
-	deleteExtraTags := flag.Bool(
-		"delete-extra-tags",
-		false,
-		"delete tags in the destination registry that are not declared"+
-			" in the Manifest (default: false)")
 	parseOnlyPtr := flag.Bool(
 		"parse-only",
 		false,
@@ -146,7 +141,6 @@ func main() {
 		mi,
 		*verbosityPtr,
 		*threadsPtr,
-		*deleteExtraTags,
 		*dryRunPtr,
 		!noSvcAcc)
 	if err != nil {

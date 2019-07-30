@@ -55,12 +55,11 @@ func MakeSyncContext(
 	mfest Manifest,
 	mi MasterInventory,
 	verbosity, threads int,
-	deleteExtraTags, dryRun, useSvcAcc bool) (SyncContext, error) {
+	dryRun, useSvcAcc bool) (SyncContext, error) {
 
 	return SyncContext{
 		Verbosity:           verbosity,
 		Threads:             threads,
-		DeleteExtraTags:     deleteExtraTags,
 		ManifestPath:        manifestPath,
 		DryRun:              dryRun,
 		UseServiceAccount:   useSvcAcc,
@@ -1316,32 +1315,18 @@ func mkPopulateRequestsForPromotion(
 				}
 			}
 
-			// Either delete extraneous tags in the destination, or warn about
-			// them (hinges on sc.DeleteExtraTags).
-			mfestIT := mfest.ToRegInvImageTag()
-			if sc.DeleteExtraTags {
-				sc.mkPopReq(
-					registry,
-					destIT.Minus(mfestIT),
-					Delete,
-					"",
-					mkProducer,
-					reqs,
-					wg)
-			} else {
-				// Warn the user about extra tags:
-				xtras := make([]string, 0)
-				for imageTag := range destIT.Minus(promotionCandidatesITRenamed) {
-					xtras = append(xtras, fmt.Sprintf(
-						"%s/%s:%s",
-						registry.Name,
-						imageTag.ImageName,
-						imageTag.Tag))
-				}
-				sort.Strings(xtras)
-				for _, img := range xtras {
-					klog.Warningf("Warning: extra tag found in dest: %s\n", img)
-				}
+			// Warn the user about extra tags:
+			xtras := make([]string, 0)
+			for imageTag := range destIT.Minus(promotionCandidatesITRenamed) {
+				xtras = append(xtras, fmt.Sprintf(
+					"%s/%s:%s",
+					registry.Name,
+					imageTag.ImageName,
+					imageTag.Tag))
+			}
+			sort.Strings(xtras)
+			for _, img := range xtras {
+				klog.Warningf("Warning: extra tag found in dest: %s\n", img)
 			}
 		}
 	}
