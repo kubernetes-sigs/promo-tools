@@ -30,7 +30,11 @@ import (
 func checkEqual(got, expected interface{}) error {
 	if !reflect.DeepEqual(got, expected) {
 		return fmt.Errorf(
-			"got (type %T):\n%v\nexpected (type %T):\n%v",
+			`<<<<<<< got (type %T)
+%v
+=======
+%v
+>>>>>>> expected (type %T)`,
 			got,
 			got,
 			expected,
