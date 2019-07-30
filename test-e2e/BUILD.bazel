@@ -6,7 +6,7 @@ load("@io_bazel_rules_docker//contrib:push-all.bzl", "docker_push")
 go_library(
     name = "go_default_library",
     srcs = ["e2e.go"],
-    importpath = "sigs.k8s.io/k8s-container-image-promoter/test",
+    importpath = "sigs.k8s.io/k8s-container-image-promoter/test-e2e",
     visibility = ["//visibility:public"],
     deps = [
         "//lib/dockerregistry:go_default_library",
