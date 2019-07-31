@@ -419,6 +419,7 @@ func getRegistryTagsFrom(req stream.ExternalRequest) (*google.Tags, error) {
 		return nil, err
 	}
 
+	// nolint[errcheck]
 	defer req.StreamProducer.Close()
 
 	tags, err := extractRegistryTags(reader)
@@ -481,7 +482,12 @@ func (sc *SyncContext) IgnoreFromPromotion(regName RegistryName) {
 	sc.InvIgnore = append(sc.InvIgnore, ImageName(imgName))
 }
 
-// ParseContainerParts registry
+// ParseContainerParts splits up a registry name into its component pieces.
+// Unfortunately it has some specialized logic around particular inputs; this
+// could be removed in a future promoter manifest version which could force the
+// user to provide these delineations for us.
+//
+// nolint[gocyclo]
 func ParseContainerParts(s string) (string, string, error) {
 	parts := strings.Split(s, "/")
 	if len(parts) <= 1 {
@@ -517,8 +523,12 @@ error:
 	return "", "", fmt.Errorf("invalid string '%s'", s)
 }
 
-// GetServiceAccountToken calls gcloud to get an access token for the specified service account
-func GetServiceAccountToken(serviceAccount string, useServiceAccount bool) (Token, error) {
+// GetServiceAccountToken calls gcloud to get an access token for the specified
+// service account.
+func GetServiceAccountToken(
+	serviceAccount string,
+	useServiceAccount bool) (Token, error) {
+
 	args := []string{
 		"auth",
 		"print-access-token",
@@ -547,7 +557,9 @@ func GetServiceAccountToken(serviceAccount string, useServiceAccount bool) (Toke
 // access tokens.
 func (sc *SyncContext) PopulateTokens() error {
 	for _, rc := range sc.RegistryContexts {
-		token, err := GetServiceAccountToken(rc.ServiceAccount, sc.UseServiceAccount)
+		token, err := GetServiceAccountToken(
+			rc.ServiceAccount,
+			sc.UseServiceAccount)
 		if err != nil {
 			return err
 		}
@@ -603,6 +615,8 @@ func GetTokenKeyDomainRepoPath(
 // NOTE: Repository names may overlap with image names. E.g., it may be in the
 // example above that there are images named gcr.io/google-containers/foo:2.0
 // and gcr.io/google-containers/foo/baz:2.0.
+//
+// nolint[gocyclo]
 func (sc *SyncContext) ReadAllRegistries(
 	mkProducer func(*SyncContext, RegistryContext) stream.Producer) {
 	// Collect all images in sc.Inv (the src and dest registry names found in
@@ -889,7 +903,7 @@ func (rii *RegInvImage) ToYAML() string {
 		digests []digest
 	}
 
-	var images []image
+	images := make([]image, 0)
 
 	for name, dmap := range *rii {
 		var digests []digest

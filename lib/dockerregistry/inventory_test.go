@@ -147,7 +147,6 @@ func TestParseRegistryManifest(t *testing.T) {
 		},
 		{
 			"Stub manifest (`images` field is empty)",
-			// nolint[lll]
 			`registries:
 - name: gcr.io/bar
   service-account: foobar@google-containers.iam.gserviceaccount.com
@@ -159,13 +158,11 @@ images: []
 			Manifest{
 				Registries: []RegistryContext{
 					{
-						Name: "gcr.io/bar",
-						// nolint[lll]
+						Name:           "gcr.io/bar",
 						ServiceAccount: "foobar@google-containers.iam.gserviceaccount.com",
 					},
 					{
-						Name: "gcr.io/foo",
-						// nolint[lll]
+						Name:           "gcr.io/foo",
 						ServiceAccount: "src@google-containers.iam.gserviceaccount.com",
 						Src:            true,
 					},
@@ -177,7 +174,6 @@ images: []
 		},
 		{
 			"Basic manifest",
-			// nolint[lll]
 			`registries:
 - name: gcr.io/bar
   service-account: foobar@google-containers.iam.gserviceaccount.com
@@ -195,13 +191,11 @@ images:
 			Manifest{
 				Registries: []RegistryContext{
 					{
-						Name: "gcr.io/bar",
-						// nolint[lll]
+						Name:           "gcr.io/bar",
 						ServiceAccount: "foobar@google-containers.iam.gserviceaccount.com",
 					},
 					{
-						Name: "gcr.io/foo",
-						// nolint[lll]
+						Name:           "gcr.io/foo",
 						ServiceAccount: "src@google-containers.iam.gserviceaccount.com",
 						Src:            true,
 					},
@@ -210,13 +204,11 @@ images:
 				Images: []Image{
 					{ImageName: "agave",
 						Dmap: DigestTags{
-							// nolint[lll]
 							"sha256:aab34c5841987a1b133388fa9f27e7960c4b1307e2f9147dca407ba26af48a54": {"latest"},
 						},
 					},
 					{ImageName: "banana",
 						Dmap: DigestTags{
-							// nolint[lll]
 							"sha256:07353f7b26327f0d933515a22b1de587b040d3d85c464ea299c1b9f242529326": {"1.8.3"},
 						},
 					},
@@ -226,7 +218,6 @@ images:
 		},
 		{
 			"Missing src registry in registries (invalid)",
-			// nolint[lll]
 			`registries:
 - name: gcr.io/bar
   service-account: foobar@google-containers.iam.gserviceaccount.com
@@ -241,12 +232,10 @@ images:
     "sha256:07353f7b26327f0d933515a22b1de587b040d3d85c464ea299c1b9f242529326": [ "1.8.3" ]  # Branches: ['master']
 `,
 			Manifest{},
-			// nolint[lll]
 			fmt.Errorf("source registry must be set"),
 		},
 	}
 
-	// nolint[lll]
 	// Test only the JSON unmarshalling logic.
 	for _, test := range tests {
 		b := []byte(test.input)
@@ -291,7 +280,6 @@ images:
 						test.name+": "+validInput))
 			}
 
-			// nolint[lll]
 			shouldBeInvalid := []struct {
 				name  string
 				input string
@@ -347,7 +335,6 @@ could not find source registry in '[gcr.io/bar/banana gcr.io/cat/subdir/A/banana
 }
 
 func TestParseImageDigest(t *testing.T) {
-	// nolint[lll]
 	var shouldBeValid = []string{
 		`sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef`,
 		`sha256:0000000000000000000000000000000000000000000000000000000000000000`,
@@ -365,7 +352,6 @@ func TestParseImageDigest(t *testing.T) {
 			fmt.Sprintf("Test: `%v' should be valid\n", testInput))
 	}
 
-	// nolint[lll]
 	var shouldBeInvalid = []string{
 		// Empty.
 		``,
@@ -391,7 +377,6 @@ func TestParseImageDigest(t *testing.T) {
 }
 
 func TestParseImageTag(t *testing.T) {
-	// nolint[lll]
 	var shouldBeValid = []string{
 		`a`,
 		`_`,
@@ -413,7 +398,6 @@ func TestParseImageTag(t *testing.T) {
 			fmt.Sprintf("Test: `%v' should be valid\n", testInput))
 	}
 
-	// nolint[lll]
 	var shouldBeInvalid = []string{
 		// Empty.
 		``,
@@ -442,7 +426,6 @@ func TestParseImageTag(t *testing.T) {
 
 func TestValidateRegistryImagePath(t *testing.T) {
 	//func validateRegistryImagePath(rip RegistryImagePath) error {
-	// nolint[lll]
 	var shouldBeValid = []string{
 		`gcr.io/foo/bar`,
 		`k8s.gcr.io/foo`,
@@ -460,7 +443,6 @@ func TestValidateRegistryImagePath(t *testing.T) {
 			fmt.Sprintf("Test: `%v' should be valid\n", testInput))
 	}
 
-	// nolint[lll]
 	var shouldBeInvalid = []string{
 		// Empty.
 		``,
@@ -496,7 +478,6 @@ func TestValidateRegistryImagePath(t *testing.T) {
 }
 
 func TestSplitRegistryImagePath(t *testing.T) {
-	// nolint[lll]
 	knownRegistryNames := []RegistryName{
 		`gcr.io/foo`,
 		`us.gcr.io/foo`,
@@ -532,7 +513,6 @@ func TestSplitRegistryImagePath(t *testing.T) {
 			nil,
 		},
 	}
-	// nolint[lll]
 	for _, test := range tests {
 		rName, iName, err := splitRegistryImagePath(test.input, knownRegistryNames)
 		eqErr := checkEqual(rName, test.expectedRegistryName)
@@ -774,7 +754,6 @@ func TestReadAllRegistries(t *testing.T) {
   ]
 }`,
 			},
-			// nolint[lll]
 			RegInvImage{
 				"addon-resizer": DigestTags{
 					"sha256:b5b2d91319f049143806baeacc886f82f621e9a2550df856b11b5c22db4570a7": {"latest"},
@@ -886,7 +865,6 @@ func TestReadAllRegistries(t *testing.T) {
   ]
 }`,
 			},
-			// nolint[lll]
 			RegInvImage{
 				"addon-resizer": DigestTags{
 					"sha256:b5b2d91319f049143806baeacc886f82f621e9a2550df856b11b5c22db4570a7": {"latest"},
@@ -1287,7 +1265,6 @@ func TestPromotion(t *testing.T) {
 		Src:            true,
 	}
 	registries := []RegistryContext{destRC, srcRC, destRC2}
-	// nolint[dup]
 	var tests = []struct {
 		name         string
 		inputM       Manifest
@@ -1415,7 +1392,6 @@ func TestPromotion(t *testing.T) {
 				Tag:            "0.9"}: 1},
 		},
 		{
-			// nolint[lll]
 			"Promote 1 tag; tag already exists in dest but is pointing to a different digest (move tag)",
 			Manifest{
 				Registries: registries,
@@ -1448,7 +1424,6 @@ func TestPromotion(t *testing.T) {
 				Tag:            "0.9"}: 1},
 		},
 		{
-			// nolint[lll]
 			"Promote 1 tag via rename",
 			Manifest{
 				Registries: registries,
@@ -1484,7 +1459,6 @@ func TestPromotion(t *testing.T) {
 				Tag:            "0.9"}: 1},
 		},
 		{
-			// nolint[lll]
 			"Promote 1 tag via rename (move image)",
 			Manifest{
 				Registries: registries,
@@ -1521,7 +1495,6 @@ func TestPromotion(t *testing.T) {
 				Tag:            "0.9"}: 1},
 		},
 		{
-			// nolint[lll]
 			"Promote 1 tag via rename (1 dest should be renamed, another should share the same name as src)",
 			Manifest{
 				Registries: registries,
@@ -1568,7 +1541,6 @@ func TestPromotion(t *testing.T) {
 			},
 		},
 		{
-			// nolint[lll]
 			"NOP; dest has extra tag, but NOP because -delete-extra-tags NOT specified",
 			Manifest{
 				Registries: registries,
@@ -1592,7 +1564,6 @@ func TestPromotion(t *testing.T) {
 			CapturedRequests{},
 		},
 		{
-			// nolint[lll]
 			"NOP (src registry does not have any of the images we want to promote)",
 			Manifest{
 				Registries: registries,
@@ -1697,7 +1668,6 @@ func TestPromotionMulti(t *testing.T) {
 		expectedReqs CapturedRequests
 	}{
 		{
-			// nolint[lll]
 			"Add 1 tag for 2 registries",
 			Manifest{
 				Registries: registries,
@@ -1739,7 +1709,6 @@ func TestPromotionMulti(t *testing.T) {
 			},
 		},
 		{
-			// nolint[lll]
 			"Add 1 tag for 1 registry",
 			Manifest{
 				Registries: registries,
@@ -1863,7 +1832,6 @@ func TestGarbageCollection(t *testing.T) {
 			CapturedRequests{},
 		},
 		{
-			// nolint[lll]
 			"Simple garbage collection (delete ALL images in dest that are untagged))",
 			Manifest{
 				Registries: registries,
@@ -1915,7 +1883,6 @@ func TestGarbageCollection(t *testing.T) {
 			},
 		},
 		{
-			// nolint[lll]
 			"Garbage collection with renames present (only garbage-collect *renamed* paths in dest)",
 			Manifest{
 				Registries: registries,
@@ -2055,7 +2022,6 @@ func TestGarbageCollectionMulti(t *testing.T) {
 		expectedReqs CapturedRequests
 	}{
 		{
-			// nolint[lll]
 			"Simple garbage collection (delete ALL images in all dests that are untagged))",
 			Manifest{
 				Registries: registries,

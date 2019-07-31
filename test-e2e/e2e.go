@@ -210,6 +210,7 @@ func writeTempManifest(mfest reg.Manifest) (string, error) {
 }
 
 func runPromotion(cwd string, manifestPath string) error {
+	// nolint[errcheck]
 	defer os.Remove(manifestPath)
 
 	// NOTE: we should probably compile the cip binary and then put it in the
