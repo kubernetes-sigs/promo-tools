@@ -83,12 +83,13 @@ func ParseManifestFromFile(
 	if err != nil {
 		return mfest, err
 	}
-	mfest.filepath = filePath
 
 	mfest, err = ParseManifestYAML(b)
 	if err != nil {
 		return mfest, err
 	}
+
+	mfest.filepath = filePath
 
 	// Perform semantic checks (beyond just YAML validation).
 	srcRegistry, err = getSrcRegistry(mfest.Registries)
