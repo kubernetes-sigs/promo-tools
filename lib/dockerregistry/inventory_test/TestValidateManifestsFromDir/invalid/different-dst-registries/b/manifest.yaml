@@ -1,0 +1,18 @@
+registries:
+- name: gcr.io/bar-staging
+  service-account: sa@robot.com
+  src: true
+- name: us.gcr.io/some-prod
+  service-account: sa@robot.com
+- name: eu.gcr.io/some-prod
+  service-account: sa@robot.com
+- name: asia.gcr.io/some-prod
+  service-account: sa@robot.com
+images:
+- name: bar-controller
+  dmap:
+    "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": ["1.0"]
+renames:
+- - "gcr.io/bar-staging/bar-controller"
+  - "us.gcr.io/some-prod/bar/bar-controller"
+  - "eu.gcr.io/some-prod/bar/bar-controller"

@@ -194,13 +194,6 @@ func ValidateManifestsFromDir(mfests []Manifest) error {
 		return fmt.Errorf("no manifests to validate")
 	}
 
-	if len(mfests) == 1 {
-		// If there is just 1 manifest, then we do not have any additional
-		// checks to perform. See validateRequiredComponents() for how an
-		// individal manifest is validated.
-		return nil
-	}
-
 	// Check that there are no overlapping manifests. Each manifest must be
 	// responsible for 1 unique source registry.
 	srcRegsSeen := make(map[RegistryName]string)

@@ -25,6 +25,8 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["inventory_test.go"],
+    # Include test fixtures.
+    data = glob(["inventory_test/**/*"]),
     embed = [":go_default_library"],
     deps = [
         "//lib/json:go_default_library",

@@ -1,0 +1,19 @@
+registries:
+- name: gcr.io/cat-staging
+  service-account: sa@robot.com
+  src: true
+- name: us.gcr.io/some-prod
+  service-account: sa@robot.com
+- name: eu.gcr.io/some-prod
+  service-account: sa@robot.com
+- name: asia.gcr.io/some-prod
+  service-account: sa@robot.com
+images:
+- name: cat-controller
+  dmap:
+    "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc": ["1.0"]
+renames:
+- - "gcr.io/cat-staging/cat-controller"
+  - "us.gcr.io/some-prod/cat/cat-controller"
+  - "eu.gcr.io/some-prod/cat/cat-controller"
+  - "asia.gcr.io/some-prod/cat/cat-controller"
