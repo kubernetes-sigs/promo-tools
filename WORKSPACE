@@ -4,7 +4,7 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 git_repository(
     name = "bazel_skylib",
     remote = "https://github.com/bazelbuild/bazel-skylib.git",
-    tag = "0.9.0"
+    tag = "0.9.0",
 )
 
 # You *must* import the Go rules before setting up the go_image rules.
@@ -20,9 +20,13 @@ local_repository(
     name = "go_sdk_repo",
     path = "tools/go_sdk",
 )
+
 load("@go_sdk_repo//:sdk.bzl", "gen_imports")
+
 gen_imports(name = "go_sdk_imports")
+
 load("@go_sdk_imports//:imports.bzl", "load_go_sdk")
+
 load_go_sdk()
 
 http_archive(
