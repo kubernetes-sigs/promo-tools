@@ -52,6 +52,6 @@ var BackoffDefault = wait.Backoff{
 	Duration: time.Second / 2, // 500ms
 	Factor:   1.618,
 	Jitter:   0.1,
-	Steps:    10,
-	Cap:      time.Second * 30,
+	Steps:    45,
+	Cap:      time.Second * 60,
 }
