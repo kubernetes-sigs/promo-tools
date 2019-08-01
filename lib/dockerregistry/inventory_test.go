@@ -482,6 +482,7 @@ func TestSplitRegistryImagePath(t *testing.T) {
 		`gcr.io/foo`,
 		`us.gcr.io/foo`,
 		`k8s.gcr.io`,
+		`eu.gcr.io/foo/d`,
 	}
 
 	var tests = []struct {
@@ -506,6 +507,13 @@ func TestSplitRegistryImagePath(t *testing.T) {
 			nil,
 		},
 		{
+			`regional GCR (extra level of nesting)`,
+			`eu.gcr.io/foo/d/e/f`,
+			`eu.gcr.io/foo/d`,
+			`e/f`,
+			nil,
+		},
+		{
 			`vanity GCR`,
 			`k8s.gcr.io/a/b/c`,
 			`k8s.gcr.io`,
@@ -514,7 +522,7 @@ func TestSplitRegistryImagePath(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		rName, iName, err := splitRegistryImagePath(test.input, knownRegistryNames)
+		rName, iName, err := SplitRegistryImagePath(test.input, knownRegistryNames)
 		eqErr := checkEqual(rName, test.expectedRegistryName)
 		checkError(
 			t,

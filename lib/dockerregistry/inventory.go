@@ -243,7 +243,7 @@ func validateRequiredComponents(m Manifest) error {
 		seenRegistries := make(map[RegistryName]ImageName)
 		for _, registryImagePath := range rename {
 			// nolint[lll]
-			registryName, imageName, err := splitRegistryImagePath(registryImagePath, knownRegistries)
+			registryName, imageName, err := SplitRegistryImagePath(registryImagePath, knownRegistries)
 			if err != nil {
 				errs = append(errs, err.Error())
 			}
@@ -283,9 +283,9 @@ func validateRequiredComponents(m Manifest) error {
 				rename))
 		}
 
-		registryNameSrc, imageNameSrc, _ := splitRegistryImagePath(srcOriginal, knownRegistries)
+		registryNameSrc, imageNameSrc, _ := SplitRegistryImagePath(srcOriginal, knownRegistries)
 		for _, registryImagePath := range rename {
-			registryName, imageName, _ := splitRegistryImagePath(registryImagePath, knownRegistries)
+			registryName, imageName, _ := SplitRegistryImagePath(registryImagePath, knownRegistries)
 			if registryName != registryNameSrc {
 				if imageName == imageNameSrc {
 					errs = append(errs, fmt.Sprintf("redundant rename for %s",
@@ -1130,7 +1130,12 @@ func (sc *SyncContext) mkPopReq(
 
 }
 
-func splitRegistryImagePath(
+// SplitRegistryImagePath takes an arbitrary image path, and splits it into its
+// component parts, according to the knownRegistries field. E.g., consider
+// "gcr.io/foo/a/b/c" as the registryImagePath. If "gcr.io/foo" is in
+// knownRegistries, then we split it into "gcr.io/foo" and "a/b/c". But if we
+// were given "gcr.io/foo/a", we would split it into "gcr.io/foo/a" and "b/c".
+func SplitRegistryImagePath(
 	registryImagePath RegistryImagePath,
 	knownRegistries []RegistryName) (RegistryName, ImageName, error) {
 
@@ -1167,7 +1172,7 @@ func DenormalizeRenames(
 		// to Dest, and Dest to Src. Because there can be multiple
 		// destinations, we have to use a nested loop.
 		for i, registryImagePathA := range rename {
-			_, _, err := splitRegistryImagePath(registryImagePathA, knownRegistries)
+			_, _, err := SplitRegistryImagePath(registryImagePathA, knownRegistries)
 			if err != nil {
 				return nil, err
 			}
@@ -1179,7 +1184,7 @@ func DenormalizeRenames(
 					continue
 				}
 
-				registryNameB, imageNameB, err := splitRegistryImagePath(registryImagePathB, knownRegistries)
+				registryNameB, imageNameB, err := SplitRegistryImagePath(registryImagePathB, knownRegistries)
 				if err != nil {
 					return nil, err
 				}
