@@ -42,9 +42,6 @@ func main() {
 
 	manifestPtr := flag.String(
 		"manifest", "", "the manifest file to load (REQUIRED)")
-	garbageCollectPtr := flag.Bool(
-		"garbage-collect",
-		false, "delete all untagged images in the destination registry")
 	threadsPtr := flag.Int(
 		"threads",
 		10, "number of concurrent goroutines to use when talking to GCR")
@@ -56,11 +53,6 @@ func main() {
 			" 1 = fatal + errors,"+
 			" 2 = fatal + errors + warnings,"+
 			" 3 = fatal + errors + warnings + informational (everything)")
-	deleteExtraTags := flag.Bool(
-		"delete-extra-tags",
-		false,
-		"delete tags in the destination registry that are not declared"+
-			" in the Manifest (default: false)")
 	parseOnlyPtr := flag.Bool(
 		"parse-only",
 		false,
@@ -114,7 +106,6 @@ func main() {
 	}
 
 	var mfest reg.Manifest
-	var rd reg.RenamesDenormalized
 	var srcRegistry *reg.RegistryContext
 	var err error
 	if len(*snapshotPtr) > 0 {
@@ -134,7 +125,7 @@ func main() {
 		if *manifestPtr == "" {
 			klog.Fatal(fmt.Errorf("-manifest=... flag is required"))
 		}
-		mfest, rd, srcRegistry, err = reg.ParseManifestFromFile(*manifestPtr)
+		mfest, err = reg.ParseManifestFromFile(*manifestPtr)
 		if err != nil {
 			klog.Fatal(err)
 		}
@@ -145,14 +136,11 @@ func main() {
 		mi[registry.Name] = nil
 	}
 	sc, err := reg.MakeSyncContext(
-		*manifestPtr,
-		mfest.Registries,
-		rd,
-		srcRegistry,
+		mfest.Filepath(),
+		mfest,
 		mi,
 		*verbosityPtr,
 		*threadsPtr,
-		*deleteExtraTags,
 		*dryRunPtr,
 		!noSvcAcc)
 	if err != nil {
@@ -188,7 +176,7 @@ func main() {
 		klog.Fatal(err)
 	}
 
-	sc.ReadRepository(reg.MkReadRepositoryCmdReal)
+	sc.ReadAllRegistries(reg.MkReadRepositoryCmdReal)
 
 	if len(*snapshotPtr) > 0 {
 		rii := sc.Inv[mfest.Registries[0].Name]
@@ -237,28 +225,6 @@ func main() {
 	}
 
 	exitCode := sc.Promote(mfest, mkPromotionCmd, nil)
-
-	if *garbageCollectPtr {
-		klog.Infof("---------- BEGIN GARBAGE COLLECTION: %s ----------\n",
-			*manifestPtr)
-		// Re-read the state of the world.
-		sc.ReadRepository(reg.MkReadRepositoryCmdReal)
-		// Garbage-collect all untagged images in dest registry.
-		mkTagDeletionCmd := func(
-			dest reg.RegistryContext,
-			imageName reg.ImageName,
-			digest reg.Digest) stream.Producer {
-			var sp stream.Subprocess
-			sp.CmdInvocation = reg.GetDeleteCmd(
-				dest,
-				sc.UseServiceAccount,
-				imageName,
-				digest,
-				false)
-			return &sp
-		}
-		sc.GarbageCollect(mfest, mkTagDeletionCmd, nil)
-	}
 
 	if *dryRunPtr {
 		fmt.Printf("********** FINISHED (DRY RUN): %s **********\n",

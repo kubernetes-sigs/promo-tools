@@ -49,7 +49,6 @@ type SyncContext struct {
 	ManifestPath        string
 	Verbosity           int
 	Threads             int
-	DeleteExtraTags     bool
 	DryRun              bool
 	UseServiceAccount   bool
 	Inv                 MasterInventory
@@ -185,6 +184,17 @@ type Manifest struct {
 	// the promotion itself is performed, do we "denormalize" at the very last
 	// moment by modifying the argument to each destination path.
 	Renames []Rename `yaml:"renames,omitempty"`
+
+	// Hidden fields; these are data structure optimizations that are populated
+	// from the fields above. As they are redundant, there is no point in
+	// storing this information in YAML.
+	renamesDenormalized RenamesDenormalized
+	srcRegistry         *RegistryContext
+	filepath            string
+}
+
+func (m Manifest) Filepath() string {
+	return m.filepath
 }
 
 // RenamesDenormalized is a lookup-optimized data structure of rename

@@ -246,7 +246,7 @@ images:
 	// Test only the JSON unmarshalling logic.
 	for _, test := range tests {
 		b := []byte(test.input)
-		imageManifest, err := ParseManifest(b)
+		imageManifest, err := ParseManifestYAML(b)
 
 		// Check the error as well (at the very least, we can check that the
 		// error was nil).
@@ -278,7 +278,7 @@ images:
 			}
 			for _, validInput := range shouldBeValid {
 				b := []byte(test.input + validInput)
-				_, err := ParseManifest(b)
+				_, err := ParseManifestYAML(b)
 				checkError(
 					t,
 					err,
@@ -329,7 +329,7 @@ could not find source registry in '[gcr.io/bar/banana gcr.io/cat/subdir/A/banana
 			}
 			for _, invalid := range shouldBeInvalid {
 				b := []byte(test.input + invalid.input)
-				_, got := ParseManifest(b)
+				_, got := ParseManifestYAML(b)
 				eqErr := checkEqual(got, invalid.err)
 				checkError(
 					t,
@@ -699,8 +699,8 @@ func TestCommandGeneration(t *testing.T) {
 		fmt.Sprintf("Test: %v (cmd string)\n", testName))
 }
 
-// TestReadRepository tests reading images and tags from a registry.
-func TestReadRepository(t *testing.T) {
+// TestReadAllRegistries tests reading images and tags from a registry.
+func TestReadAllRegistries(t *testing.T) {
 	const fakeRegName RegistryName = "gcr.io/foo"
 
 	var tests = []struct {
@@ -924,7 +924,7 @@ func TestReadRepository(t *testing.T) {
 			sr.Bytes = []byte(fakeHTTPBody)
 			return &sr
 		}
-		sc.ReadRepository(mkFakeStream1)
+		sc.ReadAllRegistries(mkFakeStream1)
 		got := sc.Inv[fakeRegName]
 		expected := test.expectedOutput
 		err := checkEqual(got, expected)
@@ -1574,7 +1574,6 @@ func TestPromotion(t *testing.T) {
 						Dmap: DigestTags{
 							"sha256:000": TagSlice{"0.9"}}}}},
 			SyncContext{
-				DeleteExtraTags: false,
 				Inv: MasterInventory{
 					"gcr.io/foo": RegInvImage{
 						"a": DigestTags{
@@ -1587,39 +1586,6 @@ func TestPromotion(t *testing.T) {
 							"sha256:000": TagSlice{"0.9"}}}}},
 			nil,
 			CapturedRequests{},
-		},
-		{
-			// nolint[lll]
-			"Delete 1 tag; dest has extra tag (if -delete-extra-tags specified)",
-			Manifest{
-				Registries: registries,
-				Images: []Image{
-					{
-						ImageName: "a",
-						Dmap: DigestTags{
-							"sha256:000": TagSlice{"0.9"}}}}},
-			SyncContext{
-				DeleteExtraTags: true,
-				Inv: MasterInventory{
-					"gcr.io/foo": RegInvImage{
-						"a": DigestTags{
-							"sha256:000": TagSlice{"0.9"}}},
-					"gcr.io/bar": RegInvImage{
-						"a": DigestTags{
-							"sha256:000": TagSlice{"0.9", "extra-tag"}}},
-					"gcr.io/cat": RegInvImage{
-						"a": DigestTags{
-							"sha256:000": TagSlice{"0.9"}}}}},
-			nil,
-			CapturedRequests{PromotionRequest{
-				TagOp:          Delete,
-				RegistrySrc:    srcRegName,
-				RegistryDest:   registries[0].Name,
-				ServiceAccount: registries[0].ServiceAccount,
-				ImageNameSrc:   "a",
-				ImageNameDest:  "a",
-				Digest:         "sha256:000",
-				Tag:            "extra-tag"}: 1},
 		},
 		{
 			// nolint[lll]
@@ -1737,7 +1703,6 @@ func TestPromotionMulti(t *testing.T) {
 						Dmap: DigestTags{
 							"sha256:000": TagSlice{"0.9", "1.0"}}}}},
 			SyncContext{
-				DeleteExtraTags: true,
 				Inv: MasterInventory{
 					"gcr.io/foo": RegInvImage{
 						"a": DigestTags{
@@ -1771,7 +1736,7 @@ func TestPromotionMulti(t *testing.T) {
 		},
 		{
 			// nolint[lll]
-			"Add 1 tag for 1 registry, but remove a tag for another",
+			"Add 1 tag for 1 registry",
 			Manifest{
 				Registries: registries,
 				Images: []Image{
@@ -1780,7 +1745,6 @@ func TestPromotionMulti(t *testing.T) {
 						Dmap: DigestTags{
 							"sha256:000": TagSlice{"0.9", "1.0"}}}}},
 			SyncContext{
-				DeleteExtraTags: true,
 				Inv: MasterInventory{
 					"gcr.io/foo": RegInvImage{
 						"a": DigestTags{
@@ -1802,15 +1766,6 @@ func TestPromotionMulti(t *testing.T) {
 					ImageNameDest:  "a",
 					Digest:         "sha256:000",
 					Tag:            "1.0"}: 1,
-				PromotionRequest{
-					TagOp:          Delete,
-					RegistrySrc:    srcRegName,
-					RegistryDest:   registries[2].Name,
-					ServiceAccount: registries[2].ServiceAccount,
-					ImageNameSrc:   "a",
-					ImageNameDest:  "a",
-					Digest:         "sha256:000",
-					Tag:            "extra-tag"}: 1,
 			},
 		},
 	}

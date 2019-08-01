@@ -52,62 +52,63 @@ func getSrcRegistry(rcs []RegistryContext) (*RegistryContext, error) {
 // MakeSyncContext creates a SyncContext.
 func MakeSyncContext(
 	manifestPath string,
-	rcs []RegistryContext,
-	rd RenamesDenormalized,
-	srcRegistry *RegistryContext,
+	mfest Manifest,
 	mi MasterInventory,
 	verbosity, threads int,
-	deleteExtraTags, dryRun, useSvcAcc bool) (SyncContext, error) {
+	dryRun, useSvcAcc bool) (SyncContext, error) {
 
 	return SyncContext{
 		Verbosity:           verbosity,
 		Threads:             threads,
-		DeleteExtraTags:     deleteExtraTags,
 		ManifestPath:        manifestPath,
 		DryRun:              dryRun,
 		UseServiceAccount:   useSvcAcc,
 		Inv:                 mi,
 		InvIgnore:           []ImageName{},
 		Tokens:              make(map[RootRepo]Token),
-		RenamesDenormalized: rd,
-		SrcRegistry:         srcRegistry,
-		RegistryContexts:    rcs,
+		RenamesDenormalized: mfest.renamesDenormalized,
+		SrcRegistry:         mfest.srcRegistry,
+		RegistryContexts:    mfest.Registries,
 		DigestMediaType:     make(DigestMediaType)}, nil
 }
 
 // ParseManifestFromFile parses a Manifest from a filepath.
 func ParseManifestFromFile(
-	filePath string) (Manifest, RenamesDenormalized, *RegistryContext, error) {
+	filePath string) (Manifest, error) {
 
 	var mfest Manifest
 	var rd RenamesDenormalized
 	var srcRegistry *RegistryContext
 	b, err := ioutil.ReadFile(filePath)
 	if err != nil {
-		return mfest, rd, srcRegistry, err
+		return mfest, err
 	}
-	mfest, err = ParseManifest(b)
+	mfest.filepath = filePath
+
+	mfest, err = ParseManifestYAML(b)
 	if err != nil {
-		return mfest, rd, srcRegistry, err
+		return mfest, err
 	}
 
 	// Perform semantic checks (beyond just YAML validation).
 	srcRegistry, err = getSrcRegistry(mfest.Registries)
 	if err != nil {
-		return mfest, rd, srcRegistry, err
+		return mfest, err
 	}
+	mfest.srcRegistry = srcRegistry
 
 	rd, err = DenormalizeRenames(mfest, srcRegistry.Name)
 	if err != nil {
-		return mfest, rd, srcRegistry, err
+		return mfest, err
 	}
+	mfest.renamesDenormalized = rd
 
-	return mfest, rd, srcRegistry, nil
+	return mfest, nil
 }
 
-// ParseManifest parses a Manifest from a byteslice. This function is separate
-// from ParseManifestFromFile() so that it can be tested independently.
-func ParseManifest(b []byte) (Manifest, error) {
+// ParseManifestYAML parses a Manifest from a byteslice. This function is
+// separate from ParseManifestFromFile() so that it can be tested independently.
+func ParseManifestYAML(b []byte) (Manifest, error) {
 	var m Manifest
 	if err := yaml.UnmarshalStrict(b, &m); err != nil {
 		return m, err
@@ -472,10 +473,10 @@ func (sc *SyncContext) IgnoreFromPromotion(regName RegistryName) {
 	_, imgName, err := ParseContainerParts(string(regName))
 	if err != nil {
 		klog.Errorf("unable to ignore from promotion: %s\n", err)
+		return
 	}
 
-	klog.Errorf("ignoring from promotion: %s\n", err)
-
+	klog.Infof("ignoring from promotion: %s\n", imgName)
 	sc.InvIgnore = append(sc.InvIgnore, ImageName(imgName))
 }
 
@@ -573,8 +574,8 @@ func GetTokenKeyDomainRepoPath(
 	return key, s[:i], s[i+1:]
 }
 
-// ReadRepository takes a Repository endpoint, and lists all images at that
-// path. A repository is recursive.
+// ReadAllRegistries reads all images in all registries in the SyncContext Each
+// registry is composed of a image repositories, which can be recursive.
 //
 // To summarize: a docker *registry* is a set of *repositories*. It just so
 // happens that to end-users, repositores resemble a tree structure because they
@@ -601,7 +602,7 @@ func GetTokenKeyDomainRepoPath(
 // NOTE: Repository names may overlap with image names. E.g., it may be in the
 // example above that there are images named gcr.io/google-containers/foo:2.0
 // and gcr.io/google-containers/foo/baz:2.0.
-func (sc *SyncContext) ReadRepository(
+func (sc *SyncContext) ReadAllRegistries(
 	mkProducer func(*SyncContext, RegistryContext) stream.Producer) {
 	// Collect all images in sc.Inv (the src and dest registry names found in
 	// the manifest).
@@ -1314,32 +1315,18 @@ func mkPopulateRequestsForPromotion(
 				}
 			}
 
-			// Either delete extraneous tags in the destination, or warn about
-			// them (hinges on sc.DeleteExtraTags).
-			mfestIT := mfest.ToRegInvImageTag()
-			if sc.DeleteExtraTags {
-				sc.mkPopReq(
-					registry,
-					destIT.Minus(mfestIT),
-					Delete,
-					"",
-					mkProducer,
-					reqs,
-					wg)
-			} else {
-				// Warn the user about extra tags:
-				xtras := make([]string, 0)
-				for imageTag := range destIT.Minus(promotionCandidatesITRenamed) {
-					xtras = append(xtras, fmt.Sprintf(
-						"%s/%s:%s",
-						registry.Name,
-						imageTag.ImageName,
-						imageTag.Tag))
-				}
-				sort.Strings(xtras)
-				for _, img := range xtras {
-					klog.Warningf("Warning: extra tag found in dest: %s\n", img)
-				}
+			// Warn the user about extra tags:
+			xtras := make([]string, 0)
+			for imageTag := range destIT.Minus(promotionCandidatesITRenamed) {
+				xtras = append(xtras, fmt.Sprintf(
+					"%s/%s:%s",
+					registry.Name,
+					imageTag.ImageName,
+					imageTag.Tag))
+			}
+			sort.Strings(xtras)
+			for _, img := range xtras {
+				klog.Warningf("Warning: extra tag found in dest: %s\n", img)
 			}
 		}
 	}
