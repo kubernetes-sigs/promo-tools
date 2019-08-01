@@ -409,8 +409,6 @@ func getRegistryTagsWrapper(req stream.ExternalRequest) (*google.Tags, error) {
 }
 
 func getRegistryTagsFrom(req stream.ExternalRequest) (*google.Tags, error) {
-	defer req.StreamProducer.Close()
-
 	reader, _, err := req.StreamProducer.Produce()
 	if err != nil {
 		klog.Warning("error reading from stream:", err)
@@ -418,6 +416,8 @@ func getRegistryTagsFrom(req stream.ExternalRequest) (*google.Tags, error) {
 		// HTTP stream.
 		return nil, err
 	}
+
+	defer req.StreamProducer.Close()
 
 	tags, err := extractRegistryTags(reader)
 	if err != nil {
