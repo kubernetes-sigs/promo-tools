@@ -1156,6 +1156,9 @@ func SplitRegistryImagePath(
 // perform lookups).
 //
 // It also checks the `renames` field in Manifest for errors.
+//
+// For examples of what this data will look like, see TestDenormalizeRenames.
+//
 // nolint[gocyclo]
 func DenormalizeRenames(
 	mfest Manifest,
