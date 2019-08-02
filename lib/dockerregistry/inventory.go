@@ -53,7 +53,6 @@ func getSrcRegistry(rcs []RegistryContext) (*RegistryContext, error) {
 func MakeSyncContext(
 	manifestPath string,
 	mfest Manifest,
-	mi MasterInventory,
 	verbosity, threads int,
 	dryRun, useSvcAcc bool) (SyncContext, error) {
 
@@ -63,7 +62,7 @@ func MakeSyncContext(
 		ManifestPath:        manifestPath,
 		DryRun:              dryRun,
 		UseServiceAccount:   useSvcAcc,
-		Inv:                 mi,
+		Inv:                 make(MasterInventory),
 		InvIgnore:           []ImageName{},
 		Tokens:              make(map[RootRepo]Token),
 		RenamesDenormalized: mfest.renamesDenormalized,
