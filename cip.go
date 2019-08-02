@@ -200,9 +200,23 @@ func main() {
 		}
 	}
 
-	sc.ReadAllRegistries(reg.MkReadRepositoryCmdReal)
-
 	if len(*snapshotPtr) > 0 {
+		sc, err = reg.MakeSyncContext(
+			mfests,
+			*verbosityPtr,
+			*threadsPtr,
+			*dryRunPtr,
+			!noSvcAcc)
+		if err != nil {
+			klog.Fatal(err)
+		}
+		sc.ReadRegistries(
+			[]reg.RegistryContext{*srcRegistry},
+			// Read all registries recursively, because we want to produce a
+			// complete snapshot.
+			true,
+			reg.MkReadRepositoryCmdReal)
+
 		rii := sc.Inv[mfests[0].Registries[0].Name]
 		if snapshotTag != "" {
 			filtered := make(reg.RegInvImage)
@@ -226,10 +240,8 @@ func main() {
 		os.Exit(0)
 	}
 
-	klog.Info(sc.Inv.PrettyValue())
-
 	// Promote.
-	edges := sc.getPromotionEdgesFromManifests(mfests, true)
+	edges := sc.GetPromotionEdgesFromManifests(mfests, true)
 	mkProducer := func(
 		srcRegistry reg.RegistryName,
 		srcImageName reg.ImageName,

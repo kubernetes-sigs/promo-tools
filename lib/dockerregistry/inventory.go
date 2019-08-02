@@ -865,7 +865,7 @@ func GetTokenKeyDomainRepoPath(
 	return key, s[:i], s[i+1:]
 }
 
-// ReadAllRegistries reads all images in all registries in the SyncContext Each
+// ReadRegistries reads all images in all registries in the SyncContext Each
 // registry is composed of a image repositories, which can be recursive.
 //
 // To summarize: a docker *registry* is a set of *repositories*. It just so
@@ -895,8 +895,11 @@ func GetTokenKeyDomainRepoPath(
 // and gcr.io/google-containers/foo/baz:2.0.
 //
 // nolint[gocyclo]
-func (sc *SyncContext) ReadAllRegistries(
+func (sc *SyncContext) ReadRegistries(
+	toRead []RegistryContext,
+	recurse bool,
 	mkProducer func(*SyncContext, RegistryContext) stream.Producer) {
+
 	// Collect all images in sc.Inv (the src and dest registry names found in
 	// the manifest).
 	var populateRequests PopulateRequests = func(
@@ -905,7 +908,7 @@ func (sc *SyncContext) ReadAllRegistries(
 		wg *sync.WaitGroup) {
 
 		// For each registry, start the very first root "repo" read call.
-		for _, rc := range sc.RegistryContexts {
+		for _, rc := range toRead {
 			// Create the request.
 			var req stream.ExternalRequest
 			req.RequestParams = rc
@@ -1008,32 +1011,34 @@ func (sc *SyncContext) ReadAllRegistries(
 			requestResults <- reqRes
 
 			// Process child repos.
-			for _, childRepoName := range tagsStruct.Children {
-				parentRC, _ := req.RequestParams.(RegistryContext)
+			if recurse {
+				for _, childRepoName := range tagsStruct.Children {
+					parentRC, _ := req.RequestParams.(RegistryContext)
 
-				childRc := RegistryContext{
-					Name: RegistryName(
-						string(parentRC.Name) + "/" + childRepoName),
-					// Inherit the service account used at the parent
-					// (cascades down from toplevel to all subrepos). In the
-					// future if the token exchange fails, we can refresh
-					// the token here instead of using the one we inherit
-					// below.
-					ServiceAccount: parentRC.ServiceAccount,
-					// Inherit the token as well.
-					Token: parentRC.Token,
-					// Don't need src, because we are just reading data
-					// (don't care if it's the source reg or not).
+					childRc := RegistryContext{
+						Name: RegistryName(
+							string(parentRC.Name) + "/" + childRepoName),
+						// Inherit the service account used at the parent
+						// (cascades down from toplevel to all subrepos). In the
+						// future if the token exchange fails, we can refresh
+						// the token here instead of using the one we inherit
+						// below.
+						ServiceAccount: parentRC.ServiceAccount,
+						// Inherit the token as well.
+						Token: parentRC.Token,
+						// Don't need src, because we are just reading data
+						// (don't care if it's the source reg or not).
+					}
+
+					var childReq stream.ExternalRequest
+					childReq.RequestParams = childRc
+					childReq.StreamProducer = mkProducer(sc, childRc)
+
+					// Every time we "descend" into child nodes, increment the
+					// semaphore.
+					wg.Add(1)
+					reqs <- childReq
 				}
-
-				var childReq stream.ExternalRequest
-				childReq.RequestParams = childRc
-				childReq.StreamProducer = mkProducer(sc, childRc)
-
-				// Every time we "descend" into child nodes, increment the
-				// semaphore.
-				wg.Add(1)
-				reqs <- childReq
 			}
 			// When we're done processing this node (req), decrement the
 			// semaphore.
@@ -1396,11 +1401,63 @@ func mkPopulateRequestsForPromotionEdges(
 	}
 }
 
-func (sc *SyncContext) getPromotionEdgesFromManifests(
-	mfests []Manifest) map[PromotionEdge]interface{} {
+// GetPromotionEdgesFromManifests generates all "edges" that we need to promote.
+func (sc *SyncContext) GetPromotionEdgesFromManifests(
+	mfests []Manifest,
+	readRepos bool,
+) map[PromotionEdge]interface{} {
 
 	edges := ToPromotionEdges(mfests)
+
+	if readRepos {
+		regs := getRegistriesToRead(edges)
+		for _, reg := range regs {
+			klog.Info("reading this reg:", reg)
+		}
+		sc.ReadRegistries(
+			regs,
+			// Do not read these registries recursively, because we already know
+			// exactly which repositories to read (getRegistriesToRead()).
+			false,
+			MkReadRepositoryCmdReal)
+	}
+
 	return sc.getPromotionCandidates(edges)
+}
+
+// getRegistriesToRead collects all unique Docker repositories we want to read
+// from. This way, we don't have to read the entire Docker registry, but only
+// those paths that we are thinking of modifying.
+func getRegistriesToRead(
+	edges map[PromotionEdge]interface{}) []RegistryContext {
+
+	rcs := make(map[RegistryContext]interface{})
+
+	// Save the src and dst endpoints as registries. We only care about the
+	// registry and image name, not the tag or digest; this is to collect all
+	// unique Docker repositories that we care about.
+	for edge := range edges {
+		srcReg := edge.SrcRegistry
+		srcReg.Name = srcReg.Name +
+			"/" +
+			RegistryName(edge.SrcImageTag.ImageName)
+
+		rcs[srcReg] = nil
+
+		dstReg := edge.DstRegistry
+		dstReg.Name = dstReg.Name +
+			"/" +
+			RegistryName(edge.DstImageTag.ImageName)
+
+		rcs[dstReg] = nil
+	}
+
+	rcsFinal := []RegistryContext{}
+	for rc := range rcs {
+		rcsFinal = append(rcsFinal, rc)
+	}
+
+	return rcsFinal
 }
 
 // Promote perferms container image promotion by realizing the intent in the
@@ -1408,7 +1465,7 @@ func (sc *SyncContext) getPromotionEdgesFromManifests(
 //
 // nolint[gocyclo]
 func (sc *SyncContext) Promote(
-	mfests []Manifest,
+	edges map[PromotionEdge]interface{},
 	mkProducer func(
 		RegistryName,
 		ImageName,
@@ -1418,8 +1475,6 @@ func (sc *SyncContext) Promote(
 		Tag,
 		TagOp) stream.Producer,
 	customProcessRequest *ProcessRequest) error {
-
-	edges := sc.getPromotionEdgesFromManifests(mfests)
 
 	if len(edges) == 0 {
 		klog.Info("Nothing to promote.")

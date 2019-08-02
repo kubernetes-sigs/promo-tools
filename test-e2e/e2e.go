@@ -152,7 +152,13 @@ func testSetup(cwd string, mfest reg.Manifest) error {
 		klog.Fatal(err)
 	}
 
-	sc.ReadAllRegistries(reg.MkReadRepositoryCmdReal)
+	sc.ReadRegistries(
+		sc.RegistryContexts,
+		// Read all registries recursively, because we want to delete every
+		// image found in it (clearRepository works by deleting each image found
+		// in sc.Inv).
+		true,
+		reg.MkReadRepositoryCmdReal)
 
 	// Clear ALL registries in the test manifest. Blank slate!
 	for _, rc := range mfest.Registries {
