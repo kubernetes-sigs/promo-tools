@@ -392,7 +392,7 @@ func getRegistryTagsWrapper(req stream.ExternalRequest) (*google.Tags, error) {
 		// either we get a well-formed tags value, or until it hits
 		// ErrWaitTimeout. This is how ExponentialBackoff() uses the
 		// ConditionFunc type.
-		if err == nil && googleTags != nil {
+		if err == nil && googleTags != nil && len(googleTags.Name) > 0 {
 			return true, nil
 		}
 		return false, nil
