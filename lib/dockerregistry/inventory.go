@@ -851,8 +851,11 @@ func (sc *SyncContext) ExecRequests(
 }
 
 func extractRegistryTags(reader io.Reader) (*google.Tags, error) {
+
 	tags := google.Tags{}
 	decoder := json.NewDecoder(reader)
+	decoder.DisallowUnknownFields()
+
 	for {
 		err := decoder.Decode(&tags)
 		if err != nil {
