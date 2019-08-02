@@ -17,10 +17,13 @@ limitations under the License.
 package stream
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"net/http"
 	"time"
+
+	"k8s.io/klog"
 )
 
 // Checks is from https://stackoverflow.com/a/40398093/437583.
@@ -53,7 +56,25 @@ func (h *HTTP) Produce() (io.Reader, io.Reader, error) {
 		return nil, nil, err
 	}
 
-	return h.Res.Body, nil, nil
+	if h.Res.StatusCode == 200 {
+		return h.Res.Body, nil, nil
+	}
+
+	// Try to glean some additional information by reading from the response
+	// body.
+	buf := new(bytes.Buffer)
+	_, err = buf.ReadFrom(h.Res.Body)
+	if err != nil {
+		klog.Errorf("could not read from HTTP response body")
+		return nil, nil, fmt.Errorf(
+			"problems encountered: unexpected response code %d",
+			h.Res.StatusCode)
+	}
+
+	return nil, nil, fmt.Errorf(
+		"problems encountered: unexpected response code %d; body: %s",
+		h.Res.StatusCode,
+		buf.String())
 }
 
 // Close closes the http request. This is required because otherwise there will
