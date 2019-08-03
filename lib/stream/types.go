@@ -49,8 +49,8 @@ type ExternalRequest struct {
 
 // BackoffDefault is the default Backoff behavior for network call retries.
 var BackoffDefault = wait.Backoff{
-	Duration: time.Second / 2, // 500ms
-	Factor:   1.618,
+	Duration: time.Second,
+	Factor:   2,
 	Jitter:   0.1,
 	Steps:    45,
 	Cap:      time.Second * 60,
