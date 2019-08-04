@@ -5,7 +5,7 @@ Registry (src registry) to another (dest registry), by reading a Manifest file
 (in YAML). The Manifest lists Docker images, and all such images are considered
 "blessed" and will be copied from src to dest.
 
-Example Manifest:
+Example Manifest for images:
 
 ```
 registries:
