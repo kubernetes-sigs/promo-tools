@@ -168,7 +168,7 @@ func testSetup(cwd string, mfest reg.Manifest) error {
 
 	// TODO: Deprecate e2e.sh script by moving all of its logic into this
 	// binary.
-	cmd := exec.Command("./test/e2e.sh", "populate")
+	cmd := exec.Command("./test-e2e/e2e.sh", "populate")
 	cmd.Dir = cwd
 
 	var stdout bytes.Buffer

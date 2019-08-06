@@ -41,10 +41,10 @@ e2e_populate()
         bazel_opts=(
             "--host_force_python=PY2"
             "--workspace_status_command=${WORKSPACE_STATUS_CMD}")
-        bazel build "${bazel_opts[@]}" //test:golden-images-loadable.tar
+        bazel build "${bazel_opts[@]}" //test-e2e:golden-images-loadable.tar
         # In order to create a manifest list, images must be pushed to a
         # repository first.
-        bazel run "${bazel_opts[@]}" //test:push-golden
+        bazel run "${bazel_opts[@]}" //test-e2e:push-golden
     popd
 
     push_repo=$(get_bazel_option STABLE_TEST_STAGING_IMG_REPOSITORY)
