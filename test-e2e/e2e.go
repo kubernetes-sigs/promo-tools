@@ -137,15 +137,9 @@ func activateServiceAccount(keyFilePath string) error {
 
 func testSetup(cwd string, mfest reg.Manifest) error {
 
-	mi := make(reg.MasterInventory)
-	for _, registry := range mfest.Registries {
-		mi[registry.Name] = nil
-	}
-
 	sc, err := reg.MakeSyncContext(
 		"(tmp Manifest path)",
 		mfest,
-		mi,
 		2,
 		10,
 		false,

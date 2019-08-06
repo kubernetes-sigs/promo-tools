@@ -131,14 +131,9 @@ func main() {
 		}
 	}
 
-	mi := make(reg.MasterInventory)
-	for _, registry := range mfest.Registries {
-		mi[registry.Name] = nil
-	}
 	sc, err := reg.MakeSyncContext(
 		mfest.Filepath(),
 		mfest,
-		mi,
 		*verbosityPtr,
 		*threadsPtr,
 		*dryRunPtr,

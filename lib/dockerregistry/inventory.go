@@ -53,7 +53,6 @@ func getSrcRegistry(rcs []RegistryContext) (*RegistryContext, error) {
 func MakeSyncContext(
 	manifestPath string,
 	mfest Manifest,
-	mi MasterInventory,
 	verbosity, threads int,
 	dryRun, useSvcAcc bool) (SyncContext, error) {
 
@@ -63,7 +62,7 @@ func MakeSyncContext(
 		ManifestPath:        manifestPath,
 		DryRun:              dryRun,
 		UseServiceAccount:   useSvcAcc,
-		Inv:                 mi,
+		Inv:                 make(MasterInventory),
 		InvIgnore:           []ImageName{},
 		Tokens:              make(map[RootRepo]Token),
 		RenamesDenormalized: mfest.renamesDenormalized,
@@ -243,7 +242,7 @@ func validateRequiredComponents(m Manifest) error {
 		seenRegistries := make(map[RegistryName]ImageName)
 		for _, registryImagePath := range rename {
 			// nolint[lll]
-			registryName, imageName, err := splitRegistryImagePath(registryImagePath, knownRegistries)
+			registryName, imageName, err := SplitRegistryImagePath(registryImagePath, knownRegistries)
 			if err != nil {
 				errs = append(errs, err.Error())
 			}
@@ -283,9 +282,9 @@ func validateRequiredComponents(m Manifest) error {
 				rename))
 		}
 
-		registryNameSrc, imageNameSrc, _ := splitRegistryImagePath(srcOriginal, knownRegistries)
+		registryNameSrc, imageNameSrc, _ := SplitRegistryImagePath(srcOriginal, knownRegistries)
 		for _, registryImagePath := range rename {
-			registryName, imageName, _ := splitRegistryImagePath(registryImagePath, knownRegistries)
+			registryName, imageName, _ := SplitRegistryImagePath(registryImagePath, knownRegistries)
 			if registryName != registryNameSrc {
 				if imageName == imageNameSrc {
 					errs = append(errs, fmt.Sprintf("redundant rename for %s",
@@ -392,7 +391,7 @@ func getRegistryTagsWrapper(req stream.ExternalRequest) (*google.Tags, error) {
 		// either we get a well-formed tags value, or until it hits
 		// ErrWaitTimeout. This is how ExponentialBackoff() uses the
 		// ConditionFunc type.
-		if err == nil && googleTags != nil {
+		if err == nil && googleTags != nil && len(googleTags.Name) > 0 {
 			return true, nil
 		}
 		return false, nil
@@ -851,8 +850,11 @@ func (sc *SyncContext) ExecRequests(
 }
 
 func extractRegistryTags(reader io.Reader) (*google.Tags, error) {
+
 	tags := google.Tags{}
 	decoder := json.NewDecoder(reader)
+	decoder.DisallowUnknownFields()
+
 	for {
 		err := decoder.Decode(&tags)
 		if err != nil {
@@ -1130,7 +1132,12 @@ func (sc *SyncContext) mkPopReq(
 
 }
 
-func splitRegistryImagePath(
+// SplitRegistryImagePath takes an arbitrary image path, and splits it into its
+// component parts, according to the knownRegistries field. E.g., consider
+// "gcr.io/foo/a/b/c" as the registryImagePath. If "gcr.io/foo" is in
+// knownRegistries, then we split it into "gcr.io/foo" and "a/b/c". But if we
+// were given "gcr.io/foo/a", we would split it into "gcr.io/foo/a" and "b/c".
+func SplitRegistryImagePath(
 	registryImagePath RegistryImagePath,
 	knownRegistries []RegistryName) (RegistryName, ImageName, error) {
 
@@ -1151,6 +1158,9 @@ func splitRegistryImagePath(
 // perform lookups).
 //
 // It also checks the `renames` field in Manifest for errors.
+//
+// For examples of what this data will look like, see TestDenormalizeRenames.
+//
 // nolint[gocyclo]
 func DenormalizeRenames(
 	mfest Manifest,
@@ -1167,7 +1177,7 @@ func DenormalizeRenames(
 		// to Dest, and Dest to Src. Because there can be multiple
 		// destinations, we have to use a nested loop.
 		for i, registryImagePathA := range rename {
-			_, _, err := splitRegistryImagePath(registryImagePathA, knownRegistries)
+			_, _, err := SplitRegistryImagePath(registryImagePathA, knownRegistries)
 			if err != nil {
 				return nil, err
 			}
@@ -1179,7 +1189,7 @@ func DenormalizeRenames(
 					continue
 				}
 
-				registryNameB, imageNameB, err := splitRegistryImagePath(registryImagePathB, knownRegistries)
+				registryNameB, imageNameB, err := SplitRegistryImagePath(registryImagePathB, knownRegistries)
 				if err != nil {
 					return nil, err
 				}
