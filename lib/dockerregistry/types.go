@@ -47,7 +47,6 @@ type CapturedRequests map[PromotionRequest]int
 
 // SyncContext is the main data structure for performing the promotion.
 type SyncContext struct {
-	ManifestPath        string
 	Verbosity           int
 	Threads             int
 	DryRun              bool
@@ -59,6 +58,30 @@ type SyncContext struct {
 	Tokens              map[RootRepo]gcloud.Token
 	RenamesDenormalized RenamesDenormalized
 	DigestMediaType     DigestMediaType
+}
+
+// PromotionEdge represents a promotion "link" of an image repository between 2
+// registries.
+type PromotionEdge struct {
+	SrcRegistry RegistryContext
+	SrcImageTag ImageTag
+
+	Digest Digest
+
+	DstRegistry RegistryContext
+	DstImageTag ImageTag
+}
+
+// VertexProperty describes the properties of an Edge, with respect to the state
+// of the world.
+type VertexProperty struct {
+	// Pqin means that the entire path, including the registry name, image
+	// name, and tag, in that combination, exists.
+	PqinExists      bool
+	DigestExists    bool
+	PqinDigestMatch bool
+	BadDigest       Digest
+	OtherTags       TagSlice
 }
 
 // RootRepo is the toplevel Docker repository (e.g., gcr.io/foo (GCR domain name
@@ -190,10 +213,6 @@ type Manifest struct {
 	renamesDenormalized RenamesDenormalized
 	srcRegistry         *RegistryContext
 	filepath            string
-}
-
-func (m Manifest) Filepath() string {
-	return m.filepath
 }
 
 // RenamesDenormalized is a lookup-optimized data structure of rename

@@ -42,6 +42,10 @@ func main() {
 
 	manifestPtr := flag.String(
 		"manifest", "", "the manifest file to load (REQUIRED)")
+	manifestDirPtr := flag.String(
+		"manifest-dir",
+		"",
+		"recursively read in all manifests within a folder; it is an error if two manifests specify conflicting intent (e.g., promotion of the same image)")
 	threadsPtr := flag.Int(
 		"threads",
 		10, "number of concurrent goroutines to use when talking to GCR")
@@ -108,38 +112,68 @@ func main() {
 	var mfest reg.Manifest
 	var srcRegistry *reg.RegistryContext
 	var err error
+	var mfests []reg.Manifest
+	sc := reg.SyncContext{}
+	mi := make(reg.MasterInventory)
+
 	if len(*snapshotPtr) > 0 {
 		srcRegistry = &reg.RegistryContext{
 			Name:           reg.RegistryName(*snapshotPtr),
 			ServiceAccount: *snapshotSvcAccPtr,
 			Src:            true,
 		}
-		mfest = reg.Manifest{
-			Registries: []reg.RegistryContext{
-				*srcRegistry,
+		mfests = []reg.Manifest{
+			{
+				Registries: []reg.RegistryContext{
+					*srcRegistry,
+				},
+				Images: []reg.Image{},
 			},
-
-			Images: []reg.Image{},
 		}
 	} else {
-		if *manifestPtr == "" {
-			klog.Fatal(fmt.Errorf("-manifest=... flag is required"))
+		if *manifestPtr == "" && *manifestDirPtr == "" {
+			klog.Fatal(fmt.Errorf("-manifest=... or -manifestDir=... flag is required"))
 		}
+	}
+
+	if *manifestPtr != "" {
 		mfest, err = reg.ParseManifestFromFile(*manifestPtr)
 		if err != nil {
 			klog.Fatal(err)
 		}
-	}
+		mfests = append(mfests, mfest)
+		for _, registry := range mfest.Registries {
+			mi[registry.Name] = nil
+		}
+		sc, err = reg.MakeSyncContext(
+			mfests,
+			*verbosityPtr,
+			*threadsPtr,
+			*dryRunPtr,
+			!noSvcAcc)
+		if err != nil {
+			klog.Fatal(err)
+		}
+	} else if *manifestDirPtr != "" {
+		mfests, err = reg.ParseManifestsFromDir(*manifestDirPtr)
+		if err != nil {
+			klog.Exitln(err)
+		}
 
-	sc, err := reg.MakeSyncContext(
-		mfest.Filepath(),
-		mfest,
-		*verbosityPtr,
-		*threadsPtr,
-		*dryRunPtr,
-		!noSvcAcc)
-	if err != nil {
-		klog.Fatal(err)
+		err = reg.ValidateManifestsFromDir(mfests)
+		if err != nil {
+			klog.Exitln(err)
+		}
+
+		sc, err = reg.MakeSyncContext(
+			mfests,
+			*verbosityPtr,
+			*threadsPtr,
+			*dryRunPtr,
+			!noSvcAcc)
+		if err != nil {
+			klog.Fatal(err)
+		}
 	}
 
 	if *parseOnlyPtr {
@@ -154,7 +188,7 @@ func main() {
 	// almost never be the case, so given a fully-parsed manifest with 0 images,
 	// treat it as if -parse-only was implied and exit gracefully.
 	if len(*snapshotPtr) == 0 {
-		if len(mfest.Images) == 0 {
+		if len(mfests[0].Images) == 0 {
 			fmt.Println("No images in manifest --- nothing to do.")
 			os.Exit(0)
 		}
@@ -165,16 +199,11 @@ func main() {
 			fmt.Printf("********** START: %s **********\n", *manifestPtr)
 		}
 	}
-	// Populate access tokens for all registries listed in the manifest.
-	err = sc.PopulateTokens()
-	if err != nil {
-		klog.Fatal(err)
-	}
 
 	sc.ReadAllRegistries(reg.MkReadRepositoryCmdReal)
 
 	if len(*snapshotPtr) > 0 {
-		rii := sc.Inv[mfest.Registries[0].Name]
+		rii := sc.Inv[mfests[0].Registries[0].Name]
 		if snapshotTag != "" {
 			filtered := make(reg.RegInvImage)
 			for imageName, digestTags := range rii {
@@ -200,7 +229,8 @@ func main() {
 	klog.Info(sc.Inv.PrettyValue())
 
 	// Promote.
-	mkPromotionCmd := func(
+	edges := sc.getPromotionEdgesFromManifests(mfests, true)
+	mkProducer := func(
 		srcRegistry reg.RegistryName,
 		srcImageName reg.ImageName,
 		destRC reg.RegistryContext,
@@ -218,8 +248,10 @@ func main() {
 			tp)
 		return &sp
 	}
-
-	exitCode := sc.Promote(mfest, mkPromotionCmd, nil)
+	err = sc.Promote(edges, mkProducer, nil)
+	if err != nil {
+		klog.Exitln(err)
+	}
 
 	if *dryRunPtr {
 		fmt.Printf("********** FINISHED (DRY RUN): %s **********\n",
@@ -227,7 +259,6 @@ func main() {
 	} else {
 		fmt.Printf("********** FINISHED: %s **********\n", *manifestPtr)
 	}
-	os.Exit(exitCode)
 }
 
 func printVersion() {

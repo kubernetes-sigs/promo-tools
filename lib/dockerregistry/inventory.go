@@ -22,6 +22,9 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"os"
+	"path/filepath"
+	"reflect"
 	"regexp"
 	"sort"
 	"strings"
@@ -50,61 +53,366 @@ func getSrcRegistry(rcs []RegistryContext) (*RegistryContext, error) {
 
 // MakeSyncContext creates a SyncContext.
 func MakeSyncContext(
-	manifestPath string,
-	mfest Manifest,
+	mfests []Manifest,
 	verbosity, threads int,
 	dryRun, useSvcAcc bool) (SyncContext, error) {
 
-	return SyncContext{
+	sc := SyncContext{
 		Verbosity:           verbosity,
 		Threads:             threads,
-		ManifestPath:        manifestPath,
 		DryRun:              dryRun,
 		UseServiceAccount:   useSvcAcc,
 		Inv:                 make(MasterInventory),
 		InvIgnore:           []ImageName{},
 		Tokens:              make(map[RootRepo]gcloud.Token),
-		RenamesDenormalized: mfest.renamesDenormalized,
-		SrcRegistry:         mfest.srcRegistry,
-		RegistryContexts:    mfest.Registries,
-		DigestMediaType:     make(DigestMediaType)}, nil
+		RenamesDenormalized: make(RenamesDenormalized),
+		RegistryContexts:    make([]RegistryContext, 0),
+		DigestMediaType:     make(DigestMediaType)}
+
+	for _, mfest := range mfests {
+		// Populate SyncContext with registries found across all manifests.
+		sc.RegistryContexts = append(sc.RegistryContexts, mfest.Registries...)
+
+		// Populate rename info found across all manifests.
+		for k, v := range mfest.renamesDenormalized {
+			sc.RenamesDenormalized[k] = v
+		}
+	}
+
+	// Populate access tokens for all registries listed in the manifest.
+	err := sc.PopulateTokens()
+	if err != nil {
+		return SyncContext{}, err
+	}
+
+	return sc, nil
 }
 
 // ParseManifestFromFile parses a Manifest from a filepath.
-func ParseManifestFromFile(
-	filePath string) (Manifest, error) {
+func ParseManifestFromFile(filePath string) (Manifest, error) {
 
 	var mfest Manifest
-	var rd RenamesDenormalized
-	var srcRegistry *RegistryContext
+	var empty Manifest
+
 	b, err := ioutil.ReadFile(filePath)
 	if err != nil {
-		return mfest, err
+		return empty, err
 	}
 
 	mfest, err = ParseManifestYAML(b)
 	if err != nil {
-		return mfest, err
+		return empty, err
 	}
 
 	mfest.filepath = filePath
 
-	// Perform semantic checks (beyond just YAML validation).
-	if len(mfest.Registries) != 0 {
-		srcRegistry, err = getSrcRegistry(mfest.Registries)
-		if err != nil {
-			return mfest, err
-		}
-		mfest.srcRegistry = srcRegistry
-
-		rd, err = DenormalizeRenames(mfest, srcRegistry.Name)
-		if err != nil {
-			return mfest, err
-		}
+	err = mfest.finalize()
+	if err != nil {
+		return empty, err
 	}
-	mfest.renamesDenormalized = rd
 
 	return mfest, nil
+}
+
+func (m *Manifest) finalize() error {
+	// Perform semantic checks (beyond just YAML validation).
+	srcRegistry, err := getSrcRegistry(m.Registries)
+	if err != nil {
+		return err
+	}
+	m.srcRegistry = srcRegistry
+
+	rd, err := DenormalizeRenames(*m, srcRegistry.Name)
+	if err != nil {
+		return err
+	}
+	m.renamesDenormalized = rd
+
+	return nil
+}
+
+// ParseManifestsFromDir parses all Manifest files within a directory. We
+// effectively have to create a map of manifests, keyed by the source registry
+// (there can only be 1 source registry).
+func ParseManifestsFromDir(dir string) ([]Manifest, error) {
+	mfests := make([]Manifest, 0)
+
+	var parseAsManifest filepath.WalkFunc = func(path string,
+		info os.FileInfo,
+		err error) error {
+
+		if err != nil {
+			// Prevent panic in case of incoming errors accessing this path.
+			klog.Errorf("failure accessing a path %q: %v\n", path, err)
+		}
+
+		// Skip directories (because they are not YAML files).
+		if info.IsDir() {
+			return nil
+		}
+
+		// First try to parse the path as a manifest file. The only requirement
+		// is that the file must end with a ".yaml" extension. We can be more
+		// restrictive in the future (maybe it will be all files with a certain
+		// pattern, passable from the CLI as an option), but let's cross that
+		// bridge when we get there.
+
+		// Skip non-YAML files.
+		if !strings.HasSuffix(path, ".yaml") {
+			return nil
+		}
+
+		mfest, errParse := ParseManifestFromFile(path)
+		if errParse != nil {
+			klog.Errorf("could not parse manifest file '%s'\n", path)
+			return errParse
+		}
+
+		// Save successful parse result.
+		mfests = append(mfests, mfest)
+
+		return nil
+	}
+
+	if err := filepath.Walk(dir, parseAsManifest); err != nil {
+		return mfests, err
+	}
+
+	if len(mfests) == 0 {
+		return nil, fmt.Errorf("no manifests found in dir: %s", dir)
+	}
+
+	return mfests, nil
+}
+
+// ValidateManifestsFromDir parses checks for errors found in the manifests,
+// taken as a whole.
+//
+// nolint[gocyclo]
+func ValidateManifestsFromDir(mfests []Manifest) error {
+	if len(mfests) == 0 {
+		return fmt.Errorf("no manifests to validate")
+	}
+
+	// Check that there are no overlapping manifests. Each manifest must be
+	// responsible for 1 unique source registry.
+	srcRegsSeen := make(map[RegistryName]string)
+	for _, mfest := range mfests {
+		if mfestFilepath, seen := srcRegsSeen[mfest.srcRegistry.Name]; seen {
+			// nolint[lll]
+			return fmt.Errorf("source registry '%s' defined in multiple manifests:\n- '%s'\n- '%s'\n", mfest.srcRegistry.Name, mfestFilepath, mfest.filepath)
+		}
+		srcRegsSeen[mfest.srcRegistry.Name] = mfest.filepath
+	}
+
+	// If two manifests are renaming images, then they should not share any
+	// rename information (should be mutually exclusive). We use a separate loop
+	// for clarity.
+	renamesSeen := make(map[RegistryImagePath]string)
+	for _, mfest := range mfests {
+		for _, rename := range mfest.Renames {
+			for _, regImgPath := range rename {
+				if mfestFilepath, seen := renamesSeen[regImgPath]; seen {
+					// nolint[lll]
+					return fmt.Errorf("rename key '%s' found in multiple manifests:\n- '%s'\n- '%s'\n", regImgPath, mfestFilepath, mfest.filepath)
+				}
+				renamesSeen[regImgPath] = mfest.filepath
+			}
+		}
+	}
+
+	// Force all manifests to share the EXACT same non-src-registry
+	// configuration. This is because they should all be promoting to the same
+	// central registry, with the same creds.
+	canonicalDstRegisries := []RegistryContext{}
+	for _, registry := range mfests[0].Registries {
+		if !registry.Src {
+			canonicalDstRegisries = append(canonicalDstRegisries, registry)
+		}
+	}
+	for _, mfest := range mfests[1:] {
+		dstRegistries := []RegistryContext{}
+		for _, registry := range mfest.Registries {
+			if !registry.Src {
+				dstRegistries = append(dstRegistries, registry)
+			}
+		}
+
+		if !reflect.DeepEqual(dstRegistries, canonicalDstRegisries) {
+			return fmt.Errorf("different destination registries found in manifests:\n- '%s'\n- '%s'\n", mfests[0].filepath, mfest.filepath)
+		}
+	}
+
+	return nil
+}
+
+// ToPromotionEdges converts a list of manifests to a set of edges we want to
+// try promoting.
+func ToPromotionEdges(mfests []Manifest) map[PromotionEdge]interface{} {
+	edges := make(map[PromotionEdge]interface{})
+	// nolint[lll]
+	for _, mfest := range mfests {
+		for _, image := range mfest.Images {
+			for digest, tagArray := range image.Dmap {
+				for _, tag := range tagArray {
+					for _, rc := range mfest.Registries {
+						if rc == *mfest.srcRegistry {
+							continue
+						}
+						edge := PromotionEdge{
+							SrcRegistry: *mfest.srcRegistry,
+							SrcImageTag: ImageTag{
+								ImageName: image.ImageName,
+								Tag:       tag},
+							Digest:      digest,
+							DstRegistry: rc,
+						}
+
+						// Renames change how edges are created.
+						regImgPath := RegistryImagePath(mfest.srcRegistry.Name) + "/" + RegistryImagePath(image.ImageName)
+						if renames, ok := mfest.renamesDenormalized[regImgPath]; ok {
+							if imgName, ok := renames[rc.Name]; ok {
+								edge.DstImageTag = ImageTag{
+									ImageName: imgName,
+									Tag:       tag}
+								edges[edge] = nil
+								continue
+							}
+						}
+						edge.DstImageTag = ImageTag{
+							ImageName: image.ImageName,
+							Tag:       tag}
+						edges[edge] = nil
+					}
+				}
+			}
+		}
+	}
+	return edges
+}
+
+// This filters out those edges from ToPromotionEdges (found in []Manifest), to
+// only those PromotionEdges that makes sense to keep around. For example, we
+// want to remove all edges that have already been promoted.
+func (sc *SyncContext) getPromotionCandidates(
+	edges map[PromotionEdge]interface{}) map[PromotionEdge]interface{} {
+
+	// Create lookup-optimized structure for images to ignore.
+	ignoreMap := make(map[ImageName]interface{})
+	for _, ignoreMe := range sc.InvIgnore {
+		ignoreMap[ignoreMe] = nil
+	}
+
+	toPromote := make(map[PromotionEdge]interface{})
+	// nolint[lll]
+	for edge := range edges {
+		// If the edge should be ignored because of a bad read in sc.Inv, drop
+		// it (complain with klog though).
+		if img, ok := ignoreMap[edge.SrcImageTag.ImageName]; ok {
+			klog.Warningf("edge %s: ignoring because src image could not be read: %s\n", edge, img)
+			continue
+		}
+
+		sp, dp := edge.VertexProps(sc.Inv)
+
+		// If dst vertex exists, NOP.
+		if dp.PqinDigestMatch {
+			klog.Infof("edge %s: skipping because it was already promoted (case 1)\n", edge)
+			continue
+		}
+
+		// If src vertex missing, LOST && NOP. We just need the digest to exist
+		// in src (we don't care if it points to the wrong tag).
+		if !sp.DigestExists {
+			klog.Errorf("edge %s: skipping %s/%s@%s because it is _LOST_ (can't find it in src registry!)\n", edge, edge.SrcRegistry.Name, edge.SrcImageTag.ImageName, edge.Digest)
+			continue
+		}
+
+		if dp.PqinDigestMatch {
+			klog.Infof("edge %s: skipping because it was already promoted (case 2)\n", edge)
+			continue
+		}
+
+		if dp.PqinExists {
+			if dp.DigestExists {
+				// NOP (already promoted).
+				klog.Infof("edge %s: skipping because it was already promoted (case 3)\n", edge)
+				continue
+			} else {
+				// Pqin points to the wrong digest.
+				klog.Warningf("edge %s: tag %s points to the wrong digest; moving\n, dp.BadDigest")
+			}
+		} else {
+			if dp.DigestExists {
+				// Digest exists in dst, but the pqin we desire does not
+				// exist. Just add the pqin to this existing digest.
+				klog.Infof("edge %s: digest %s already exists, but does not have the pqin we want (%s)\n", edge, dp.OtherTags)
+			} else {
+				// Neither the digest nor the pqin exists in dst.
+				klog.Infof("edge %s: regular promotion (neither digest nor pqin exists in dst)\n", edge)
+			}
+		}
+
+		toPromote[edge] = nil
+	}
+
+	return toPromote
+}
+
+// VertexProps determines the properties of each vertex (src and dst) in the
+// edge, depending on the state of the world in the MasterInventory.
+func (edge PromotionEdge) VertexProps(
+	mi MasterInventory) (VertexProperty, VertexProperty) {
+
+	d := edge.VertexPropsFor(edge.DstRegistry, edge.DstImageTag, mi)
+	s := edge.VertexPropsFor(edge.SrcRegistry, edge.SrcImageTag, mi)
+
+	return s, d
+}
+
+// VertexPropsFor examines one of the two vertices (src or dst) of a
+// PromotionEdge.
+func (edge PromotionEdge) VertexPropsFor(
+	rc RegistryContext,
+	imageTag ImageTag,
+	mi MasterInventory) VertexProperty {
+
+	p := VertexProperty{}
+
+	rii, ok := mi[rc.Name]
+	if !ok {
+		return p
+	}
+	digestTags, ok := rii[imageTag.ImageName]
+	if !ok {
+		return p
+	}
+
+	if tagSlice, ok := digestTags[edge.Digest]; ok {
+		p.DigestExists = true
+		// Record the tags that are associated with this digest; it may turn out
+		// that within this tagslice, we indeed have the correct digest, in
+		// which we set it back to an empty slice.
+		p.OtherTags = tagSlice
+	}
+
+	for digest, tagSlice := range digestTags {
+		for _, tag := range tagSlice {
+			if tag == imageTag.Tag {
+				p.PqinExists = true
+				if digest == edge.Digest {
+					p.PqinDigestMatch = true
+					// Both the digest and tag match what we wanted in the
+					// imageTag, so there are no extraneous tags to bother with.
+					p.OtherTags = TagSlice{}
+				} else {
+					p.BadDigest = digest
+				}
+			}
+		}
+	}
+
+	return p
 }
 
 // ParseManifestYAML parses a Manifest from a byteslice. This function is
@@ -934,175 +1242,6 @@ func ToLQIN(registryName RegistryName, imageName ImageName) string {
 	return string(registryName) + "/" + string(imageName)
 }
 
-// GetLostImages gets all images in Manifest which are missing from src, and
-// also logs them in the process.
-func (sc *SyncContext) GetLostImages(mfest Manifest) RegInvImageDigest {
-	src := sc.Inv[sc.SrcRegistry.Name].ToRegInvImageDigest()
-
-	// If we had trouble reading from any of the images in the src registry,
-	// remove them from the manifest to ignore them, so that we don't create any
-	// false positives about lost images.
-	klog.Warningf("removing images from the manifest that could not be read from the src registry: %s\n", sc.InvIgnore)
-	mfestImagesFinal := []Image{}
-	for _, image := range mfest.Images {
-		for _, ignoreMe := range sc.InvIgnore {
-			if image.ImageName != ignoreMe {
-				mfestImagesFinal = append(mfestImagesFinal, image)
-			}
-		}
-	}
-	mfest.Images = mfestImagesFinal
-
-	// lost = all images that cannot be found from src.
-	lost := mfest.ToRegInvImageDigest().Minus(src)
-
-	if len(lost) > 0 {
-		klog.Errorf(
-			"ERROR: Lost images (all images in Manifest that cannot be found"+
-				" from src registry %v):\n",
-			sc.SrcRegistry.Name)
-		for imageDigest := range lost {
-			fqin := ToFQIN(
-				sc.SrcRegistry.Name,
-				imageDigest.ImageName,
-				imageDigest.Digest)
-			klog.Errorf(
-				"  %v in manifest is NOT in src registry!\n",
-				fqin)
-		}
-		return lost
-	}
-	return nil
-}
-
-// NOTE: the issue with renaming an image is that we still need to know the
-// original (source) image path because we need to use it in the actual call to
-// add-tag during promotion. This means the request population logic must be
-// aware of both the original and renamed version of the image name.
-//
-// By the time the mkPopReq is called, we are dealing with renamed inventory
-// (riit). We need to detect this case from within this function and create the
-// correct request populator --- namely, the source registry/Manifest's original
-// image name must be used as the reference.
-//
-// The Manifest houses `registries` which contain the registry names. The
-// RenamesDenormalized map will contain bidirectional entries for the rename.
-// Since we already have the dest registry, we can just look up the destRegistry
-// name + (renamed) image name in the RenamesDenormalized map; if we find an
-// entry, then we just need to pick out the one for the source registry (it is
-// guaranteed to be there). Now we have the source registry name in sc, so we
-// can use that and the image name associated with the source registry to use as
-// the source destination reg+image name.
-func (sc *SyncContext) mkPopReq(
-	destRC RegistryContext,
-	riit RegInvImageTag,
-	tp TagOp,
-	oldDigest Digest,
-	mkProducer PromotionContext,
-	reqs chan<- stream.ExternalRequest,
-	wg *sync.WaitGroup) {
-
-	dest := sc.Inv[destRC.Name]
-	for imageTag, digest := range riit {
-		var req stream.ExternalRequest
-
-		// Get original image name, if we detect a rename.
-		srcImageName := imageTag.ImageName
-		registryImagePath := RegistryImagePath(
-			ToLQIN(destRC.Name, imageTag.ImageName))
-		if renameMap, ok := sc.RenamesDenormalized[registryImagePath]; ok {
-			if origImageName, ok := renameMap[sc.SrcRegistry.Name]; ok {
-				srcImageName = origImageName
-			} else {
-				// This should never happen, as the src registry is guaranteed
-				// (during manifest parsing and renames denormalization) to
-				// exist as a key for every map in RenamesDenormalized.
-				//
-				// nolint[lll]
-				klog.Warningf("could not find src registry in renameMap for image '%v'\n", imageTag.ImageName)
-				continue
-			}
-		}
-
-		req.StreamProducer = mkProducer(
-			// We need to populate from the source to the dest.
-			sc.SrcRegistry.Name,
-			srcImageName,
-			destRC,
-			imageTag.ImageName,
-			digest,
-			imageTag.Tag,
-			tp)
-		tpStr := ""
-		fqin := ToFQIN(
-			destRC.Name,
-			imageTag.ImageName,
-			digest)
-		movePointerOnly := false
-		tpStr = tp.PrettyValue()
-		if tp == Move {
-			// It could be that we are either moving a tag by
-			// uploading a new digest to dest, or that we are just
-			// moving a tag from an already-uploaded digest in dest.
-			// (The latter should be a lot quicker because there is no
-			// need to copy the digest into the registry as it already
-			// exists there). We should make a distinction and say so in
-			// the logs.
-			imageDigest := ImageDigest{
-				ImageName: imageTag.ImageName,
-				Digest:    digest,
-			}
-			_, movePointerOnly = dest.ToRegInvImageDigest()[imageDigest]
-		}
-		// Display msg when promoting.
-		msg := fmt.Sprintf(
-			"mkPopReq: %s tag: %s -> %s\n", tpStr, imageTag.Tag, fqin)
-		// For moving tags, display a more verbose message (show the
-		// what the tag currently points to).
-		if tp == Move {
-			msg = fmt.Sprintf(`%s tag: %s
-  OLD -> %s/%s@%s
-  NEW -> %s/%s@%s
-`,
-				tpStr,
-				imageTag.Tag,
-				destRC.Name,
-				imageTag.ImageName,
-				oldDigest,
-				destRC.Name,
-				imageTag.ImageName, digest)
-			if movePointerOnly {
-				msg += fmt.Sprintf(
-					"    (Digest %v already exists in destination.)",
-					digest)
-			} else {
-				msg += fmt.Sprintf(
-					"    (Digest %v does not yet exist"+
-						" in destination.)",
-					digest)
-			}
-		}
-		klog.Info(msg)
-
-		// Save some information about this request. It's a bit like
-		// HTTP "headers".
-		req.RequestParams = PromotionRequest{
-			tp,
-			sc.SrcRegistry.Name,
-			destRC.Name,
-			destRC.ServiceAccount,
-			srcImageName,
-			imageTag.ImageName,
-			digest,
-			oldDigest,
-			imageTag.Tag,
-		}
-		wg.Add(1)
-		reqs <- req
-	}
-
-}
-
 // SplitRegistryImagePath takes an arbitrary image path, and splits it into its
 // component parts, according to the knownRegistries field. E.g., consider
 // "gcr.io/foo/a/b/c" as the registryImagePath. If "gcr.io/foo" is in
@@ -1174,191 +1313,102 @@ func DenormalizeRenames(
 	return rd, nil
 }
 
-func getRenameMap(
-	lqin string,
-	rd RenamesDenormalized) map[RegistryName]ImageName {
-
-	m, ok := rd[RegistryImagePath(lqin)]
-	if ok {
-		return m
-	}
-	return nil
-}
-
-// applyRenames takes a given RegInvImageTag (riit) and converts it to a new
-// RegInvImageTag (riitRenamed), by using information in RenamesDenormalized
-// (rd).
-func (riit *RegInvImageTag) applyRenames(
-	srcReg RegistryName,
-	destReg RegistryName,
-	rd RenamesDenormalized) RegInvImageTag {
-
-	riitRenamed := RegInvImageTag{}
-	for imageTag, digest := range *riit {
-		lqin := ToLQIN(srcReg, imageTag.ImageName)
-		m := getRenameMap(lqin, rd)
-		newName, ok := m[destReg]
-		// Only rename if this dest registry requires renaming.
-		if m != nil && ok {
-			imageTagRenamed := imageTag
-			imageTagRenamed.ImageName = newName
-			riitRenamed[imageTagRenamed] = digest
-		} else {
-			riitRenamed[imageTag] = digest
-		}
-	}
-	return riitRenamed
-}
-
-// mkPopulateRequestsForPromotion creates all requests necessary to reconcile
-// the Manifest against the state of the world.
-//
-// nolint[gocyclo]
-func mkPopulateRequestsForPromotion(
-	mfest Manifest,
-	promotionCandidatesIT RegInvImageTag,
+// nolint[lll]
+func mkPopulateRequestsForPromotionEdges(
+	toPromote map[PromotionEdge]interface{},
 	mkProducer PromotionContext) PopulateRequests {
 	return func(sc *SyncContext, reqs chan<- stream.ExternalRequest, wg *sync.WaitGroup) {
-		for _, registry := range mfest.Registries {
-			if registry.Src {
+		if len(toPromote) == 0 {
+			klog.Info("Nothing to promote.")
+			return
+		}
+
+		if sc.DryRun {
+			klog.Info("---------- BEGIN PROMOTION (DRY RUN) ----------")
+		} else {
+			klog.Info("---------- BEGIN PROMOTION ----------")
+		}
+
+		for promoteMe := range toPromote {
+			var req stream.ExternalRequest
+			tp := Add
+			oldDigest := Digest("")
+
+			_, dp := promoteMe.VertexProps(sc.Inv)
+
+			if dp.PqinDigestMatch {
+				klog.Infof("edge %s: skipping because it was already promoted (case 2)\n", promoteMe)
 				continue
 			}
 
-			// Promote images that are not in the destination registry.
-			destIT := sc.Inv[registry.Name].ToRegInvImageTag()
-
-			// For this dest registry, check if there are any renamings that
-			// must occur. If so, modify the promotionCandidatesIT so that they
-			// use the renamed versions. This is because destIT already has the
-			// renamed versions (easier for set difference). We could go the
-			// other way and rename the pertinent images in destIT to match the
-			// naming scheme of the source registry (i.e., the raw `images`
-			// field in the Manifest) --- one way is not obviously superior over
-			// the other.
-			promotionCandidatesITRenamed := promotionCandidatesIT.applyRenames(
-				sc.SrcRegistry.Name, registry.Name, sc.RenamesDenormalized)
-
-			promotionFiltered := promotionCandidatesITRenamed.Minus(destIT)
-			promotionFilteredID := promotionFiltered.ToRegInvImageDigest()
-
-			if len(promotionFilteredID) > 0 {
-				klog.Infof(
-					"To promote (after removing already-promoted images):\n%v",
-					promotionFilteredID.PrettyValue())
-				if sc.DryRun {
-					klog.Infof(
-						"---------- BEGIN PROMOTION (DRY RUN): %s: %s ----------\n",
-						sc.ManifestPath,
-						registry.Name)
+			if dp.PqinExists {
+				if dp.DigestExists {
+					// NOP (already promoted).
+					klog.Infof("edge %s: skipping because it was already promoted (case 3)\n", promoteMe)
+					continue
 				} else {
-					klog.Infof("---------- BEGIN PROMOTION: %s: %s ----------\n",
-						sc.ManifestPath,
-						registry.Name)
+					// Pqin points to the wrong digest.
+					klog.Warningf("edge %s: tag %s points to the wrong digest; moving\n, dp.BadDigest")
+					tp = Move
+					oldDigest = dp.BadDigest
 				}
 			} else {
-				klog.Infof("Nothing to promote for %s.\n", registry.Name)
-			}
-
-			sc.mkPopReq(
-				registry, // destRegistry
-				promotionFiltered,
-				Add,
-				"",
-				mkProducer,
-				reqs,
-				wg)
-
-			// Audit the intersection (make sure already-existing tags in the
-			// destination are pointing to the digest specified in the
-			// manifest).
-			toAudit := promotionCandidatesITRenamed.Intersection(destIT)
-			for imageTag, digest := range toAudit {
-				if liveDigest, ok := destIT[imageTag]; ok {
-					// dest has this imageTag already; need to audit.
-					pqin := ToPQIN(
-						registry.Name,
-						imageTag.ImageName,
-						imageTag.Tag)
-					if digest == liveDigest {
-						// NOP if dest's imageTag is already pointing to the
-						// same digest as in the manifest.
-
-						klog.Infof(
-							"skipping: image '%v' already points to the same"+
-								" digest (%v) as in the Manifest\n",
-							pqin,
-							digest)
-						continue
-					} else {
-						// Dest's tag is pointing to the wrong digest! Need to
-						// move the tag.
-						klog.Warningf(
-							"Warning: image '%v' is pointing to the wrong"+
-								" digest\n       got: %v\n  expected: %v\n",
-							pqin,
-							liveDigest,
-							digest)
-
-						sc.mkPopReq(
-							registry,
-							RegInvImageTag{imageTag: digest},
-							Move,
-							liveDigest,
-							mkProducer,
-							reqs,
-							wg)
-					}
+				if dp.DigestExists {
+					// Digest exists in dst, but the pqin we desire does not
+					// exist. Just add the pqin to this existing digest.
+					klog.Infof("edge %s: digest %s already exists, but does not have the pqin we want (%s)\n", promoteMe, dp.OtherTags)
+				} else {
+					// Neither the digest nor the pqin exists in dst.
+					klog.Infof("edge %s: regular promotion (neither digest nor pqin exists in dst)\n", promoteMe)
 				}
 			}
 
-			// Warn the user about extra tags:
-			xtras := make([]string, 0)
-			for imageTag := range destIT.Minus(promotionCandidatesITRenamed) {
-				xtras = append(xtras, fmt.Sprintf(
-					"%s/%s:%s",
-					registry.Name,
-					imageTag.ImageName,
-					imageTag.Tag))
+			req.StreamProducer = mkProducer(
+				// TODO: Clean up types to avoid having to split up promoteMe
+				// prematurely like this.
+				promoteMe.SrcRegistry.Name,
+				promoteMe.SrcImageTag.ImageName,
+				promoteMe.DstRegistry,
+				promoteMe.DstImageTag.ImageName,
+				promoteMe.Digest,
+				promoteMe.DstImageTag.Tag,
+				tp)
+
+			// Save some information about this request. It's a bit like
+			// HTTP "headers".
+			req.RequestParams = PromotionRequest{
+				tp,
+				// TODO: Clean up types to avoid having to split up promoteMe
+				// prematurely like this.
+				promoteMe.SrcRegistry.Name,
+				promoteMe.DstRegistry.Name,
+				promoteMe.DstRegistry.ServiceAccount,
+				promoteMe.SrcImageTag.ImageName,
+				promoteMe.DstImageTag.ImageName,
+				promoteMe.Digest,
+				oldDigest,
+				promoteMe.DstImageTag.Tag,
 			}
-			sort.Strings(xtras)
-			for _, img := range xtras {
-				klog.Warningf("Warning: extra tag found in dest: %s\n", img)
-			}
+			wg.Add(1)
+			reqs <- req
+
 		}
 	}
 }
 
-// GetPromotionCandidatesIT returns those images that are due for promotion.
-func (sc *SyncContext) GetPromotionCandidatesIT(
-	mfest Manifest) RegInvImageTag {
+func (sc *SyncContext) getPromotionEdgesFromManifests(
+	mfests []Manifest) map[PromotionEdge]interface{} {
 
-	srcRegName := sc.SrcRegistry.Name
-	src := sc.Inv[srcRegName]
-
-	// If we had trouble reading from any of the images in the src/dest
-	// registries, remove them from src to simulate them being missing; this has
-	// the effect of removing from the act of promotion.
-	for _, imgName := range sc.InvIgnore {
-		delete(src, imgName)
-	}
-
-	// promotionCandidates = all images in the manifest that can be found from
-	// src. But, this is filtered later to remove those ones that are already in
-	// dest (see mkPopulateRequestsForPromotion).
-	promotionCandidates := mfest.ToRegInvImageDigest().Intersection(src.ToRegInvImageDigest())
-
-	klog.Infof(
-		"To promote (intersection of Manifest and src registry %v):\n%v",
-		sc.SrcRegistry.Name,
-		promotionCandidates.PrettyValue())
-
-	return promotionCandidates.ToRegInvImageTag()
+	edges := ToPromotionEdges(mfests)
+	return sc.getPromotionCandidates(edges)
 }
 
-// Promote performs container image promotion by realizing the intent in the
+// Promote perferms container image promotion by realizing the intent in the
 // Manifest.
+//
+// nolint[gocyclo]
 func (sc *SyncContext) Promote(
-	mfest Manifest,
+	mfests []Manifest,
 	mkProducer func(
 		RegistryName,
 		ImageName,
@@ -1367,24 +1417,22 @@ func (sc *SyncContext) Promote(
 		Digest,
 		Tag,
 		TagOp) stream.Producer,
-	customProcessRequest *ProcessRequest) int {
+	customProcessRequest *ProcessRequest) error {
 
-	var exitCode int
+	edges := sc.getPromotionEdgesFromManifests(mfests)
 
-	mfestID := (mfest.ToRegInvImageDigest())
-
-	klog.Infof("Desired state:\n%v", mfestID.PrettyValue())
-	lost := sc.GetLostImages(mfest)
-	if len(lost) > 0 {
-		// TODO: Have more meaningful exit codes (use iota?).
-		exitCode = 1
+	if len(edges) == 0 {
+		klog.Info("Nothing to promote.")
+		return nil
 	}
 
-	promotionCandidatesIT := sc.GetPromotionCandidatesIT(mfest)
+	klog.Info("Pending promotions:")
+	for edge := range edges {
+		klog.Infof("  %v\n", edge)
+	}
 
-	var populateRequests = mkPopulateRequestsForPromotion(
-		mfest,
-		promotionCandidatesIT,
+	var populateRequests = mkPopulateRequestsForPromotionEdges(
+		edges,
 		mkProducer)
 
 	var processRequest ProcessRequest
@@ -1451,7 +1499,7 @@ func (sc *SyncContext) Promote(
 		sc.PrintCapturedRequests(&captured)
 	}
 
-	return exitCode
+	return nil
 }
 
 // PrintCapturedRequests pretty-prints all given PromotionRequests.

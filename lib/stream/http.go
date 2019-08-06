@@ -50,6 +50,8 @@ func (h *HTTP) Produce() (io.Reader, io.Reader, error) {
 
 	var err error
 
+	// We close the response body in Close().
+	// nolint[bodyclose]
 	h.Res, err = client.Do(h.Req)
 
 	if err != nil {

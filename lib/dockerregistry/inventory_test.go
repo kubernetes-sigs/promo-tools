@@ -19,6 +19,8 @@ package inventory
 import (
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"reflect"
 	"sync"
 	"testing"
@@ -331,6 +333,339 @@ could not find source registry in '[gcr.io/bar/banana gcr.io/cat/subdir/A/banana
 						test.name+": "+invalid.name))
 			}
 		}
+	}
+}
+
+func TestParseManifestsFromDir(t *testing.T) {
+	pwd := bazelTestPath("TestParseManifestsFromDir")
+
+	var tests = []struct {
+		name string
+		// "input" is folder name, relative to the location of this source file.
+		input          string
+		expectedOutput []Manifest
+		expectedError  error
+	}{
+		{
+			"No manifests found (invalid)",
+			"empty",
+			[]Manifest{},
+			fmt.Errorf("no manifests found in dir: %s/%s", pwd, "empty"),
+		},
+		{
+			"Singleton (single manifest)",
+			"singleton",
+			[]Manifest{
+				{
+					Registries: []RegistryContext{
+						{
+							Name:           "gcr.io/foo-staging",
+							ServiceAccount: "sa@robot.com",
+							Src:            true,
+						},
+						{
+							Name:           "us.gcr.io/some-prod",
+							ServiceAccount: "sa@robot.com",
+						},
+						{
+							Name:           "eu.gcr.io/some-prod",
+							ServiceAccount: "sa@robot.com",
+						},
+						{
+							Name:           "asia.gcr.io/some-prod",
+							ServiceAccount: "sa@robot.com",
+						},
+					},
+					Images: []Image{
+						{ImageName: "foo-controller",
+							Dmap: DigestTags{
+								"sha256:c3d310f4741b3642497da8826e0986db5e02afc9777a2b8e668c8e41034128c1": {"1.0"},
+							},
+						},
+					},
+					Renames: []Rename{
+						[]RegistryImagePath{
+							"gcr.io/foo-staging/foo-controller",
+							"us.gcr.io/some-prod/foo/foo-controller",
+							"eu.gcr.io/some-prod/foo/foo-controller",
+							"asia.gcr.io/some-prod/foo/foo-controller"}},
+					filepath: "a/manifest.yaml",
+				},
+			},
+			nil,
+		},
+		{
+			"Basic (multiple manifests)",
+			"basic",
+			[]Manifest{
+				{
+					Registries: []RegistryContext{
+						{
+							Name:           "gcr.io/foo-staging",
+							ServiceAccount: "sa@robot.com",
+							Src:            true,
+						},
+						{
+							Name:           "us.gcr.io/some-prod",
+							ServiceAccount: "sa@robot.com",
+						},
+						{
+							Name:           "eu.gcr.io/some-prod",
+							ServiceAccount: "sa@robot.com",
+						},
+						{
+							Name:           "asia.gcr.io/some-prod",
+							ServiceAccount: "sa@robot.com",
+						},
+					},
+					Images: []Image{
+						{ImageName: "foo-controller",
+							Dmap: DigestTags{
+								"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": {"1.0"},
+							},
+						},
+					},
+					Renames: []Rename{
+						[]RegistryImagePath{
+							"gcr.io/foo-staging/foo-controller",
+							"us.gcr.io/some-prod/foo/foo-controller",
+							"eu.gcr.io/some-prod/foo/foo-controller",
+							"asia.gcr.io/some-prod/foo/foo-controller"}},
+					filepath: "a/manifest.yaml"},
+				{
+					Registries: []RegistryContext{
+						{
+							Name:           "gcr.io/cat-staging",
+							ServiceAccount: "sa@robot.com",
+							Src:            true,
+						},
+						{
+							Name:           "us.gcr.io/some-prod",
+							ServiceAccount: "sa@robot.com",
+						},
+						{
+							Name:           "eu.gcr.io/some-prod",
+							ServiceAccount: "sa@robot.com",
+						},
+						{
+							Name:           "asia.gcr.io/some-prod",
+							ServiceAccount: "sa@robot.com",
+						},
+					},
+					Images: []Image{
+						{ImageName: "cat-controller",
+							Dmap: DigestTags{
+								"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc": {"1.0"},
+							},
+						},
+					},
+					Renames: []Rename{
+						[]RegistryImagePath{
+							"gcr.io/cat-staging/cat-controller",
+							"us.gcr.io/some-prod/cat/cat-controller",
+							"eu.gcr.io/some-prod/cat/cat-controller",
+							"asia.gcr.io/some-prod/cat/cat-controller"}},
+					filepath: "b/c/manifest.yaml"},
+				{
+					Registries: []RegistryContext{
+						{
+							Name:           "gcr.io/bar-staging",
+							ServiceAccount: "sa@robot.com",
+							Src:            true,
+						},
+						{
+							Name:           "us.gcr.io/some-prod",
+							ServiceAccount: "sa@robot.com",
+						},
+						{
+							Name:           "eu.gcr.io/some-prod",
+							ServiceAccount: "sa@robot.com",
+						},
+						{
+							Name:           "asia.gcr.io/some-prod",
+							ServiceAccount: "sa@robot.com",
+						},
+					},
+					Images: []Image{
+						{ImageName: "bar-controller",
+							Dmap: DigestTags{
+								"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": {"1.0"},
+							},
+						},
+					},
+					Renames: []Rename{
+						[]RegistryImagePath{
+							"gcr.io/bar-staging/bar-controller",
+							"us.gcr.io/some-prod/bar/bar-controller",
+							"eu.gcr.io/some-prod/bar/bar-controller",
+							"asia.gcr.io/some-prod/bar/bar-controller"}},
+					filepath: "b/manifest.yaml"},
+				{
+					Registries: []RegistryContext{
+						{
+							Name:           "gcr.io/qux-staging",
+							ServiceAccount: "sa@robot.com",
+							Src:            true,
+						},
+						{
+							Name:           "us.gcr.io/some-prod",
+							ServiceAccount: "sa@robot.com",
+						},
+						{
+							Name:           "eu.gcr.io/some-prod",
+							ServiceAccount: "sa@robot.com",
+						},
+						{
+							Name:           "asia.gcr.io/some-prod",
+							ServiceAccount: "sa@robot.com",
+						},
+					},
+					Images: []Image{
+						{ImageName: "qux-controller",
+							Dmap: DigestTags{
+								"sha256:0000000000000000000000000000000000000000000000000000000000000000": {"1.0"},
+							},
+						},
+					},
+					Renames: []Rename{
+						[]RegistryImagePath{
+							"gcr.io/qux-staging/qux-controller",
+							"us.gcr.io/some-prod/qux/qux-controller",
+							"eu.gcr.io/some-prod/qux/qux-controller",
+							"asia.gcr.io/some-prod/qux/qux-controller"}},
+					filepath: "manifest.yaml"},
+			},
+			nil,
+		},
+	}
+
+	for _, test := range tests {
+		fixtureDir := bazelTestPath("TestParseManifestsFromDir", test.input)
+
+		// Fixup expected filepaths to match bazel's testing directory.
+		expectedModified := test.expectedOutput[:0]
+		for _, mfest := range test.expectedOutput {
+			mfest.filepath = filepath.Join(fixtureDir, mfest.filepath)
+			expectedModified = append(expectedModified, mfest)
+		}
+
+		got, err := ParseManifestsFromDir(fixtureDir)
+
+		// Clear private fields (redundant data) that are calculated on-the-fly
+		// (it's too verbose to include them here; besides, it's not what we're
+		// testing).
+		gotModified := got[:0]
+		for _, mfest := range got {
+			mfest.renamesDenormalized = nil
+			mfest.srcRegistry = nil
+			gotModified = append(gotModified, mfest)
+		}
+
+		// Check the error as well (at the very least, we can check that the
+		// error was nil).
+		eqErr := checkEqual(err, test.expectedError)
+		checkError(t, eqErr, fmt.Sprintf("Test: %v (error)\n", test.name))
+
+		// There is nothing more to check if we expected a parse failure.
+		if test.expectedError != nil {
+			continue
+		}
+
+		eqErr = checkEqual(gotModified, test.expectedOutput)
+		checkError(
+			t,
+			eqErr,
+			fmt.Sprintf("Test: %v (Manifest)\n", test.name))
+	}
+}
+
+func TestValidateManifestsFromDir(t *testing.T) {
+
+	var shouldBeValid = []string{
+		"basic",
+		"singleton",
+	}
+
+	pwd := bazelTestPath("TestValidateManifestsFromDir")
+
+	for _, testInput := range shouldBeValid {
+		fixtureDir := filepath.Join(pwd, "valid", testInput)
+		mfests, _ := ParseManifestsFromDir(fixtureDir)
+		err := ValidateManifestsFromDir(mfests)
+		eqErr := checkEqual(err, nil)
+		checkError(
+			t,
+			eqErr,
+			fmt.Sprintf("Test: `%v' should be valid\n", testInput))
+	}
+
+	// nolint[golint]
+	var shouldBeInvalid = []struct {
+		dirName       string
+		expectedError error
+	}{
+		{
+			"empty",
+			fmt.Errorf("no manifests found in dir: %s", filepath.Join(pwd, "invalid/empty")),
+		},
+		{
+			"overlapping-src-registries",
+			fmt.Errorf(
+				"source registry '%s' defined in multiple manifests:\n- '%s'\n- '%s'\n",
+				"gcr.io/foo-staging",
+				filepath.Join(pwd, "invalid/overlapping-src-registries/a/manifest.yaml"),
+				filepath.Join(pwd, "invalid/overlapping-src-registries/b/manifest.yaml")),
+		},
+		{
+			// For this one, the manifest b/manifest.yaml is already invalid.
+			"overlapping-renames-invalid-manifest",
+			fmt.Errorf("multiple renames found for registry 'asia.gcr.io/some-prod' in 'renames', for image foo/foo-controller"),
+		},
+		{
+			"overlapping-renames-across-manifests",
+			fmt.Errorf(
+				"rename key '%s' found in multiple manifests:\n- '%s'\n- '%s'\n",
+				"asia.gcr.io/some-prod/foo/foo-controller",
+				filepath.Join(pwd, "invalid/overlapping-renames-across-manifests/a/manifest.yaml"),
+				filepath.Join(pwd, "invalid/overlapping-renames-across-manifests/b/manifest.yaml")),
+		},
+		{
+			"different-dst-registries",
+			fmt.Errorf(
+				"different destination registries found in manifests:\n- '%s'\n- '%s'\n",
+				filepath.Join(pwd, "invalid/different-dst-registries/a/manifest.yaml"),
+				filepath.Join(pwd, "invalid/different-dst-registries/b/manifest.yaml")),
+		},
+		{
+			"different-dst-registry-creds",
+			// We get the same error message as above because
+			// ValidateManifestsFromDir uses reflect.DeepEqual() as a predicate.
+			fmt.Errorf(
+				"different destination registries found in manifests:\n- '%s'\n- '%s'\n",
+				filepath.Join(pwd, "invalid/different-dst-registry-creds/a/manifest.yaml"),
+				filepath.Join(pwd, "invalid/different-dst-registry-creds/b/manifest.yaml")),
+		},
+	}
+
+	for _, test := range shouldBeInvalid {
+		fixtureDir := bazelTestPath("TestValidateManifestsFromDir", "invalid", test.dirName)
+		var eqErr error
+
+		// It could be that a manifest, taken individually, failed on its own,
+		// before we even get to ValidateManifestsFromDir(). So handle these
+		// cases as well.
+		mfests, errParse := ParseManifestsFromDir(fixtureDir)
+		if errParse != nil {
+			eqErr = checkEqual(errParse, test.expectedError)
+		} else {
+			err := ValidateManifestsFromDir(mfests)
+			eqErr = checkEqual(err, test.expectedError)
+		}
+		checkError(
+			t,
+			eqErr,
+			fmt.Sprintf("Test: `%v' should be invalid\n", test.dirName))
+
 	}
 }
 
@@ -1243,6 +1578,177 @@ func TestSetManipulationsRegInvImageTag(t *testing.T) {
 	}
 }
 
+func TestToPromotionEdges(t *testing.T) {
+	srcRegName := RegistryName("gcr.io/foo")
+	destRegName := RegistryName("gcr.io/bar")
+	destRegName2 := RegistryName("gcr.io/cat")
+	destRC := RegistryContext{
+		Name:           destRegName,
+		ServiceAccount: "robot",
+	}
+	destRC2 := RegistryContext{
+		Name:           destRegName2,
+		ServiceAccount: "robot",
+	}
+	srcRC := RegistryContext{
+		Name:           srcRegName,
+		ServiceAccount: "robot",
+		Src:            true,
+	}
+	registries1 := []RegistryContext{destRC, srcRC}
+	registries2 := []RegistryContext{destRC, srcRC, destRC2}
+
+	sc := SyncContext{
+		Inv: MasterInventory{
+			"gcr.io/foo": RegInvImage{
+				"a": DigestTags{
+					"sha256:000": TagSlice{"0.9"}}},
+			"gcr.io/bar": RegInvImage{
+				"a": DigestTags{
+					"sha256:000": TagSlice{"0.9"}},
+				"b": DigestTags{
+					"sha256:111": TagSlice{}}},
+			"gcr.io/cat": RegInvImage{
+				"a": DigestTags{
+					"sha256:000": TagSlice{"0.9"}}}}}
+
+	var tests = []struct {
+		name             string
+		input            []Manifest
+		expectedInitial  map[PromotionEdge]interface{}
+		expectedFiltered map[PromotionEdge]interface{}
+	}{
+		{
+			"Basic case (1 new edge; already promoted)",
+			[]Manifest{
+				{
+					Registries: registries1,
+					Images: []Image{
+						{
+							ImageName: "a",
+							Dmap: DigestTags{
+								"sha256:000": TagSlice{"0.9"}}}},
+					srcRegistry: &srcRC},
+			},
+			map[PromotionEdge]interface{}{
+				{
+					SrcRegistry: srcRC,
+					SrcImageTag: ImageTag{
+						ImageName: "a",
+						Tag:       "0.9"},
+					Digest:      "sha256:000",
+					DstRegistry: destRC,
+					DstImageTag: ImageTag{
+						ImageName: "a",
+						Tag:       "0.9"}}: nil,
+			},
+			make(map[PromotionEdge]interface{}),
+		},
+		{
+			"Basic case (2 new edges; already promoted)",
+			[]Manifest{
+				{
+					Registries: registries2,
+					Images: []Image{
+						{
+							ImageName: "a",
+							Dmap: DigestTags{
+								"sha256:000": TagSlice{"0.9"}}}},
+					srcRegistry: &srcRC},
+			},
+			map[PromotionEdge]interface{}{
+				{
+					SrcRegistry: srcRC,
+					SrcImageTag: ImageTag{
+						ImageName: "a",
+						Tag:       "0.9"},
+					Digest:      "sha256:000",
+					DstRegistry: destRC,
+					DstImageTag: ImageTag{
+						ImageName: "a",
+						Tag:       "0.9"}}: nil,
+				{
+					SrcRegistry: srcRC,
+					SrcImageTag: ImageTag{
+						ImageName: "a",
+						Tag:       "0.9"},
+					Digest:      "sha256:000",
+					DstRegistry: destRC2,
+					DstImageTag: ImageTag{
+						ImageName: "a",
+						Tag:       "0.9"}}: nil,
+			},
+			make(map[PromotionEdge]interface{}),
+		},
+		{
+			"Basic case (2 new edges; 1 is renamed and should be promoted)",
+			[]Manifest{
+				{
+					Registries: registries2,
+					Images: []Image{
+						{
+							ImageName: "a",
+							Dmap: DigestTags{
+								"sha256:000": TagSlice{"0.9"}}}},
+					Renames: []Rename{
+						[]RegistryImagePath{
+							"gcr.io/foo/a",
+							"gcr.io/cat/some/subdir/a"}},
+					srcRegistry: &srcRC},
+			},
+			map[PromotionEdge]interface{}{
+				{
+					SrcRegistry: srcRC,
+					SrcImageTag: ImageTag{
+						ImageName: "a",
+						Tag:       "0.9"},
+					Digest:      "sha256:000",
+					DstRegistry: destRC,
+					DstImageTag: ImageTag{
+						ImageName: "a",
+						Tag:       "0.9"}}: nil,
+				{
+					SrcRegistry: srcRC,
+					SrcImageTag: ImageTag{
+						ImageName: "a",
+						Tag:       "0.9"},
+					Digest:      "sha256:000",
+					DstRegistry: destRC2,
+					DstImageTag: ImageTag{
+						ImageName: "some/subdir/a",
+						Tag:       "0.9"}}: nil,
+			},
+			map[PromotionEdge]interface{}{
+				{
+					SrcRegistry: srcRC,
+					SrcImageTag: ImageTag{
+						ImageName: "a",
+						Tag:       "0.9"},
+					Digest:      "sha256:000",
+					DstRegistry: destRC2,
+					DstImageTag: ImageTag{
+						ImageName: "some/subdir/a",
+						Tag:       "0.9"}}: nil,
+			},
+		},
+	}
+
+	for _, test := range tests {
+		// Finalize Manifests (in particular, populaze renamesDenormalized map).
+		for i := range test.input {
+			// Skip errors.
+			_ = test.input[i].finalize()
+		}
+		got := ToPromotionEdges(test.input)
+		err := checkEqual(got, test.expectedInitial)
+		checkError(t, err, fmt.Sprintf("checkError: test: %v (ToPromotionEdges)\n", test.name))
+
+		got = sc.getPromotionCandidates(got)
+		err = checkEqual(got, test.expectedFiltered)
+		checkError(t, err, fmt.Sprintf("checkError: test: %v (getPromotionCandidates)\n", test.name))
+	}
+}
+
 // TestPromotion is the most important test as it simulates the main job of the
 // promoter. There should be a fake "handler" that can execute stateful changes
 // to a fake GCR. Then it's just a matter of comparing the input GCR states +
@@ -1296,7 +1802,8 @@ func TestPromotion(t *testing.T) {
 					{
 						ImageName: "a",
 						Dmap: DigestTags{
-							"sha256:000": TagSlice{"0.9"}}}}},
+							"sha256:000": TagSlice{"0.9"}}}},
+				srcRegistry: &srcRC},
 			SyncContext{
 				Inv: MasterInventory{
 					"gcr.io/foo": RegInvImage{
@@ -1325,7 +1832,8 @@ func TestPromotion(t *testing.T) {
 					{
 						ImageName: "b",
 						Dmap: DigestTags{
-							"sha256:111": TagSlice{"0.9"}}}}},
+							"sha256:111": TagSlice{"0.9"}}}},
+				srcRegistry: &srcRC},
 			SyncContext{
 				Inv: MasterInventory{
 					"gcr.io/foo": RegInvImage{
@@ -1345,7 +1853,8 @@ func TestPromotion(t *testing.T) {
 					{
 						ImageName: "a",
 						Dmap: DigestTags{
-							"sha256:000": TagSlice{"0.9"}}}}},
+							"sha256:000": TagSlice{"0.9"}}}},
+				srcRegistry: &srcRC},
 			SyncContext{
 				Inv: MasterInventory{
 					"gcr.io/foo": RegInvImage{
@@ -1376,7 +1885,8 @@ func TestPromotion(t *testing.T) {
 					{
 						ImageName: "a",
 						Dmap: DigestTags{
-							"sha256:000": TagSlice{"0.9"}}}}},
+							"sha256:000": TagSlice{"0.9"}}}},
+				srcRegistry: &srcRC},
 			SyncContext{
 				Inv: MasterInventory{
 					"gcr.io/foo": RegInvImage{
@@ -1407,7 +1917,8 @@ func TestPromotion(t *testing.T) {
 					{
 						ImageName: "a",
 						Dmap: DigestTags{
-							"sha256:000": TagSlice{"0.9"}}}}},
+							"sha256:000": TagSlice{"0.9"}}}},
+				srcRegistry: &srcRC},
 			SyncContext{
 				Inv: MasterInventory{
 					"gcr.io/foo": RegInvImage{
@@ -1443,7 +1954,8 @@ func TestPromotion(t *testing.T) {
 				Renames: []Rename{
 					[]RegistryImagePath{
 						"gcr.io/foo/a",
-						"gcr.io/bar/some/subdir/path/a"}}},
+						"gcr.io/bar/some/subdir/path/a"}},
+				srcRegistry: &srcRC},
 			SyncContext{
 				Inv: MasterInventory{
 					"gcr.io/foo": RegInvImage{
@@ -1478,7 +1990,8 @@ func TestPromotion(t *testing.T) {
 				Renames: []Rename{
 					[]RegistryImagePath{
 						"gcr.io/foo/a",
-						"gcr.io/bar/some/subdir/path/a"}}},
+						"gcr.io/bar/some/subdir/path/a"}},
+				srcRegistry: &srcRC},
 			SyncContext{
 				Inv: MasterInventory{
 					"gcr.io/foo": RegInvImage{
@@ -1514,7 +2027,8 @@ func TestPromotion(t *testing.T) {
 				Renames: []Rename{
 					[]RegistryImagePath{
 						"gcr.io/foo/a",
-						"gcr.io/bar/some/subdir/path/a"}}},
+						"gcr.io/bar/some/subdir/path/a"}},
+				srcRegistry: &srcRC},
 			SyncContext{
 				Inv: MasterInventory{
 					"gcr.io/foo": RegInvImage{
@@ -1556,7 +2070,8 @@ func TestPromotion(t *testing.T) {
 					{
 						ImageName: "a",
 						Dmap: DigestTags{
-							"sha256:000": TagSlice{"0.9"}}}}},
+							"sha256:000": TagSlice{"0.9"}}}},
+				srcRegistry: &srcRC},
 			SyncContext{
 				Inv: MasterInventory{
 					"gcr.io/foo": RegInvImage{
@@ -1585,7 +2100,8 @@ func TestPromotion(t *testing.T) {
 					{
 						ImageName: "b",
 						Dmap: DigestTags{
-							"sha256:bbb": TagSlice{"also-missing"}}}}},
+							"sha256:bbb": TagSlice{"also-missing"}}}},
+				srcRegistry: &srcRC},
 			SyncContext{
 				Inv: MasterInventory{
 					"gcr.io/foo": RegInvImage{
@@ -1631,7 +2147,7 @@ func TestPromotion(t *testing.T) {
 		rd, err := DenormalizeRenames(test.inputM, srcReg.Name)
 		checkError(t, err,
 			fmt.Sprintf("checkError (rd): test: %v\n", test.name))
-		test.inputSc.RenamesDenormalized = rd
+		test.inputM.renamesDenormalized = rd
 		test.inputSc.SrcRegistry = srcReg
 
 		// Simulate bad network conditions.
@@ -1642,7 +2158,7 @@ func TestPromotion(t *testing.T) {
 		}
 
 		test.inputSc.Promote(
-			test.inputM,
+			[]Manifest{test.inputM},
 			nopStream,
 			&processRequestFake)
 
@@ -1683,7 +2199,8 @@ func TestPromotionMulti(t *testing.T) {
 					{
 						ImageName: "a",
 						Dmap: DigestTags{
-							"sha256:000": TagSlice{"0.9", "1.0"}}}}},
+							"sha256:000": TagSlice{"0.9", "1.0"}}}},
+				srcRegistry: &srcRC},
 			SyncContext{
 				Inv: MasterInventory{
 					"gcr.io/foo": RegInvImage{
@@ -1724,7 +2241,8 @@ func TestPromotionMulti(t *testing.T) {
 					{
 						ImageName: "a",
 						Dmap: DigestTags{
-							"sha256:000": TagSlice{"0.9", "1.0"}}}}},
+							"sha256:000": TagSlice{"0.9", "1.0"}}}},
+				srcRegistry: &srcRC},
 			SyncContext{
 				Inv: MasterInventory{
 					"gcr.io/foo": RegInvImage{
@@ -1779,7 +2297,7 @@ func TestPromotionMulti(t *testing.T) {
 			fmt.Sprintf("checkError (srcReg): test: %v\n", test.name))
 		test.inputSc.SrcRegistry = srcReg
 		test.inputSc.Promote(
-			test.inputM,
+			[]Manifest{test.inputM},
 			nopStream,
 			&processRequestFake)
 		err = checkEqual(captured, test.expectedReqs)
@@ -2310,4 +2828,14 @@ func TestParseContainerParts(t *testing.T) {
 		errEqual := checkEqual(got, test.expected)
 		checkError(t, errEqual, "checkError: test: shouldBeInValid\n")
 	}
+}
+
+// Helper functions.
+
+func bazelTestPath(testName string, paths ...string) string {
+	prefix := []string{
+		os.Getenv("PWD"),
+		"inventory_test",
+		testName}
+	return filepath.Join(append(prefix, paths...)...)
 }
