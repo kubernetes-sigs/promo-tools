@@ -28,18 +28,18 @@ type Filestore struct {
 	// Base is the leading part of an artifact path, including the scheme.
 	// It is everything that is not the actual file name itself.
 	// e.g. "gs://prod-artifacts/myproject"
-	Base           string `yaml:"base,omitempty"`
-	ServiceAccount string `yaml:"service-account,omitempty"`
-	Src            bool   `yaml:"src,omitempty"`
+	Base           string `json:"base,omitempty"`
+	ServiceAccount string `json:"service-account,omitempty"`
+	Src            bool   `json:"src,omitempty"`
 }
 
 // File holds information about a file artifact.
 // File artifacts are copied from a source Filestore to N destination Filestores
 type File struct {
 	// Name is the relative path of the file, relative to the Filestore base
-	Name string `yaml:"name"`
+	Name string `json:"name"`
 	// SHA256 holds the SHA256 hash of the specified file (hex encoded)
-	SHA256 string `yaml:"sha256,omitempty"`
+	SHA256 string `json:"sha256,omitempty"`
 }
 
 // Manifest stores the information in a manifest file (describing the
@@ -49,8 +49,8 @@ type Manifest struct {
 	// Filestores are (for example) GCS or S3 buckets.
 	// It is possible that in the future, we support promoting to multiple
 	// filestores, in which case we would have more than just Src/Dest.
-	Filestores []Filestore `yaml:"filestores,omitempty"`
-	Files      []File      `yaml:"files,omitempty"`
+	Filestores []Filestore `json:"filestores,omitempty"`
+	Files      []File      `json:"files,omitempty"`
 }
 
 // ParseManifest parses a Manifest.
