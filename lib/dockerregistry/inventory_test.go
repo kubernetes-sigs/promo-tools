@@ -1780,6 +1780,14 @@ func TestPromotion(t *testing.T) {
 		Src:            true,
 	}
 	registries := []RegistryContext{destRC, srcRC, destRC2}
+
+	registriesRebase := []RegistryContext{
+		{
+			Name:           RegistryName("us.gcr.io/dog/some/subdir/path/foo"),
+			ServiceAccount: "robot",
+		},
+		srcRC}
+
 	var tests = []struct {
 		name         string
 		inputM       Manifest
@@ -2062,6 +2070,36 @@ func TestPromotion(t *testing.T) {
 					Digest:         "sha256:000",
 					Tag:            "0.9"}: 1,
 			},
+		},
+		{
+			"Promote 1 tag as a 'rebase'",
+			Manifest{
+				Registries: registriesRebase,
+				Images: []Image{
+					{
+						ImageName: "a",
+						Dmap: DigestTags{
+							"sha256:000": TagSlice{"0.9"}}}},
+				srcRegistry: &srcRC},
+			SyncContext{
+				Inv: MasterInventory{
+					"gcr.io/foo": RegInvImage{
+						"a": DigestTags{
+							"sha256:000": TagSlice{"0.9"}}},
+					"us.gcr.io/dog/some/subdir/path": RegInvImage{
+						"a": DigestTags{
+							"sha256:111": TagSlice{"0.8"}}},
+				}},
+			nil,
+			CapturedRequests{PromotionRequest{
+				TagOp:          Add,
+				RegistrySrc:    srcRegName,
+				RegistryDest:   registriesRebase[0].Name,
+				ServiceAccount: registriesRebase[0].ServiceAccount,
+				ImageNameSrc:   "a",
+				ImageNameDest:  "a",
+				Digest:         "sha256:000",
+				Tag:            "0.9"}: 1},
 		},
 		{
 			"NOP; dest has extra tag, but NOP because -delete-extra-tags NOT specified",
