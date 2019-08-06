@@ -17,13 +17,11 @@ limitations under the License.
 package inventory
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
-	"os/exec"
 	"regexp"
 	"sort"
 	"strings"
@@ -37,6 +35,7 @@ import (
 	cr "github.com/google/go-containerregistry/pkg/v1/types"
 	cipJson "sigs.k8s.io/k8s-container-image-promoter/lib/json"
 	"sigs.k8s.io/k8s-container-image-promoter/lib/stream"
+	"sigs.k8s.io/k8s-container-image-promoter/pkg/gcloud"
 )
 
 func getSrcRegistry(rcs []RegistryContext) (*RegistryContext, error) {
@@ -64,7 +63,7 @@ func MakeSyncContext(
 		UseServiceAccount:   useSvcAcc,
 		Inv:                 make(MasterInventory),
 		InvIgnore:           []ImageName{},
-		Tokens:              make(map[RootRepo]Token),
+		Tokens:              make(map[RootRepo]gcloud.Token),
 		RenamesDenormalized: mfest.renamesDenormalized,
 		SrcRegistry:         mfest.srcRegistry,
 		RegistryContexts:    mfest.Registries,
@@ -91,15 +90,17 @@ func ParseManifestFromFile(
 	mfest.filepath = filePath
 
 	// Perform semantic checks (beyond just YAML validation).
-	srcRegistry, err = getSrcRegistry(mfest.Registries)
-	if err != nil {
-		return mfest, err
-	}
-	mfest.srcRegistry = srcRegistry
+	if len(mfest.Registries) != 0 {
+		srcRegistry, err = getSrcRegistry(mfest.Registries)
+		if err != nil {
+			return mfest, err
+		}
+		mfest.srcRegistry = srcRegistry
 
-	rd, err = DenormalizeRenames(mfest, srcRegistry.Name)
-	if err != nil {
-		return mfest, err
+		rd, err = DenormalizeRenames(mfest, srcRegistry.Name)
+		if err != nil {
+			return mfest, err
+		}
 	}
 	mfest.renamesDenormalized = rd
 
@@ -522,41 +523,11 @@ error:
 	return "", "", fmt.Errorf("invalid string '%s'", s)
 }
 
-// GetServiceAccountToken calls gcloud to get an access token for the specified
-// service account.
-func GetServiceAccountToken(
-	serviceAccount string,
-	useServiceAccount bool) (Token, error) {
-
-	args := []string{
-		"auth",
-		"print-access-token",
-	}
-	args = MaybeUseServiceAccount(serviceAccount, useServiceAccount, args)
-
-	cmd := exec.Command("gcloud", args...)
-
-	var stdout bytes.Buffer
-	cmd.Stdout = &stdout
-
-	// Do not log the token (stdout) on error, because it could
-	// be that the token was valid, but that Run() failed for
-	// other reasons. NEVER print the token as part of an error message!
-
-	err := cmd.Run()
-	if err != nil {
-		return "", err
-	}
-
-	token := Token(strings.TrimSpace(stdout.String()))
-	return token, nil
-}
-
 // PopulateTokens populates the SyncContext's Tokens map with actual usable
 // access tokens.
 func (sc *SyncContext) PopulateTokens() error {
 	for _, rc := range sc.RegistryContexts {
-		token, err := GetServiceAccountToken(
+		token, err := gcloud.GetServiceAccountToken(
 			rc.ServiceAccount,
 			sc.UseServiceAccount)
 		if err != nil {
@@ -1384,7 +1355,7 @@ func (sc *SyncContext) GetPromotionCandidatesIT(
 	return promotionCandidates.ToRegInvImageTag()
 }
 
-// Promote perferms container image promotion by realizing the intent in the
+// Promote performs container image promotion by realizing the intent in the
 // Manifest.
 func (sc *SyncContext) Promote(
 	mfest Manifest,
@@ -1802,20 +1773,6 @@ func (sc *SyncContext) ClearRepository(
 	}
 }
 
-// MaybeUseServiceAccount injects a '--account=...' argument to the command with
-// the given service account.
-func MaybeUseServiceAccount(
-	serviceAccount string,
-	useServiceAccount bool,
-	cmd []string) []string {
-	if useServiceAccount && len(serviceAccount) > 0 {
-		cmd = append(cmd, "")
-		copy(cmd[2:], cmd[1:])
-		cmd[1] = fmt.Sprintf("--account=%v", serviceAccount)
-	}
-	return cmd
-}
-
 // GetWriteCmd generates a gcloud command that is used to make modifications to
 // a Docker Registry.
 func GetWriteCmd(
@@ -1851,7 +1808,10 @@ func GetWriteCmd(
 			ToPQIN(dest.Name, destImageName, tag)}
 	}
 	// Use the service account if it is desired.
-	return MaybeUseServiceAccount(dest.ServiceAccount, useServiceAccount, cmd)
+	return gcloud.MaybeUseServiceAccount(
+		dest.ServiceAccount,
+		useServiceAccount,
+		cmd)
 }
 
 // GetDeleteCmd generates the cloud command used to delete images (used for
@@ -1875,5 +1835,8 @@ func GetDeleteCmd(
 		cmd = append(cmd, "--force-delete-tags")
 		cmd = append(cmd, "--quiet")
 	}
-	return MaybeUseServiceAccount(rc.ServiceAccount, useServiceAccount, cmd)
+	return gcloud.MaybeUseServiceAccount(
+		rc.ServiceAccount,
+		useServiceAccount,
+		cmd)
 }

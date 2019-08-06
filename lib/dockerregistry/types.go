@@ -22,6 +22,7 @@ import (
 	cr "github.com/google/go-containerregistry/pkg/v1/types"
 
 	"sigs.k8s.io/k8s-container-image-promoter/lib/stream"
+	"sigs.k8s.io/k8s-container-image-promoter/pkg/gcloud"
 )
 
 // RequestResult contains information about the result of running a request
@@ -55,7 +56,7 @@ type SyncContext struct {
 	InvIgnore           []ImageName
 	RegistryContexts    []RegistryContext
 	SrcRegistry         *RegistryContext
-	Tokens              map[RootRepo]Token
+	Tokens              map[RootRepo]gcloud.Token
 	RenamesDenormalized RenamesDenormalized
 	DigestMediaType     DigestMediaType
 }
@@ -63,9 +64,6 @@ type SyncContext struct {
 // RootRepo is the toplevel Docker repository (e.g., gcr.io/foo (GCR domain name
 // + GCP project name).
 type RootRepo string
-
-// Token is the oauth2 access token used for API calls over HTTP.
-type Token string
 
 // MasterInventory stores multiple RegInvImage elements, keyed by RegistryName.
 type MasterInventory map[RegistryName]RegInvImage
@@ -157,6 +155,7 @@ type Manifest struct {
 	// registries, in which case we would have more than just Src/Dest.
 	Registries []RegistryContext `yaml:"registries,omitempty"`
 	Images     []Image           `yaml:"images,omitempty"`
+
 	// A rename list can contain a list of paths, where each path is a string.
 	//
 	// - A rename entry must have at least 2 paths, one for the source, another
@@ -228,7 +227,7 @@ type DigestTags map[Digest]TagSlice
 type RegistryContext struct {
 	Name           RegistryName `yaml:"name,omitempty"`
 	ServiceAccount string       `yaml:"service-account,omitempty"`
-	Token          Token        `yaml:"-"`
+	Token          gcloud.Token `yaml:"-"`
 	Src            bool         `yaml:"src,omitempty"`
 }
 
