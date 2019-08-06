@@ -1026,8 +1026,8 @@ func TestCommandGeneration(t *testing.T) {
 		fmt.Sprintf("Test: %v (cmd string)\n", testName))
 }
 
-// TestReadAllRegistries tests reading images and tags from a registry.
-func TestReadAllRegistries(t *testing.T) {
+// TestReadRegistries tests reading images and tags from a registry.
+func TestReadRegistries(t *testing.T) {
 	const fakeRegName RegistryName = "gcr.io/foo"
 
 	var tests = []struct {
@@ -1223,15 +1223,16 @@ func TestReadAllRegistries(t *testing.T) {
 	for _, test := range tests {
 		// Destination registry is a placeholder, because ReadImageNames acts on
 		// 2 registries (src and dest) at once.
-		sc := SyncContext{
-			RegistryContexts: []RegistryContext{
-				{
-					Name:           fakeRegName,
-					ServiceAccount: "robot",
-				},
+		rcs := []RegistryContext{
+			{
+				Name:           fakeRegName,
+				ServiceAccount: "robot",
 			},
-			Inv:             map[RegistryName]RegInvImage{fakeRegName: nil},
-			DigestMediaType: make(DigestMediaType)}
+		}
+		sc := SyncContext{
+			RegistryContexts: rcs,
+			Inv:              map[RegistryName]RegInvImage{fakeRegName: nil},
+			DigestMediaType:  make(DigestMediaType)}
 		// test is used to pin the "test" variable from the outer "range"
 		// scope (see scopelint).
 		test := test
@@ -1249,7 +1250,7 @@ func TestReadAllRegistries(t *testing.T) {
 			sr.Bytes = []byte(fakeHTTPBody)
 			return &sr
 		}
-		sc.ReadAllRegistries(mkFakeStream1)
+		sc.ReadRegistries(rcs, true, mkFakeStream1)
 		got := sc.Inv[fakeRegName]
 		expected := test.expectedOutput
 		err := checkEqual(got, expected)
@@ -2157,8 +2158,11 @@ func TestPromotion(t *testing.T) {
 			}
 		}
 
-		test.inputSc.Promote(
+		edges := test.inputSc.GetPromotionEdgesFromManifests(
 			[]Manifest{test.inputM},
+			false)
+		test.inputSc.Promote(
+			edges,
 			nopStream,
 			&processRequestFake)
 
@@ -2296,8 +2300,12 @@ func TestPromotionMulti(t *testing.T) {
 		checkError(t, err,
 			fmt.Sprintf("checkError (srcReg): test: %v\n", test.name))
 		test.inputSc.SrcRegistry = srcReg
-		test.inputSc.Promote(
+
+		edges := test.inputSc.GetPromotionEdgesFromManifests(
 			[]Manifest{test.inputM},
+			false)
+		test.inputSc.Promote(
+			edges,
 			nopStream,
 			&processRequestFake)
 		err = checkEqual(captured, test.expectedReqs)
