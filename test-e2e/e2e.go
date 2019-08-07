@@ -79,38 +79,40 @@ func main() {
 			klog.Fatal("error with test setup:", err)
 		}
 
+		fmt.Println("checking snapshots BEFORE promotion:")
 		for _, snapshot := range t.Snapshots {
-			images, err := getSnapshot(
-				*repoRootPtr,
-				snapshot.Name,
-				t.Registries)
-			if err != nil {
-				klog.Fatal("could not get pre-promotion snapshot of repo", snapshot.Name)
-			}
-			if err := checkEqual(snapshot.Before, images); err != nil {
-				fmt.Println(err)
-				os.Exit(1)
-			}
+			checkSnapshot(snapshot.Name, snapshot.Before, *repoRootPtr, t.Registries)
 		}
 
 		err = runPromotion(*repoRootPtr, t)
 		if err != nil {
 			klog.Fatal("error with promotion:", err)
 		}
+
+		fmt.Println("checking snapshots AFTER promotion:")
 		for _, snapshot := range t.Snapshots {
-			images, err := getSnapshot(
-				*repoRootPtr,
-				snapshot.Name,
-				t.Registries)
-			if err != nil {
-				klog.Fatal("could not get post-promotion snapshot of repo", snapshot.Name)
-			}
-			if err := checkEqual(snapshot.After, images); err != nil {
-				fmt.Println(err)
-				os.Exit(1)
-			}
+			checkSnapshot(snapshot.Name, snapshot.After, *repoRootPtr, t.Registries)
 		}
+
 		fmt.Printf("e2e test '%s': OK\n", t.Name)
+	}
+}
+
+func checkSnapshot(repo reg.RegistryName,
+	expected []reg.Image,
+	cwd string,
+	rcs []reg.RegistryContext) {
+
+	got, err := getSnapshot(
+		cwd,
+		repo,
+		rcs)
+	if err != nil {
+		klog.Fatal("could not get snapshot of repo", repo)
+	}
+	if err := checkEqual(got, expected); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
 	}
 }
 
@@ -120,19 +122,14 @@ func activateServiceAccount(keyFilePath string) error {
 		"activate-service-account",
 		"--key-file="+keyFilePath)
 
-	var stdout bytes.Buffer
-	cmd.Stdout = &stdout
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
 
 	err := cmd.Run()
 	if err != nil {
-		fmt.Println("stdout", stdout.String())
-		fmt.Println("stderr", stderr.String())
 		return err
 	}
 
-	fmt.Println(stdout.String())
 	return nil
 }
 
@@ -287,19 +284,14 @@ func runPromotion(cwd string, t E2ETest) error {
 
 	cmd.Dir = cwd
 
-	var stdout bytes.Buffer
-	cmd.Stdout = &stdout
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
 
 	err := cmd.Run()
 	if err != nil {
-		fmt.Println("stdout", stdout.String())
-		fmt.Println("stderr", stderr.String())
 		return err
 	}
 
-	fmt.Println(stdout.String())
 	return nil
 }
 
