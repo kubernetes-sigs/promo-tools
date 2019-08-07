@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"reflect"
+	"strings"
 
 	yaml "gopkg.in/yaml.v2"
 	"k8s.io/klog"
@@ -87,8 +88,9 @@ func main() {
 			if err != nil {
 				klog.Fatal("could not get pre-promotion snapshot of repo", snapshot.Name)
 			}
-			if !reflect.DeepEqual(snapshot.Before, images) {
-				klog.Fatalf("expected: %s\ngot: %s", snapshot.Before, images)
+			if err := checkEqual(snapshot.Before, images); err != nil {
+				fmt.Println(err)
+				os.Exit(1)
 			}
 		}
 
@@ -105,8 +107,9 @@ func main() {
 			if err != nil {
 				klog.Fatal("could not get post-promotion snapshot of repo", snapshot.Name)
 			}
-			if !reflect.DeepEqual(snapshot.After, images) {
-				klog.Fatalf("expected: %s\ngot: %s", snapshot.After, images)
+			if err := checkEqual(snapshot.After, images); err != nil {
+				fmt.Println(err)
+				os.Exit(1)
 			}
 		}
 		fmt.Printf("e2e test '%s': OK\n", t.Name)
@@ -166,25 +169,125 @@ func testSetup(cwd string, mfest reg.Manifest) error {
 		clearRepository(rc.Name, mfest, &sc)
 	}
 
-	// TODO: Deprecate e2e.sh script by moving all of its logic into this
-	// binary.
-	cmd := exec.Command("./test/e2e.sh", "populate")
-	cmd.Dir = cwd
+	pwd := os.Getenv("PWD")
+	pushRepo := getBazelOption("STABLE_TEST_STAGING_IMG_REPOSITORY")
 
-	var stdout bytes.Buffer
-	cmd.Stdout = &stdout
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-
-	err = cmd.Run()
-	if err != nil {
-		fmt.Println("stdout", stdout.String())
-		fmt.Println("stderr", stderr.String())
-		return err
+	if pushRepo == "" {
+		return fmt.Errorf(
+			"could not dereference STABLE_TEST_STAGING_IMG_REPOSITORY")
 	}
 
-	fmt.Println(stdout.String())
+	cmds := [][]string{
+		{
+			"bazel",
+			"build",
+			"--host_force_python=PY2",
+			fmt.Sprintf(
+				"--workspace_status_command=%s/workspace_status.sh",
+				pwd),
+			"//test-e2e:golden-images-loadable.tar",
+		},
+		// In order to create a manifest list, images must be pushed to a
+		// repository first.
+		{
+			"bazel",
+			"run",
+			"--host_force_python=PY2",
+			fmt.Sprintf(
+				"--workspace_status_command=%s/workspace_status.sh",
+				pwd),
+			"//test-e2e:push-golden",
+		},
+		{
+			"docker",
+			"manifest",
+			"create",
+			fmt.Sprintf("%s/golden:1.0", pushRepo),
+			fmt.Sprintf("%s/golden:1.0-linux_amd64", pushRepo),
+			fmt.Sprintf("%s/golden:1.0-linux_s390x", pushRepo),
+		},
+		// Fixup the s390x image because it's set to amd64 by default (there is
+		// no way to specify architecture from within bazel yet when creating
+		// images).
+		{
+			"docker",
+			"manifest",
+			"annotate",
+			"--arch=s390x",
+			fmt.Sprintf("%s/golden:1.0", pushRepo),
+			fmt.Sprintf("%s/golden:1.0-linux_s390x", pushRepo),
+		},
+		{
+			"docker",
+			"manifest",
+			"inspect",
+			fmt.Sprintf("%s/golden:1.0", pushRepo),
+		},
+		// Finally, push the manifest list. It is just metadata around existing
+		// images in a repository.
+		{
+			"docker",
+			"manifest",
+			"push",
+			"--purge",
+			fmt.Sprintf("%s/golden:1.0", pushRepo),
+		},
+	}
+
+	for _, cmd := range cmds {
+		fmt.Println("execing cmd", cmd)
+		stdout, stderr, err := execCommand(cwd, cmd[0], cmd[1:]...)
+		if err != nil {
+			return err
+		}
+		fmt.Println(stdout)
+		fmt.Println(stderr)
+	}
+
 	return nil
+}
+
+func execCommand(
+	cwd, cmdString string,
+	args ...string) (string, string, error) {
+
+	cmd := exec.Command(cmdString, args...)
+	if cwd != "" {
+		cmd.Dir = cwd
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		klog.Errorf("for command %s:\nstdout:\n%sstderr:\n%s\n",
+			cmdString,
+			stdout.String(),
+			stderr.String())
+		return "", "", err
+	}
+	return stdout.String(), stderr.String(), nil
+}
+
+func getBazelOption(o string) string {
+	stdout, _, err := execCommand(
+		"",
+		fmt.Sprintf("%s/workspace_status.sh", os.Getenv("PWD")))
+	if err != nil {
+		return ""
+	}
+
+	for _, line := range strings.Split(strings.TrimSuffix(stdout, "\n"), "\n") {
+		if strings.Contains(line, o) {
+			words := strings.Split(line, " ")
+			if len(words) == 2 {
+				return words[1]
+			}
+		}
+	}
+	return ""
 }
 
 func writeTempManifest(mfest reg.Manifest) (string, error) {
@@ -354,4 +457,22 @@ func printVersion() {
 func printUsage() {
 	fmt.Fprintf(os.Stderr, "Usage of %s:\n", os.Args[0])
 	flag.PrintDefaults()
+}
+
+// TODO: Use the version of checkEqual found in
+// lib/dockerregistry/inventory_test.go.
+func checkEqual(got, expected interface{}) error {
+	if !reflect.DeepEqual(got, expected) {
+		return fmt.Errorf(
+			`<<<<<<< got (type %T)
+%v
+=======
+%v
+>>>>>>> expected (type %T)`,
+			got,
+			got,
+			expected,
+			expected)
+	}
+	return nil
 }

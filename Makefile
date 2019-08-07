@@ -5,6 +5,7 @@ all: test build
 build:
 	bazel build $(BAZEL_BUILD_OPTS) //:cip
 	bazel build $(BAZEL_BUILD_OPTS) //test-e2e:e2e
+	bazel build $(BAZEL_BUILD_OPTS) //cmd/promobot-files:promobot-files
 image:
 	bazel build $(BAZEL_BUILD_OPTS) //:cip-docker-loadable.tar
 image-load: image

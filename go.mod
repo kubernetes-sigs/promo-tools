@@ -5,7 +5,6 @@ go 1.12
 require (
 	cloud.google.com/go v0.38.0
 	github.com/google/go-containerregistry v0.0.0-20190619182234-abf9ef06abd9
-	github.com/googleapis/gax-go v2.0.2+incompatible // indirect
 	go.opencensus.io v0.22.0 // indirect
 	golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45
 	google.golang.org/api v0.7.0
