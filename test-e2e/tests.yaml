@@ -15,20 +15,20 @@
   invocation:
   - "-manifest=$PWD/test-e2e/fixture/sanity/manifest.yaml"
   snapshots:
-  - name: us.gcr.io/k8s-cip-test-prod
+  - name: us.gcr.io/k8s-cip-test-prod/some/subdir
     before: []
     after: &golden-images
-    - name: golden
+    - name: foo
       dmap:
-        sha256:5587f8edeb8ebe3b25617f97d262d62d5d2c662a76b13550d5828d1abb0e59da:
-        - 1.0-linux_amd64
-        sha256:cf856619c44270ef9fdf9b6915ae14e392af735ec06ccf2c1951cac4b4e28590:
+        sha256:a42e27f5d18d51c581efef2584ff9aebbfeffcb3145e81e52b1dccf62915e4a3:
         - 1.0
-        sha256:d6dd6eed79ac51e53e6133e9c7d080b5f8a82263096f4b48d0727fa09f73abd5:
+        sha256:2af5205553239e0eb17c544bc1e90c2d6173012a191f0a44131aa2f9c44bb511:
+        - 1.0-linux_amd64
+        sha256:2740382935148a02bf425a893d14848dd6238e405935440ce5c13b771a33f2fd:
         - 1.0-linux_s390x
-  - name: eu.gcr.io/k8s-cip-test-prod
+  - name: eu.gcr.io/k8s-cip-test-prod/some/subdir
     before: []
     after: *golden-images
-  - name: asia.gcr.io/k8s-cip-test-prod
+  - name: asia.gcr.io/k8s-cip-test-prod/some/subdir
     before: []
     after: *golden-images

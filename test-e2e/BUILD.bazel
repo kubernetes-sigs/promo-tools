@@ -49,37 +49,37 @@ go_image(
 # FIXME: We should be using some custom Bazel rule that can just for-loop
 # across the different os/arch combinations.
 
-# linux_amd64
+# foo: linux_amd64
 container_layer(
-    name = "golden-layer-linux_amd64",
-    directory = "/golden/linux_amd64",
-    files = ["golden/linux_amd64.txt"],
+    name = "golden-layer-foo-1.0-linux_amd64",
+    directory = "/golden/foo/linux_amd64",
+    files = ["golden/foo/1.0-linux_amd64"],
 )
 
 container_image(
-    name = "golden-image-linux_amd64",
+    name = "golden-image-foo-1.0-linux_amd64",
     # No base image to simulate 'scratch' image.
-    layers = [":golden-layer-linux_amd64"],
+    layers = [":golden-layer-foo-1.0-linux_amd64"],
 )
 
-# linux_s390x
+# foo: linux_s390x
 container_layer(
-    name = "golden-layer-linux_s390x",
-    directory = "/golden/linux_s390x",
-    files = ["golden/linux_s390x.txt"],
+    name = "golden-layer-foo-1.0-linux_s390x",
+    directory = "/golden/foo/linux_s390x",
+    files = ["golden/foo/1.0-linux_s390x"],
 )
 
 container_image(
-    name = "golden-image-linux_s390x",
+    name = "golden-image-foo-1.0-linux_s390x",
     # No base image to simulate 'scratch' image.
-    layers = [":golden-layer-linux_s390x"],
+    layers = [":golden-layer-foo-1.0-linux_s390x"],
 )
 
 container_bundle(
     name = "golden-images-loadable",
     images = {
-        "{STABLE_TEST_STAGING_IMG_REPOSITORY}/golden:1.0-linux_amd64": "//test-e2e:golden-image-linux_amd64",
-        "{STABLE_TEST_STAGING_IMG_REPOSITORY}/golden:1.0-linux_s390x": "//test-e2e:golden-image-linux_s390x",
+        "{STABLE_TEST_STAGING_IMG_REPOSITORY}/golden-foo/foo:1.0-linux_amd64": "//test-e2e:golden-image-foo-1.0-linux_amd64",
+        "{STABLE_TEST_STAGING_IMG_REPOSITORY}/golden-foo/foo:1.0-linux_s390x": "//test-e2e:golden-image-foo-1.0-linux_s390x",
     },
 )
 

@@ -170,9 +170,9 @@ func testSetup(cwd string, t E2ETest) error {
 			"docker",
 			"manifest",
 			"create",
-			fmt.Sprintf("%s/golden:1.0", pushRepo),
-			fmt.Sprintf("%s/golden:1.0-linux_amd64", pushRepo),
-			fmt.Sprintf("%s/golden:1.0-linux_s390x", pushRepo),
+			fmt.Sprintf("%s/golden-foo/foo:1.0", pushRepo),
+			fmt.Sprintf("%s/golden-foo/foo:1.0-linux_amd64", pushRepo),
+			fmt.Sprintf("%s/golden-foo/foo:1.0-linux_s390x", pushRepo),
 		},
 		// Fixup the s390x image because it's set to amd64 by default (there is
 		// no way to specify architecture from within bazel yet when creating
@@ -182,14 +182,14 @@ func testSetup(cwd string, t E2ETest) error {
 			"manifest",
 			"annotate",
 			"--arch=s390x",
-			fmt.Sprintf("%s/golden:1.0", pushRepo),
-			fmt.Sprintf("%s/golden:1.0-linux_s390x", pushRepo),
+			fmt.Sprintf("%s/golden-foo/foo:1.0", pushRepo),
+			fmt.Sprintf("%s/golden-foo/foo:1.0-linux_s390x", pushRepo),
 		},
 		{
 			"docker",
 			"manifest",
 			"inspect",
-			fmt.Sprintf("%s/golden:1.0", pushRepo),
+			fmt.Sprintf("%s/golden-foo/foo:1.0", pushRepo),
 		},
 		// Finally, push the manifest list. It is just metadata around existing
 		// images in a repository.
@@ -198,7 +198,7 @@ func testSetup(cwd string, t E2ETest) error {
 			"manifest",
 			"push",
 			"--purge",
-			fmt.Sprintf("%s/golden:1.0", pushRepo),
+			fmt.Sprintf("%s/golden-foo/foo:1.0", pushRepo),
 		},
 	}
 
