@@ -69,14 +69,21 @@ func MakeSyncContext(
 		RegistryContexts:    make([]RegistryContext, 0),
 		DigestMediaType:     make(DigestMediaType)}
 
+	registriesSeen := make(map[RegistryContext]interface{})
 	for _, mfest := range mfests {
-		// Populate SyncContext with registries found across all manifests.
-		sc.RegistryContexts = append(sc.RegistryContexts, mfest.Registries...)
+		for _, r := range mfest.Registries {
+			registriesSeen[r] = nil
+		}
 
 		// Populate rename info found across all manifests.
 		for k, v := range mfest.renamesDenormalized {
 			sc.RenamesDenormalized[k] = v
 		}
+	}
+
+	// Populate SyncContext with registries found across all manifests.
+	for r := range registriesSeen {
+		sc.RegistryContexts = append(sc.RegistryContexts, r)
 	}
 
 	// Populate access tokens for all registries listed in the manifest.
