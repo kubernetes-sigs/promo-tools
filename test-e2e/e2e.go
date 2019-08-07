@@ -93,9 +93,6 @@ func main() {
 			}
 		}
 
-		if err != nil {
-			klog.Fatal("could not write Manifest file:", err)
-		}
 		err = runPromotion(*repoRootPtr, t)
 		if err != nil {
 			klog.Fatal("error with promotion:", err)
@@ -263,27 +260,6 @@ func getBazelOption(o string) string {
 		}
 	}
 	return ""
-}
-
-func writeTempManifest(mfest reg.Manifest) (string, error) {
-	bs, err := yaml.Marshal(mfest)
-	if err != nil {
-		return "", fmt.Errorf("cannot serialize manifest to yaml: %s", err)
-	}
-
-	tmpfile, err := ioutil.TempFile("", "tmp-promoter-manifest")
-	if err != nil {
-		klog.Fatal(err)
-	}
-
-	if _, err := tmpfile.Write(bs); err != nil {
-		klog.Fatal(err)
-	}
-	if err := tmpfile.Close(); err != nil {
-		klog.Fatal(err)
-	}
-
-	return tmpfile.Name(), nil
 }
 
 func runPromotion(cwd string, t E2ETest) error {
