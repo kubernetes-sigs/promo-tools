@@ -629,22 +629,6 @@ func TestValidateManifestsFromDir(t *testing.T) {
 				filepath.Join(pwd, "invalid/overlapping-renames-across-manifests/a/manifest.yaml"),
 				filepath.Join(pwd, "invalid/overlapping-renames-across-manifests/b/manifest.yaml")),
 		},
-		{
-			"different-dst-registries",
-			fmt.Errorf(
-				"different destination registries found in manifests:\n- '%s'\n- '%s'\n",
-				filepath.Join(pwd, "invalid/different-dst-registries/a/manifest.yaml"),
-				filepath.Join(pwd, "invalid/different-dst-registries/b/manifest.yaml")),
-		},
-		{
-			"different-dst-registry-creds",
-			// We get the same error message as above because
-			// ValidateManifestsFromDir uses reflect.DeepEqual() as a predicate.
-			fmt.Errorf(
-				"different destination registries found in manifests:\n- '%s'\n- '%s'\n",
-				filepath.Join(pwd, "invalid/different-dst-registry-creds/a/manifest.yaml"),
-				filepath.Join(pwd, "invalid/different-dst-registry-creds/b/manifest.yaml")),
-		},
 	}
 
 	for _, test := range shouldBeInvalid {

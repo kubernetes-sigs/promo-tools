@@ -24,7 +24,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"reflect"
 	"regexp"
 	"sort"
 	"strings"
@@ -225,28 +224,6 @@ func ValidateManifestsFromDir(mfests []Manifest) error {
 				}
 				renamesSeen[regImgPath] = mfest.filepath
 			}
-		}
-	}
-
-	// Force all manifests to share the EXACT same non-src-registry
-	// configuration. This is because they should all be promoting to the same
-	// central registry, with the same creds.
-	canonicalDstRegisries := []RegistryContext{}
-	for _, registry := range mfests[0].Registries {
-		if !registry.Src {
-			canonicalDstRegisries = append(canonicalDstRegisries, registry)
-		}
-	}
-	for _, mfest := range mfests[1:] {
-		dstRegistries := []RegistryContext{}
-		for _, registry := range mfest.Registries {
-			if !registry.Src {
-				dstRegistries = append(dstRegistries, registry)
-			}
-		}
-
-		if !reflect.DeepEqual(dstRegistries, canonicalDstRegisries) {
-			return fmt.Errorf("different destination registries found in manifests:\n- '%s'\n- '%s'\n", mfests[0].filepath, mfest.filepath)
 		}
 	}
 
