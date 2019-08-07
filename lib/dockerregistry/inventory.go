@@ -1759,7 +1759,6 @@ func supportedMediaType(v string) (cr.MediaType, error) {
 // separately (deletion of manifest lists vs deletion of other media types).
 func (sc *SyncContext) ClearRepository(
 	regName RegistryName,
-	mfest Manifest,
 	mkProducer func(RegistryContext, ImageName, Digest) stream.Producer,
 	customProcessRequest *ProcessRequest) {
 
@@ -1772,7 +1771,7 @@ func (sc *SyncContext) ClearRepository(
 			reqs chan<- stream.ExternalRequest,
 			wg *sync.WaitGroup) {
 
-			for _, registry := range mfest.Registries {
+			for _, registry := range sc.RegistryContexts {
 				// Skip over any registry that does not match the regName we want to
 				// wipe.
 				if registry.Name != regName {
