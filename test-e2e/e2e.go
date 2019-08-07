@@ -55,10 +55,6 @@ func main() {
 		os.Exit(0)
 	}
 
-	if *testsPtr == "" {
-		klog.Fatal(fmt.Errorf("-tests=... flag is required"))
-	}
-
 	if *repoRootPtr == "" {
 		klog.Fatal(fmt.Errorf("-repo-root=... flag is required"))
 	}
@@ -78,13 +74,16 @@ func main() {
 	// Loop through each e2e test case.
 	for _, t := range ts {
 		fmt.Printf("Running e2e test '%s'...\n", t.Name)
-		err := testSetup(*repoRootPtr, t.Manifest)
+		err := testSetup(*repoRootPtr, t)
 		if err != nil {
 			klog.Fatal("error with test setup:", err)
 		}
 
 		for _, snapshot := range t.Snapshots {
-			images, err := getSnapshot(*repoRootPtr, snapshot.Name, t.Manifest)
+			images, err := getSnapshot(
+				*repoRootPtr,
+				snapshot.Name,
+				t.Registries)
 			if err != nil {
 				klog.Fatal("could not get pre-promotion snapshot of repo", snapshot.Name)
 			}
@@ -94,16 +93,18 @@ func main() {
 			}
 		}
 
-		manifestPath, err := writeTempManifest(t.Manifest)
 		if err != nil {
 			klog.Fatal("could not write Manifest file:", err)
 		}
-		err = runPromotion(*repoRootPtr, manifestPath)
+		err = runPromotion(*repoRootPtr, t)
 		if err != nil {
 			klog.Fatal("error with promotion:", err)
 		}
 		for _, snapshot := range t.Snapshots {
-			images, err := getSnapshot(*repoRootPtr, snapshot.Name, t.Manifest)
+			images, err := getSnapshot(
+				*repoRootPtr,
+				snapshot.Name,
+				t.Registries)
 			if err != nil {
 				klog.Fatal("could not get post-promotion snapshot of repo", snapshot.Name)
 			}
@@ -138,35 +139,9 @@ func activateServiceAccount(keyFilePath string) error {
 	return nil
 }
 
-func testSetup(cwd string, mfest reg.Manifest) error {
-
-	sc, err := reg.MakeSyncContext(
-		[]reg.Manifest{mfest},
-		2,
-		10,
-		false,
-		true)
-	if err != nil {
-		klog.Fatal(err)
-	}
-
-	err = sc.PopulateTokens()
-	if err != nil {
-		klog.Fatal(err)
-	}
-
-	sc.ReadRegistries(
-		sc.RegistryContexts,
-		// Read all registries recursively, because we want to delete every
-		// image found in it (clearRepository works by deleting each image found
-		// in sc.Inv).
-		true,
-		reg.MkReadRepositoryCmdReal)
-
-	// Clear ALL registries in the test manifest. Blank slate!
-	for _, rc := range mfest.Registries {
-		fmt.Println("CLEARING REPO", rc.Name)
-		clearRepository(rc.Name, mfest, &sc)
+func testSetup(cwd string, t E2ETest) error {
+	if err := t.clearRepositories(); err != nil {
+		return err
 	}
 
 	pwd := os.Getenv("PWD")
@@ -311,22 +286,28 @@ func writeTempManifest(mfest reg.Manifest) (string, error) {
 	return tmpfile.Name(), nil
 }
 
-func runPromotion(cwd string, manifestPath string) error {
-	// nolint[errcheck]
-	defer os.Remove(manifestPath)
-
-	// NOTE: we should probably compile the cip binary and then put it in the
-	// PATH and then use multirun.sh as-is.
-
-	cmd := exec.Command(
-		"bazel",
+func runPromotion(cwd string, t E2ETest) error {
+	args := []string{
 		"run",
-		"--workspace_status_command="+cwd+"/workspace_status.sh",
+		"--workspace_status_command=" + cwd + "/workspace_status.sh",
 		":cip",
 		"--",
 		"-dry-run=false",
 		"-verbosity=3",
-		"-manifest="+manifestPath)
+	}
+
+	argsFinal := []string{}
+
+	args = append(args, t.Invocation...)
+
+	for _, arg := range args {
+		argsFinal = append(argsFinal, strings.ReplaceAll(arg, "$PWD", cwd))
+	}
+
+	cmd := exec.Command(
+		"bazel",
+		argsFinal...,
+	)
 
 	cmd.Dir = cwd
 
@@ -346,8 +327,11 @@ func runPromotion(cwd string, manifestPath string) error {
 	return nil
 }
 
-func extractSvcAcc(registry reg.RegistryName, mfest reg.Manifest) string {
-	for _, r := range mfest.Registries {
+func extractSvcAcc(
+	registry reg.RegistryName,
+	rcs []reg.RegistryContext) string {
+
+	for _, r := range rcs {
 		if r.Name == registry {
 			return r.ServiceAccount
 		}
@@ -357,7 +341,7 @@ func extractSvcAcc(registry reg.RegistryName, mfest reg.Manifest) string {
 
 func getSnapshot(cwd string,
 	registry reg.RegistryName,
-	mfest reg.Manifest) ([]reg.Image, error) {
+	rcs []reg.RegistryContext) ([]reg.Image, error) {
 
 	invocation := []string{
 		"run",
@@ -366,7 +350,7 @@ func getSnapshot(cwd string,
 		"--",
 		"-snapshot=" + string(registry)}
 
-	svcAcc := extractSvcAcc(registry, mfest)
+	svcAcc := extractSvcAcc(registry, rcs)
 	if len(svcAcc) > 0 {
 		invocation = append(invocation, "-snapshot-service-account="+svcAcc)
 	}
@@ -394,8 +378,38 @@ func getSnapshot(cwd string,
 	return images, err
 }
 
+func (t *E2ETest) clearRepositories() error {
+	// We need a SyncContext to clear the repos. That's it. The actual
+	// promotions will be done by the cip binary, not this tool.
+	sc, err := reg.MakeSyncContext(
+		[]reg.Manifest{
+			{Registries: t.Registries},
+		},
+		2,
+		10,
+		false,
+		true)
+	if err != nil {
+		return err
+	}
+
+	sc.ReadRegistries(
+		sc.RegistryContexts,
+		// Read all registries recursively, because we want to delete every
+		// image found in it (clearRepository works by deleting each image found
+		// in sc.Inv).
+		true,
+		reg.MkReadRepositoryCmdReal)
+
+	// Clear ALL registries in the test manifest. Blank slate!
+	for _, rc := range t.Registries {
+		fmt.Println("CLEARING REPO", rc.Name)
+		clearRepository(rc.Name, &sc)
+	}
+	return nil
+}
+
 func clearRepository(regName reg.RegistryName,
-	mfest reg.Manifest,
 	sc *reg.SyncContext) {
 
 	mkDeletionCmd := func(
@@ -412,16 +426,17 @@ func clearRepository(regName reg.RegistryName,
 		return &sp
 	}
 
-	sc.ClearRepository(regName, mfest, mkDeletionCmd, nil)
+	sc.ClearRepository(regName, mkDeletionCmd, nil)
 }
 
 // E2ETest holds all the information about a single e2e test. It has the
 // promoter manifest, and the before/after snapshots of all repositories that it
 // cares about.
 type E2ETest struct {
-	Name      string             `name:"tests,omitempty"`
-	Manifest  reg.Manifest       `manifest:"tests,omitempty"`
-	Snapshots []RegistrySnapshot `snapshots:"tests,omitempty"`
+	Name       string                `yaml:"name,omitempty"`
+	Registries []reg.RegistryContext `yaml:"registries,omitempty"`
+	Invocation []string              `yaml:"invocation,omitempty"`
+	Snapshots  []RegistrySnapshot    `yaml:"snapshots,omitempty"`
 }
 
 // E2ETests is an array of E2ETest.

@@ -1,20 +1,23 @@
 # TODO: Add more nuanced promotion cases, such as:
 #
-# - renames
+# - rebases
 # - tag restoration (move tag back from one Digest to another)
-- name: "sanity (basic promotion)"
-  manifest:
-    registries:
-    - name: gcr.io/k8s-staging-cip-test
-      service-account: k8s-infra-gcr-promoter@k8s-cip-test-prod.iam.gserviceaccount.com
-      src: true
-    - name: us.gcr.io/k8s-cip-test-prod
-      service-account: k8s-infra-gcr-promoter@k8s-cip-test-prod.iam.gserviceaccount.com
-    - name: eu.gcr.io/k8s-cip-test-prod
-      service-account: k8s-infra-gcr-promoter@k8s-cip-test-prod.iam.gserviceaccount.com
-    - name: asia.gcr.io/k8s-cip-test-prod
-      service-account: k8s-infra-gcr-promoter@k8s-cip-test-prod.iam.gserviceaccount.com
-    images: &golden-images
+- name: "sanity (basic promotion on single manifest file)"
+  registries:
+  - name: gcr.io/k8s-staging-cip-test
+    service-account: k8s-infra-gcr-promoter@k8s-cip-test-prod.iam.gserviceaccount.com
+  - name: us.gcr.io/k8s-cip-test-prod
+    service-account: k8s-infra-gcr-promoter@k8s-cip-test-prod.iam.gserviceaccount.com
+  - name: eu.gcr.io/k8s-cip-test-prod
+    service-account: k8s-infra-gcr-promoter@k8s-cip-test-prod.iam.gserviceaccount.com
+  - name: asia.gcr.io/k8s-cip-test-prod
+    service-account: k8s-infra-gcr-promoter@k8s-cip-test-prod.iam.gserviceaccount.com
+  invocation:
+  - "-manifest=$PWD/test-e2e/fixture/sanity/manifest.yaml"
+  snapshots:
+  - name: us.gcr.io/k8s-cip-test-prod
+    before: []
+    after: &golden-images
     - name: golden
       dmap:
         sha256:5587f8edeb8ebe3b25617f97d262d62d5d2c662a76b13550d5828d1abb0e59da:
@@ -23,10 +26,6 @@
         - 1.0
         sha256:d6dd6eed79ac51e53e6133e9c7d080b5f8a82263096f4b48d0727fa09f73abd5:
         - 1.0-linux_s390x
-  snapshots:
-  - name: us.gcr.io/k8s-cip-test-prod
-    before: []
-    after: *golden-images
   - name: eu.gcr.io/k8s-cip-test-prod
     before: []
     after: *golden-images
