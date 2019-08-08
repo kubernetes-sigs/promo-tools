@@ -1054,7 +1054,8 @@ func MkReadRepositoryCmdReal(
 			repoPath)
 	}
 	rc.Token = sc.Tokens[RootRepo(tokenKey)]
-	httpReq.SetBasicAuth("oauth2accesstoken", string(rc.Token))
+	var bearer = "Bearer " + string(rc.Token)
+	httpReq.Header.Add("Authorization", bearer)
 	sh.Req = httpReq
 
 	return &sh
