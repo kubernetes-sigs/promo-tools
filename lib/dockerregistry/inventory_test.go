@@ -590,9 +590,16 @@ func TestValidateManifestsFromDir(t *testing.T) {
 
 	for _, testInput := range shouldBeValid {
 		fixtureDir := filepath.Join(pwd, "valid", testInput)
-		mfests, _ := ParseManifestsFromDir(fixtureDir)
+
+		mfests, errParse := ParseManifestsFromDir(fixtureDir)
+		eqErr := checkEqual(errParse, nil)
+		checkError(
+			t,
+			eqErr,
+			fmt.Sprintf("Test: `%v' should be valid (parse)\n", testInput))
+
 		err := ValidateManifestsFromDir(mfests)
-		eqErr := checkEqual(err, nil)
+		eqErr = checkEqual(err, nil)
 		checkError(
 			t,
 			eqErr,
