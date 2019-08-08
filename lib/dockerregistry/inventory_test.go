@@ -1808,9 +1808,7 @@ func TestToPromotionEdges(t *testing.T) {
 }
 
 // TestPromotion is the most important test as it simulates the main job of the
-// promoter. There should be a fake "handler" that can execute stateful changes
-// to a fake GCR. Then it's just a matter of comparing the input GCR states +
-// manifest, and then comparing what the output GCR states look like.
+// promoter.
 func TestPromotion(t *testing.T) {
 	// CapturedRequests is like a bitmap. We clear off bits (delete keys) for
 	// each request that we see that got generated. Then it's just a matter of
