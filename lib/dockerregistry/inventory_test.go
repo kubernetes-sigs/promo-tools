@@ -537,6 +537,71 @@ func TestParseManifestsFromDir(t *testing.T) {
 			},
 			nil,
 		},
+		{
+			"Multiple (with 'rebase')",
+			"multiple-rebases",
+			[]Manifest{
+				{
+					Registries: []RegistryContext{
+						{
+							Name:           "gcr.io/foo-staging",
+							ServiceAccount: "sa@robot.com",
+							Src:            true,
+						},
+						{
+							Name:           "us.gcr.io/some-prod/foo",
+							ServiceAccount: "sa@robot.com",
+						},
+						{
+							Name:           "eu.gcr.io/some-prod/foo",
+							ServiceAccount: "sa@robot.com",
+						},
+						{
+							Name:           "asia.gcr.io/some-prod/foo",
+							ServiceAccount: "sa@robot.com",
+						},
+					},
+					Images: []Image{
+						{ImageName: "foo-controller",
+							Dmap: DigestTags{
+								"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": {"1.0"},
+							},
+						},
+					},
+					filepath: "a/manifest.yaml",
+				},
+				{
+					Registries: []RegistryContext{
+						{
+							Name:           "gcr.io/bar-staging",
+							ServiceAccount: "sa@robot.com",
+							Src:            true,
+						},
+						{
+							Name:           "us.gcr.io/some-prod/bar",
+							ServiceAccount: "sa@robot.com",
+						},
+						{
+							Name:           "eu.gcr.io/some-prod/bar",
+							ServiceAccount: "sa@robot.com",
+						},
+						{
+							Name:           "asia.gcr.io/some-prod/bar",
+							ServiceAccount: "sa@robot.com",
+						},
+					},
+					Images: []Image{
+						{ImageName: "bar-controller",
+							Dmap: DigestTags{
+								"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": {"1.0"},
+							},
+						},
+					},
+					filepath: "b/manifest.yaml",
+				},
+			},
+			nil,
+		},
 	}
 
 	for _, test := range tests {
@@ -584,6 +649,7 @@ func TestValidateManifestsFromDir(t *testing.T) {
 	var shouldBeValid = []string{
 		"basic",
 		"singleton",
+		"multiple-rebases",
 	}
 
 	pwd := bazelTestPath("TestValidateManifestsFromDir")
