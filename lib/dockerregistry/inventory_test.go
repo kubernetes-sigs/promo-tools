@@ -2211,6 +2211,84 @@ func TestPromotion(t *testing.T) {
 			nil,
 			CapturedRequests{},
 		},
+		{
+			"Add 1 tag for 2 registries",
+			Manifest{
+				Registries: registries,
+				Images: []Image{
+					{
+						ImageName: "a",
+						Dmap: DigestTags{
+							"sha256:000": TagSlice{"0.9", "1.0"}}}},
+				srcRegistry: &srcRC},
+			SyncContext{
+				Inv: MasterInventory{
+					"gcr.io/foo": RegInvImage{
+						"a": DigestTags{
+							"sha256:000": TagSlice{"0.9"}}},
+					"gcr.io/bar": RegInvImage{
+						"a": DigestTags{
+							"sha256:000": TagSlice{"0.9"}}},
+					"gcr.io/cat": RegInvImage{
+						"a": DigestTags{
+							"sha256:000": TagSlice{"0.9"}}}}},
+			nil,
+			CapturedRequests{
+				PromotionRequest{
+					TagOp:          Add,
+					RegistrySrc:    srcRegName,
+					RegistryDest:   registries[0].Name,
+					ServiceAccount: registries[0].ServiceAccount,
+					ImageNameSrc:   "a",
+					ImageNameDest:  "a",
+					Digest:         "sha256:000",
+					Tag:            "1.0"}: 1,
+				PromotionRequest{
+					TagOp:          Add,
+					RegistrySrc:    srcRegName,
+					RegistryDest:   registries[2].Name,
+					ServiceAccount: registries[2].ServiceAccount,
+					ImageNameSrc:   "a",
+					ImageNameDest:  "a",
+					Digest:         "sha256:000",
+					Tag:            "1.0"}: 1,
+			},
+		},
+		{
+			"Add 1 tag for 1 registry",
+			Manifest{
+				Registries: registries,
+				Images: []Image{
+					{
+						ImageName: "a",
+						Dmap: DigestTags{
+							"sha256:000": TagSlice{"0.9", "1.0"}}}},
+				srcRegistry: &srcRC},
+			SyncContext{
+				Inv: MasterInventory{
+					"gcr.io/foo": RegInvImage{
+						"a": DigestTags{
+							"sha256:000": TagSlice{"0.9"}}},
+					"gcr.io/bar": RegInvImage{
+						"a": DigestTags{
+							"sha256:000": TagSlice{"0.9"}}},
+					"gcr.io/cat": RegInvImage{
+						"a": DigestTags{
+							"sha256:000": TagSlice{
+								"0.9", "1.0", "extra-tag"}}}}},
+			nil,
+			CapturedRequests{
+				PromotionRequest{
+					TagOp:          Add,
+					RegistrySrc:    srcRegName,
+					RegistryDest:   registries[0].Name,
+					ServiceAccount: registries[0].ServiceAccount,
+					ImageNameSrc:   "a",
+					ImageNameDest:  "a",
+					Digest:         "sha256:000",
+					Tag:            "1.0"}: 1,
+			},
+		},
 	}
 
 	// captured is sort of a "global variable" because processRequestFake
@@ -2289,84 +2367,7 @@ func TestPromotionMulti(t *testing.T) {
 		inputM       Manifest
 		inputSc      SyncContext
 		expectedReqs CapturedRequests
-	}{
-		{
-			"Add 1 tag for 2 registries",
-			Manifest{
-				Registries: registries,
-				Images: []Image{
-					{
-						ImageName: "a",
-						Dmap: DigestTags{
-							"sha256:000": TagSlice{"0.9", "1.0"}}}},
-				srcRegistry: &srcRC},
-			SyncContext{
-				Inv: MasterInventory{
-					"gcr.io/foo": RegInvImage{
-						"a": DigestTags{
-							"sha256:000": TagSlice{"0.9"}}},
-					"gcr.io/bar": RegInvImage{
-						"a": DigestTags{
-							"sha256:000": TagSlice{"0.9"}}},
-					"gcr.io/qux": RegInvImage{
-						"a": DigestTags{
-							"sha256:000": TagSlice{"0.9"}}}}},
-			CapturedRequests{
-				PromotionRequest{
-					TagOp:          Add,
-					RegistrySrc:    srcRegName,
-					RegistryDest:   registries[1].Name,
-					ServiceAccount: registries[1].ServiceAccount,
-					ImageNameSrc:   "a",
-					ImageNameDest:  "a",
-					Digest:         "sha256:000",
-					Tag:            "1.0"}: 1,
-				PromotionRequest{
-					TagOp:          Add,
-					RegistrySrc:    srcRegName,
-					RegistryDest:   registries[2].Name,
-					ServiceAccount: registries[2].ServiceAccount,
-					ImageNameSrc:   "a",
-					ImageNameDest:  "a",
-					Digest:         "sha256:000",
-					Tag:            "1.0"}: 1,
-			},
-		},
-		{
-			"Add 1 tag for 1 registry",
-			Manifest{
-				Registries: registries,
-				Images: []Image{
-					{
-						ImageName: "a",
-						Dmap: DigestTags{
-							"sha256:000": TagSlice{"0.9", "1.0"}}}},
-				srcRegistry: &srcRC},
-			SyncContext{
-				Inv: MasterInventory{
-					"gcr.io/foo": RegInvImage{
-						"a": DigestTags{
-							"sha256:000": TagSlice{"0.9"}}},
-					"gcr.io/bar": RegInvImage{
-						"a": DigestTags{
-							"sha256:000": TagSlice{"0.9"}}},
-					"gcr.io/qux": RegInvImage{
-						"a": DigestTags{
-							"sha256:000": TagSlice{
-								"0.9", "1.0", "extra-tag"}}}}},
-			CapturedRequests{
-				PromotionRequest{
-					TagOp:          Add,
-					RegistrySrc:    srcRegName,
-					RegistryDest:   registries[1].Name,
-					ServiceAccount: registries[1].ServiceAccount,
-					ImageNameSrc:   "a",
-					ImageNameDest:  "a",
-					Digest:         "sha256:000",
-					Tag:            "1.0"}: 1,
-			},
-		},
-	}
+	}{}
 
 	// captured is sort of a "global variable" because processRequestFake
 	// closes over it.
