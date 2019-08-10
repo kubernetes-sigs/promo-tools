@@ -1315,6 +1315,37 @@ func TestReadRegistries(t *testing.T) {
 	}
 }
 
+func TestGetTokenKeyDomainRepoPath(t *testing.T) {
+	type TokenKeyDomainRepoPath [3]string
+	var tests = []struct {
+		name     string
+		input    RegistryName
+		expected TokenKeyDomainRepoPath
+	}{
+		{
+			"basic",
+			"gcr.io/foo/bar",
+			[3]string{"gcr.io/foo", "gcr.io", "foo/bar"},
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			tokenKey, domain, repoPath := GetTokenKeyDomainRepoPath(test.input)
+
+			err := checkEqual(tokenKey, test.expected[0])
+			checkError(t, err, "(tokenKey)\n")
+
+			err = checkEqual(domain, test.expected[1])
+			checkError(t, err, "(domain)\n")
+
+			err = checkEqual(repoPath, test.expected[2])
+			checkError(t, err, "(repoPath)\n")
+		})
+	}
+}
+
 func TestSetManipulationsRegistryInventories(t *testing.T) {
 	var tests = []struct {
 		name           string
