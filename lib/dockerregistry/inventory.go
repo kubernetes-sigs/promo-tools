@@ -825,9 +825,10 @@ func (sc *SyncContext) PopulateTokens() error {
 		if err != nil {
 			return err
 		}
-		tokenName := RootRepo(string(rc.Name))
-		sc.Tokens[tokenName] = token
+		tokenKey, _, _ := GetTokenKeyDomainRepoPath(rc.Name)
+		sc.Tokens[RootRepo(tokenKey)] = token
 	}
+
 	return nil
 }
 
