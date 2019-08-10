@@ -276,6 +276,7 @@ func runPromotion(cwd string, t E2ETest) error {
 		argsFinal = append(argsFinal, strings.ReplaceAll(arg, "$PWD", cwd))
 	}
 
+	fmt.Println("execing cmd", "bazel", argsFinal)
 	cmd := exec.Command(
 		"bazel",
 		argsFinal...,
@@ -322,6 +323,7 @@ func getSnapshot(cwd string,
 		invocation = append(invocation, "-snapshot-service-account="+svcAcc)
 	}
 
+	fmt.Println("execing cmd", "bazel", invocation)
 	cmd := exec.Command("bazel", invocation...)
 
 	cmd.Dir = cwd
