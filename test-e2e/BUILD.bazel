@@ -75,11 +75,25 @@ container_image(
     layers = [":golden-layer-foo-1.0-linux_s390x"],
 )
 
+# bar
+container_layer(
+    name = "golden-layer-bar-1.0",
+    directory = "/golden/bar/",
+    files = ["golden/bar/1.0"],
+)
+
+container_image(
+    name = "golden-image-bar-1.0",
+    # No base image to simulate 'scratch' image.
+    layers = [":golden-layer-bar-1.0"],
+)
+
 container_bundle(
     name = "golden-images-loadable",
     images = {
         "{STABLE_TEST_STAGING_IMG_REPOSITORY}/golden-foo/foo:1.0-linux_amd64": "//test-e2e:golden-image-foo-1.0-linux_amd64",
         "{STABLE_TEST_STAGING_IMG_REPOSITORY}/golden-foo/foo:1.0-linux_s390x": "//test-e2e:golden-image-foo-1.0-linux_s390x",
+        "{STABLE_TEST_STAGING_IMG_REPOSITORY}/golden-bar/bar:1.0": "//test-e2e:golden-image-bar-1.0",
     },
 )
 
