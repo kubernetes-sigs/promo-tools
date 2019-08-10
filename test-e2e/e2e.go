@@ -111,8 +111,7 @@ func checkSnapshot(repo reg.RegistryName,
 		klog.Exitf("could not get snapshot of %s: %s\n", repo, err)
 	}
 	if err := checkEqual(got, expected); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		klog.Exitln(err)
 	}
 }
 
