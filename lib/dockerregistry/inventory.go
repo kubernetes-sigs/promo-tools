@@ -963,31 +963,20 @@ func (sc *SyncContext) ReadRegistries(
 			// them, and exclude any image paths that are actually just folder
 			// names without any images in them.
 			if len(digestTags) > 0 {
-				tokenKey, _, repoPath := GetTokenKeyDomainRepoPath(rName)
-
-				// If there is no slash in the repoPath, it is a toplevel
-				// imageName, and we can use tagsStruct.Name as-is. E.g.,
-				// "gcr.io/foo/bar" will have ""
-				var imageName ImageName
-				if strings.Count(repoPath, "/") == 0 {
-					imageName = ImageName(tagsStruct.Name)
-				} else {
-					upto := strings.IndexByte(repoPath, '/')
-					imageName = ImageName(
-						strings.TrimPrefix(
-							tagsStruct.Name,
-							(tagsStruct.Name[:upto])+"/"))
+				rootReg, imageName, err := SplitByKnownRegistries(rName, sc.RegistryContexts)
+				if err != nil {
+					klog.Exitln(err)
 				}
 
 				currentRepo := make(RegInvImage)
 				currentRepo[imageName] = digestTags
 
 				mutex.Lock()
-				existingRegEntry := sc.Inv[RegistryName(tokenKey)]
+				existingRegEntry := sc.Inv[rootReg]
 				if len(existingRegEntry) == 0 {
-					sc.Inv[RegistryName(tokenKey)] = currentRepo
+					sc.Inv[rootReg] = currentRepo
 				} else {
-					sc.Inv[RegistryName(tokenKey)][imageName] = digestTags
+					sc.Inv[rootReg][imageName] = digestTags
 				}
 				mutex.Unlock()
 			}
@@ -1031,6 +1020,25 @@ func (sc *SyncContext) ReadRegistries(
 		}
 	}
 	sc.ExecRequests(populateRequests, processRequest)
+}
+
+func SplitByKnownRegistries(
+	r RegistryName,
+	rcs []RegistryContext) (RegistryName, ImageName, error) {
+
+	for _, rc := range rcs {
+		if strings.HasPrefix(string(r), string(rc.Name)) {
+			trimmed := strings.TrimPrefix(string(r), string(rc.Name))
+
+			// Remove leading "/" character, if any.
+			if trimmed[0] == '/' {
+				return rc.Name, ImageName(trimmed[1:]), nil
+			}
+			return rc.Name, ImageName(trimmed), nil
+		}
+	}
+
+	return "", "", fmt.Errorf("unknown registry %q", r)
 }
 
 // MkReadRepositoryCmdReal creates a stream.Producer which makes a real call
