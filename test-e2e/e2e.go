@@ -73,7 +73,7 @@ func main() {
 
 	// Loop through each e2e test case.
 	for _, t := range ts {
-		fmt.Printf("Running e2e test '%s'...\n", t.Name)
+		fmt.Printf("\n===> Running e2e test '%s'...\n", t.Name)
 		err := testSetup(*repoRootPtr, t)
 		if err != nil {
 			klog.Fatal("error with test setup:", err)
@@ -94,7 +94,7 @@ func main() {
 			checkSnapshot(snapshot.Name, snapshot.After, *repoRootPtr, t.Registries)
 		}
 
-		fmt.Printf("e2e test '%s': OK\n", t.Name)
+		fmt.Printf("\n===> e2e test '%s': OK\n", t.Name)
 	}
 }
 
