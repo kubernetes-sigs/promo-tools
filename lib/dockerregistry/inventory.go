@@ -24,7 +24,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"reflect"
 	"regexp"
 	"sort"
 	"strings"
@@ -69,14 +68,21 @@ func MakeSyncContext(
 		RegistryContexts:    make([]RegistryContext, 0),
 		DigestMediaType:     make(DigestMediaType)}
 
+	registriesSeen := make(map[RegistryContext]interface{})
 	for _, mfest := range mfests {
-		// Populate SyncContext with registries found across all manifests.
-		sc.RegistryContexts = append(sc.RegistryContexts, mfest.Registries...)
+		for _, r := range mfest.Registries {
+			registriesSeen[r] = nil
+		}
 
 		// Populate rename info found across all manifests.
 		for k, v := range mfest.renamesDenormalized {
 			sc.RenamesDenormalized[k] = v
 		}
+	}
+
+	// Populate SyncContext with registries found across all manifests.
+	for r := range registriesSeen {
+		sc.RegistryContexts = append(sc.RegistryContexts, r)
 	}
 
 	// Populate access tokens for all registries listed in the manifest.
@@ -218,28 +224,6 @@ func ValidateManifestsFromDir(mfests []Manifest) error {
 				}
 				renamesSeen[regImgPath] = mfest.filepath
 			}
-		}
-	}
-
-	// Force all manifests to share the EXACT same non-src-registry
-	// configuration. This is because they should all be promoting to the same
-	// central registry, with the same creds.
-	canonicalDstRegisries := []RegistryContext{}
-	for _, registry := range mfests[0].Registries {
-		if !registry.Src {
-			canonicalDstRegisries = append(canonicalDstRegisries, registry)
-		}
-	}
-	for _, mfest := range mfests[1:] {
-		dstRegistries := []RegistryContext{}
-		for _, registry := range mfest.Registries {
-			if !registry.Src {
-				dstRegistries = append(dstRegistries, registry)
-			}
-		}
-
-		if !reflect.DeepEqual(dstRegistries, canonicalDstRegisries) {
-			return fmt.Errorf("different destination registries found in manifests:\n- '%s'\n- '%s'\n", mfests[0].filepath, mfest.filepath)
 		}
 	}
 
@@ -841,9 +825,10 @@ func (sc *SyncContext) PopulateTokens() error {
 		if err != nil {
 			return err
 		}
-		tokenName := RootRepo(string(rc.Name))
-		sc.Tokens[tokenName] = token
+		tokenKey, _, _ := GetTokenKeyDomainRepoPath(rc.Name)
+		sc.Tokens[RootRepo(tokenKey)] = token
 	}
+
 	return nil
 }
 
@@ -978,31 +963,20 @@ func (sc *SyncContext) ReadRegistries(
 			// them, and exclude any image paths that are actually just folder
 			// names without any images in them.
 			if len(digestTags) > 0 {
-				tokenKey, _, repoPath := GetTokenKeyDomainRepoPath(rName)
-
-				// If there is no slash in the repoPath, it is a toplevel
-				// imageName, and we can use tagsStruct.Name as-is. E.g.,
-				// "gcr.io/foo/bar" will have ""
-				var imageName ImageName
-				if strings.Count(repoPath, "/") == 0 {
-					imageName = ImageName(tagsStruct.Name)
-				} else {
-					upto := strings.IndexByte(repoPath, '/')
-					imageName = ImageName(
-						strings.TrimPrefix(
-							tagsStruct.Name,
-							(tagsStruct.Name[:upto])+"/"))
+				rootReg, imageName, err := SplitByKnownRegistries(rName, sc.RegistryContexts)
+				if err != nil {
+					klog.Exitln(err)
 				}
 
 				currentRepo := make(RegInvImage)
 				currentRepo[imageName] = digestTags
 
 				mutex.Lock()
-				existingRegEntry := sc.Inv[RegistryName(tokenKey)]
+				existingRegEntry := sc.Inv[rootReg]
 				if len(existingRegEntry) == 0 {
-					sc.Inv[RegistryName(tokenKey)] = currentRepo
+					sc.Inv[rootReg] = currentRepo
 				} else {
-					sc.Inv[RegistryName(tokenKey)][imageName] = digestTags
+					sc.Inv[rootReg][imageName] = digestTags
 				}
 				mutex.Unlock()
 			}
@@ -1048,6 +1022,25 @@ func (sc *SyncContext) ReadRegistries(
 	sc.ExecRequests(populateRequests, processRequest)
 }
 
+func SplitByKnownRegistries(
+	r RegistryName,
+	rcs []RegistryContext) (RegistryName, ImageName, error) {
+
+	for _, rc := range rcs {
+		if strings.HasPrefix(string(r), string(rc.Name)) {
+			trimmed := strings.TrimPrefix(string(r), string(rc.Name))
+
+			// Remove leading "/" character, if any.
+			if trimmed[0] == '/' {
+				return rc.Name, ImageName(trimmed[1:]), nil
+			}
+			return rc.Name, ImageName(trimmed), nil
+		}
+	}
+
+	return "", "", fmt.Errorf("unknown registry %q", r)
+}
+
 // MkReadRepositoryCmdReal creates a stream.Producer which makes a real call
 // over the network.
 func MkReadRepositoryCmdReal(
@@ -1069,8 +1062,20 @@ func MkReadRepositoryCmdReal(
 			domain,
 			repoPath)
 	}
-	rc.Token = sc.Tokens[RootRepo(tokenKey)]
-	httpReq.SetBasicAuth("oauth2accesstoken", string(rc.Token))
+
+	token, ok := sc.Tokens[RootRepo(tokenKey)]
+	if !ok {
+		klog.Errorf("access token for key '%s' not found\n", tokenKey)
+		klog.Error("valid keys:")
+		for key := range sc.Tokens {
+			klog.Error(key)
+		}
+		klog.Exitf("access token for key '%s' not found\n", tokenKey)
+	}
+
+	rc.Token = token
+	var bearer = "Bearer " + string(rc.Token)
+	httpReq.Header.Add("Authorization", bearer)
 	sh.Req = httpReq
 
 	return &sh
@@ -1752,7 +1757,6 @@ func supportedMediaType(v string) (cr.MediaType, error) {
 // separately (deletion of manifest lists vs deletion of other media types).
 func (sc *SyncContext) ClearRepository(
 	regName RegistryName,
-	mfest Manifest,
 	mkProducer func(RegistryContext, ImageName, Digest) stream.Producer,
 	customProcessRequest *ProcessRequest) {
 
@@ -1765,7 +1769,7 @@ func (sc *SyncContext) ClearRepository(
 			reqs chan<- stream.ExternalRequest,
 			wg *sync.WaitGroup) {
 
-			for _, registry := range mfest.Registries {
+			for _, registry := range sc.RegistryContexts {
 				// Skip over any registry that does not match the regName we want to
 				// wipe.
 				if registry.Name != regName {
