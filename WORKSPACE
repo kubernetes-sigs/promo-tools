@@ -108,35 +108,8 @@ load(
     "@distroless//package_manager:package_manager.bzl",
     "package_manager_repositories",
 )
-load(
-    "@distroless//package_manager:dpkg.bzl",
-    "dpkg_list",
-    "dpkg_src",
-)
 
 package_manager_repositories()
-
-dpkg_src(
-    name = "debian_jessie",
-    arch = "amd64",
-    distro = "jessie",
-    sha256 = "7240a1c6ce11c3658d001261e77797818e610f7da6c2fb1f98a24fdbf4e8d84c",
-    # The Debian snapshot datetime to use. See http://snapshot.debian.org/ for
-    # more information.
-    snapshot = "20190812T140702Z",
-    url = "http://snapshot.debian.org/archive",
-)
-
-# GNU Make
-dpkg_list(
-    name = "package_bundle",
-    packages = [
-        "make",
-    ],
-    sources = [
-        "@debian_jessie//file:Packages.json",
-    ],
-)
 
 # Golang
 # HEAD as of 2019-08-12.

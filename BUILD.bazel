@@ -2,8 +2,9 @@ load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
 load("@io_bazel_rules_docker//go:image.bzl", "go_image")
 load("@io_bazel_rules_docker//container:container.bzl", "container_bundle", "container_image", "container_layer", "container_push")
 load("@io_bazel_rules_docker//contrib:push-all.bzl", "docker_push")
-load("@package_bundle//file:packages.bzl", "packages")
-load("@io_bazel_rules_docker//docker/toolchain_container:toolchain_container.bzl", "toolchain_container")
+load("@io_bazel_rules_docker//docker/toolchain_container:toolchain_container.bzl", "language_tool_layer", "toolchain_container")
+
+load("@io_bazel_rules_docker//docker/package_managers:download_pkgs.bzl", "download_pkgs")
 
 # Go image. "bazel build //:cip-docker-image.tar" results in a tarfile that is
 # "docker load -i"-able, but the image is automatially named
@@ -57,7 +58,7 @@ container_bundle(
 )
 
 toolchain_container(
-    name = "e2e-env-base",
+    name = "e2e-env",
     base = "@bazel-docker-gcloud//image",
     cmd = [
         "/bin/sh",
@@ -74,15 +75,22 @@ toolchain_container(
     installation_cleanup_commands = "rm -f /etc/init.d/.depend.boot /etc/init.d/.depend.start /etc/init.d/.depend.stop",
     language_layers = [
         "@layer_definitions//layers/ubuntu1604/go:go-ltl",
+        "make-ltl",
     ],
 )
 
-container_image(
-    name = "e2e-env",
-    base = "e2e-env-base",
-    debs = [
-        packages["make"],
+download_pkgs(
+    name = "gnu-make_debs",
+    image_tar = "@bazel-docker-gcloud//image",
+    packages = [
+        "make",
     ],
+)
+
+language_tool_layer(
+    name = "make-ltl",
+    base = "@bazel-docker-gcloud//image",
+    installables_tar = ":gnu-make_debs.tar",
 )
 
 docker_push(
