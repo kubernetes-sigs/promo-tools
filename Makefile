@@ -16,6 +16,8 @@ lint:
 	@./lint.sh
 test:
 	bazel test --test_output=all //lib/...
+test-e2e:
+	make && ./bazel-bin/test-e2e/linux_amd64_stripped/e2e -tests=$(PWD)/test-e2e/tests.yaml -repo-root $(PWD) -key-file $(CIP_E2E_KEY_FILE)
 update:
 	# Update go modules (source of truth!).
 	GO111MODULE=on go mod verify
@@ -23,4 +25,4 @@ update:
 	# Update bazel rules to use these new dependencies.
 	bazel run $(BAZEL_BUILD_OPTS) //:gazelle -- update-repos -prune -from_file=go.mod
 	bazel run //:gazelle
-.PHONY: build image image-load image-push lint test update
+.PHONY: build image image-load image-push lint test test-e2e update
