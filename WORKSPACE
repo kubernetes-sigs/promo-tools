@@ -52,6 +52,16 @@ http_archive(
 )
 
 load(
+    "@io_bazel_rules_docker//repositories:repositories.bzl",
+    container_repositories = "repositories",
+)
+container_repositories()
+
+load("@io_bazel_rules_docker//toolchains/docker:toolchain.bzl",
+    docker_toolchain_configure="toolchain_configure"
+)
+
+load(
     "@io_bazel_rules_docker//go:image.bzl",
     _go_image_repos = "repositories",
 )
@@ -68,6 +78,15 @@ container_pull(
     digest = "sha256:3b77ee8bfa6a2513fb6343cfad0dd6fd6ddd67d0632908c3a5fb9b57dd68ec1b",
 )
 
+container_pull(
+    name = "bazel-docker-gcloud",
+    registry = "gcr.io",
+    repository = "asci-toolchain/nosla-ubuntu16_04-bazel-docker-gcloud",
+    # Current as of 2019-08-12
+    # https://github.com/GoogleCloudPlatform/container-definitions/tree/master/ubuntu1604_bazel_docker_gcloud
+    digest = "sha256:56d2a333c27cc939754718f1aaacf22c9b18cb0091c395aa4c1ce05e3f577c3d",
+)
+
 # Maybe use cloud-builders/gcloud, for GCB. But for Prow just use the google-sdk
 # one.
 #container_pull(
@@ -77,6 +96,64 @@ container_pull(
 #    # Version 232.0.0
 #    digest = "sha256:6e6b1e2fd53cb94c4dc2af8381ef50bf4c7ac49bc5c728efda4ab15b41d0b510",
 #)
+
+
+git_repository(
+    name = "distroless",
+    commit = "ffad38db8b67138e93f77488967139ba6763cb68",
+    remote = "https://github.com/GoogleContainerTools/distroless.git",
+)
+
+load(
+    "@distroless//package_manager:package_manager.bzl",
+    "package_manager_repositories",
+)
+load(
+    "@distroless//package_manager:dpkg.bzl",
+    "dpkg_list",
+    "dpkg_src",
+)
+
+package_manager_repositories()
+
+dpkg_src(
+    name = "debian_jessie",
+    arch = "amd64",
+    distro = "jessie",
+    sha256 = "7240a1c6ce11c3658d001261e77797818e610f7da6c2fb1f98a24fdbf4e8d84c",
+    # The Debian snapshot datetime to use. See http://snapshot.debian.org/ for
+    # more information.
+    snapshot = "20190812T140702Z",
+    url = "http://snapshot.debian.org/archive",
+)
+
+# GNU Make
+dpkg_list(
+    name = "package_bundle",
+    packages = [
+        "make",
+    ],
+    sources = [
+        "@debian_jessie//file:Packages.json",
+    ],
+)
+
+# Golang
+# HEAD as of 2019-08-12.
+http_archive(
+    name = "layer_definitions",
+    sha256 = "cbdc9cc06bb0755b0e5caae40b7cbd20d4f5b19d860de02e983586df3e7894ec",
+    strip_prefix = "layer-definitions-" + "a8dfda9de289c68d217a15904f8a6500dcce7c88",
+    urls = ["https://github.com/GoogleCloudPlatform/layer-definitions/archive/" + "a8dfda9de289c68d217a15904f8a6500dcce7c88" + ".tar.gz"],
+)
+
+load("@layer_definitions//layers/ubuntu1604/base:deps.bzl", ubuntu1604_base_deps = "deps")
+
+ubuntu1604_base_deps()
+
+load("@layer_definitions//layers/ubuntu1604/go:deps.bzl", go_deps = "deps")
+
+go_deps()
 
 container_pull(
     name = "distroless-base",

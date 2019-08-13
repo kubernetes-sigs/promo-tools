@@ -16,6 +16,12 @@ lint:
 	@./lint.sh
 test:
 	bazel test --test_output=all //lib/...
+image-e2e-env:
+	bazel build $(BAZEL_BUILD_OPTS) //:e2e-env-docker-loadable.tar
+image-load-e2e-env: image-e2e-env
+	docker load -i bazel-bin/e2e-env-docker-loadable.tar
+image-push-e2e-env: image-load-e2e-env
+	bazel run $(BAZEL_BUILD_OPTS) :push-e2e-env
 test-e2e:
 	make && ./bazel-bin/test-e2e/linux_amd64_stripped/e2e -tests=$(PWD)/test-e2e/tests.yaml -repo-root $(PWD) -key-file $(CIP_E2E_KEY_FILE)
 update:
