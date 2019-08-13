@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"hash/crc32"
 	"io"
 	"os"
 	"strings"
@@ -64,19 +65,39 @@ func (s *gcsSyncFilestore) UploadFile(
 		}
 	}()
 
+	// Compute crc32 checksum for upload integrity
+	var fileCRC32C uint32
+	{
+		hasher := crc32.New(crc32.MakeTable(crc32.Castagnoli))
+		if _, err := io.Copy(hasher, in); err != nil {
+			return fmt.Errorf("error computing crc32 checksum: %v", err)
+		}
+		fileCRC32C = hasher.Sum32()
+
+		if _, err := in.Seek(0, 0); err != nil {
+			return fmt.Errorf("error rewinding in file: %v", err)
+		}
+	}
+
 	klog.Infof("uploading to %s", gcsURL)
 
-	out := s.client.Bucket(s.bucket).Object(absolutePath).NewWriter(ctx)
+	w := s.client.Bucket(s.bucket).Object(absolutePath).NewWriter(ctx)
 
-	if _, err := io.Copy(out, in); err != nil {
-		if err2 := out.Close(); err2 != nil {
+	w.CRC32C = fileCRC32C
+	w.SendCRC32C = true
+
+	// Much bigger chunk size for faster uploading
+	w.ChunkSize = 128 * 1024 * 1024
+
+	if _, err := io.Copy(w, in); err != nil {
+		if err2 := w.Close(); err2 != nil {
 			klog.Warningf("error closing upload stream: %v", err)
 			// TODO: Try to delete the possibly partially written file?
 		}
 		return fmt.Errorf("error uploading to %q: %v", gcsURL, err)
 	}
 
-	if err := out.Close(); err != nil {
+	if err := w.Close(); err != nil {
 		return fmt.Errorf("error uploading to %q: %v", gcsURL, err)
 	}
 
