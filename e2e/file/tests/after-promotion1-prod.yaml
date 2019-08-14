@@ -1,0 +1,94 @@
+files:
+- absolutePath: gs://k8s-cip-test-prod/cip/0/21.bin
+  attributes:
+  - name: uncompressed-sha256
+    value: ff1be5ac610eccbf4441faa78bbee5b2b3fc9b3deb3a970a4a80fe89a7722e4f
+  - name: uncompressed-size
+    value: "210000"
+  contentEncoding: gzip
+  md5: 15d2b83d4ec9a2e5c3bd1afdb45ef976
+  size: 242
+- absolutePath: gs://k8s-cip-test-prod/cip/0/91.bin
+  attributes:
+  - name: uncompressed-sha256
+    value: 70e86b714acef00c6035b1472f3ea5fff9acf8418ad722b77b4e4e58cf747d89
+  - name: uncompressed-size
+    value: "910000"
+  contentEncoding: gzip
+  md5: 80822dfe58212145ddbb63504aac568d
+  size: 921
+- absolutePath: gs://k8s-cip-test-prod/cip/1/1.bin
+  attributes:
+  - name: uncompressed-sha256
+    value: 684ad25fdc2bbb80cbc910dd1bde6d5499ccf860ca6ee44704b77ec445271353
+  - name: uncompressed-size
+    value: "10000"
+  contentEncoding: gzip
+  md5: 31047d267d9d0ac9ed3c41fe1e08c581
+  size: 48
+- absolutePath: gs://k8s-cip-test-prod/cip/1/71.bin
+  attributes:
+  - name: uncompressed-sha256
+    value: 670d1eb2f358d107219d13b2994a69a5ab52054305a940926045f20186752e48
+  - name: uncompressed-size
+    value: "710000"
+  contentEncoding: gzip
+  md5: 88299522b0fe0898d3203f6e0cf35ba6
+  size: 727
+- absolutePath: gs://k8s-cip-test-prod/cip/2/51.bin
+  attributes:
+  - name: uncompressed-sha256
+    value: a041e4b10473ebad456d5671005b35205dc85e7bd6c57d3b7fd3b31b823b83af
+  - name: uncompressed-size
+    value: "510000"
+  contentEncoding: gzip
+  md5: ece21f7a76ff349934b6dff428d45638
+  size: 534
+- absolutePath: gs://k8s-cip-test-prod/cip/3/31.bin
+  attributes:
+  - name: uncompressed-sha256
+    value: 392f48b07edc430d1734f8cd6095e7f63e955d59cda5907ea74b82366edc4fa4
+  - name: uncompressed-size
+    value: "310000"
+  contentEncoding: gzip
+  md5: aabebc5d064c5f4fe4c9f13c4f0d08d0
+  size: 340
+- absolutePath: gs://k8s-cip-test-prod/cip/4/11.bin
+  attributes:
+  - name: uncompressed-sha256
+    value: 7293ceeed9da612c2c87467987cfe8dcb874f20fc11896060294d099def25ab5
+  - name: uncompressed-size
+    value: "110000"
+  contentEncoding: gzip
+  md5: 2d0f902bcd09bc4aa621d0ea843f3143
+  size: 146
+- absolutePath: gs://k8s-cip-test-prod/cip/4/81.bin
+  attributes:
+  - name: uncompressed-sha256
+    value: 1b92f85c861ff0d2c4b090e57190421d9803c24a44e79ffdce6660aa4c64be3d
+  - name: uncompressed-size
+    value: "810000"
+  contentEncoding: gzip
+  md5: 3933bb405b47135860019396958ad34e
+  size: 825
+- absolutePath: gs://k8s-cip-test-prod/cip/5/61.bin
+  attributes:
+  - name: uncompressed-sha256
+    value: ad4a9b6b5c155f7fa0352e7714030d78e73a8577ace5c825133cacd15021ae59
+  - name: uncompressed-size
+    value: "610000"
+  contentEncoding: gzip
+  md5: 1b20ce6f74148beac6209ac701a7bbd4
+  size: 631
+- absolutePath: gs://k8s-cip-test-prod/cip/6/41.bin
+  attributes:
+  - name: uncompressed-sha256
+    value: de0d8525c70854d85f49e323fb91a91ba6b68e76d81c5d13a220c0e6cc9a4b52
+  - name: uncompressed-size
+    value: "410000"
+  contentEncoding: gzip
+  md5: c340d9564db7dada56cf03d4cc9685b4
+  size: 437
+- absolutePath: gs://k8s-cip-test-prod/index.html
+  md5: f45818b1cddf4359e6e5c418fe46b999
+  size: 43

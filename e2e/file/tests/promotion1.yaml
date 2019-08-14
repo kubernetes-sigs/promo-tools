@@ -1,0 +1,26 @@
+filestores:
+- base: gs://k8s-staging-cip-test/
+  src: true
+- base: gs://k8s-cip-test-prod/cip/
+  service-account: k8s-infra-gcr-promoter@k8s-artifacts-prod.iam.gserviceaccount.com
+files:
+- name: 0/21.bin
+  sha256: ff1be5ac610eccbf4441faa78bbee5b2b3fc9b3deb3a970a4a80fe89a7722e4f
+- name: 0/91.bin
+  sha256: 70e86b714acef00c6035b1472f3ea5fff9acf8418ad722b77b4e4e58cf747d89
+- name: 1/1.bin
+  sha256: 684ad25fdc2bbb80cbc910dd1bde6d5499ccf860ca6ee44704b77ec445271353
+- name: 1/71.bin
+  sha256: 670d1eb2f358d107219d13b2994a69a5ab52054305a940926045f20186752e48
+- name: 2/51.bin
+  sha256: a041e4b10473ebad456d5671005b35205dc85e7bd6c57d3b7fd3b31b823b83af
+- name: 3/31.bin
+  sha256: 392f48b07edc430d1734f8cd6095e7f63e955d59cda5907ea74b82366edc4fa4
+- name: 4/11.bin
+  sha256: 7293ceeed9da612c2c87467987cfe8dcb874f20fc11896060294d099def25ab5
+- name: 4/81.bin
+  sha256: 1b92f85c861ff0d2c4b090e57190421d9803c24a44e79ffdce6660aa4c64be3d
+- name: 5/61.bin
+  sha256: ad4a9b6b5c155f7fa0352e7714030d78e73a8577ace5c825133cacd15021ae59
+- name: 6/41.bin
+  sha256: de0d8525c70854d85f49e323fb91a91ba6b68e76d81c5d13a220c0e6cc9a4b52

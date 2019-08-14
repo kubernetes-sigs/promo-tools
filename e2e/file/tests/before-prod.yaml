@@ -1,0 +1,4 @@
+files:
+- absolutePath: gs://k8s-cip-test-prod/index.html
+  md5: f45818b1cddf4359e6e5c418fe46b999
+  size: 43
