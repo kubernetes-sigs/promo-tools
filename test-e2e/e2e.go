@@ -137,8 +137,7 @@ func testSetup(cwd string, t E2ETest) error {
 		return err
 	}
 
-	pwd := os.Getenv("PWD")
-	pushRepo := getBazelOption("STABLE_TEST_STAGING_IMG_REPOSITORY")
+	pushRepo := getBazelOption(cwd, "STABLE_TEST_STAGING_IMG_REPOSITORY")
 
 	if pushRepo == "" {
 		return fmt.Errorf(
@@ -154,7 +153,7 @@ func testSetup(cwd string, t E2ETest) error {
 			"--host_force_python=PY2",
 			fmt.Sprintf(
 				"--workspace_status_command=%s/workspace_status.sh",
-				pwd),
+				cwd),
 			"//test-e2e:push-golden",
 		},
 		{
@@ -230,10 +229,10 @@ func execCommand(
 	return stdout.String(), stderr.String(), nil
 }
 
-func getBazelOption(o string) string {
+func getBazelOption(cwd, o string) string {
 	stdout, _, err := execCommand(
 		"",
-		fmt.Sprintf("%s/workspace_status.sh", os.Getenv("PWD")))
+		fmt.Sprintf("%s/workspace_status.sh", cwd))
 	if err != nil {
 		return ""
 	}
