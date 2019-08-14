@@ -17,7 +17,7 @@ lint:
 test:
 	bazel test --test_output=all //lib/...
 test-e2e:
-	make && ./bazel-bin/test-e2e/linux_amd64_stripped/e2e -tests=$(PWD)/test-e2e/tests.yaml -repo-root $(PWD) -key-file $(CIP_E2E_KEY_FILE)
+	bazel run $(BAZEL_BUILD_OPTS) //test-e2e:e2e -- -tests=$(REPO_ROOT)/test-e2e/tests.yaml -repo-root=$(REPO_ROOT) -key-file=$(CIP_E2E_KEY_FILE)
 update:
 	# Update go modules (source of truth!).
 	GO111MODULE=on go mod verify
