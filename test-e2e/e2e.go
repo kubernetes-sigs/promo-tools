@@ -100,11 +100,11 @@ func main() {
 
 func checkSnapshot(repo reg.RegistryName,
 	expected []reg.Image,
-	cwd string,
+	repoRoot string,
 	rcs []reg.RegistryContext) {
 
 	got, err := getSnapshot(
-		cwd,
+		repoRoot,
 		repo,
 		rcs)
 	if err != nil {
@@ -132,13 +132,12 @@ func activateServiceAccount(keyFilePath string) error {
 	return nil
 }
 
-func testSetup(cwd string, t E2ETest) error {
+func testSetup(repoRoot string, t E2ETest) error {
 	if err := t.clearRepositories(); err != nil {
 		return err
 	}
 
-	pwd := os.Getenv("PWD")
-	pushRepo := getBazelOption("STABLE_TEST_STAGING_IMG_REPOSITORY")
+	pushRepo := getBazelOption(repoRoot, "STABLE_TEST_STAGING_IMG_REPOSITORY")
 
 	if pushRepo == "" {
 		return fmt.Errorf(
@@ -146,15 +145,6 @@ func testSetup(cwd string, t E2ETest) error {
 	}
 
 	cmds := [][]string{
-		{
-			"bazel",
-			"build",
-			"--host_force_python=PY2",
-			fmt.Sprintf(
-				"--workspace_status_command=%s/workspace_status.sh",
-				pwd),
-			"//test-e2e:golden-images-loadable.tar",
-		},
 		// In order to create a manifest list, images must be pushed to a
 		// repository first.
 		{
@@ -163,7 +153,7 @@ func testSetup(cwd string, t E2ETest) error {
 			"--host_force_python=PY2",
 			fmt.Sprintf(
 				"--workspace_status_command=%s/workspace_status.sh",
-				pwd),
+				repoRoot),
 			"//test-e2e:push-golden",
 		},
 		{
@@ -204,7 +194,7 @@ func testSetup(cwd string, t E2ETest) error {
 
 	for _, cmd := range cmds {
 		fmt.Println("execing cmd", cmd)
-		stdout, stderr, err := execCommand(cwd, cmd[0], cmd[1:]...)
+		stdout, stderr, err := execCommand(repoRoot, cmd[0], cmd[1:]...)
 		if err != nil {
 			return err
 		}
@@ -216,12 +206,12 @@ func testSetup(cwd string, t E2ETest) error {
 }
 
 func execCommand(
-	cwd, cmdString string,
+	repoRoot, cmdString string,
 	args ...string) (string, string, error) {
 
 	cmd := exec.Command(cmdString, args...)
-	if cwd != "" {
-		cmd.Dir = cwd
+	if repoRoot != "" {
+		cmd.Dir = repoRoot
 	}
 
 	var stdout bytes.Buffer
@@ -239,10 +229,8 @@ func execCommand(
 	return stdout.String(), stderr.String(), nil
 }
 
-func getBazelOption(o string) string {
-	stdout, _, err := execCommand(
-		"",
-		fmt.Sprintf("%s/workspace_status.sh", os.Getenv("PWD")))
+func getBazelOption(repoRoot, o string) string {
+	stdout, _, err := execCommand(repoRoot, "./workspace_status.sh")
 	if err != nil {
 		return ""
 	}
@@ -258,10 +246,10 @@ func getBazelOption(o string) string {
 	return ""
 }
 
-func runPromotion(cwd string, t E2ETest) error {
+func runPromotion(repoRoot string, t E2ETest) error {
 	args := []string{
 		"run",
-		"--workspace_status_command=" + cwd + "/workspace_status.sh",
+		"--workspace_status_command=" + repoRoot + "/workspace_status.sh",
 		":cip",
 		"--",
 		"-dry-run=false",
@@ -273,7 +261,7 @@ func runPromotion(cwd string, t E2ETest) error {
 	args = append(args, t.Invocation...)
 
 	for _, arg := range args {
-		argsFinal = append(argsFinal, strings.ReplaceAll(arg, "$PWD", cwd))
+		argsFinal = append(argsFinal, strings.ReplaceAll(arg, "$PWD", repoRoot))
 	}
 
 	fmt.Println("execing cmd", "bazel", argsFinal)
@@ -282,7 +270,7 @@ func runPromotion(cwd string, t E2ETest) error {
 		argsFinal...,
 	)
 
-	cmd.Dir = cwd
+	cmd.Dir = repoRoot
 
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -307,13 +295,13 @@ func extractSvcAcc(
 	return ""
 }
 
-func getSnapshot(cwd string,
+func getSnapshot(repoRoot string,
 	registry reg.RegistryName,
 	rcs []reg.RegistryContext) ([]reg.Image, error) {
 
 	invocation := []string{
 		"run",
-		"--workspace_status_command=" + cwd + "/workspace_status.sh",
+		"--workspace_status_command=" + repoRoot + "/workspace_status.sh",
 		":cip",
 		"--",
 		"-snapshot=" + string(registry)}
@@ -326,7 +314,7 @@ func getSnapshot(cwd string,
 	fmt.Println("execing cmd", "bazel", invocation)
 	cmd := exec.Command("bazel", invocation...)
 
-	cmd.Dir = cwd
+	cmd.Dir = repoRoot
 
 	var stdout bytes.Buffer
 	cmd.Stdout = &stdout
