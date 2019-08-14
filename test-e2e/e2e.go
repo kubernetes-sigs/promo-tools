@@ -230,9 +230,7 @@ func execCommand(
 }
 
 func getBazelOption(repoRoot, o string) string {
-	stdout, _, err := execCommand(
-		"",
-		fmt.Sprintf("%s/workspace_status.sh", repoRoot))
+	stdout, _, err := execCommand(repoRoot, "./workspace_status.sh")
 	if err != nil {
 		return ""
 	}
