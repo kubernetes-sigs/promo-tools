@@ -39,3 +39,32 @@ attempt to copy remaining files, but the process will report the error.
 
 Currently only Google Cloud Storage (GCS) buckets supported, with a prefix of
 `gs://`
+
+## Creating a manifest
+
+To create a manifest, you'll have to construct the filestores section by hand.
+But to construct the files section, we include a handy python script, in
+`dev/build-file-manifest`
+
+It operates on local files, so you'll want to download the files you intend to
+promote, for example using:
+
+```sh
+mkdir download
+gsutil rsync -r gs://my-bucket download
+```
+
+Then `dev/build-file-manifest` transforms the output from sha256sum to the
+expected yaml format, and can be used like this:
+
+```sh
+cd download
+find . -type f | sort | xargs sha256sum | ../dev/build-file-manifest
+```
+
+You can often just append that to your manifest:
+
+```sh
+cd download
+find . -type f | sort | xargs sha256sum | ../dev/build-file-manifest >> ~/my-manifest.yaml
+```
