@@ -133,12 +133,16 @@ func (p *FilestorePromoter) computeNeededOperations(
 		}
 
 		changed := false
-		if destFile.MD5 != sourceFile.MD5 {
-			klog.Warningf("MD5 mismatch on source %q vs dest %q: %q vs %q",
+		if destFile.SHA256 == "" {
+			klog.Warningf("SHA256 not set on dest %q; will copy",
+				sourceFile.AbsolutePath)
+			changed = true
+		} else if destFile.SHA256 != f.SHA256 {
+			klog.Warningf("SHA256 mismatch on source %q vs dest %q: %s vs %s",
 				sourceFile.AbsolutePath,
 				destFile.AbsolutePath,
-				sourceFile.MD5,
-				destFile.MD5)
+				f.SHA256,
+				destFile.SHA256)
 			changed = true
 		}
 

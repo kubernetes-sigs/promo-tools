@@ -18,17 +18,23 @@ package filepromoter
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 	"hash/crc32"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 
 	"cloud.google.com/go/storage"
 	"google.golang.org/api/iterator"
 	"k8s.io/klog"
 	api "sigs.k8s.io/k8s-container-image-promoter/pkg/api/files"
+)
+
+const (
+	MetadataKeyUncompressedSize   = "uncompressed-size"
+	MetadataKeyUncompressedSHA256 = "uncompressed-sha256"
+	MetadataKeySHA256             = "sha256"
 )
 
 type gcsSyncFilestore struct {
@@ -46,11 +52,57 @@ func (s *gcsSyncFilestore) OpenReader(
 	return s.client.Bucket(s.bucket).Object(absolutePath).NewReader(ctx)
 }
 
-// UploadFile uploads a local file to the specified destination
+// UploadFileRaw uploads a local file to the specified destination.
+// It will attempt to use transparent compression for faster/cheaper downloads.
 func (s *gcsSyncFilestore) UploadFile(
 	ctx context.Context,
 	dest string,
 	localFile string) error {
+
+	sha256, err := computeSHA256ForFile(localFile)
+	if err != nil {
+		return err
+	}
+
+	stat, err := os.Stat(localFile)
+	if err != nil {
+		return fmt.Errorf("error getting stat for %q: %v", localFile, err)
+	}
+
+	metadata := map[string]string{}
+
+	tmpfile, err := maybeGzip(localFile)
+	if err != nil {
+		return fmt.Errorf("error compressing file: %v", err)
+	}
+	if tmpfile == "" {
+		// Not worth compressing
+
+		metadata[MetadataKeySHA256] = sha256
+
+		return s.uploadFileRaw(ctx, dest, localFile, "", "", metadata)
+	}
+
+	defer loggedRemove(tmpfile)
+
+	contentEncoding := "gzip"
+	contentType := "application/octet-stream"
+
+	metadata[MetadataKeyUncompressedSHA256] = sha256
+	metadata[MetadataKeyUncompressedSize] = strconv.FormatInt(stat.Size(), 10)
+
+	return s.uploadFileRaw(ctx, dest, tmpfile, contentEncoding, contentType, metadata)
+}
+
+// uploadFileRaw uploads a local file to the specified destination
+// it does not perform any smart compression etc.
+func (s *gcsSyncFilestore) uploadFileRaw(
+	ctx context.Context,
+	dest string,
+	localFile string,
+	contentEncoding string,
+	contentType string,
+	metadata map[string]string) error {
 	absolutePath := s.prefix + dest
 
 	gcsURL := "gs://" + s.bucket + "/" + absolutePath
@@ -85,6 +137,11 @@ func (s *gcsSyncFilestore) UploadFile(
 
 	w.CRC32C = fileCRC32C
 	w.SendCRC32C = true
+
+	w.ContentEncoding = contentEncoding
+	w.ContentType = contentType
+
+	w.Metadata = metadata
 
 	// Much bigger chunk size for faster uploading
 	w.ChunkSize = 128 * 1024 * 1024
@@ -132,12 +189,23 @@ func (s *gcsSyncFilestore) ListFiles(
 		file := &syncFileInfo{}
 		file.AbsolutePath = "gs://" + s.bucket + "/" + obj.Name
 		file.RelativePath = strings.TrimPrefix(name, s.prefix)
-		if obj.MD5 == nil {
-			return nil, fmt.Errorf("MD5 not set on file %q", file.AbsolutePath)
+
+		sha256 := obj.Metadata[MetadataKeySHA256]
+		if sha256 == "" {
+			sha256 = obj.Metadata[MetadataKeyUncompressedSHA256]
+		}
+		file.SHA256 = sha256
+
+		file.Size = obj.Size
+		uncompressedSize := obj.Metadata[MetadataKeyUncompressedSize]
+		if uncompressedSize != "" {
+			n, err := strconv.ParseInt(uncompressedSize, 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("unable to parse attribute uncompressed-size=%q", uncompressedSize)
+			}
+			file.Size = n
 		}
 
-		file.MD5 = hex.EncodeToString(obj.MD5)
-		file.Size = obj.Size
 		file.filestore = s
 
 		files[file.RelativePath] = file

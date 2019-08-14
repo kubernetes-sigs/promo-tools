@@ -34,10 +34,8 @@ type syncFileInfo struct {
 	RelativePath string
 	AbsolutePath string
 
-	// Some backends (GCS and S3) expose the MD5 of the content in metadata
-	// This can allow skipping unnecessary copies.
-	// Note: with multipart uploads or compression, the value is unobvious.
-	MD5 string
+	// We can store the SHA256 in attributes, and this can save a copy
+	SHA256 string
 
 	Size int64
 
