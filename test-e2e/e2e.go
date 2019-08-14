@@ -146,15 +146,6 @@ func testSetup(cwd string, t E2ETest) error {
 	}
 
 	cmds := [][]string{
-		{
-			"bazel",
-			"build",
-			"--host_force_python=PY2",
-			fmt.Sprintf(
-				"--workspace_status_command=%s/workspace_status.sh",
-				pwd),
-			"//test-e2e:golden-images-loadable.tar",
-		},
 		// In order to create a manifest list, images must be pushed to a
 		// repository first.
 		{
