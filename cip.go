@@ -25,6 +25,7 @@ import (
 	"k8s.io/klog"
 	reg "sigs.k8s.io/k8s-container-image-promoter/lib/dockerregistry"
 	"sigs.k8s.io/k8s-container-image-promoter/lib/stream"
+	"sigs.k8s.io/k8s-container-image-promoter/pkg/gcloud"
 )
 
 // GitDescribe is stamped by bazel.
@@ -67,6 +68,10 @@ func main() {
 		true,
 		"print what would have happened by running this tool;"+
 			" do not actually modify any registry")
+	keyFilesPtr := flag.String(
+		"key-files",
+		"",
+		"CSV of service account key files that must be activated for the promotion (<json-key-file-path>,...)")
 	// Add in help flag information, because Go's "flag" package automatically
 	// adds it, but for whatever reason does not show it as part of available
 	// options.
@@ -107,6 +112,13 @@ func main() {
 	if *versionPtr {
 		printVersion()
 		os.Exit(0)
+	}
+
+	// Activate service accounts.
+	if len(*keyFilesPtr) > 0 {
+		if err := gcloud.ActivateServiceAccounts(*keyFilesPtr); err != nil {
+			klog.Exitln(err)
+		}
 	}
 
 	var mfest reg.Manifest
