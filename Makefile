@@ -1,5 +1,7 @@
 REPO_ROOT:=$(shell git rev-parse --show-toplevel)
-BAZEL_BUILD_OPTS:=--workspace_status_command=$(REPO_ROOT)/workspace_status.sh --host_force_python=PY2
+BAZEL_BUILD_OPTS:=--workspace_status_command=$(REPO_ROOT)/workspace_status.sh \
+	--host_force_python=PY2 \
+	--stamp
 
 all: test build
 build:
