@@ -15,6 +15,7 @@ import (
 
 	reg "sigs.k8s.io/k8s-container-image-promoter/lib/dockerregistry"
 	"sigs.k8s.io/k8s-container-image-promoter/lib/stream"
+	"sigs.k8s.io/k8s-container-image-promoter/pkg/gcloud"
 )
 
 // GitDescribe is stamped by bazel.
@@ -65,8 +66,7 @@ func main() {
 	}
 
 	if len(*keyFilePtr) > 0 {
-		err = activateServiceAccount(*keyFilePtr)
-		if err != nil {
+		if err := gcloud.ActivateServiceAccount(*keyFilePtr); err != nil {
 			klog.Fatal("could not activate service account from .json", err)
 		}
 	}
@@ -113,23 +113,6 @@ func checkSnapshot(repo reg.RegistryName,
 	if err := checkEqual(got, expected); err != nil {
 		klog.Exitln(err)
 	}
-}
-
-func activateServiceAccount(keyFilePath string) error {
-	cmd := exec.Command("gcloud",
-		"auth",
-		"activate-service-account",
-		"--key-file="+keyFilePath)
-
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	err := cmd.Run()
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func testSetup(repoRoot string, t E2ETest) error {
@@ -254,6 +237,9 @@ func runPromotion(repoRoot string, t E2ETest) error {
 		"--",
 		"-dry-run=false",
 		"-verbosity=3",
+		// There is no need to use -key-files=... because we already activated
+		// the 1 service account we need during e2e tests with our own -key-file
+		// flag.
 	}
 
 	argsFinal := []string{}
