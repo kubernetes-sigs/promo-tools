@@ -11,6 +11,7 @@ go_library(
     deps = [
         "//lib/dockerregistry:go_default_library",
         "//lib/stream:go_default_library",
+        "//pkg/gcloud:go_default_library",
         "@in_gopkg_yaml_v2//:go_default_library",
         "@io_k8s_klog//:go_default_library",
     ],

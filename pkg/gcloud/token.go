@@ -18,9 +18,14 @@ package gcloud
 
 import (
 	"bytes"
+	"encoding/csv"
 	"fmt"
+	"io"
+	"os"
 	"os/exec"
 	"strings"
+
+	"k8s.io/klog"
 )
 
 // Token is the oauth2 access token used for API calls over HTTP.
@@ -68,4 +73,44 @@ func MaybeUseServiceAccount(
 		cmd[1] = fmt.Sprintf("--account=%v", serviceAccount)
 	}
 	return cmd
+}
+
+// ActivateServiceAccounts uses the given CSV of JSON key filepaths to activate
+// the associated service accounts.
+func ActivateServiceAccounts(keyFilePaths string) error {
+	r := csv.NewReader(strings.NewReader(keyFilePaths))
+	for {
+		record, err := r.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			klog.Exitln(err)
+		}
+
+		for _, keyFilePath := range record {
+			if err := ActivateServiceAccount(keyFilePath); err != nil {
+				klog.Exitln(err)
+			}
+		}
+	}
+	return nil
+}
+
+// ActivateServiceAccount activates the service account with gcloud.
+func ActivateServiceAccount(keyFilePath string) error {
+	cmd := exec.Command("gcloud",
+		"auth",
+		"activate-service-account",
+		"--key-file="+keyFilePath)
+
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	err := cmd.Run()
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
