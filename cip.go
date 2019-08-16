@@ -200,8 +200,15 @@ func main() {
 	// almost never be the case, so given a fully-parsed manifest with 0 images,
 	// treat it as if -parse-only was implied and exit gracefully.
 	if len(*snapshotPtr) == 0 {
-		if len(mfests[0].Images) == 0 {
-			fmt.Println("No images in manifest --- nothing to do.")
+		imagesInManifests := false
+		for _, mfest := range mfests {
+			if len(mfest.Images) > 0 {
+				imagesInManifests = true
+				break
+			}
+		}
+		if !imagesInManifests {
+			fmt.Println("No images in manifest(s) --- nothing to do.")
 			os.Exit(0)
 		}
 
