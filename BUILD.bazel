@@ -24,15 +24,8 @@ container_image(
         "/bin/bash",
         "-c",
     ],
-    layers = [":cip-util"],
-    env = {"PATH": "/cip:/cip/util:${PATH}"},
+    env = {"PATH": "/cip:${PATH}"},
     symlinks = {"/cip/cip": "/app/cip-docker-image.binary"},
-)
-
-container_layer(
-    name = "cip-util",
-    directory = "/cip/util",
-    files = ["util/multirun.sh"],
 )
 
 # Invoke with "bazel build //:cip-docker-loadable.tar". Then you can run "docker
