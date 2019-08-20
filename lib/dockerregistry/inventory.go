@@ -85,6 +85,11 @@ func MakeSyncContext(
 		sc.RegistryContexts = append(sc.RegistryContexts, r)
 	}
 
+	// Sort the list for determinism.
+	sort.Slice(sc.RegistryContexts, func(i, j int) bool {
+		return sc.RegistryContexts[i].Name < sc.RegistryContexts[j].Name
+	})
+
 	// Populate access tokens for all registries listed in the manifest.
 	err := sc.PopulateTokens()
 	if err != nil {
@@ -1027,6 +1032,13 @@ func (sc *SyncContext) ReadRegistries(
 func SplitByKnownRegistries(
 	r RegistryName,
 	rcs []RegistryContext) (RegistryName, ImageName, error) {
+
+	// Sort by length (reverse order, so that the longest registry names come
+	// first). This is so that we try to match the leading prefix against the
+	// longest registry names first.
+	sort.Slice(rcs, func(i, j int) bool {
+		return len(rcs[i].Name) > len(rcs[j].Name)
+	})
 
 	for _, rc := range rcs {
 		if strings.HasPrefix(string(r), string(rc.Name)) {
