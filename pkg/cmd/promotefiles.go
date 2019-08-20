@@ -52,6 +52,7 @@ func (o *PromoteFilesOptions) PopulateDefaults() {
 }
 
 // RunPromoteFiles executes a file promotion command
+// nolint[gocyclo]
 func RunPromoteFiles(ctx context.Context, options PromoteFilesOptions) error {
 	manifest, err := readManifest(options.ManifestPath)
 	if err != nil {
