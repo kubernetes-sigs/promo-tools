@@ -28,7 +28,7 @@ image_tag="$git_desc"
 
 p_ STABLE_TEST_STAGING_IMG_REPOSITORY gcr.io/k8s-staging-cip-test
 p_ STABLE_IMG_REGISTRY gcr.io
-p_ STABLE_IMG_REPOSITORY cip-demo-staging
+p_ STABLE_IMG_REPOSITORY k8s-staging-artifact-promoter
 p_ STABLE_IMG_NAME cip
 p_ STABLE_GIT_COMMIT "${git_commit}"
 p_ STABLE_GIT_DESC "${git_desc}"

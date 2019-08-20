@@ -1022,6 +1022,8 @@ func (sc *SyncContext) ReadRegistries(
 	sc.ExecRequests(populateRequests, processRequest)
 }
 
+// SplitByKnownRegistries splits a registry name into a RegistryName and
+// ImageName.
 func SplitByKnownRegistries(
 	r RegistryName,
 	rcs []RegistryContext) (RegistryName, ImageName, error) {

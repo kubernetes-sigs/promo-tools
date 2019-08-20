@@ -102,6 +102,7 @@ func openFilestore(
 func (p *FilestorePromoter) computeNeededOperations(
 	source, dest map[string]*syncFileInfo,
 	destFilestore syncFilestore) ([]SyncFileOp, error) {
+	// nolint[prealloc]
 	var ops []SyncFileOp
 
 	for i := range p.Files {

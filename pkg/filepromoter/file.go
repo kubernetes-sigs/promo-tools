@@ -53,6 +53,7 @@ type copyFileOp struct {
 }
 
 // Run implements SyncFileOp.Run
+// nolint[gocyclo]
 func (o *copyFileOp) Run(ctx context.Context) error {
 	// Download to our temp file
 	f, err := ioutil.TempFile("", "promoter")
