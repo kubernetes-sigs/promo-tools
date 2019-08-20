@@ -601,7 +601,20 @@ func validateRequiredComponents(m Manifest) error {
 // PrettyValue creates a prettified string representation of MasterInventory.
 func (mi *MasterInventory) PrettyValue() string {
 	var b strings.Builder
-	for regName, v := range *mi {
+	regNames := []RegistryName{}
+	for regName := range *mi {
+		regNames = append(regNames, regName)
+	}
+	sort.Slice(regNames, func(i, j int) bool {
+		return regNames[i] < regNames[j]
+	})
+
+	for _, regName := range regNames {
+		v, ok := (*mi)[regName]
+		if !ok {
+			klog.Error("corrupt MasterInventory")
+			return ""
+		}
 		fmt.Fprintln(&b, regName)
 		imageNamesSorted := make([]string, 0)
 		for imageName := range v {
