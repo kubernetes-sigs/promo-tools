@@ -85,6 +85,11 @@ func MakeSyncContext(
 		sc.RegistryContexts = append(sc.RegistryContexts, r)
 	}
 
+	// Sort the list for determinism.
+	sort.Slice(sc.RegistryContexts, func(i, j int) bool {
+		return sc.RegistryContexts[i].Name < sc.RegistryContexts[j].Name
+	})
+
 	// Populate access tokens for all registries listed in the manifest.
 	err := sc.PopulateTokens()
 	if err != nil {
@@ -596,7 +601,20 @@ func validateRequiredComponents(m Manifest) error {
 // PrettyValue creates a prettified string representation of MasterInventory.
 func (mi *MasterInventory) PrettyValue() string {
 	var b strings.Builder
-	for regName, v := range *mi {
+	regNames := []RegistryName{}
+	for regName := range *mi {
+		regNames = append(regNames, regName)
+	}
+	sort.Slice(regNames, func(i, j int) bool {
+		return regNames[i] < regNames[j]
+	})
+
+	for _, regName := range regNames {
+		v, ok := (*mi)[regName]
+		if !ok {
+			klog.Error("corrupt MasterInventory")
+			return ""
+		}
 		fmt.Fprintln(&b, regName)
 		imageNamesSorted := make([]string, 0)
 		for imageName := range v {
@@ -1027,6 +1045,13 @@ func (sc *SyncContext) ReadRegistries(
 func SplitByKnownRegistries(
 	r RegistryName,
 	rcs []RegistryContext) (RegistryName, ImageName, error) {
+
+	// Sort by length (reverse order, so that the longest registry names come
+	// first). This is so that we try to match the leading prefix against the
+	// longest registry names first.
+	sort.Slice(rcs, func(i, j int) bool {
+		return len(rcs[i].Name) > len(rcs[j].Name)
+	})
 
 	for _, rc := range rcs {
 		if strings.HasPrefix(string(r), string(rc.Name)) {
