@@ -17,6 +17,17 @@
 set -o errexit
 set -o nounset
 set -o pipefail
+set -o xtrace
+
+# If running in prow, set up the dependencies and default checkout folder.
+if [[ -n "${PROW_JOB_ID:-}" ]]; then
+    mkdir /home/prow/go/src/sigs.k8s.io
+    ln -s "${PWD}" /home/prow/go/src/sigs.k8s.io/k8s-container-image-promoter
+    cd /home/prow/go/src/sigs.k8s.io/k8s-container-image-promoter
+    export GO111MODULE=on
+    go version
+    go mod download
+fi
 
 SCRIPT_ROOT=$(dirname "${BASH_SOURCE[0]}")
 
