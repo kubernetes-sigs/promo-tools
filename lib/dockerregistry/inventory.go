@@ -85,15 +85,25 @@ func MakeSyncContext(
 		sc.RegistryContexts = append(sc.RegistryContexts, r)
 	}
 
-	// Sort the list for determinism.
+	// Sort the list for determinism. We first sort it alphabetically, then sort
+	// it by length (reverse order, so that the longest registry names come
+	// first). This is so that we try to match the leading prefix against the
+	// longest registry names first. We sort alphabetically first because we
+	// want the final order to be deterministic.
 	sort.Slice(sc.RegistryContexts, func(i, j int) bool {
 		return sc.RegistryContexts[i].Name < sc.RegistryContexts[j].Name
 	})
+	sort.Slice(sc.RegistryContexts, func(i, j int) bool {
+		// nolint[lll]
+		return len(sc.RegistryContexts[i].Name) > len(sc.RegistryContexts[j].Name)
+	})
 
 	// Populate access tokens for all registries listed in the manifest.
-	err := sc.PopulateTokens()
-	if err != nil {
-		return SyncContext{}, err
+	if useSvcAcc {
+		err := sc.PopulateTokens()
+		if err != nil {
+			return SyncContext{}, err
+		}
 	}
 
 	return sc, nil
@@ -1047,13 +1057,6 @@ func (sc *SyncContext) ReadRegistries(
 func SplitByKnownRegistries(
 	r RegistryName,
 	rcs []RegistryContext) (RegistryName, ImageName, error) {
-
-	// Sort by length (reverse order, so that the longest registry names come
-	// first). This is so that we try to match the leading prefix against the
-	// longest registry names first.
-	sort.Slice(rcs, func(i, j int) bool {
-		return len(rcs[i].Name) > len(rcs[j].Name)
-	})
 
 	for _, rc := range rcs {
 		if strings.HasPrefix(string(r), string(rc.Name)) {
