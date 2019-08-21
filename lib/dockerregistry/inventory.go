@@ -599,6 +599,8 @@ func validateRequiredComponents(m Manifest) error {
 }
 
 // PrettyValue creates a prettified string representation of MasterInventory.
+//
+// nolint[gocyclo]
 func (mi *MasterInventory) PrettyValue() string {
 	var b strings.Builder
 	regNames := []RegistryName{}
