@@ -180,32 +180,6 @@ and that the registries have not been tampered with independent of the image
 promotion process (e.g., if an image gets promoted out-of-band, then the
 promoter will print a warning about it being present).
 
-### Running the multirun.sh script locally (dry run mode)
-
-The promoter does not yet accept more than 1 promoter manifest per invocation.
-In order to handle changes to multiple promoter manifests inside a single PR,
-the `util/multirun.sh` script accepts paths/secrets to multiple manifests to run
-them serially.
-
-The presubmit job can be "faked" locally for testing in a dry-run mode, by just
-building the image with `make image-load` and then invoking:
-
-```
-read -r -d '' command << EOM
-multirun.sh /cip/cip \
-/go/src/github.com/kubernetes/k8s.io/k8s.gcr.io/k8s-staging-cluster-api/manifest.yaml \
-/go/src/github.com/kubernetes/k8s.io/k8s.gcr.io/k8s-staging-coredns/manifest.yaml \
-/go/src/github.com/kubernetes/k8s.io/k8s.gcr.io/k8s-staging-csi/manifest.yaml
-EOM
-
-docker run --rm -it \
-    -v $HOME/go:/go \
-    gcr.io/cip-demo-staging/cip:latest \
-    "${command}"
-```
-
-This basically runs a dry run of the presubmit job.
-
 # Releasing
 
 We follow [Semver](https://semver.org/) for versioning. For each new release,
