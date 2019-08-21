@@ -99,9 +99,11 @@ func MakeSyncContext(
 	})
 
 	// Populate access tokens for all registries listed in the manifest.
-	err := sc.PopulateTokens()
-	if err != nil {
-		return SyncContext{}, err
+	if useSvcAcc {
+		err := sc.PopulateTokens()
+		if err != nil {
+			return SyncContext{}, err
+		}
 	}
 
 	return sc, nil
