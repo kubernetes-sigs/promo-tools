@@ -15,11 +15,18 @@ image-load: image
 image-push: image
 	bazel run $(BAZEL_BUILD_OPTS) :push-cip
 lint:
-	@./lint.sh
+	GO111MODULE=on golangci-lint run
+lint-ci: download
+	make lint
 test:
 	bazel test --test_output=all //lib/...
+test-ci: download
+	make build
+	make test
 test-e2e:
 	bazel run $(BAZEL_BUILD_OPTS) //test-e2e:e2e -- -tests=$(REPO_ROOT)/test-e2e/tests.yaml -repo-root=$(REPO_ROOT) -key-file=$(CIP_E2E_KEY_FILE)
+download:
+	GO111MODULE=on go mod download
 update:
 	# Update go modules (source of truth!).
 	GO111MODULE=on go mod verify
@@ -27,4 +34,4 @@ update:
 	# Update bazel rules to use these new dependencies.
 	bazel run $(BAZEL_BUILD_OPTS) //:gazelle -- update-repos -prune -from_file=go.mod
 	bazel run //:gazelle
-.PHONY: build image image-load image-push lint test test-e2e update
+.PHONY: build download image image-load image-push lint test test-e2e update
