@@ -212,6 +212,9 @@ func main() {
 			os.Exit(0)
 		}
 
+		// Print version to make Prow logs more self-explanatory.
+		printVersion()
+
 		if *dryRunPtr {
 			fmt.Printf("********** START (DRY RUN): %s **********\n", *manifestPtr)
 		} else {
