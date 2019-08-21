@@ -1095,21 +1095,18 @@ func MkReadRepositoryCmdReal(
 			repoPath)
 	}
 
-	token, ok := sc.Tokens[RootRepo(tokenKey)]
-	if !ok {
-		klog.Errorf("access token for key '%s' not found\n", tokenKey)
-		klog.Error("valid keys:")
-		for key := range sc.Tokens {
-			klog.Error(key)
+	if sc.UseServiceAccount {
+		token, ok := sc.Tokens[RootRepo(tokenKey)]
+		if !ok {
+			klog.Exitf("access token for key '%s' not found\n", tokenKey)
 		}
-		klog.Exitf("access token for key '%s' not found\n", tokenKey)
+
+		rc.Token = token
+		var bearer = "Bearer " + string(rc.Token)
+		httpReq.Header.Add("Authorization", bearer)
 	}
 
-	rc.Token = token
-	var bearer = "Bearer " + string(rc.Token)
-	httpReq.Header.Add("Authorization", bearer)
 	sh.Req = httpReq
-
 	return &sh
 }
 
