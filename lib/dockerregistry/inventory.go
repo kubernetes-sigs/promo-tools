@@ -33,7 +33,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog"
 
+	"github.com/google/go-containerregistry/pkg/authn"
+	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1/google"
+	"github.com/google/go-containerregistry/pkg/v1/remote"
 	cr "github.com/google/go-containerregistry/pkg/v1/types"
 	cipJson "sigs.k8s.io/k8s-container-image-promoter/lib/json"
 	"sigs.k8s.io/k8s-container-image-promoter/lib/stream"
@@ -1402,16 +1405,19 @@ func mkPopulateRequestsForPromotionEdges(
 				}
 			}
 
-			req.StreamProducer = mkProducer(
-				// TODO: Clean up types to avoid having to split up promoteMe
-				// prematurely like this.
-				promoteMe.SrcRegistry.Name,
-				promoteMe.SrcImageTag.ImageName,
-				promoteMe.DstRegistry,
-				promoteMe.DstImageTag.ImageName,
-				promoteMe.Digest,
-				promoteMe.DstImageTag.Tag,
-				tp)
+			// Do not invoke mkProducer for Add or Move operations.
+			if tp == Delete {
+				req.StreamProducer = mkProducer(
+					// TODO: Clean up types to avoid having to split up promoteMe
+					// prematurely like this.
+					promoteMe.SrcRegistry.Name,
+					promoteMe.SrcImageTag.ImageName,
+					promoteMe.DstRegistry,
+					promoteMe.DstImageTag.ImageName,
+					promoteMe.Digest,
+					promoteMe.DstImageTag.Tag,
+					tp)
+			}
 
 			// Save some information about this request. It's a bit like
 			// HTTP "headers".
@@ -1535,34 +1541,57 @@ func (sc *SyncContext) Promote(
 		for req := range reqs {
 			reqRes := RequestResult{Context: req}
 			errors := make(Errors, 0)
-			stdoutReader, stderrReader, err := req.StreamProducer.Produce()
-			if err != nil {
-				errors = append(errors, Error{
-					Context: "running process",
-					Error:   err})
-			}
-			b, err := ioutil.ReadAll(stdoutReader)
-			if err != nil {
-				errors = append(errors, Error{
-					Context: "reading process stdout",
-					Error:   err})
-			}
-			be, err := ioutil.ReadAll(stderrReader)
-			if err != nil {
-				errors = append(errors, Error{
-					Context: "reading process stderr",
-					Error:   err})
-			}
-			// The add-tag has stderr; it uses stderr for debug messages, so
-			// don't count it as an error. Instead just print it out as extra
-			// info.
-			klog.Infof("process stdout:\n%v\n", string(b))
-			klog.Infof("process stderr:\n%v\n", string(be))
-			err = req.StreamProducer.Close()
-			if err != nil {
-				errors = append(errors, Error{
-					Context: "closing process",
-					Error:   err})
+			// If we're adding or moving (i.e., creating a new image or
+			// overwriting), do not bother shelling out to gcloud. Instead just
+			// use the gcrane.doCopy() method directly.
+
+			var err error
+			var stdoutReader io.Reader
+			var stderrReader io.Reader
+
+			rpr := req.RequestParams.(PromotionRequest)
+			if rpr.TagOp == Move || rpr.TagOp == Add {
+				err := writeImage(
+					ToFQIN(rpr.RegistrySrc, rpr.ImageNameSrc, rpr.Digest),
+					ToPQIN(rpr.RegistryDest, rpr.ImageNameDest, rpr.Tag))
+
+				if err != nil {
+					klog.Error(err)
+					errors = append(errors, Error{
+						Context: "running writeImage()",
+						Error:   err})
+				}
+
+			} else {
+				stdoutReader, stderrReader, err = req.StreamProducer.Produce()
+				if err != nil {
+					errors = append(errors, Error{
+						Context: "running process",
+						Error:   err})
+				}
+				b, err := ioutil.ReadAll(stdoutReader)
+				if err != nil {
+					errors = append(errors, Error{
+						Context: "reading process stdout",
+						Error:   err})
+				}
+				be, err := ioutil.ReadAll(stderrReader)
+				if err != nil {
+					errors = append(errors, Error{
+						Context: "reading process stderr",
+						Error:   err})
+				}
+				// The add-tag has stderr; it uses stderr for debug messages, so
+				// don't count it as an error. Instead just print it out as extra
+				// info.
+				klog.Infof("process stdout:\n%v\n", string(b))
+				klog.Infof("process stderr:\n%v\n", string(be))
+				err = req.StreamProducer.Close()
+				if err != nil {
+					errors = append(errors, Error{
+						Context: "closing process",
+						Error:   err})
+				}
 			}
 			reqRes.Errors = errors
 			requestResults <- reqRes
@@ -1923,18 +1952,6 @@ func GetWriteCmd(
 
 	var cmd []string
 	switch tp {
-	case Move:
-		// The "add-tag" command also moves tags as necessary.
-		fallthrough
-	case Add:
-		cmd = []string{"gcloud",
-			"--quiet",
-			"--verbosity=debug",
-			"container",
-			"images",
-			"add-tag",
-			ToFQIN(srcRegistry, srcImageName, digest),
-			ToPQIN(dest.Name, destImageName, tag)}
 	case Delete:
 		cmd = []string{"gcloud",
 			"--quiet",
@@ -1942,6 +1959,8 @@ func GetWriteCmd(
 			"images",
 			"untag",
 			ToPQIN(dest.Name, destImageName, tag)}
+	default:
+		klog.Exitln("unsupported tag operation:", tp)
 	}
 	// Use the service account if it is desired.
 	return gcloud.MaybeUseServiceAccount(
@@ -1975,4 +1994,99 @@ func GetDeleteCmd(
 		rc.ServiceAccount,
 		useServiceAccount,
 		cmd)
+}
+
+func writeImage(src, dst string) error {
+	srcAuth, dstAuth, srcRef, dstRef, err := parseRefAuths(src, dst)
+
+	if err != nil {
+		klog.Exitln(err)
+	}
+
+	// nolint[govet]
+	if err := copyIndex(
+		src, dst,
+		srcAuth, dstAuth,
+		srcRef, dstRef); err != nil {
+
+		// nolint[govet]
+		if err := copyImage(
+			src, dst,
+			srcAuth, dstAuth,
+			srcRef, dstRef); err != nil {
+
+			klog.Errorf("failed to copy image: %v", err)
+		}
+	}
+
+	return err
+}
+
+func parseRefAuths(src, dst string) (
+	authn.Authenticator,
+	authn.Authenticator,
+	name.Reference,
+	name.Reference,
+	error) {
+
+	srcRef, err := name.ParseReference(src)
+	if err != nil {
+		// nolint[lll]
+		return nil, nil, nil, nil, fmt.Errorf("parsing reference %q: %v", src, err)
+	}
+
+	dstRef, err := name.ParseReference(dst)
+	if err != nil {
+		// nolint[lll]
+		return nil, nil, nil, nil, fmt.Errorf("parsing reference %q: %v", dst, err)
+	}
+
+	srcAuth, err := authn.DefaultKeychain.Resolve(srcRef.Context().Registry)
+	if err != nil {
+		// nolint[lll]
+		return nil, nil, nil, nil, fmt.Errorf("getting auth for %q: %v", src, err)
+	}
+
+	dstAuth, err := authn.DefaultKeychain.Resolve(dstRef.Context().Registry)
+	if err != nil {
+		// nolint[lll]
+		return nil, nil, nil, nil, fmt.Errorf("getting auth for %q: %v", dst, err)
+	}
+
+	return srcAuth, dstAuth, srcRef, dstRef, nil
+}
+
+func copyImage(
+	src, dst string,
+	srcAuth, dstAuth authn.Authenticator,
+	srcRef, dstRef name.Reference) error {
+
+	img, err := remote.Image(srcRef, remote.WithAuth(srcAuth))
+	if err != nil {
+		return fmt.Errorf("reading image %q: %v", src, err)
+	}
+
+	if err := remote.Write(dstRef, img, remote.WithAuth(dstAuth)); err != nil {
+		return fmt.Errorf("writing image %q: %v", dst, err)
+	}
+
+	return nil
+}
+
+func copyIndex(
+	src, dst string,
+	srcAuth, dstAuth authn.Authenticator,
+	srcRef, dstRef name.Reference) error {
+
+	idx, err := remote.Index(srcRef, remote.WithAuth(srcAuth))
+	if err != nil {
+		return fmt.Errorf("reading image %q: %v", src, err)
+	}
+
+	// nolint[lll]
+	if err := remote.WriteIndex(dstRef, idx, remote.WithAuth(dstAuth)); err != nil {
+		return fmt.Errorf("writing image %q: %v", dst, err)
+	}
+
+	return nil
 }
