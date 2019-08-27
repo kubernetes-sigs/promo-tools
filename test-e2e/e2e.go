@@ -233,6 +233,7 @@ func runPromotion(repoRoot string, t E2ETest) error {
 	args := []string{
 		"run",
 		"--workspace_status_command=" + repoRoot + "/workspace_status.sh",
+		"--stamp",
 		":cip",
 		"--",
 		"-dry-run=false",
