@@ -984,57 +984,6 @@ func TestCommandGeneration(t *testing.T) {
 		eqErr,
 		fmt.Sprintf("Test: %v (cmd string)\n", testName))
 
-	testName = "GetWriteCmd (Add)"
-	tp = Add
-	got = GetWriteCmd(
-		destRC,
-		true,
-		srcRegName,
-		srcImageName,
-		destImageName,
-		digest,
-		tag,
-		tp)
-	expected = []string{
-		"gcloud",
-		"--account=robot",
-		"--quiet",
-		"--verbosity=debug",
-		"container",
-		"images",
-		"add-tag",
-		ToFQIN(srcRegName, destImageName, digest),
-		ToPQIN(destRC.Name, destImageName, tag)}
-	eqErr = checkEqual(got, expected)
-	checkError(
-		t,
-		eqErr,
-		fmt.Sprintf("Test: %v (cmd string)\n", testName))
-
-	got = GetWriteCmd(
-		destRC,
-		false,
-		srcRegName,
-		srcImageName,
-		destImageName,
-		digest,
-		tag,
-		tp)
-	expected = []string{
-		"gcloud",
-		"--quiet",
-		"--verbosity=debug",
-		"container",
-		"images",
-		"add-tag",
-		ToFQIN(srcRegName, destImageName, digest),
-		ToPQIN(destRC.Name, destImageName, tag)}
-	eqErr = checkEqual(got, expected)
-	checkError(
-		t,
-		eqErr,
-		fmt.Sprintf("Test: %v (cmd string)\n", testName))
-
 	testName = "GetWriteCmd (Delete)"
 	tp = Delete
 	got = GetWriteCmd(
