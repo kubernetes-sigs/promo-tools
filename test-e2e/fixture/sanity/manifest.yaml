@@ -18,3 +18,4 @@ images:
     - 1.0-linux_amd64
     sha256:2740382935148a02bf425a893d14848dd6238e405935440ce5c13b771a33f2fd:
     - 1.0-linux_s390x
+    sha256:03aec0c717de7850ee3e3165ecdf73cf1abf0bdb5b6cce04695eeb80637360f8: []

@@ -2137,6 +2137,41 @@ func TestPromotion(t *testing.T) {
 				Tag:            "0.9"}: 1},
 		},
 		{
+			"Promote 1 digest (tagless promotion)",
+			Manifest{
+				Registries: registries,
+				Images: []Image{
+					{
+						ImageName: "a",
+						Dmap: DigestTags{
+							"sha256:000": TagSlice{}}}},
+				srcRegistry: &srcRC},
+			SyncContext{
+				Inv: MasterInventory{
+					"gcr.io/foo": RegInvImage{
+						"a": DigestTags{
+							"sha256:000": TagSlice{}}},
+					"gcr.io/bar": RegInvImage{
+						"a": DigestTags{
+							// "bar" already has it
+							"sha256:000": TagSlice{}}},
+					"gcr.io/cat": RegInvImage{
+						"c": DigestTags{
+							"sha256:222": TagSlice{}}}}},
+			nil,
+			CapturedRequests{
+				PromotionRequest{
+					TagOp:          Add,
+					RegistrySrc:    srcRegName,
+					RegistryDest:   registries[2].Name,
+					ServiceAccount: registries[2].ServiceAccount,
+					ImageNameSrc:   "a",
+					ImageNameDest:  "a",
+					Digest:         "sha256:000",
+					Tag:            ""}: 1,
+			},
+		},
+		{
 			"NOP; dest has extra tag, but NOP because -delete-extra-tags NOT specified",
 			Manifest{
 				Registries: registries,

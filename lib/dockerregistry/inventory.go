@@ -256,34 +256,33 @@ func ToPromotionEdges(mfests []Manifest) map[PromotionEdge]interface{} {
 	for _, mfest := range mfests {
 		for _, image := range mfest.Images {
 			for digest, tagArray := range image.Dmap {
-				for _, tag := range tagArray {
-					for _, rc := range mfest.Registries {
-						if rc == *mfest.srcRegistry {
-							continue
-						}
-						edge := PromotionEdge{
-							SrcRegistry: *mfest.srcRegistry,
-							SrcImageTag: ImageTag{
-								ImageName: image.ImageName,
-								Tag:       tag},
-							Digest:      digest,
-							DstRegistry: rc,
-						}
+				for _, destRC := range mfest.Registries {
+					if destRC == *mfest.srcRegistry {
+						continue
+					}
 
-						// Renames change how edges are created.
-						regImgPath := RegistryImagePath(mfest.srcRegistry.Name) + "/" + RegistryImagePath(image.ImageName)
-						if renames, ok := mfest.renamesDenormalized[regImgPath]; ok {
-							if imgName, ok := renames[rc.Name]; ok {
-								edge.DstImageTag = ImageTag{
-									ImageName: imgName,
-									Tag:       tag}
-								edges[edge] = nil
-								continue
-							}
+					if len(tagArray) > 0 {
+						for _, tag := range tagArray {
+							edge := mkPromotionEdge(
+								*mfest.srcRegistry,
+								destRC,
+								image.ImageName,
+								digest,
+								tag,
+								mfest.renamesDenormalized)
+							edges[edge] = nil
 						}
-						edge.DstImageTag = ImageTag{
-							ImageName: image.ImageName,
-							Tag:       tag}
+					} else {
+						// If this digest does not have any associated tags,
+						// still create a promotion edge for it (tagless
+						// promotion).
+						edge := mkPromotionEdge(
+							*mfest.srcRegistry,
+							destRC,
+							image.ImageName,
+							digest,
+							"", // No associated tag; still promote!
+							mfest.renamesDenormalized)
 						edges[edge] = nil
 					}
 				}
@@ -293,11 +292,48 @@ func ToPromotionEdges(mfests []Manifest) map[PromotionEdge]interface{} {
 	return edges
 }
 
+func mkPromotionEdge(
+	srcRC, dstRC RegistryContext,
+	srcImageName ImageName,
+	digest Digest,
+	tag Tag,
+	rd RenamesDenormalized) PromotionEdge {
+
+	edge := PromotionEdge{
+		SrcRegistry: srcRC,
+		SrcImageTag: ImageTag{
+			ImageName: srcImageName,
+			Tag:       tag},
+		Digest:      digest,
+		DstRegistry: dstRC,
+	}
+
+	// Renames change how edges are created.
+	// nolint[lll]
+	regImgPath := RegistryImagePath(srcRC.Name) + "/" + RegistryImagePath(srcImageName)
+	if renames, ok := rd[regImgPath]; ok {
+		if imgName, ok := renames[dstRC.Name]; ok {
+			edge.DstImageTag = ImageTag{
+				ImageName: imgName,
+				Tag:       tag}
+			return edge
+		}
+	}
+
+	// Without renames, the name in the destination is the same as the name in
+	// the source.
+	edge.DstImageTag = ImageTag{
+		ImageName: srcImageName,
+		Tag:       tag}
+	return edge
+}
+
 // This filters out those edges from ToPromotionEdges (found in []Manifest), to
 // only those PromotionEdges that makes sense to keep around. For example, we
 // want to remove all edges that have already been promoted.
 //
 // nolint[funlen]
+// nolint[gocyclo]
 func (sc *SyncContext) getPromotionCandidates(
 	edges map[PromotionEdge]interface{}) map[PromotionEdge]interface{} {
 
@@ -322,6 +358,16 @@ func (sc *SyncContext) getPromotionCandidates(
 		// If dst vertex exists, NOP.
 		if dp.PqinDigestMatch {
 			klog.Infof("edge %s: skipping because it was already promoted (case 1)\n", edge)
+			continue
+		}
+
+		// If this edge is for a tagless promotion, skip if the digest exists in
+		// the destination.
+		if edge.DstImageTag.Tag == "" && dp.DigestExists {
+			// Still, log a warning if the source is missing the image.
+			if !sp.DigestExists {
+				klog.Errorf("edge %s: skipping %s/%s@%s because it was already promoted, but it is still _LOST_ (can't find it in src registry! please backfill it!)\n", edge, edge.SrcRegistry.Name, edge.SrcImageTag.ImageName, edge.Digest)
+			}
 			continue
 		}
 
@@ -1553,11 +1599,27 @@ func (sc *SyncContext) Promote(
 
 			rpr := req.RequestParams.(PromotionRequest)
 			if rpr.TagOp == Move || rpr.TagOp == Add {
-				err := writeImage(
-					ToFQIN(rpr.RegistrySrc, rpr.ImageNameSrc, rpr.Digest),
-					ToPQIN(rpr.RegistryDest, rpr.ImageNameDest, rpr.Tag))
 
-				if err != nil {
+				srcVertex := ToFQIN(rpr.RegistrySrc, rpr.ImageNameSrc, rpr.Digest)
+
+				var dstVertex string
+
+				if len(rpr.Tag) > 0 {
+					dstVertex = ToPQIN(
+						rpr.RegistryDest,
+						rpr.ImageNameDest,
+						rpr.Tag)
+				} else {
+					// If there is no tag, then it is a tagless promotion. So
+					// the destination vertex must be referenced with a digest
+					// (FQIN), not a tag (PQIN).
+					dstVertex = ToFQIN(
+						rpr.RegistryDest,
+						rpr.ImageNameDest,
+						rpr.Digest)
+				}
+
+				if err := writeImage(srcVertex, dstVertex); err != nil {
 					klog.Error(err)
 					errors = append(errors, Error{
 						Context: "running writeImage()",
