@@ -105,11 +105,11 @@ If there are multiple destination registries, the above calculation is repeated
 for each destination registry. The promoter also prints warnings about images in
 `M` that cannot be found in the source registry (call it `S`):
 
-- `D \ S` = images that are lost (no way to promote it because it cannot be found!)
+- `M \ S` = images that are lost (no way to promote it because it cannot be found!)
 
 ## Server-side operations
 
-During the promtion process, all data resides on the server (currently, Google
+During the promotion process, all data resides on the server (currently, Google
 Container Registry for images). That is, no images get pulled and pushed back
 up. There are two reasons why it does things entirely server-side:
 
