@@ -21,7 +21,7 @@ p_() {
 
 git_commit="$(git rev-parse HEAD)"
 git_desc="$(git describe --always --dirty --long)"
-timestamp_utc_rfc3339=$(date --utc --rfc-3339=seconds)
+timestamp_utc_rfc3339=$(date -u +"%Y-%m-%d %H:%M:%S%z")
 timestamp_utc_date_dashes="${timestamp_utc_rfc3339% *}"
 timestamp_utc_date_no_dashes="${timestamp_utc_date_dashes//-/}"
 image_tag="$git_desc"
