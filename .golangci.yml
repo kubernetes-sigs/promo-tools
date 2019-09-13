@@ -61,9 +61,10 @@ linters:
 issues:
   exclude-use-default: false
   exclude-rules:
-  - path: "lib/dockerregistry/inventory_test.go"
+  - path: "_test.go"
     linters:
     - dupl
     - errcheck
+    - funlen
     - lll
     - staticcheck

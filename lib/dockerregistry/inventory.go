@@ -293,6 +293,8 @@ func ToPromotionEdges(mfests []Manifest) map[PromotionEdge]interface{} {
 // This filters out those edges from ToPromotionEdges (found in []Manifest), to
 // only those PromotionEdges that makes sense to keep around. For example, we
 // want to remove all edges that have already been promoted.
+//
+// nolint[funlen]
 func (sc *SyncContext) getPromotionCandidates(
 	edges map[PromotionEdge]interface{}) map[PromotionEdge]interface{} {
 
