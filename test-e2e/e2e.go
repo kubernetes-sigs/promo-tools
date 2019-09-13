@@ -174,6 +174,15 @@ func testSetup(repoRoot string, t E2ETest) error {
 			"--purge",
 			fmt.Sprintf("%s/golden-foo/foo:1.0", pushRepo),
 		},
+		// Remove tag for tagless image.
+		{
+			"gcloud",
+			"container",
+			"images",
+			"untag",
+			"--quiet",
+			fmt.Sprintf("%s/golden-foo/foo:NOTAG-0", pushRepo),
+		},
 	}
 
 	for _, cmd := range cmds {
