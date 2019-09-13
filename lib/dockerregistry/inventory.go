@@ -378,15 +378,10 @@ func (sc *SyncContext) getPromotionCandidates(
 			continue
 		}
 
-		if dp.PqinDigestMatch {
-			klog.Infof("edge %s: skipping because it was already promoted (case 2)\n", edge)
-			continue
-		}
-
 		if dp.PqinExists {
 			if dp.DigestExists {
 				// NOP (already promoted).
-				klog.Infof("edge %s: skipping because it was already promoted (case 3)\n", edge)
+				klog.Infof("edge %s: skipping because it was already promoted (case 2)\n", edge)
 				continue
 			} else {
 				// Pqin points to the wrong digest.
@@ -1426,30 +1421,12 @@ func mkPopulateRequestsForPromotionEdges(
 
 			_, dp := promoteMe.VertexProps(sc.Inv)
 
-			if dp.PqinDigestMatch {
-				klog.Infof("edge %s: skipping because it was already promoted (case 2)\n", promoteMe)
-				continue
-			}
-
 			if dp.PqinExists {
-				if dp.DigestExists {
-					// NOP (already promoted).
-					klog.Infof("edge %s: skipping because it was already promoted (case 3)\n", promoteMe)
-					continue
-				} else {
+				if !dp.DigestExists {
 					// Pqin points to the wrong digest.
 					klog.Warningf("edge %s: tag %s points to the wrong digest; moving\n, dp.BadDigest")
 					tp = Move
 					oldDigest = dp.BadDigest
-				}
-			} else {
-				if dp.DigestExists {
-					// Digest exists in dst, but the pqin we desire does not
-					// exist. Just add the pqin to this existing digest.
-					klog.Infof("edge %s: digest %s already exists, but does not have the pqin we want (%s)\n", promoteMe, dp.OtherTags)
-				} else {
-					// Neither the digest nor the pqin exists in dst.
-					klog.Infof("edge %s: regular promotion (neither digest nor pqin exists in dst)\n", promoteMe)
 				}
 			}
 
