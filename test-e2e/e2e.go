@@ -115,6 +115,7 @@ func checkSnapshot(repo reg.RegistryName,
 	}
 }
 
+// nolint[funlen]
 func testSetup(repoRoot string, t E2ETest) error {
 	if err := t.clearRepositories(); err != nil {
 		return err
