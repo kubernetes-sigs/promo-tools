@@ -125,6 +125,7 @@ func main() {
 	var srcRegistry *reg.RegistryContext
 	var err error
 	var mfests []reg.Manifest
+	promotionEdges := make(map[reg.PromotionEdge]interface{})
 	sc := reg.SyncContext{}
 	mi := make(reg.MasterInventory)
 
@@ -200,6 +201,11 @@ func main() {
 	// almost never be the case, so given a fully-parsed manifest with 0 images,
 	// treat it as if -parse-only was implied and exit gracefully.
 	if len(*snapshotPtr) == 0 {
+		promotionEdges, err = reg.ToPromotionEdges(mfests)
+		if err != nil {
+			klog.Exitln(err)
+		}
+
 		imagesInManifests := false
 		for _, mfest := range mfests {
 			if len(mfest.Images) > 0 {
@@ -263,7 +269,6 @@ func main() {
 	}
 
 	// Promote.
-	edges := sc.GetPromotionEdgesFromManifests(mfests, true)
 	mkProducer := func(
 		srcRegistry reg.RegistryName,
 		srcImageName reg.ImageName,
@@ -282,7 +287,7 @@ func main() {
 			tp)
 		return &sp
 	}
-	err = sc.Promote(edges, mkProducer, nil)
+	err = sc.Promote(promotionEdges, mkProducer, nil)
 	if err != nil {
 		klog.Exitln(err)
 	}

@@ -1,0 +1,23 @@
+registries:
+- name: gcr.io/bar-staging
+  service-account: sa@robot.com
+  src: true
+- name: us.gcr.io/some-prod
+  service-account: sa@robot.com
+- name: eu.gcr.io/some-prod
+  service-account: sa@robot.com
+- name: asia.gcr.io/some-prod
+  service-account: sa@robot.com
+images:
+- name: bar-quux
+  dmap:
+    "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": ["1.0"]
+renames:
+- - "gcr.io/bar-staging/bar-quux"
+  # These renames conflict with the destination name claimed by
+  # "a/manifest.yaml". It's OK if the images that are tagged are the same
+  # digest (redundant), but in this
+  # case the digests are also different.
+  - "us.gcr.io/some-prod/foo-controller"
+  - "eu.gcr.io/some-prod/foo-controller"
+  - "asia.gcr.io/some-prod/foo-controller"

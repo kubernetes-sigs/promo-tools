@@ -216,17 +216,6 @@ func ValidateManifestsFromDir(mfests []Manifest) error {
 		return fmt.Errorf("no manifests to validate")
 	}
 
-	// Check that there are no overlapping manifests. Each manifest must be
-	// responsible for 1 unique source registry.
-	srcRegsSeen := make(map[RegistryName]string)
-	for _, mfest := range mfests {
-		if mfestFilepath, seen := srcRegsSeen[mfest.srcRegistry.Name]; seen {
-			// nolint[lll]
-			return fmt.Errorf("source registry '%s' defined in multiple manifests:\n- '%s'\n- '%s'\n", mfest.srcRegistry.Name, mfestFilepath, mfest.filepath)
-		}
-		srcRegsSeen[mfest.srcRegistry.Name] = mfest.filepath
-	}
-
 	// If two manifests are renaming images, then they should not share any
 	// rename information (should be mutually exclusive). We use a separate loop
 	// for clarity.
@@ -248,7 +237,8 @@ func ValidateManifestsFromDir(mfests []Manifest) error {
 
 // ToPromotionEdges converts a list of manifests to a set of edges we want to
 // try promoting.
-func ToPromotionEdges(mfests []Manifest) map[PromotionEdge]interface{} {
+func ToPromotionEdges(
+	mfests []Manifest) (map[PromotionEdge]interface{}, error) {
 	edges := make(map[PromotionEdge]interface{})
 	// nolint[lll]
 	for _, mfest := range mfests {
@@ -287,7 +277,8 @@ func ToPromotionEdges(mfests []Manifest) map[PromotionEdge]interface{} {
 			}
 		}
 	}
-	return edges
+
+	return checkOverlappingEdges(edges)
 }
 
 func mkPromotionEdge(
@@ -400,6 +391,90 @@ func (sc *SyncContext) getPromotionCandidates(
 	}
 
 	return toPromote
+}
+
+// checkOverlappingEdges checks to ensure that all the edges taken together as a
+// whole are consistent. It checks that there are no duplicate promotions
+// desired to the same destination vertex (same destination PQIN). If the
+// digests are the same for those edges, ignore because by definition the
+// digests are cryptographically guaranteed to be the same thing (it doesn't
+// matter if 2 different parties want the same exact image to become promoted to
+// the same destination --- in many ways this is actually a good thing because
+// it's a form of redundancy). However, return an error if the digests are
+// different, because most likely this is at best just human error and at worst
+// a malicious attack (someone trying to push an image to an endpoint they
+// shouldn't own, or possibly an attempt to rename a tag for an existin image to
+// be something else).
+//
+// nolint[gocyclo]
+func checkOverlappingEdges(
+	edges map[PromotionEdge]interface{}) (map[PromotionEdge]interface{}, error) {
+
+	// Build up a "promotionIntent". This will be checked below.
+	promotionIntent := make(map[string]map[Digest][]PromotionEdge)
+	for edge := range edges {
+		dstPQIN := ToPQIN(edge.DstRegistry.Name,
+			edge.DstImageTag.ImageName,
+			edge.DstImageTag.Tag)
+
+		digestToEdges, ok := promotionIntent[dstPQIN]
+		if ok {
+			// Store the edge.
+			digestToEdges[edge.Digest] = append(digestToEdges[edge.Digest], edge)
+			promotionIntent[dstPQIN] = digestToEdges
+		} else {
+			// Make this edge lay claim to this destination vertex.
+			edgeList := make([]PromotionEdge, 0)
+			edgeList = append(edgeList, edge)
+			digestToEdges := make(map[Digest][]PromotionEdge)
+			digestToEdges[edge.Digest] = edgeList
+			promotionIntent[dstPQIN] = digestToEdges
+		}
+	}
+
+	// Review the promotionIntent to ensure that there are no issues.
+	overlapError := false
+	emptyEdgeListError := false
+	checked := make(map[PromotionEdge]interface{})
+	for pqin, digestToEdges := range promotionIntent {
+		if len(digestToEdges) < 2 {
+			for _, edgeList := range digestToEdges {
+				switch len(edgeList) {
+				case 0:
+					klog.Errorf("no edges for %v", pqin)
+					emptyEdgeListError = true
+				case 1:
+					checked[edgeList[0]] = nil
+				default:
+					klog.Infof("redundant promotion: multiple edges want to promote the same digest to the same destination endpoint %v:", pqin)
+					for _, edge := range edgeList {
+						klog.Infof("%v", edge)
+					}
+					klog.Infof("using the first one: %v", edgeList[0])
+					checked[edgeList[0]] = nil
+				}
+			}
+		} else {
+			klog.Errorf("multiple edges want to promote *different* images (digests) to the same destination endpoint %v:", pqin)
+			for digest, edgeList := range digestToEdges {
+				klog.Errorf("  for digest %v:\n", digest)
+				for _, edge := range edgeList {
+					klog.Errorf("%v\n", edge)
+				}
+			}
+			overlapError = true
+		}
+	}
+
+	if overlapError {
+		return nil, fmt.Errorf("overlapping edges detected")
+	}
+
+	if emptyEdgeListError {
+		return nil, fmt.Errorf("empty edgeList(s) detected")
+	}
+
+	return checked, nil
 }
 
 // VertexProps determines the properties of each vertex (src and dst) in the
@@ -1464,13 +1539,11 @@ func mkPopulateRequestsForPromotionEdges(
 	}
 }
 
-// GetPromotionEdgesFromManifests generates all "edges" that we need to promote.
-func (sc *SyncContext) GetPromotionEdgesFromManifests(
-	mfests []Manifest,
+// FilterPromotionEdges generates all "edges" that we want to promote.
+func (sc *SyncContext) FilterPromotionEdges(
+	edges map[PromotionEdge]interface{},
 	readRepos bool,
 ) map[PromotionEdge]interface{} {
-
-	edges := ToPromotionEdges(mfests)
 
 	if readRepos {
 		regs := getRegistriesToRead(edges)
