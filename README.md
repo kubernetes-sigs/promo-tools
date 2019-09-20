@@ -87,25 +87,20 @@ from running `make build`, and then invoking it with the correct path under
 `./bazel-bin`. For example, if you are on a Linux machine, running `make build`
 will output a binary at `./bazel-bin/linux_amd64_stripped/cip`.
 
-# How it works
+# What it does
 
-At a high level, the promoter simply performs set operations ("set" as in
-mathematics, like in Venn diagrams). It first creates the set of all images in
-the destination registry (let's call it `D`). It also creates the set of all
-images defined in the promoter manifest as "promotion candidates in the
-manifest" (call it `M`).
+The promoter's behaviour can be described in terms of mathematical sets (as in Venn diagrams).
+Suppose `S` is the set of images in the source registry, `D` is the set of all images in the destination registry and
+`M` is the set of images to be promoted (these are defined in the promoter manifest). Then:
 
-Given the above, we get the following results:
+- `M ∩ D` = images which do not need promoting since they are already present in the destination registry
+- `(M ∩ S) \ D` = images that are copied
 
-- `M ∩ D` = images that have already been promoted (NOP)
-- `M \ D` = images that must be promoted
-- `D \ M` = images that are extraneous to the manifest (can be deleted with `-delete-extra-tags` flag)
+The above statements are true for each destination registry.
 
-If there are multiple destination registries, the above calculation is repeated
-for each destination registry. The promoter also prints warnings about images in
-`M` that cannot be found in the source registry (call it `S`):
+The promoter also prints warnings about images that cannot be promoted:
 
-- `M \ S` = images that are lost (no way to promote it because it cannot be found!)
+- `M \ (S ∪ D)` = images that cannot be found
 
 ## Server-side operations
 
