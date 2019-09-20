@@ -33,10 +33,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog"
 
-	"github.com/google/go-containerregistry/pkg/authn"
-	"github.com/google/go-containerregistry/pkg/name"
+	"github.com/google/go-containerregistry/pkg/crane"
 	"github.com/google/go-containerregistry/pkg/v1/google"
-	"github.com/google/go-containerregistry/pkg/v1/remote"
 	cr "github.com/google/go-containerregistry/pkg/v1/types"
 	cipJson "sigs.k8s.io/k8s-container-image-promoter/lib/json"
 	"sigs.k8s.io/k8s-container-image-promoter/lib/stream"
@@ -1596,7 +1594,7 @@ func (sc *SyncContext) Promote(
 						rpr.Digest)
 				}
 
-				if err := writeImage(srcVertex, dstVertex); err != nil {
+				if err := crane.Copy(srcVertex, dstVertex); err != nil {
 					klog.Error(err)
 					errors = append(errors, Error{
 						Context: "running writeImage()",
@@ -2035,99 +2033,4 @@ func GetDeleteCmd(
 		rc.ServiceAccount,
 		useServiceAccount,
 		cmd)
-}
-
-func writeImage(src, dst string) error {
-	srcAuth, dstAuth, srcRef, dstRef, err := parseRefAuths(src, dst)
-
-	if err != nil {
-		klog.Exitln(err)
-	}
-
-	// nolint[govet]
-	if err := copyIndex(
-		src, dst,
-		srcAuth, dstAuth,
-		srcRef, dstRef); err != nil {
-
-		// nolint[govet]
-		if err := copyImage(
-			src, dst,
-			srcAuth, dstAuth,
-			srcRef, dstRef); err != nil {
-
-			klog.Errorf("failed to copy image: %v", err)
-		}
-	}
-
-	return err
-}
-
-func parseRefAuths(src, dst string) (
-	authn.Authenticator,
-	authn.Authenticator,
-	name.Reference,
-	name.Reference,
-	error) {
-
-	srcRef, err := name.ParseReference(src)
-	if err != nil {
-		// nolint[lll]
-		return nil, nil, nil, nil, fmt.Errorf("parsing reference %q: %v", src, err)
-	}
-
-	dstRef, err := name.ParseReference(dst)
-	if err != nil {
-		// nolint[lll]
-		return nil, nil, nil, nil, fmt.Errorf("parsing reference %q: %v", dst, err)
-	}
-
-	srcAuth, err := authn.DefaultKeychain.Resolve(srcRef.Context().Registry)
-	if err != nil {
-		// nolint[lll]
-		return nil, nil, nil, nil, fmt.Errorf("getting auth for %q: %v", src, err)
-	}
-
-	dstAuth, err := authn.DefaultKeychain.Resolve(dstRef.Context().Registry)
-	if err != nil {
-		// nolint[lll]
-		return nil, nil, nil, nil, fmt.Errorf("getting auth for %q: %v", dst, err)
-	}
-
-	return srcAuth, dstAuth, srcRef, dstRef, nil
-}
-
-func copyImage(
-	src, dst string,
-	srcAuth, dstAuth authn.Authenticator,
-	srcRef, dstRef name.Reference) error {
-
-	img, err := remote.Image(srcRef, remote.WithAuth(srcAuth))
-	if err != nil {
-		return fmt.Errorf("reading image %q: %v", src, err)
-	}
-
-	if err := remote.Write(dstRef, img, remote.WithAuth(dstAuth)); err != nil {
-		return fmt.Errorf("writing image %q: %v", dst, err)
-	}
-
-	return nil
-}
-
-func copyIndex(
-	src, dst string,
-	srcAuth, dstAuth authn.Authenticator,
-	srcRef, dstRef name.Reference) error {
-
-	idx, err := remote.Index(srcRef, remote.WithAuth(srcAuth))
-	if err != nil {
-		return fmt.Errorf("reading image %q: %v", src, err)
-	}
-
-	// nolint[lll]
-	if err := remote.WriteIndex(dstRef, idx, remote.WithAuth(dstAuth)); err != nil {
-		return fmt.Errorf("writing image %q: %v", dst, err)
-	}
-
-	return nil
 }
