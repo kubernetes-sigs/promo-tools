@@ -650,6 +650,9 @@ func TestValidateManifestsFromDir(t *testing.T) {
 		"basic",
 		"singleton",
 		"multiple-rebases",
+		"overlapping-src-registries",
+		"overlapping-destination-vertices-same-digest",
+		"overlapping-destination-vertices-same-digest-by-rename",
 	}
 
 	pwd := bazelTestPath("TestValidateManifestsFromDir")
@@ -662,45 +665,69 @@ func TestValidateManifestsFromDir(t *testing.T) {
 		checkError(
 			t,
 			eqErr,
-			fmt.Sprintf("Test: `%v' should be valid (parse)\n", testInput))
+			fmt.Sprintf("Test: `%v' should be valid (ParseManifestsFromDir)\n", testInput))
 
 		err := ValidateManifestsFromDir(mfests)
 		eqErr = checkEqual(err, nil)
 		checkError(
 			t,
 			eqErr,
+			fmt.Sprintf("Test: `%v' should be valid (ValidateManifestsFromDir)\n", testInput))
+
+		_, edgeErr := ToPromotionEdges(mfests)
+		eqErr = checkEqual(edgeErr, nil)
+		checkError(
+			t,
+			eqErr,
 			fmt.Sprintf("Test: `%v' should be valid\n", testInput))
+
 	}
 
 	// nolint[golint]
 	var shouldBeInvalid = []struct {
-		dirName       string
-		expectedError error
+		dirName               string
+		expectedParseError    error
+		expectedValidateError error
+		expectedEdgeError     error
 	}{
 		{
 			"empty",
 			fmt.Errorf("no manifests found in dir: %s", filepath.Join(pwd, "invalid/empty")),
-		},
-		{
-			"overlapping-src-registries",
-			fmt.Errorf(
-				"source registry '%s' defined in multiple manifests:\n- '%s'\n- '%s'\n",
-				"gcr.io/foo-staging",
-				filepath.Join(pwd, "invalid/overlapping-src-registries/a/manifest.yaml"),
-				filepath.Join(pwd, "invalid/overlapping-src-registries/b/manifest.yaml")),
+			nil,
+			nil,
 		},
 		{
 			// For this one, the manifest b/manifest.yaml is already invalid.
 			"overlapping-renames-invalid-manifest",
 			fmt.Errorf("multiple renames found for registry 'asia.gcr.io/some-prod' in 'renames', for image foo/foo-controller"),
+			nil,
+			nil,
 		},
 		{
 			"overlapping-renames-across-manifests",
+			nil,
 			fmt.Errorf(
 				"rename key '%s' found in multiple manifests:\n- '%s'\n- '%s'\n",
 				"asia.gcr.io/some-prod/foo/foo-controller",
 				filepath.Join(pwd, "invalid/overlapping-renames-across-manifests/a/manifest.yaml"),
 				filepath.Join(pwd, "invalid/overlapping-renames-across-manifests/b/manifest.yaml")),
+			nil,
+		},
+		{
+
+			"overlapping-destination-vertices-different-digest",
+			nil,
+			nil,
+			fmt.Errorf(
+				"overlapping edges detected"),
+		},
+		{
+
+			"overlapping-destination-vertices-different-digest-by-rename",
+			nil,
+			nil,
+			fmt.Errorf(
+				"overlapping edges detected"),
 		},
 	}
 
@@ -712,17 +739,31 @@ func TestValidateManifestsFromDir(t *testing.T) {
 		// before we even get to ValidateManifestsFromDir(). So handle these
 		// cases as well.
 		mfests, errParse := ParseManifestsFromDir(fixtureDir)
-		if errParse != nil {
-			eqErr = checkEqual(errParse, test.expectedError)
-		} else {
-			err := ValidateManifestsFromDir(mfests)
-			eqErr = checkEqual(err, test.expectedError)
-		}
+		eqErr = checkEqual(errParse, test.expectedParseError)
 		checkError(
 			t,
 			eqErr,
-			fmt.Sprintf("Test: `%v' should be invalid\n", test.dirName))
+			fmt.Sprintf("Test: `%v' should be invalid (ParseManifestsFromDir)\n", test.dirName))
+		if errParse != nil {
+			continue
+		}
 
+		validateErr := ValidateManifestsFromDir(mfests)
+		eqErr = checkEqual(validateErr, test.expectedValidateError)
+		checkError(
+			t,
+			eqErr,
+			fmt.Sprintf("Test: `%v' should be invalid (ValidateManifestsFromDir)\n", test.dirName))
+		if validateErr != nil {
+			continue
+		}
+
+		_, edgeErr := ToPromotionEdges(mfests)
+		eqErr = checkEqual(edgeErr, test.expectedEdgeError)
+		checkError(
+			t,
+			eqErr,
+			fmt.Sprintf("Test: `%v' should be invalid (ToPromotionEdges)\n", test.dirName))
 	}
 }
 
@@ -1651,10 +1692,11 @@ func TestToPromotionEdges(t *testing.T) {
 					"sha256:000": TagSlice{"0.9"}}}}}
 
 	var tests = []struct {
-		name             string
-		input            []Manifest
-		expectedInitial  map[PromotionEdge]interface{}
-		expectedFiltered map[PromotionEdge]interface{}
+		name               string
+		input              []Manifest
+		expectedInitial    map[PromotionEdge]interface{}
+		expectedInitialErr error
+		expectedFiltered   map[PromotionEdge]interface{}
 	}{
 		{
 			"Basic case (1 new edge; already promoted)",
@@ -1680,6 +1722,7 @@ func TestToPromotionEdges(t *testing.T) {
 						ImageName: "a",
 						Tag:       "0.9"}}: nil,
 			},
+			nil,
 			make(map[PromotionEdge]interface{}),
 		},
 		{
@@ -1716,6 +1759,7 @@ func TestToPromotionEdges(t *testing.T) {
 						ImageName: "a",
 						Tag:       "0.9"}}: nil,
 			},
+			nil,
 			make(map[PromotionEdge]interface{}),
 		},
 		{
@@ -1756,6 +1800,7 @@ func TestToPromotionEdges(t *testing.T) {
 						ImageName: "some/subdir/a",
 						Tag:       "0.9"}}: nil,
 			},
+			nil,
 			map[PromotionEdge]interface{}{
 				{
 					SrcRegistry: srcRC,
@@ -1777,9 +1822,12 @@ func TestToPromotionEdges(t *testing.T) {
 			// Skip errors.
 			_ = test.input[i].finalize()
 		}
-		got := ToPromotionEdges(test.input)
+		got, gotErr := ToPromotionEdges(test.input)
 		err := checkEqual(got, test.expectedInitial)
 		checkError(t, err, fmt.Sprintf("checkError: test: %v (ToPromotionEdges)\n", test.name))
+
+		err = checkEqual(gotErr, test.expectedInitialErr)
+		checkError(t, err, fmt.Sprintf("checkError: test: %v (ToPromotionEdges (error mismatch)\n", test.name))
 
 		got = sc.getPromotionCandidates(got)
 		err = checkEqual(got, test.expectedFiltered)
@@ -2344,11 +2392,15 @@ func TestPromotion(t *testing.T) {
 			}
 		}
 
-		edges := test.inputSc.GetPromotionEdgesFromManifests(
-			[]Manifest{test.inputM},
+		edges, err := ToPromotionEdges([]Manifest{test.inputM})
+		eqErr := checkEqual(err, nil)
+		checkError(t, eqErr, fmt.Sprintf("Test: %v: (unexpected error getting promotion edges)\n", test.name))
+
+		filteredEdges := test.inputSc.FilterPromotionEdges(
+			edges,
 			false)
 		test.inputSc.Promote(
-			edges,
+			filteredEdges,
 			nopStream,
 			&processRequestFake)
 

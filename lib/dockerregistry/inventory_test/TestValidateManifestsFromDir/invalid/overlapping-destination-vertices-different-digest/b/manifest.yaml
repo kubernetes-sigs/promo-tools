@@ -1,0 +1,16 @@
+registries:
+- name: gcr.io/foo-staging
+  service-account: sa@robot.com
+  src: true
+- name: us.gcr.io/some-prod
+  service-account: sa@robot.com
+- name: eu.gcr.io/some-prod
+  service-account: sa@robot.com
+- name: asia.gcr.io/some-prod
+  service-account: sa@robot.com
+images:
+- name: foo-controller
+  dmap:
+    # This sha conflicts with a's manifest that has "aaaa..." point to the "1.0" tag.
+    "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": ["1.0"]
+renames: []
