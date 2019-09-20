@@ -218,17 +218,6 @@ func ValidateManifestsFromDir(mfests []Manifest) error {
 		return fmt.Errorf("no manifests to validate")
 	}
 
-	// Check that there are no overlapping manifests. Each manifest must be
-	// responsible for 1 unique source registry.
-	srcRegsSeen := make(map[RegistryName]string)
-	for _, mfest := range mfests {
-		if mfestFilepath, seen := srcRegsSeen[mfest.srcRegistry.Name]; seen {
-			// nolint[lll]
-			return fmt.Errorf("source registry '%s' defined in multiple manifests:\n- '%s'\n- '%s'\n", mfest.srcRegistry.Name, mfestFilepath, mfest.filepath)
-		}
-		srcRegsSeen[mfest.srcRegistry.Name] = mfest.filepath
-	}
-
 	// If two manifests are renaming images, then they should not share any
 	// rename information (should be mutually exclusive). We use a separate loop
 	// for clarity.
