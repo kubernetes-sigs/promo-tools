@@ -412,7 +412,15 @@ func checkOverlappingEdges(
 
 	// Build up a "promotionIntent". This will be checked below.
 	promotionIntent := make(map[string]map[Digest][]PromotionEdge)
+	checked := make(map[PromotionEdge]interface{})
 	for edge := range edges {
+		// Skip overlap checks for edges that are tagless, because by definition
+		// they cannot overlap with another edge.
+		if edge.DstImageTag.Tag == "" {
+			checked[edge] = nil
+			continue
+		}
+
 		dstPQIN := ToPQIN(edge.DstRegistry.Name,
 			edge.DstImageTag.ImageName,
 			edge.DstImageTag.Tag)
@@ -435,7 +443,6 @@ func checkOverlappingEdges(
 	// Review the promotionIntent to ensure that there are no issues.
 	overlapError := false
 	emptyEdgeListError := false
-	checked := make(map[PromotionEdge]interface{})
 	for pqin, digestToEdges := range promotionIntent {
 		if len(digestToEdges) < 2 {
 			for _, edgeList := range digestToEdges {

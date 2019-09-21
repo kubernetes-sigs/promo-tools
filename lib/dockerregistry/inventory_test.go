@@ -1835,6 +1835,194 @@ func TestToPromotionEdges(t *testing.T) {
 	}
 }
 
+func TestCheckOverlappingEdges(t *testing.T) {
+	srcRegName := RegistryName("gcr.io/foo")
+	destRegName := RegistryName("gcr.io/bar")
+	destRC := RegistryContext{
+		Name:           destRegName,
+		ServiceAccount: "robot",
+	}
+	srcRC := RegistryContext{
+		Name:           srcRegName,
+		ServiceAccount: "robot",
+		Src:            true,
+	}
+
+	var tests = []struct {
+		name        string
+		input       map[PromotionEdge]interface{}
+		expected    map[PromotionEdge]interface{}
+		expectedErr error
+	}{
+		{
+			"Basic case (0 edges)",
+			make(map[PromotionEdge]interface{}),
+			make(map[PromotionEdge]interface{}),
+			nil,
+		},
+		{
+			"Basic case (singleton edge, no overlapping edges)",
+			map[PromotionEdge]interface{}{
+				{
+					SrcRegistry: srcRC,
+					SrcImageTag: ImageTag{
+						ImageName: "a",
+						Tag:       "0.9"},
+					Digest:      "sha256:000",
+					DstRegistry: destRC,
+					DstImageTag: ImageTag{
+						ImageName: "a",
+						Tag:       "0.9"}}: nil,
+			},
+			map[PromotionEdge]interface{}{
+				{
+					SrcRegistry: srcRC,
+					SrcImageTag: ImageTag{
+						ImageName: "a",
+						Tag:       "0.9"},
+					Digest:      "sha256:000",
+					DstRegistry: destRC,
+					DstImageTag: ImageTag{
+						ImageName: "a",
+						Tag:       "0.9"}}: nil,
+			},
+			nil,
+		},
+		{
+			"Basic case (two edges, no overlapping edges)",
+			map[PromotionEdge]interface{}{
+				{
+					SrcRegistry: srcRC,
+					SrcImageTag: ImageTag{
+						ImageName: "a",
+						Tag:       "0.9"},
+					Digest:      "sha256:000",
+					DstRegistry: destRC,
+					DstImageTag: ImageTag{
+						ImageName: "a",
+						Tag:       "0.9"}}: nil,
+				{
+					SrcRegistry: srcRC,
+					SrcImageTag: ImageTag{
+						ImageName: "b",
+						Tag:       "0.9"},
+					Digest:      "sha256:111",
+					DstRegistry: destRC,
+					DstImageTag: ImageTag{
+						ImageName: "b",
+						Tag:       "0.9"}}: nil,
+			},
+			map[PromotionEdge]interface{}{
+				{
+					SrcRegistry: srcRC,
+					SrcImageTag: ImageTag{
+						ImageName: "a",
+						Tag:       "0.9"},
+					Digest:      "sha256:000",
+					DstRegistry: destRC,
+					DstImageTag: ImageTag{
+						ImageName: "a",
+						Tag:       "0.9"}}: nil,
+				{
+					SrcRegistry: srcRC,
+					SrcImageTag: ImageTag{
+						ImageName: "b",
+						Tag:       "0.9"},
+					Digest:      "sha256:111",
+					DstRegistry: destRC,
+					DstImageTag: ImageTag{
+						ImageName: "b",
+						Tag:       "0.9"}}: nil,
+			},
+			nil,
+		},
+		{
+			"Basic case (two edges, overlapped)",
+			map[PromotionEdge]interface{}{
+				{
+					SrcRegistry: srcRC,
+					SrcImageTag: ImageTag{
+						ImageName: "a",
+						Tag:       "0.9"},
+					Digest:      "sha256:000",
+					DstRegistry: destRC,
+					DstImageTag: ImageTag{
+						ImageName: "a",
+						Tag:       "0.9"}}: nil,
+				{
+					SrcRegistry: srcRC,
+					SrcImageTag: ImageTag{
+						ImageName: "b",
+						Tag:       "0.9"},
+					Digest:      "sha256:111",
+					DstRegistry: destRC,
+					DstImageTag: ImageTag{
+						ImageName: "a",
+						Tag:       "0.9"}}: nil,
+			},
+			nil,
+			fmt.Errorf("overlapping edges detected"),
+		},
+		{
+			"Basic case (two tagless edges (different digests, same PQIN), no overlap)",
+			map[PromotionEdge]interface{}{
+				{
+					SrcRegistry: srcRC,
+					SrcImageTag: ImageTag{
+						ImageName: "a",
+						Tag:       "0.9"},
+					Digest:      "sha256:000",
+					DstRegistry: destRC,
+					DstImageTag: ImageTag{
+						ImageName: "a",
+						Tag:       ""}}: nil,
+				{
+					SrcRegistry: srcRC,
+					SrcImageTag: ImageTag{
+						ImageName: "b",
+						Tag:       "0.9"},
+					Digest:      "sha256:111",
+					DstRegistry: destRC,
+					DstImageTag: ImageTag{
+						ImageName: "a",
+						Tag:       ""}}: nil,
+			},
+			map[PromotionEdge]interface{}{
+				{
+					SrcRegistry: srcRC,
+					SrcImageTag: ImageTag{
+						ImageName: "a",
+						Tag:       "0.9"},
+					Digest:      "sha256:000",
+					DstRegistry: destRC,
+					DstImageTag: ImageTag{
+						ImageName: "a",
+						Tag:       ""}}: nil,
+				{
+					SrcRegistry: srcRC,
+					SrcImageTag: ImageTag{
+						ImageName: "b",
+						Tag:       "0.9"},
+					Digest:      "sha256:111",
+					DstRegistry: destRC,
+					DstImageTag: ImageTag{
+						ImageName: "a",
+						Tag:       ""}}: nil,
+			},
+			nil,
+		},
+	}
+
+	for _, test := range tests {
+		got, gotErr := checkOverlappingEdges(test.input)
+		err := checkEqual(got, test.expected)
+		checkError(t, err, fmt.Sprintf("checkError: test: %v\n", test.name))
+
+		err = checkEqual(gotErr, test.expectedErr)
+		checkError(t, err, fmt.Sprintf("checkError: test: %v (error mismatch)\n", test.name))
+	}
+}
+
 // TestPromotion is the most important test as it simulates the main job of the
 // promoter.
 func TestPromotion(t *testing.T) {
