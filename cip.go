@@ -283,6 +283,7 @@ func main() {
 			tp)
 		return &sp
 	}
+	promotionEdges = sc.FilterPromotionEdges(promotionEdges, true)
 	err = sc.Promote(promotionEdges, mkProducer, nil)
 	if err != nil {
 		klog.Exitln(err)
