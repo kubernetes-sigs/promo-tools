@@ -195,11 +195,7 @@ func main() {
 
 	// If there are no images in the manifest, it may be a stub manifest file
 	// (such as for brand new registries that would be watched by the promoter
-	// for the very first time). In any case, we do NOT want to process such
-	// manifests, because other logic like garbage collection would think that
-	// the manifest desires a completely blank registry. In practice this would
-	// almost never be the case, so given a fully-parsed manifest with 0 images,
-	// treat it as if -parse-only was implied and exit gracefully.
+	// for the very first time).
 	if len(*snapshotPtr) == 0 {
 		promotionEdges, err = reg.ToPromotionEdges(mfests)
 		if err != nil {
