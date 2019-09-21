@@ -93,6 +93,10 @@ func main() {
 		"snapshot-service-account",
 		"",
 		"service account to use for -snapshot")
+	manifestBasedSnapshotOf := flag.String(
+		"manifest-based-snapshot-of",
+		"",
+		"read all images in either -manifest or -manifest-dir and print all images that will be promoted to the given registry; this is like -snapshot, but instead of reading from a registry, it reads from the manifests those images that need to be promoted to the given registry")
 	noSvcAcc := false
 	flag.BoolVar(&noSvcAcc, "no-service-account", false,
 		"do not pass '--account=...' to all gcloud calls (default: false)")
@@ -149,6 +153,15 @@ func main() {
 		}
 	}
 
+	if len(*manifestBasedSnapshotOf) > 0 {
+		srcRegistry = &reg.RegistryContext{
+			Name:           reg.RegistryName(*manifestBasedSnapshotOf),
+			ServiceAccount: *snapshotSvcAccPtr,
+			Src:            true,
+		}
+	}
+
+	doingPromotion := false
 	if *manifestPtr != "" {
 		mfest, err = reg.ParseManifestFromFile(*manifestPtr)
 		if err != nil {
@@ -167,6 +180,7 @@ func main() {
 		if err != nil {
 			klog.Fatal(err)
 		}
+		doingPromotion = true
 	} else if *manifestDirPtr != "" {
 		mfests, err = reg.ParseManifestsFromDir(*manifestDirPtr)
 		if err != nil {
@@ -187,6 +201,7 @@ func main() {
 		if err != nil {
 			klog.Fatal(err)
 		}
+		doingPromotion = true
 	}
 
 	if *parseOnlyPtr {
@@ -196,7 +211,7 @@ func main() {
 	// If there are no images in the manifest, it may be a stub manifest file
 	// (such as for brand new registries that would be watched by the promoter
 	// for the very first time).
-	if len(*snapshotPtr) == 0 {
+	if doingPromotion && len(*manifestBasedSnapshotOf) == 0 {
 		promotionEdges, err = reg.ToPromotionEdges(mfests)
 		if err != nil {
 			klog.Exitln(err)
@@ -224,26 +239,48 @@ func main() {
 		}
 	}
 
-	if len(*snapshotPtr) > 0 {
-		sc, err = reg.MakeSyncContext(
-			mfests,
-			*verbosityPtr,
-			*threadsPtr,
-			*dryRunPtr,
-			!noSvcAcc)
-		if err != nil {
-			klog.Fatal(err)
-		}
-		sc.ReadRegistries(
-			[]reg.RegistryContext{*srcRegistry},
-			// Read all registries recursively, because we want to produce a
-			// complete snapshot.
-			true,
-			reg.MkReadRepositoryCmdReal)
+	if len(*snapshotPtr) > 0 || len(*manifestBasedSnapshotOf) > 0 {
+		rii := make(reg.RegInvImage)
+		if len(*manifestBasedSnapshotOf) > 0 {
+			promotionEdges, err = reg.ToPromotionEdges(mfests)
+			if err != nil {
+				klog.Exitln(err)
+			}
+			rii = reg.EdgesToRegInvImage(promotionEdges,
+				*manifestBasedSnapshotOf)
 
-		rii := sc.Inv[mfests[0].Registries[0].Name]
-		if snapshotTag != "" {
-			rii = reg.FilterByTag(rii, snapshotTag)
+			if *minimalSnapshotPtr {
+				sc.ReadRegistries(
+					[]reg.RegistryContext{*srcRegistry},
+					// No need to read all registries recursively because if we
+					// read in manifests, by default we treat each image entry
+					// as its own repository.
+					true,
+					reg.MkReadRepositoryCmdReal)
+				sc.ReadGManifestLists(reg.MkReadManifestListCmdReal)
+				rii = sc.RemoveChildDigestEntries(rii)
+			}
+		} else {
+			sc, err = reg.MakeSyncContext(
+				mfests,
+				*verbosityPtr,
+				*threadsPtr,
+				*dryRunPtr,
+				!noSvcAcc)
+			if err != nil {
+				klog.Fatal(err)
+			}
+			sc.ReadRegistries(
+				[]reg.RegistryContext{*srcRegistry},
+				// Read all registries recursively, because we want to produce a
+				// complete snapshot.
+				true,
+				reg.MkReadRepositoryCmdReal)
+
+			rii = sc.Inv[mfests[0].Registries[0].Name]
+			if snapshotTag != "" {
+				rii = reg.FilterByTag(rii, snapshotTag)
+			}
 		}
 
 		snapshot := rii.ToYAML()

@@ -1589,6 +1589,57 @@ func (sc *SyncContext) FilterPromotionEdges(
 	return sc.getPromotionCandidates(edges)
 }
 
+// EdgesToRegInvImage takes the destination endpoints of all edges and converts
+// their information to a RegInvImage type. It uses only those edges that are
+// trying to promote to the given destination registry.
+func EdgesToRegInvImage(
+	edges map[PromotionEdge]interface{},
+	destRegistry string) RegInvImage {
+
+	rii := make(RegInvImage)
+
+	destRegistry = strings.TrimRight(destRegistry, "/")
+
+	for edge := range edges {
+		imgName := ""
+		prefix := ""
+		if strings.HasPrefix(
+			string(edge.DstRegistry.Name),
+			destRegistry) {
+
+			prefix = strings.TrimPrefix(
+				string(edge.DstRegistry.Name),
+				destRegistry)
+
+			if len(prefix) > 0 {
+				imgName = prefix + "/" + string(edge.DstImageTag.ImageName)
+			} else {
+				imgName = string(edge.DstImageTag.ImageName)
+			}
+
+			imgName = strings.TrimLeft(imgName, "/")
+
+		} else {
+			continue
+		}
+
+		if rii[ImageName(imgName)] == nil {
+			rii[ImageName(imgName)] = make(DigestTags)
+		}
+
+		digestTags := rii[ImageName(imgName)]
+		if len(edge.DstImageTag.Tag) > 0 {
+			digestTags[edge.Digest] = append(
+				digestTags[edge.Digest],
+				edge.DstImageTag.Tag)
+		} else {
+			digestTags[edge.Digest] = TagSlice{}
+		}
+	}
+
+	return rii
+}
+
 // getRegistriesToRead collects all unique Docker repositories we want to read
 // from. This way, we don't have to read the entire Docker registry, but only
 // those paths that we are thinking of modifying.
