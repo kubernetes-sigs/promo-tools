@@ -89,6 +89,10 @@ func main() {
 		"read all images in a repository and print to stdout")
 	snapshotTag := ""
 	flag.StringVar(&snapshotTag, "snapshot-tag", snapshotTag, "only snapshot images with the given tag")
+	minimalSnapshotPtr := flag.Bool(
+		"minimal-snapshot",
+		false,
+		"(only works with -snapshot) discard tagless images from -snapshot output if they are referenced by a manifest list")
 	snapshotSvcAccPtr := flag.String(
 		"snapshot-service-account",
 		"",
@@ -133,11 +137,19 @@ func main() {
 	sc := reg.SyncContext{}
 	mi := make(reg.MasterInventory)
 
-	if len(*snapshotPtr) > 0 {
-		srcRegistry = &reg.RegistryContext{
-			Name:           reg.RegistryName(*snapshotPtr),
-			ServiceAccount: *snapshotSvcAccPtr,
-			Src:            true,
+	if len(*snapshotPtr) > 0 || len(*manifestBasedSnapshotOf) > 0 {
+		if len(*snapshotPtr) > 0 {
+			srcRegistry = &reg.RegistryContext{
+				Name:           reg.RegistryName(*snapshotPtr),
+				ServiceAccount: *snapshotSvcAccPtr,
+				Src:            true,
+			}
+		} else {
+			srcRegistry = &reg.RegistryContext{
+				Name:           reg.RegistryName(*manifestBasedSnapshotOf),
+				ServiceAccount: *snapshotSvcAccPtr,
+				Src:            true,
+			}
 		}
 		mfests = []reg.Manifest{
 			{
@@ -150,14 +162,6 @@ func main() {
 	} else {
 		if *manifestPtr == "" && *manifestDirPtr == "" {
 			klog.Fatal(fmt.Errorf("-manifest=... or -manifestDir=... flag is required"))
-		}
-	}
-
-	if len(*manifestBasedSnapshotOf) > 0 {
-		srcRegistry = &reg.RegistryContext{
-			Name:           reg.RegistryName(*manifestBasedSnapshotOf),
-			ServiceAccount: *snapshotSvcAccPtr,
-			Src:            true,
 		}
 	}
 
@@ -257,7 +261,7 @@ func main() {
 					// as its own repository.
 					true,
 					reg.MkReadRepositoryCmdReal)
-				sc.ReadGManifestLists(reg.MkReadManifestListCmdReal)
+				sc.ReadGCRManifestLists(reg.MkReadManifestListCmdReal)
 				rii = sc.RemoveChildDigestEntries(rii)
 			}
 		} else {
@@ -280,6 +284,11 @@ func main() {
 			rii = sc.Inv[mfests[0].Registries[0].Name]
 			if snapshotTag != "" {
 				rii = reg.FilterByTag(rii, snapshotTag)
+			}
+			if *minimalSnapshotPtr {
+				klog.Info("-minimal-snapshot specifed; removing tagless child digests of manifest lists")
+				sc.ReadGCRManifestLists(reg.MkReadManifestListCmdReal)
+				rii = sc.RemoveChildDigestEntries(rii)
 			}
 		}
 

@@ -58,6 +58,7 @@ type SyncContext struct {
 	Tokens              map[RootRepo]gcloud.Token
 	RenamesDenormalized RenamesDenormalized
 	DigestMediaType     DigestMediaType
+	ParentDigest        ParentDigest
 }
 
 // PromotionEdge represents a promotion "link" of an image repository between 2
@@ -250,6 +251,15 @@ type RegistryContext struct {
 	Src            bool         `yaml:"src,omitempty"`
 }
 
+// GCRManifestListContext is used only for reading GCRManifestList information
+// from GCR, in the function ReadGCRManifestLists.
+type GCRManifestListContext struct {
+	RegistryContext RegistryContext
+	ImageName       ImageName
+	Tag             Tag
+	Digest          Digest
+}
+
 // RegistryName is the leading part of an image name that includes the domain;
 // it is everything that is not the actual image name itself. E.g.,
 // "gcr.io/google-containers".
@@ -262,6 +272,30 @@ type ImageName string
 
 // DigestMediaType holds media information about a Digest.
 type DigestMediaType map[Digest]cr.MediaType
+
+// ParentDigest holds a map of the digests of children to parent digests. It is
+// a reverse mapping of ManifestLists, which point to all the child manifests.
+type ParentDigest map[Digest]Digest
+
+// GCRManifestList is the JSON shape of the response from GCR for requesting
+// manifest information for a DockerManifestList (see ReadGCRManifestLists).
+type GCRManifestList struct {
+	SchemaVersion int           `json:"schemaVersion"`
+	MediaType     string        `json:"mediaType"`
+	Manifests     []gcrManifest `json:"manifests"`
+}
+
+type gcrManifest struct {
+	MediaType string      `json:"mediaType"`
+	Size      int         `json:"size"`
+	Digest    Digest      `json:"digest"`
+	Platform  gcrPlatform `json:"platform"`
+}
+
+type gcrPlatform struct {
+	Architecture string `json:"architecture"`
+	OS           string `json:"os"`
+}
 
 // Digest is a string that contains the SHA256 hash of a Docker container image.
 type Digest string
