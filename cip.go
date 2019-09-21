@@ -243,20 +243,7 @@ func main() {
 
 		rii := sc.Inv[mfests[0].Registries[0].Name]
 		if snapshotTag != "" {
-			filtered := make(reg.RegInvImage)
-			for imageName, digestTags := range rii {
-				for digest, tags := range digestTags {
-					for _, tag := range tags {
-						if string(tag) == snapshotTag {
-							if filtered[imageName] == nil {
-								filtered[imageName] = make(reg.DigestTags)
-							}
-							filtered[imageName][digest] = append(filtered[imageName][digest], tag)
-						}
-					}
-				}
-			}
-			rii = filtered
+			rii = reg.FilterByTag(rii, snapshotTag)
 		}
 
 		snapshot := rii.ToYAML()

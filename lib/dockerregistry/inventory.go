@@ -1178,6 +1178,27 @@ func (sc *SyncContext) ReadRegistries(
 	sc.ExecRequests(populateRequests, processRequest)
 }
 
+// FilterByTag removes all images in RegInvImage that do not match the
+// filterTag.
+func FilterByTag(rii RegInvImage, filterTag string) RegInvImage {
+	filtered := make(RegInvImage)
+	for imageName, digestTags := range rii {
+		for digest, tags := range digestTags {
+			for _, tag := range tags {
+				if string(tag) == filterTag {
+					if filtered[imageName] == nil {
+						filtered[imageName] = make(DigestTags)
+					}
+					filtered[imageName][digest] = append(
+						filtered[imageName][digest],
+						tag)
+				}
+			}
+		}
+	}
+	return filtered
+}
+
 // SplitByKnownRegistries splits a registry name into a RegistryName and
 // ImageName.
 func SplitByKnownRegistries(
