@@ -1456,7 +1456,9 @@ func MkReadManifestListCmdReal(
 		domain,
 		repoPath,
 		gmlc.ImageName,
-		gmlc.Tag)
+		// Always refer by a digest, because it may be the case that this
+		// manifest list is not actually tagged!
+		gmlc.Digest)
 
 	httpReq, err := http.NewRequest("GET", endpoint, nil)
 
@@ -1470,7 +1472,7 @@ func MkReadManifestListCmdReal(
 			domain,
 			repoPath,
 			gmlc.ImageName,
-			gmlc.Tag)
+			gmlc.Digest)
 	}
 
 	if sc.UseServiceAccount {
