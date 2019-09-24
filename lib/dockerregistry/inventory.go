@@ -67,7 +67,8 @@ func MakeSyncContext(
 		Tokens:              make(map[RootRepo]gcloud.Token),
 		RenamesDenormalized: make(RenamesDenormalized),
 		RegistryContexts:    make([]RegistryContext, 0),
-		DigestMediaType:     make(DigestMediaType)}
+		DigestMediaType:     make(DigestMediaType),
+		ParentDigest:        make(ParentDigest)}
 
 	registriesSeen := make(map[RegistryContext]interface{})
 	for _, mfest := range mfests {
@@ -412,7 +413,15 @@ func checkOverlappingEdges(
 
 	// Build up a "promotionIntent". This will be checked below.
 	promotionIntent := make(map[string]map[Digest][]PromotionEdge)
+	checked := make(map[PromotionEdge]interface{})
 	for edge := range edges {
+		// Skip overlap checks for edges that are tagless, because by definition
+		// they cannot overlap with another edge.
+		if edge.DstImageTag.Tag == "" {
+			checked[edge] = nil
+			continue
+		}
+
 		dstPQIN := ToPQIN(edge.DstRegistry.Name,
 			edge.DstImageTag.ImageName,
 			edge.DstImageTag.Tag)
@@ -435,7 +444,6 @@ func checkOverlappingEdges(
 	// Review the promotionIntent to ensure that there are no issues.
 	overlapError := false
 	emptyEdgeListError := false
-	checked := make(map[PromotionEdge]interface{})
 	for pqin, digestToEdges := range promotionIntent {
 		if len(digestToEdges) < 2 {
 			for _, edgeList := range digestToEdges {
@@ -872,6 +880,67 @@ func getRegistryTagsFrom(req stream.ExternalRequest) (*google.Tags, error) {
 	return tags, nil
 }
 
+func getGCRManifestListWrapper(
+	req stream.ExternalRequest) (*GCRManifestList, error) {
+
+	var gcrManifestList *GCRManifestList
+
+	var getGCRManifestListCondition wait.ConditionFunc = func() (bool, error) {
+		var err error
+
+		gcrManifestList, err = getGCRManifestListFrom(req)
+
+		// We never return an error (err) in the second part of our return
+		// argument, because we don't want to prematurely stop the
+		// ExponentialBackoff() loop; we want it to continue looping until
+		// either we get a well-formed value, or until it hits
+		// ErrWaitTimeout. This is how ExponentialBackoff() uses the
+		// ConditionFunc type.
+		if err == nil &&
+			gcrManifestList != nil &&
+			len(gcrManifestList.Manifests) > 0 {
+
+			return true, nil
+		}
+		// nolint[lll]
+		klog.Errorf("invalid gcrManifestList state: %s for request %s", gcrManifestList, req)
+		return false, nil
+	}
+
+	err := wait.ExponentialBackoff(
+		stream.BackoffDefault,
+		getGCRManifestListCondition)
+
+	if err != nil {
+		klog.Error(err)
+		return nil, err
+	}
+
+	return gcrManifestList, nil
+}
+
+func getGCRManifestListFrom(
+	req stream.ExternalRequest) (*GCRManifestList, error) {
+
+	reader, _, err := req.StreamProducer.Produce()
+	if err != nil {
+		klog.Warning("error reading from stream:", err)
+		return nil, err
+	}
+
+	// nolint[errcheck]
+	defer req.StreamProducer.Close()
+
+	gcrManifestList, err := extractGCRManifestList(reader)
+	if err != nil {
+		// nolint[lll]
+		klog.Warningf("for request %s: error parsing GCRManifestList from io.Reader handle: %s", req.RequestParams, err)
+		return nil, err
+	}
+
+	return gcrManifestList, nil
+}
+
 func getJSONSFromProcess(req stream.ExternalRequest) (cipJson.Objects, Errors) {
 	var jsons cipJson.Objects
 	errors := make(Errors, 0)
@@ -1171,6 +1240,145 @@ func (sc *SyncContext) ReadRegistries(
 	sc.ExecRequests(populateRequests, processRequest)
 }
 
+// ReadGCRManifestLists reads all manifest lists and populates the ParentDigest
+// field of the SyncContext. ParentDigest is a map of values of the form
+// map[ChildDigest]ParentDigest; and so, if a digest has an entry in this map,
+// it is referenced by a parent DockerManifestList.
+//
+// TODO: Combine this function with ReadRegistries().
+//
+// nolint[gocyclo]
+func (sc *SyncContext) ReadGCRManifestLists(
+	mkProducer func(*SyncContext, GCRManifestListContext) stream.Producer) {
+
+	// Collect all images in sc.Inv (the src and dest registry names found in
+	// the manifest).
+	var populateRequests PopulateRequests = func(
+		sc *SyncContext,
+		reqs chan<- stream.ExternalRequest,
+		wg *sync.WaitGroup) {
+
+		// Find all images that are of cr.MediaType == DockerManifestList; these
+		// images will be queried.
+		for registryName, rii := range sc.Inv {
+			var rc RegistryContext
+			for _, registryContext := range sc.RegistryContexts {
+				if registryContext.Name == registryName {
+					rc = registryContext
+				}
+			}
+			for imageName, digestTags := range rii {
+				for digest, tagSlice := range digestTags {
+					if sc.DigestMediaType[digest] == cr.DockerManifestList {
+						// Create the request.
+						var req stream.ExternalRequest
+						var tag Tag
+						if len(tagSlice) > 0 {
+							// It could be that this ManifestList has been
+							// tagged multiple times. Just grab the first tag.
+							tag = tagSlice[0]
+						}
+						gmlc := GCRManifestListContext{
+							RegistryContext: rc,
+							ImageName:       imageName,
+							Tag:             tag,
+							Digest:          digest}
+						req.RequestParams = gmlc
+						req.StreamProducer = mkProducer(sc, gmlc)
+						wg.Add(1)
+						reqs <- req
+					}
+				}
+			}
+		}
+	}
+
+	var processRequest ProcessRequest = func(
+		sc *SyncContext,
+		reqs chan stream.ExternalRequest,
+		requestResults chan<- RequestResult,
+		wg *sync.WaitGroup,
+		mutex *sync.Mutex) {
+
+		for req := range reqs {
+			reqRes := RequestResult{Context: req}
+
+			// Now run the request (make network HTTP call with
+			// ExponentialBackoff()).
+			gcrManifestList, err := getGCRManifestListWrapper(req)
+			if err != nil {
+				// Skip this request if it has unrecoverable errors (even after
+				// ExponentialBackoff).
+				reqRes.Errors = Errors{
+					Error{
+						Context: "getGCRManifestListWrapper",
+						Error:   err}}
+				requestResults <- reqRes
+				wg.Add(-1)
+
+				continue
+			}
+
+			gmlc := req.RequestParams.(GCRManifestListContext)
+
+			for _, gManifest := range gcrManifestList.Manifests {
+				mutex.Lock()
+				sc.ParentDigest[gManifest.Digest] = gmlc.Digest
+				mutex.Unlock()
+			}
+
+			reqRes.Errors = Errors{}
+			requestResults <- reqRes
+
+			wg.Add(-1)
+		}
+	}
+	sc.ExecRequests(populateRequests, processRequest)
+}
+
+// FilterByTag removes all images in RegInvImage that do not match the
+// filterTag.
+func FilterByTag(rii RegInvImage, filterTag string) RegInvImage {
+	filtered := make(RegInvImage)
+	for imageName, digestTags := range rii {
+		for digest, tags := range digestTags {
+			for _, tag := range tags {
+				if string(tag) == filterTag {
+					if filtered[imageName] == nil {
+						filtered[imageName] = make(DigestTags)
+					}
+					filtered[imageName][digest] = append(
+						filtered[imageName][digest],
+						tag)
+				}
+			}
+		}
+	}
+	return filtered
+}
+
+// RemoveChildDigestEntries removes all tagless images in RegInvImage that are
+// referenced by ManifestLists in the Registries.
+func (sc *SyncContext) RemoveChildDigestEntries(rii RegInvImage) RegInvImage {
+	filtered := make(RegInvImage)
+	for imageName, digestTags := range rii {
+		for digest, tagSlice := range digestTags {
+			_, hasParent := sc.ParentDigest[digest]
+			// If this image digest is only referenced as part of a parent
+			// ManfestList (i.e. not directly tagged), we filter it out.
+			if hasParent && len(tagSlice) == 0 {
+				continue
+			}
+
+			if filtered[imageName] == nil {
+				filtered[imageName] = make(DigestTags)
+			}
+			filtered[imageName][digest] = tagSlice
+		}
+	}
+	return filtered
+}
+
 // SplitByKnownRegistries splits a registry name into a RegistryName and
 // ImageName.
 func SplitByKnownRegistries(
@@ -1222,6 +1430,56 @@ func MkReadRepositoryCmdReal(
 
 		rc.Token = token
 		var bearer = "Bearer " + string(rc.Token)
+		httpReq.Header.Add("Authorization", bearer)
+	}
+
+	sh.Req = httpReq
+	return &sh
+}
+
+// MkReadManifestListCmdReal creates a stream.Producer which makes a real call
+// over the network to read ManifestList information.
+//
+// TODO: Consider replacing stream.Producer return type with a simple ([]byte,
+// error) tuple instead.
+func MkReadManifestListCmdReal(
+	sc *SyncContext,
+	gmlc GCRManifestListContext) stream.Producer {
+
+	var sh stream.HTTP
+
+	tokenKey, domain, repoPath := GetTokenKeyDomainRepoPath(
+		gmlc.RegistryContext.Name)
+
+	endpoint := fmt.Sprintf(
+		"https://%s/v2/%s/%s/manifests/%s",
+		domain,
+		repoPath,
+		gmlc.ImageName,
+		gmlc.Tag)
+
+	httpReq, err := http.NewRequest("GET", endpoint, nil)
+
+	// Without this, GCR responds as we had used the "Accept:
+	// application/vnd.docker.distribution.manifest.v1+prettyjws" header.
+	httpReq.Header.Add("Accept", "*/*")
+
+	if err != nil {
+		klog.Fatalf(
+			"could not create HTTP request for manifest list '%s/%s/%s:%s'",
+			domain,
+			repoPath,
+			gmlc.ImageName,
+			gmlc.Tag)
+	}
+
+	if sc.UseServiceAccount {
+		token, ok := sc.Tokens[RootRepo(tokenKey)]
+		if !ok {
+			klog.Exitf("access token for key '%s' not found\n", tokenKey)
+		}
+
+		var bearer = "Bearer " + string(token)
 		httpReq.Header.Add("Authorization", bearer)
 	}
 
@@ -1298,11 +1556,30 @@ func extractRegistryTags(reader io.Reader) (*google.Tags, error) {
 			if err == io.EOF {
 				break
 			}
-			fmt.Println("DECODING ERROR:", err)
+			klog.Error("DECODING ERROR: ", err)
 			return nil, err
 		}
 	}
 	return &tags, nil
+}
+
+func extractGCRManifestList(reader io.Reader) (*GCRManifestList, error) {
+
+	gcrManifestList := GCRManifestList{}
+	decoder := json.NewDecoder(reader)
+	decoder.DisallowUnknownFields()
+
+	for {
+		err := decoder.Decode(&gcrManifestList)
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			klog.Error("DECODING ERROR: ", err)
+			return nil, err
+		}
+	}
+	return &gcrManifestList, nil
 }
 
 // Overwrite insert's b's values into a.
@@ -1559,6 +1836,57 @@ func (sc *SyncContext) FilterPromotionEdges(
 	}
 
 	return sc.getPromotionCandidates(edges)
+}
+
+// EdgesToRegInvImage takes the destination endpoints of all edges and converts
+// their information to a RegInvImage type. It uses only those edges that are
+// trying to promote to the given destination registry.
+func EdgesToRegInvImage(
+	edges map[PromotionEdge]interface{},
+	destRegistry string) RegInvImage {
+
+	rii := make(RegInvImage)
+
+	destRegistry = strings.TrimRight(destRegistry, "/")
+
+	for edge := range edges {
+		imgName := ""
+		prefix := ""
+		if strings.HasPrefix(
+			string(edge.DstRegistry.Name),
+			destRegistry) {
+
+			prefix = strings.TrimPrefix(
+				string(edge.DstRegistry.Name),
+				destRegistry)
+
+			if len(prefix) > 0 {
+				imgName = prefix + "/" + string(edge.DstImageTag.ImageName)
+			} else {
+				imgName = string(edge.DstImageTag.ImageName)
+			}
+
+			imgName = strings.TrimLeft(imgName, "/")
+
+		} else {
+			continue
+		}
+
+		if rii[ImageName(imgName)] == nil {
+			rii[ImageName(imgName)] = make(DigestTags)
+		}
+
+		digestTags := rii[ImageName(imgName)]
+		if len(edge.DstImageTag.Tag) > 0 {
+			digestTags[edge.Digest] = append(
+				digestTags[edge.Digest],
+				edge.DstImageTag.Tag)
+		} else {
+			digestTags[edge.Digest] = TagSlice{}
+		}
+	}
+
+	return rii
 }
 
 // getRegistriesToRead collects all unique Docker repositories we want to read

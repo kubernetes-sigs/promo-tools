@@ -56,7 +56,10 @@ linters:
   enable-all: true
   disable:
   - gochecknoglobals
+  - godox
   - gosec
+  - stylecheck
+  - whitespace
 
 issues:
   exclude-use-default: false

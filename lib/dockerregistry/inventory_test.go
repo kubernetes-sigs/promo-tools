@@ -25,6 +25,7 @@ import (
 	"sync"
 	"testing"
 
+	cr "github.com/google/go-containerregistry/pkg/v1/types"
 	"sigs.k8s.io/k8s-container-image-promoter/lib/json"
 	"sigs.k8s.io/k8s-container-image-promoter/lib/stream"
 )
@@ -1305,6 +1306,92 @@ func TestReadRegistries(t *testing.T) {
 	}
 }
 
+// TestReadGManifestLists tests reading ManifestList information from GCR.
+func TestReadGManifestLists(t *testing.T) {
+	const fakeRegName RegistryName = "gcr.io/foo"
+
+	var tests = []struct {
+		name           string
+		input          map[string]string
+		expectedOutput ParentDigest
+	}{
+		{
+			"Basic example",
+			map[string]string{
+				"gcr.io/foo/someImage": `{
+   "schemaVersion": 2,
+   "mediaType": "application/vnd.docker.distribution.manifest.list.v2+json",
+   "manifests": [
+      {
+         "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+         "size": 739,
+         "digest": "sha256:0bd88bcba94f800715fca33ffc4bde430646a7c797237313cbccdcdef9f80f2d",
+         "platform": {
+            "architecture": "amd64",
+            "os": "linux"
+         }
+      },
+      {
+         "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+         "size": 739,
+         "digest": "sha256:0ad4f92011b2fa5de88a6e6a2d8b97f38371246021c974760e5fc54b9b7069e5",
+         "platform": {
+            "architecture": "s390x",
+            "os": "linux"
+         }
+      }
+   ]
+}`,
+			},
+			ParentDigest{
+				"sha256:0bd88bcba94f800715fca33ffc4bde430646a7c797237313cbccdcdef9f80f2d": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+				"sha256:0ad4f92011b2fa5de88a6e6a2d8b97f38371246021c974760e5fc54b9b7069e5": "sha256:0000000000000000000000000000000000000000000000000000000000000000"},
+		},
+	}
+
+	for _, test := range tests {
+		// Destination registry is a placeholder, because ReadImageNames acts on
+		// 2 registries (src and dest) at once.
+		rcs := []RegistryContext{
+			{
+				Name:           fakeRegName,
+				ServiceAccount: "robot",
+			},
+		}
+		sc := SyncContext{
+			RegistryContexts: rcs,
+			Inv: map[RegistryName]RegInvImage{
+				"gcr.io/foo": {
+					"someImage": DigestTags{
+						"sha256:0000000000000000000000000000000000000000000000000000000000000000": TagSlice{"1.0"}}}},
+			DigestMediaType: DigestMediaType{
+				"sha256:0000000000000000000000000000000000000000000000000000000000000000": cr.DockerManifestList},
+			ParentDigest: make(ParentDigest)}
+		// test is used to pin the "test" variable from the outer "range"
+		// scope (see scopelint).
+		test := test
+		mkFakeStream1 := func(sc *SyncContext, gmlc GCRManifestListContext) stream.Producer {
+			var sr stream.Fake
+
+			_, domain, repoPath := GetTokenKeyDomainRepoPath(gmlc.RegistryContext.Name)
+			fakeHTTPBody, ok := test.input[domain+"/"+repoPath+"/"+string(gmlc.ImageName)]
+			if !ok {
+				checkError(
+					t,
+					fmt.Errorf("could not read fakeHTTPBody"),
+					fmt.Sprintf("Test: %v\n", test.name))
+			}
+			sr.Bytes = []byte(fakeHTTPBody)
+			return &sr
+		}
+		sc.ReadGCRManifestLists(mkFakeStream1)
+		got := sc.ParentDigest
+		expected := test.expectedOutput
+		err := checkEqual(got, expected)
+		checkError(t, err, fmt.Sprintf("Test: %v\n", test.name))
+	}
+}
+
 func TestGetTokenKeyDomainRepoPath(t *testing.T) {
 	type TokenKeyDomainRepoPath [3]string
 	var tests = []struct {
@@ -1832,6 +1919,194 @@ func TestToPromotionEdges(t *testing.T) {
 		got = sc.getPromotionCandidates(got)
 		err = checkEqual(got, test.expectedFiltered)
 		checkError(t, err, fmt.Sprintf("checkError: test: %v (getPromotionCandidates)\n", test.name))
+	}
+}
+
+func TestCheckOverlappingEdges(t *testing.T) {
+	srcRegName := RegistryName("gcr.io/foo")
+	destRegName := RegistryName("gcr.io/bar")
+	destRC := RegistryContext{
+		Name:           destRegName,
+		ServiceAccount: "robot",
+	}
+	srcRC := RegistryContext{
+		Name:           srcRegName,
+		ServiceAccount: "robot",
+		Src:            true,
+	}
+
+	var tests = []struct {
+		name        string
+		input       map[PromotionEdge]interface{}
+		expected    map[PromotionEdge]interface{}
+		expectedErr error
+	}{
+		{
+			"Basic case (0 edges)",
+			make(map[PromotionEdge]interface{}),
+			make(map[PromotionEdge]interface{}),
+			nil,
+		},
+		{
+			"Basic case (singleton edge, no overlapping edges)",
+			map[PromotionEdge]interface{}{
+				{
+					SrcRegistry: srcRC,
+					SrcImageTag: ImageTag{
+						ImageName: "a",
+						Tag:       "0.9"},
+					Digest:      "sha256:000",
+					DstRegistry: destRC,
+					DstImageTag: ImageTag{
+						ImageName: "a",
+						Tag:       "0.9"}}: nil,
+			},
+			map[PromotionEdge]interface{}{
+				{
+					SrcRegistry: srcRC,
+					SrcImageTag: ImageTag{
+						ImageName: "a",
+						Tag:       "0.9"},
+					Digest:      "sha256:000",
+					DstRegistry: destRC,
+					DstImageTag: ImageTag{
+						ImageName: "a",
+						Tag:       "0.9"}}: nil,
+			},
+			nil,
+		},
+		{
+			"Basic case (two edges, no overlapping edges)",
+			map[PromotionEdge]interface{}{
+				{
+					SrcRegistry: srcRC,
+					SrcImageTag: ImageTag{
+						ImageName: "a",
+						Tag:       "0.9"},
+					Digest:      "sha256:000",
+					DstRegistry: destRC,
+					DstImageTag: ImageTag{
+						ImageName: "a",
+						Tag:       "0.9"}}: nil,
+				{
+					SrcRegistry: srcRC,
+					SrcImageTag: ImageTag{
+						ImageName: "b",
+						Tag:       "0.9"},
+					Digest:      "sha256:111",
+					DstRegistry: destRC,
+					DstImageTag: ImageTag{
+						ImageName: "b",
+						Tag:       "0.9"}}: nil,
+			},
+			map[PromotionEdge]interface{}{
+				{
+					SrcRegistry: srcRC,
+					SrcImageTag: ImageTag{
+						ImageName: "a",
+						Tag:       "0.9"},
+					Digest:      "sha256:000",
+					DstRegistry: destRC,
+					DstImageTag: ImageTag{
+						ImageName: "a",
+						Tag:       "0.9"}}: nil,
+				{
+					SrcRegistry: srcRC,
+					SrcImageTag: ImageTag{
+						ImageName: "b",
+						Tag:       "0.9"},
+					Digest:      "sha256:111",
+					DstRegistry: destRC,
+					DstImageTag: ImageTag{
+						ImageName: "b",
+						Tag:       "0.9"}}: nil,
+			},
+			nil,
+		},
+		{
+			"Basic case (two edges, overlapped)",
+			map[PromotionEdge]interface{}{
+				{
+					SrcRegistry: srcRC,
+					SrcImageTag: ImageTag{
+						ImageName: "a",
+						Tag:       "0.9"},
+					Digest:      "sha256:000",
+					DstRegistry: destRC,
+					DstImageTag: ImageTag{
+						ImageName: "a",
+						Tag:       "0.9"}}: nil,
+				{
+					SrcRegistry: srcRC,
+					SrcImageTag: ImageTag{
+						ImageName: "b",
+						Tag:       "0.9"},
+					Digest:      "sha256:111",
+					DstRegistry: destRC,
+					DstImageTag: ImageTag{
+						ImageName: "a",
+						Tag:       "0.9"}}: nil,
+			},
+			nil,
+			fmt.Errorf("overlapping edges detected"),
+		},
+		{
+			"Basic case (two tagless edges (different digests, same PQIN), no overlap)",
+			map[PromotionEdge]interface{}{
+				{
+					SrcRegistry: srcRC,
+					SrcImageTag: ImageTag{
+						ImageName: "a",
+						Tag:       "0.9"},
+					Digest:      "sha256:000",
+					DstRegistry: destRC,
+					DstImageTag: ImageTag{
+						ImageName: "a",
+						Tag:       ""}}: nil,
+				{
+					SrcRegistry: srcRC,
+					SrcImageTag: ImageTag{
+						ImageName: "b",
+						Tag:       "0.9"},
+					Digest:      "sha256:111",
+					DstRegistry: destRC,
+					DstImageTag: ImageTag{
+						ImageName: "a",
+						Tag:       ""}}: nil,
+			},
+			map[PromotionEdge]interface{}{
+				{
+					SrcRegistry: srcRC,
+					SrcImageTag: ImageTag{
+						ImageName: "a",
+						Tag:       "0.9"},
+					Digest:      "sha256:000",
+					DstRegistry: destRC,
+					DstImageTag: ImageTag{
+						ImageName: "a",
+						Tag:       ""}}: nil,
+				{
+					SrcRegistry: srcRC,
+					SrcImageTag: ImageTag{
+						ImageName: "b",
+						Tag:       "0.9"},
+					Digest:      "sha256:111",
+					DstRegistry: destRC,
+					DstImageTag: ImageTag{
+						ImageName: "a",
+						Tag:       ""}}: nil,
+			},
+			nil,
+		},
+	}
+
+	for _, test := range tests {
+		got, gotErr := checkOverlappingEdges(test.input)
+		err := checkEqual(got, test.expected)
+		checkError(t, err, fmt.Sprintf("checkError: test: %v\n", test.name))
+
+		err = checkEqual(gotErr, test.expectedErr)
+		checkError(t, err, fmt.Sprintf("checkError: test: %v (error mismatch)\n", test.name))
 	}
 }
 
