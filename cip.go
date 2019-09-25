@@ -298,7 +298,7 @@ func main() {
 
 		var snapshot string
 		if *flattenedSnapshotPtr {
-			snapshot = rii.ToFlattened()
+			snapshot = rii.ToCSV()
 		} else {
 			snapshot = rii.ToYAML()
 		}

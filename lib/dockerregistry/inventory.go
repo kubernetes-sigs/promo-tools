@@ -1668,7 +1668,7 @@ func (rii *RegInvImage) ToYAML() string {
 	return b.String()
 }
 
-// ToFlattened is like ToYAML, but instead of printing things in an indented
+// ToCSV is like ToYAML, but instead of printing things in an indented
 // format, it prints one image on each line as a CSV. If there is a tag pointing
 // to the image, then it is printed next to the image on the same line.
 //
@@ -1678,7 +1678,7 @@ func (rii *RegInvImage) ToYAML() string {
 // a@sha256:0000000000000000000000000000000000000000000000000000000000000000,a:1.0
 // a@sha256:0000000000000000000000000000000000000000000000000000000000000000,a:latest
 // b@sha256:1111111111111111111111111111111111111111111111111111111111111111,-
-func (rii *RegInvImage) ToFlattened() string {
+func (rii *RegInvImage) ToCSV() string {
 	images := rii.ToSorted()
 
 	var b strings.Builder
