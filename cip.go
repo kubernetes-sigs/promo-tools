@@ -42,7 +42,7 @@ func main() {
 	klog.InitFlags(nil)
 
 	manifestPtr := flag.String(
-		"manifest", "", "the manifest file to load (REQUIRED)")
+		"manifest", "", "the manifest file to load")
 	manifestDirPtr := flag.String(
 		"manifest-dir",
 		"",
@@ -92,7 +92,11 @@ func main() {
 	minimalSnapshotPtr := flag.Bool(
 		"minimal-snapshot",
 		false,
-		"(only works with -snapshot) discard tagless images from -snapshot output if they are referenced by a manifest list")
+		"(only works with -snapshot/-manifest-based-snapshot-of) discard tagless images from snapshot output if they are referenced by a manifest list")
+	outputFormatPtr := flag.String(
+		"output-format",
+		"YAML",
+		"(only works with -snapshot/-manifest-based-snapshot-of) choose output format of the snapshot (default: YAML; allowed values: 'YAML' or 'CSV')")
 	snapshotSvcAccPtr := flag.String(
 		"snapshot-service-account",
 		"",
@@ -292,7 +296,16 @@ func main() {
 			}
 		}
 
-		snapshot := rii.ToYAML()
+		var snapshot string
+		switch *outputFormatPtr {
+		case "CSV":
+			snapshot = rii.ToCSV()
+		case "YAML":
+			snapshot = rii.ToYAML()
+		default:
+			klog.Errorf("invalid value %s for -output-format; defaulting to YAML", *outputFormatPtr)
+			snapshot = rii.ToYAML()
+		}
 		fmt.Print(snapshot)
 		os.Exit(0)
 	}

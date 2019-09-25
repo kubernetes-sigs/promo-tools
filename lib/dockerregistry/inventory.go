@@ -1607,21 +1607,9 @@ func ToPQIN(registryName RegistryName, imageName ImageName, tag Tag) string {
 	return string(registryName) + "/" + string(imageName) + ":" + string(tag)
 }
 
-// ToYAML displays a RegInvImage as YAML, but with the map items sorted
-// alphabetically.
-func (rii *RegInvImage) ToYAML() string {
-	// Temporary structs that have slices, not maps.
-	type digest struct {
-		hash string
-		tags []string
-	}
-
-	type image struct {
-		name    string
-		digests []digest
-	}
-
-	images := make([]image, 0)
+// ToSorted converts a RegInvImage type to a sorted structure.
+func (rii *RegInvImage) ToSorted() []ImageWithDigestSlice {
+	images := make([]ImageWithDigestSlice, 0)
 
 	for name, dmap := range *rii {
 		var digests []digest
@@ -1642,7 +1630,7 @@ func (rii *RegInvImage) ToYAML() string {
 			return digests[i].hash < digests[j].hash
 		})
 
-		images = append(images, image{
+		images = append(images, ImageWithDigestSlice{
 			name:    string(name),
 			digests: digests,
 		})
@@ -1651,6 +1639,14 @@ func (rii *RegInvImage) ToYAML() string {
 	sort.Slice(images, func(i, j int) bool {
 		return images[i].name < images[j].name
 	})
+
+	return images
+}
+
+// ToYAML displays a RegInvImage as YAML, but with the map items sorted
+// alphabetically.
+func (rii *RegInvImage) ToYAML() string {
+	images := rii.ToSorted()
 
 	var b strings.Builder
 	for _, image := range images {
@@ -1665,6 +1661,39 @@ func (rii *RegInvImage) ToYAML() string {
 				}
 			} else {
 				fmt.Fprintf(&b, " []\n")
+			}
+		}
+	}
+
+	return b.String()
+}
+
+// ToCSV is like ToYAML, but instead of printing things in an indented
+// format, it prints one image on each line as a CSV. If there is a tag pointing
+// to the image, then it is printed next to the image on the same line.
+//
+// E.g.
+//
+// nolint[lll]
+// a@sha256:0000000000000000000000000000000000000000000000000000000000000000,a:1.0
+// a@sha256:0000000000000000000000000000000000000000000000000000000000000000,a:latest
+// b@sha256:1111111111111111111111111111111111111111111111111111111111111111,-
+func (rii *RegInvImage) ToCSV() string {
+	images := rii.ToSorted()
+
+	var b strings.Builder
+	for _, image := range images {
+		for _, digestEntry := range image.digests {
+			if len(digestEntry.tags) > 0 {
+				for _, tag := range digestEntry.tags {
+					fmt.Fprintf(&b, "%s@%s,%s:%s\n",
+						image.name,
+						digestEntry.hash,
+						image.name,
+						tag)
+				}
+			} else {
+				fmt.Fprintf(&b, "%s@%s,-\n", image.name, digestEntry.hash)
 			}
 		}
 	}
