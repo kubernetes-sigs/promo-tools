@@ -349,9 +349,9 @@ type PromotionContext func(
 	Tag,
 	TagOp) stream.Producer
 
-// ImageSortable uses a slice of digests instead of a map, allowing its contents
-// to be sorted.
-type ImageSortable struct {
+// ImageWithDigestSlice uses a slice of digests instead of a map, allowing its
+// contents to be sorted.
+type ImageWithDigestSlice struct {
 	name    string
 	digests []digest
 }

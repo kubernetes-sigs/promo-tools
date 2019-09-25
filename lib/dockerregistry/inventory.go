@@ -1608,8 +1608,8 @@ func ToPQIN(registryName RegistryName, imageName ImageName, tag Tag) string {
 }
 
 // ToSorted converts a RegInvImage type to a sorted structure.
-func (rii *RegInvImage) ToSorted() []ImageSortable {
-	images := make([]ImageSortable, 0)
+func (rii *RegInvImage) ToSorted() []ImageWithDigestSlice {
+	images := make([]ImageWithDigestSlice, 0)
 
 	for name, dmap := range *rii {
 		var digests []digest
@@ -1630,7 +1630,7 @@ func (rii *RegInvImage) ToSorted() []ImageSortable {
 			return digests[i].hash < digests[j].hash
 		})
 
-		images = append(images, ImageSortable{
+		images = append(images, ImageWithDigestSlice{
 			name:    string(name),
 			digests: digests,
 		})
