@@ -349,6 +349,18 @@ type PromotionContext func(
 	Tag,
 	TagOp) stream.Producer
 
+// ImageSortable uses a slice of digests instead of a map, allowing its contents
+// to be sorted.
+type ImageSortable struct {
+	name    string
+	digests []digest
+}
+
+type digest struct {
+	hash string
+	tags []string
+}
+
 // Various conversion functions.
 
 // ToRegInvImageDigest converts a Manifest to a RegInvImageDigest.
