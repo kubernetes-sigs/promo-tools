@@ -93,10 +93,10 @@ func main() {
 		"minimal-snapshot",
 		false,
 		"(only works with -snapshot/-manifest-based-snapshot-of) discard tagless images from snapshot output if they are referenced by a manifest list")
-	flattenedSnapshotPtr := flag.Bool(
-		"flattened-snapshot",
-		false,
-		"(only works with -snapshot) instead of printing YAML, print all images by their full digest reference, sorted lexicographically")
+	outputFormatPtr := flag.String(
+		"output-format",
+		"YAML",
+		"(only works with -snapshot/-manifest-based-snapshot-of) choose output format of the snapshot (default: YAML; allowed values: 'YAML' or 'CSV')")
 	snapshotSvcAccPtr := flag.String(
 		"snapshot-service-account",
 		"",
@@ -297,9 +297,13 @@ func main() {
 		}
 
 		var snapshot string
-		if *flattenedSnapshotPtr {
+		switch *outputFormatPtr {
+		case "CSV":
 			snapshot = rii.ToCSV()
-		} else {
+		case "YAML":
+			snapshot = rii.ToYAML()
+		default:
+			klog.Errorf("invalid value %s for -output-format; defaulting to YAML", *outputFormatPtr)
 			snapshot = rii.ToYAML()
 		}
 		fmt.Print(snapshot)
