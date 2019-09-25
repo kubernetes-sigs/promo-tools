@@ -93,6 +93,10 @@ func main() {
 		"minimal-snapshot",
 		false,
 		"(only works with -snapshot) discard tagless images from -snapshot output if they are referenced by a manifest list")
+	flattenedSnapshotPtr := flag.Bool(
+		"flattened-snapshot",
+		false,
+		"(only works with -snapshot) instead of printing YAML, print all images by their full digest reference, sorted lexicographically")
 	snapshotSvcAccPtr := flag.String(
 		"snapshot-service-account",
 		"",
@@ -292,7 +296,12 @@ func main() {
 			}
 		}
 
-		snapshot := rii.ToYAML()
+		var snapshot string
+		if *flattenedSnapshotPtr {
+			snapshot = rii.ToFlattened()
+		} else {
+			snapshot = rii.ToYAML()
+		}
 		fmt.Print(snapshot)
 		os.Exit(0)
 	}

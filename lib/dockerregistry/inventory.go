@@ -1668,6 +1668,39 @@ func (rii *RegInvImage) ToYAML() string {
 	return b.String()
 }
 
+// ToFlattened is like ToYAML, but instead of printing things in an indented
+// format, it prints one image on each line as a CSV. If there is a tag pointing
+// to the image, then it is printed next to the image on the same line.
+//
+// E.g.
+//
+// nolint[lll]
+// a@sha256:0000000000000000000000000000000000000000000000000000000000000000,a:1.0
+// a@sha256:0000000000000000000000000000000000000000000000000000000000000000,a:latest
+// b@sha256:1111111111111111111111111111111111111111111111111111111111111111,-
+func (rii *RegInvImage) ToFlattened() string {
+	images := rii.ToSorted()
+
+	var b strings.Builder
+	for _, image := range images {
+		for _, digestEntry := range image.digests {
+			if len(digestEntry.tags) > 0 {
+				for _, tag := range digestEntry.tags {
+					fmt.Fprintf(&b, "%s@%s,%s:%s\n",
+						image.name,
+						digestEntry.hash,
+						image.name,
+						tag)
+				}
+			} else {
+				fmt.Fprintf(&b, "%s@%s,-\n", image.name, digestEntry.hash)
+			}
+		}
+	}
+
+	return b.String()
+}
+
 // ToLQIN converts a RegistryName and ImangeName to form a loosely-qualified
 // image name (LQIN). Notice that it is missing tag information --- hence
 // "loosely-qualified".
