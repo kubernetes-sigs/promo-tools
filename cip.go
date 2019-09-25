@@ -42,7 +42,7 @@ func main() {
 	klog.InitFlags(nil)
 
 	manifestPtr := flag.String(
-		"manifest", "", "the manifest file to load (REQUIRED)")
+		"manifest", "", "the manifest file to load")
 	manifestDirPtr := flag.String(
 		"manifest-dir",
 		"",
@@ -92,7 +92,7 @@ func main() {
 	minimalSnapshotPtr := flag.Bool(
 		"minimal-snapshot",
 		false,
-		"(only works with -snapshot) discard tagless images from -snapshot output if they are referenced by a manifest list")
+		"(only works with -snapshot/-manifest-based-snapshot-of) discard tagless images from snapshot output if they are referenced by a manifest list")
 	flattenedSnapshotPtr := flag.Bool(
 		"flattened-snapshot",
 		false,
