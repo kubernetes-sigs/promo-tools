@@ -260,9 +260,6 @@ func main() {
 			if *minimalSnapshotPtr {
 				sc.ReadRegistries(
 					[]reg.RegistryContext{*srcRegistry},
-					// No need to read all registries recursively because if we
-					// read in manifests, by default we treat each image entry
-					// as its own repository.
 					true,
 					reg.MkReadRepositoryCmdReal)
 				sc.ReadGCRManifestLists(reg.MkReadManifestListCmdReal)
