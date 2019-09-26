@@ -233,7 +233,7 @@ func main() {
 			}
 		}
 		if !imagesInManifests {
-			fmt.Println("No images in manifest(s) --- nothing to do.")
+			klog.Info("No images in manifest(s) --- nothing to do.")
 			os.Exit(0)
 		}
 
@@ -241,9 +241,9 @@ func main() {
 		printVersion()
 
 		if *dryRunPtr {
-			fmt.Printf("********** START (DRY RUN): %s **********\n", *manifestPtr)
+			klog.Info("********** START (DRY RUN) **********")
 		} else {
-			fmt.Printf("********** START: %s **********\n", *manifestPtr)
+			klog.Info("********** START **********")
 		}
 	}
 
@@ -333,10 +333,9 @@ func main() {
 	}
 
 	if *dryRunPtr {
-		fmt.Printf("********** FINISHED (DRY RUN): %s **********\n",
-			*manifestPtr)
+		klog.Info("********** FINISHED (DRY RUN) **********")
 	} else {
-		fmt.Printf("********** FINISHED: %s **********\n", *manifestPtr)
+		klog.Info("********** FINISHED **********")
 	}
 }
 
