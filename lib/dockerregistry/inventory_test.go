@@ -512,7 +512,7 @@ func TestParseManifestsFromDir(t *testing.T) {
 			expectedModified = append(expectedModified, mfest)
 		}
 
-		got, err := ParseManifestsFromDir(fixtureDir)
+		got, err := ParseManifestsFromDir(fixtureDir, ParseManifestFromFile)
 
 		// Clear private fields (redundant data) that are calculated on-the-fly
 		// (it's too verbose to include them here; besides, it's not what we're
@@ -556,7 +556,7 @@ func TestValidateManifestsFromDir(t *testing.T) {
 	for _, testInput := range shouldBeValid {
 		fixtureDir := filepath.Join(pwd, "valid", testInput)
 
-		mfests, errParse := ParseManifestsFromDir(fixtureDir)
+		mfests, errParse := ParseManifestsFromDir(fixtureDir, ParseManifestFromFile)
 		eqErr := checkEqual(errParse, nil)
 		checkError(
 			t,
@@ -602,7 +602,7 @@ func TestValidateManifestsFromDir(t *testing.T) {
 		// It could be that a manifest, taken individually, failed on its own,
 		// before we even get to ValidateManifestsFromDir(). So handle these
 		// cases as well.
-		mfests, errParse := ParseManifestsFromDir(fixtureDir)
+		mfests, errParse := ParseManifestsFromDir(fixtureDir, ParseManifestFromFile)
 		eqErr = checkEqual(errParse, test.expectedParseError)
 		checkError(
 			t,

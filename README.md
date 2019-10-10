@@ -41,6 +41,21 @@ registry.
 
 Currently only Google Container Registry (GCR) is supported.
 
+## Thin Manifests
+
+Thin manifests are a more secure form of promoter Manifests. They are just like
+regular Manifests, but instead of having an `images: ...` field, instead they
+have a `imagesPath: ...` field that points to a separate file containing the
+`images: ...` information. You can use these thin manifests by specifying the
+`-thin-manifest-dir=<target directory>` flag, which forces all promoter
+manifests to be defined as thin manifests within the target directory.
+
+You would use these manifests to separate credential names and
+source/destination registry information from the `images` information. For
+example, using thin manifests would allow you to define `images` YAMLs in a
+folder separate from your thin manifests, allowing you to lock down the thin
+manifests with highly restrictive permissions.
+
 # Install
 
 1. Install [bazel][bazel].

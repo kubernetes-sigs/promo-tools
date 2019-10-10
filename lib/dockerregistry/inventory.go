@@ -131,6 +131,66 @@ func ParseManifestFromFile(filePath string) (Manifest, error) {
 	return mfest, nil
 }
 
+// ParseThinManifestFromFile parses a ThinManifest from a filepath and generates
+// a Manifest.
+func ParseThinManifestFromFile(filePath string) (Manifest, error) {
+
+	var thinManifest ThinManifest
+	var mfest Manifest
+	var empty Manifest
+
+	b, err := ioutil.ReadFile(filePath)
+	if err != nil {
+		return empty, err
+	}
+
+	thinManifest, err = ParseThinManifestYAML(b)
+	if err != nil {
+		return empty, err
+	}
+
+	imagesPath := thinManifest.ImagesPath
+	// Handle a relative path for "ImagesPath", if necessary.
+	if strings.HasPrefix(thinManifest.ImagesPath, ".") {
+		imagesPath = filepath.Join(
+			filepath.Dir(filePath),
+			thinManifest.ImagesPath)
+	}
+	images, err := ParseImagesFromFile(imagesPath)
+	if err != nil {
+		return empty, err
+	}
+
+	mfest.filepath = filePath
+	mfest.Images = images
+	mfest.Registries = thinManifest.Registries
+
+	err = mfest.finalize()
+	if err != nil {
+		return empty, err
+	}
+
+	return mfest, nil
+}
+
+// ParseImagesFromFile parses an Images type from a file.
+func ParseImagesFromFile(filePath string) (Images, error) {
+	var images Images
+	var empty Images
+
+	b, err := ioutil.ReadFile(filePath)
+	if err != nil {
+		return empty, err
+	}
+
+	images, err = ParseImagesYAML(b)
+	if err != nil {
+		return empty, err
+	}
+
+	return images, nil
+}
+
 func (m *Manifest) finalize() error {
 	// Perform semantic checks (beyond just YAML validation).
 	srcRegistry, err := getSrcRegistry(m.Registries)
@@ -145,7 +205,9 @@ func (m *Manifest) finalize() error {
 // ParseManifestsFromDir parses all Manifest files within a directory. We
 // effectively have to create a map of manifests, keyed by the source registry
 // (there can only be 1 source registry).
-func ParseManifestsFromDir(dir string) ([]Manifest, error) {
+func ParseManifestsFromDir(
+	dir string,
+	parseManifestFunc func(string) (Manifest, error)) ([]Manifest, error) {
 	mfests := make([]Manifest, 0)
 
 	var parseAsManifest filepath.WalkFunc = func(path string,
@@ -168,7 +230,7 @@ func ParseManifestsFromDir(dir string) ([]Manifest, error) {
 			return nil
 		}
 
-		mfest, errParse := ParseManifestFromFile(path)
+		mfest, errParse := parseManifestFunc(path)
 		if errParse != nil {
 			klog.Errorf("could not parse manifest file '%s'\n", path)
 			return errParse
@@ -488,6 +550,26 @@ func ParseManifestYAML(b []byte) (Manifest, error) {
 	}
 
 	return m, m.Validate()
+}
+
+// ParseThinManifestYAML parses a ThinManifest from a byteslice.
+func ParseThinManifestYAML(b []byte) (ThinManifest, error) {
+	var m ThinManifest
+	if err := yaml.UnmarshalStrict(b, &m); err != nil {
+		return m, err
+	}
+
+	return m, nil
+}
+
+// ParseImagesYAML parses Images from a byteslice.
+func ParseImagesYAML(b []byte) (Images, error) {
+	var images Images
+	if err := yaml.UnmarshalStrict(b, &images); err != nil {
+		return images, err
+	}
+
+	return images, nil
 }
 
 // Validate checks for semantic errors in the yaml fields (the structure of the
