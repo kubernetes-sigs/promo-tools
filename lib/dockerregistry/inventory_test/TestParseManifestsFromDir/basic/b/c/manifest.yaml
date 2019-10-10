@@ -12,8 +12,3 @@ images:
 - name: cat-controller
   dmap:
     "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc": ["1.0"]
-renames:
-- - "gcr.io/cat-staging/cat-controller"
-  - "us.gcr.io/some-prod/cat/cat-controller"
-  - "eu.gcr.io/some-prod/cat/cat-controller"
-  - "asia.gcr.io/some-prod/cat/cat-controller"

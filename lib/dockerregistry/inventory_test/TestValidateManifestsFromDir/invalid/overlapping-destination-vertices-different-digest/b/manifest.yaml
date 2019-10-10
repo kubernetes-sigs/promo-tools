@@ -13,4 +13,3 @@ images:
   dmap:
     # This sha conflicts with a's manifest that has "aaaa..." point to the "1.0" tag.
     "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": ["1.0"]
-renames: []

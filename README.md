@@ -41,23 +41,6 @@ registry.
 
 Currently only Google Container Registry (GCR) is supported.
 
-## Renames
-
-It is possible to rename images during the process of promotion. For example, if
-you want `gcr.io/myproject-staging-area/apple` to get promoted as
-`gcr.io/myproject-production/some/other/subdir/apple`, you could add the
-following to the Example above:
-
-```
-renames:
-- ["gcr.io/myproject-staging-area/apple", "gcr.io/myproject-production/some/other/subdir/apple"]
-```
-
-Each entry in the `renames` field is a list of image paths; all images in the
-list are treated as "equal". The only requirement is that each list must contain
-at least 1 item that points to a source registry (in this case,
-`gcr.io/myproject-staging-area`).
-
 # Install
 
 1. Install [bazel][bazel].

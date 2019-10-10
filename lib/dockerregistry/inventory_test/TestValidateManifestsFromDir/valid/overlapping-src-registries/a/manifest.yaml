@@ -12,4 +12,3 @@ images:
 - name: foo-controller
   dmap:
     "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": ["1.0"]
-renames: []

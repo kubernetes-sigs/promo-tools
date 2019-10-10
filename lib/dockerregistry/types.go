@@ -47,18 +47,17 @@ type CapturedRequests map[PromotionRequest]int
 
 // SyncContext is the main data structure for performing the promotion.
 type SyncContext struct {
-	Verbosity           int
-	Threads             int
-	DryRun              bool
-	UseServiceAccount   bool
-	Inv                 MasterInventory
-	InvIgnore           []ImageName
-	RegistryContexts    []RegistryContext
-	SrcRegistry         *RegistryContext
-	Tokens              map[RootRepo]gcloud.Token
-	RenamesDenormalized RenamesDenormalized
-	DigestMediaType     DigestMediaType
-	ParentDigest        ParentDigest
+	Verbosity         int
+	Threads           int
+	DryRun            bool
+	UseServiceAccount bool
+	Inv               MasterInventory
+	InvIgnore         []ImageName
+	RegistryContexts  []RegistryContext
+	SrcRegistry       *RegistryContext
+	Tokens            map[RootRepo]gcloud.Token
+	DigestMediaType   DigestMediaType
+	ParentDigest      ParentDigest
 }
 
 // PromotionEdge represents a promotion "link" of an image repository between 2
@@ -180,44 +179,12 @@ type Manifest struct {
 	Registries []RegistryContext `yaml:"registries,omitempty"`
 	Images     []Image           `yaml:"images,omitempty"`
 
-	// A rename list can contain a list of paths, where each path is a string.
-	//
-	// - A rename entry must have at least 2 paths, one for the source, another
-	// for at least 1 dest registry.
-	//
-	// - Any unknown registry entries in here will be considered a parsing
-	// error.
-	//
-	// - Any redundant entries in here will be considered a parsing error. E.g.,
-	// "gcr.io/louhi-qa/glbc:gcr.io/louhi-gke-k8s/glbc" is redunant as it is
-	// implied already.
-	//
-	// - The names must be valid paths (no errant punctuation, etc.).
-	//
-	// - No self-loops allowed (a registry must not appear more than 1 time).
-	//
-	// - Each name must be the registry+pathname, *without* a trailing slash.
-	//
-	// Just before the promotion, each rename entry is processed, to update the
-	// master inventory entries for the *renamed* images.
-	//
-	// When fetching data from a renamed image's repository, they are
-	// "normalized" to the path as seen in the source registry for that image
-	// --- this is so that the set difference logic can be used as-is. Only when
-	// the promotion itself is performed, do we "denormalize" at the very last
-	// moment by modifying the argument to each destination path.
-	Renames []Rename `yaml:"renames,omitempty"`
-
 	// Hidden fields; these are data structure optimizations that are populated
 	// from the fields above. As they are redundant, there is no point in
 	// storing this information in YAML.
 	srcRegistry *RegistryContext
 	filepath    string
 }
-
-// RenamesDenormalized is a lookup-optimized data structure of rename
-// information.
-type RenamesDenormalized map[RegistryImagePath]map[RegistryName]ImageName
 
 // Image holds information about an image. It's like an "Object" in the OOP
 // sense, and holds all the information relating to a particular image that we
@@ -226,10 +193,6 @@ type Image struct {
 	ImageName ImageName  `yaml:"name"`
 	Dmap      DigestTags `yaml:"dmap,omitempty"`
 }
-
-// Rename is list of paths, where each path is full
-// image name (registry + image name, without the tag).
-type Rename []RegistryImagePath
 
 // RegistryImagePath is the registry name and image name, without the tag. E.g.
 // "gcr.io/foo/bar/baz/image".

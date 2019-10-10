@@ -58,17 +58,16 @@ func MakeSyncContext(
 	dryRun, useSvcAcc bool) (SyncContext, error) {
 
 	sc := SyncContext{
-		Verbosity:           verbosity,
-		Threads:             threads,
-		DryRun:              dryRun,
-		UseServiceAccount:   useSvcAcc,
-		Inv:                 make(MasterInventory),
-		InvIgnore:           []ImageName{},
-		Tokens:              make(map[RootRepo]gcloud.Token),
-		RenamesDenormalized: make(RenamesDenormalized),
-		RegistryContexts:    make([]RegistryContext, 0),
-		DigestMediaType:     make(DigestMediaType),
-		ParentDigest:        make(ParentDigest)}
+		Verbosity:         verbosity,
+		Threads:           threads,
+		DryRun:            dryRun,
+		UseServiceAccount: useSvcAcc,
+		Inv:               make(MasterInventory),
+		InvIgnore:         []ImageName{},
+		Tokens:            make(map[RootRepo]gcloud.Token),
+		RegistryContexts:  make([]RegistryContext, 0),
+		DigestMediaType:   make(DigestMediaType),
+		ParentDigest:      make(ParentDigest)}
 
 	registriesSeen := make(map[RegistryContext]interface{})
 	for _, mfest := range mfests {
@@ -349,8 +348,7 @@ func (sc *SyncContext) getPromotionCandidates(
 // it's a form of redundancy). However, return an error if the digests are
 // different, because most likely this is at best just human error and at worst
 // a malicious attack (someone trying to push an image to an endpoint they
-// shouldn't own, or possibly an attempt to rename a tag for an existin image to
-// be something else).
+// shouldn't own).
 //
 // nolint[gocyclo]
 func checkOverlappingEdges(
@@ -607,76 +605,10 @@ func validateRequiredComponents(m Manifest) error {
 		}
 	}
 
-	for _, rename := range m.Renames {
-		// The names must be valid paths.
-		// Each name must be the registry+pathname, *without* a trailing slash.
-		if len(rename) < 2 {
-			// nolint[lll]
-			errs = append(errs,
-				fmt.Sprintf("a rename entry must have at least 2 paths, one for the source, another for at least 1 dest registry"))
-		}
-
-		// Make sure there is only 1 rename per registry, and that there is 1
-		// entry for the source registry..
-		var srcOriginal RegistryImagePath
-		seenRegistries := make(map[RegistryName]ImageName)
-		for _, registryImagePath := range rename {
-			// nolint[lll]
-			registryName, imageName, err := SplitRegistryImagePath(registryImagePath, knownRegistries)
-			if err != nil {
-				errs = append(errs, err.Error())
-			}
-
-			if _, ok := seenRegistries[registryName]; ok {
-				// nolint[lll]
-				errs = append(errs, fmt.Sprintf("multiple renames found for registry '%v' in 'renames', for image %v",
-					registryName,
-					imageName))
-			} else {
-				seenRegistries[registryName] = imageName
-			}
-
-			if err = validateRegistryImagePath(registryImagePath); err != nil {
-				errs = append(errs, err.Error())
-			}
-
-			// Check if the registry is found in the outer `registries` field.
-			found := false
-			for _, rc := range m.Registries {
-				if rc.Name == registryName {
-					found = true
-				}
-			}
-			if !found {
-				// nolint[lll]
-				errs = append(errs, fmt.Sprintf("unknown registry '%v' in 'renames' (not defined in 'registries')", registryName))
-			}
-
-			if registryName == srcRegistryName {
-				srcOriginal = registryImagePath
-			}
-		}
-
-		if len(m.Registries) > 0 && len(srcOriginal) == 0 {
-			errs = append(errs, fmt.Sprintf("could not find source registry in '%v'",
-				rename))
-		}
-
-		registryNameSrc, imageNameSrc, _ := SplitRegistryImagePath(srcOriginal, knownRegistries)
-		for _, registryImagePath := range rename {
-			registryName, imageName, _ := SplitRegistryImagePath(registryImagePath, knownRegistries)
-			if registryName != registryNameSrc {
-				if imageName == imageNameSrc {
-					errs = append(errs, fmt.Sprintf("redundant rename for %s",
-						rename))
-				}
-			}
-		}
-
-	}
 	if len(errs) == 0 {
 		return nil
 	}
+
 	return fmt.Errorf(strings.Join(errs, "\n"))
 }
 
@@ -1672,56 +1604,6 @@ func SplitRegistryImagePath(
 		ImageName(""),
 		// nolint[lll]
 		fmt.Errorf("could not determine registry name for '%v'", registryImagePath)
-}
-
-// DenormalizeRenames coverts the nested list of rename strings in the
-// Manifest's `renames` field into a more query-friendly nested map (easier to
-// perform lookups).
-//
-// It also checks the `renames` field in Manifest for errors.
-//
-// For examples of what this data will look like, see TestDenormalizeRenames.
-//
-// nolint[gocyclo]
-func DenormalizeRenames(
-	mfest Manifest,
-	srcRegistryName RegistryName) (RenamesDenormalized, error) {
-
-	knownRegistries := make([]RegistryName, 0)
-	for _, r := range mfest.Registries {
-		knownRegistries = append(knownRegistries, r.Name)
-	}
-
-	rd := make(RenamesDenormalized)
-	for _, rename := range mfest.Renames {
-		// Create "directed edges" that go in both directions --- from Src
-		// to Dest, and Dest to Src. Because there can be multiple
-		// destinations, we have to use a nested loop.
-		for i, registryImagePathA := range rename {
-			_, _, err := SplitRegistryImagePath(registryImagePathA, knownRegistries)
-			if err != nil {
-				return nil, err
-			}
-
-			// Create the directed edge targets.
-			directedEdges := make(map[RegistryName]ImageName)
-			for j, registryImagePathB := range rename {
-				if j == i {
-					continue
-				}
-
-				registryNameB, imageNameB, err := SplitRegistryImagePath(registryImagePathB, knownRegistries)
-				if err != nil {
-					return nil, err
-				}
-				directedEdges[registryNameB] = imageNameB
-			}
-
-			// Assign all targets to the starting point, registryImagePathA.
-			rd[registryImagePathA] = directedEdges
-		}
-	}
-	return rd, nil
 }
 
 // nolint[lll]

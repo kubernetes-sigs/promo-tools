@@ -12,8 +12,3 @@ images:
 - name: qux-controller
   dmap:
     "sha256:0000000000000000000000000000000000000000000000000000000000000000": ["1.0"]
-renames:
-- - "gcr.io/qux-staging/qux-controller"
-  - "us.gcr.io/some-prod/qux/qux-controller"
-  - "eu.gcr.io/some-prod/qux/qux-controller"
-  - "asia.gcr.io/some-prod/qux/qux-controller"
