@@ -163,13 +163,8 @@ func ParseManifestsFromDir(dir string) ([]Manifest, error) {
 		}
 
 		// First try to parse the path as a manifest file. The only requirement
-		// is that the file must end with a ".yaml" extension. We can be more
-		// restrictive in the future (maybe it will be all files with a certain
-		// pattern, passable from the CLI as an option), but let's cross that
-		// bridge when we get there.
-
-		// Skip non-YAML files.
-		if !strings.HasSuffix(path, ".yaml") {
+		// is that the file must be named "promoter-manifest.yaml".
+		if !strings.HasSuffix(path, "/promoter-manifest.yaml") {
 			return nil
 		}
 

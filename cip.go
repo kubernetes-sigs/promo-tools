@@ -46,7 +46,7 @@ func main() {
 	manifestDirPtr := flag.String(
 		"manifest-dir",
 		"",
-		"recursively read in all manifests within a folder; it is an error if two manifests specify conflicting intent (e.g., promotion of the same image)")
+		"recursively read in all manifests within a folder; it is an error if two manifests specify conflicting intent (e.g., promotion of the same image); manifests inside this directory *MUST* be named 'promoter-manifest.yaml'")
 	threadsPtr := flag.Int(
 		"threads",
 		10, "number of concurrent goroutines to use when talking to GCR")

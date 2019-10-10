@@ -311,7 +311,7 @@ func TestParseManifestsFromDir(t *testing.T) {
 							},
 						},
 					},
-					filepath: "a/manifest.yaml",
+					filepath: "a/promoter-manifest.yaml",
 				},
 			},
 			nil,
@@ -347,7 +347,7 @@ func TestParseManifestsFromDir(t *testing.T) {
 							},
 						},
 					},
-					filepath: "a/manifest.yaml"},
+					filepath: "a/promoter-manifest.yaml"},
 				{
 					Registries: []RegistryContext{
 						{
@@ -375,7 +375,7 @@ func TestParseManifestsFromDir(t *testing.T) {
 							},
 						},
 					},
-					filepath: "b/c/manifest.yaml"},
+					filepath: "b/c/promoter-manifest.yaml"},
 				{
 					Registries: []RegistryContext{
 						{
@@ -403,7 +403,7 @@ func TestParseManifestsFromDir(t *testing.T) {
 							},
 						},
 					},
-					filepath: "b/manifest.yaml"},
+					filepath: "b/promoter-manifest.yaml"},
 				{
 					Registries: []RegistryContext{
 						{
@@ -431,7 +431,7 @@ func TestParseManifestsFromDir(t *testing.T) {
 							},
 						},
 					},
-					filepath: "manifest.yaml"},
+					filepath: "promoter-manifest.yaml"},
 			},
 			nil,
 		},
@@ -466,7 +466,7 @@ func TestParseManifestsFromDir(t *testing.T) {
 							},
 						},
 					},
-					filepath: "a/manifest.yaml",
+					filepath: "a/promoter-manifest.yaml",
 				},
 				{
 					Registries: []RegistryContext{
@@ -495,7 +495,7 @@ func TestParseManifestsFromDir(t *testing.T) {
 							},
 						},
 					},
-					filepath: "b/manifest.yaml",
+					filepath: "b/promoter-manifest.yaml",
 				},
 			},
 			nil,
