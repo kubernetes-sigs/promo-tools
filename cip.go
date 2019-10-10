@@ -165,7 +165,7 @@ func main() {
 		}
 	} else {
 		if *manifestPtr == "" && *manifestDirPtr == "" {
-			klog.Fatal(fmt.Errorf("-manifest=... or -manifestDir=... flag is required"))
+			klog.Fatal(fmt.Errorf("-manifest=... or -manifest-dir=... flag is required"))
 		}
 	}
 
