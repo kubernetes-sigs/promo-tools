@@ -622,7 +622,6 @@ func TestParseManifestsFromDir(t *testing.T) {
 		// testing).
 		gotModified := got[:0]
 		for _, mfest := range got {
-			mfest.renamesDenormalized = nil
 			mfest.srcRegistry = nil
 			gotModified = append(gotModified, mfest)
 		}
@@ -653,7 +652,6 @@ func TestValidateManifestsFromDir(t *testing.T) {
 		"multiple-rebases",
 		"overlapping-src-registries",
 		"overlapping-destination-vertices-same-digest",
-		"overlapping-destination-vertices-same-digest-by-rename",
 	}
 
 	pwd := bazelTestPath("TestValidateManifestsFromDir")
@@ -667,13 +665,6 @@ func TestValidateManifestsFromDir(t *testing.T) {
 			t,
 			eqErr,
 			fmt.Sprintf("Test: `%v' should be valid (ParseManifestsFromDir)\n", testInput))
-
-		err := ValidateManifestsFromDir(mfests)
-		eqErr = checkEqual(err, nil)
-		checkError(
-			t,
-			eqErr,
-			fmt.Sprintf("Test: `%v' should be valid (ValidateManifestsFromDir)\n", testInput))
 
 		_, edgeErr := ToPromotionEdges(mfests)
 		eqErr = checkEqual(edgeErr, nil)
@@ -722,14 +713,6 @@ func TestValidateManifestsFromDir(t *testing.T) {
 			fmt.Errorf(
 				"overlapping edges detected"),
 		},
-		{
-
-			"overlapping-destination-vertices-different-digest-by-rename",
-			nil,
-			nil,
-			fmt.Errorf(
-				"overlapping edges detected"),
-		},
 	}
 
 	for _, test := range shouldBeInvalid {
@@ -746,16 +729,6 @@ func TestValidateManifestsFromDir(t *testing.T) {
 			eqErr,
 			fmt.Sprintf("Test: `%v' should be invalid (ParseManifestsFromDir)\n", test.dirName))
 		if errParse != nil {
-			continue
-		}
-
-		validateErr := ValidateManifestsFromDir(mfests)
-		eqErr = checkEqual(validateErr, test.expectedValidateError)
-		checkError(
-			t,
-			eqErr,
-			fmt.Sprintf("Test: `%v' should be invalid (ValidateManifestsFromDir)\n", test.dirName))
-		if validateErr != nil {
 			continue
 		}
 
@@ -1849,58 +1822,6 @@ func TestToPromotionEdges(t *testing.T) {
 			nil,
 			make(map[PromotionEdge]interface{}),
 		},
-		{
-			"Basic case (2 new edges; 1 is renamed and should be promoted)",
-			[]Manifest{
-				{
-					Registries: registries2,
-					Images: []Image{
-						{
-							ImageName: "a",
-							Dmap: DigestTags{
-								"sha256:000": TagSlice{"0.9"}}}},
-					Renames: []Rename{
-						[]RegistryImagePath{
-							"gcr.io/foo/a",
-							"gcr.io/cat/some/subdir/a"}},
-					srcRegistry: &srcRC},
-			},
-			map[PromotionEdge]interface{}{
-				{
-					SrcRegistry: srcRC,
-					SrcImageTag: ImageTag{
-						ImageName: "a",
-						Tag:       "0.9"},
-					Digest:      "sha256:000",
-					DstRegistry: destRC,
-					DstImageTag: ImageTag{
-						ImageName: "a",
-						Tag:       "0.9"}}: nil,
-				{
-					SrcRegistry: srcRC,
-					SrcImageTag: ImageTag{
-						ImageName: "a",
-						Tag:       "0.9"},
-					Digest:      "sha256:000",
-					DstRegistry: destRC2,
-					DstImageTag: ImageTag{
-						ImageName: "some/subdir/a",
-						Tag:       "0.9"}}: nil,
-			},
-			nil,
-			map[PromotionEdge]interface{}{
-				{
-					SrcRegistry: srcRC,
-					SrcImageTag: ImageTag{
-						ImageName: "a",
-						Tag:       "0.9"},
-					Digest:      "sha256:000",
-					DstRegistry: destRC2,
-					DstImageTag: ImageTag{
-						ImageName: "some/subdir/a",
-						Tag:       "0.9"}}: nil,
-			},
-		},
 	}
 
 	for _, test := range tests {
@@ -2310,126 +2231,6 @@ func TestPromotion(t *testing.T) {
 				Tag:            "0.9"}: 1},
 		},
 		{
-			"Promote 1 tag via rename",
-			Manifest{
-				Registries: registries,
-				Images: []Image{
-					{
-						ImageName: "a",
-						Dmap: DigestTags{
-							"sha256:000": TagSlice{"0.9"}}}},
-				Renames: []Rename{
-					[]RegistryImagePath{
-						"gcr.io/foo/a",
-						"gcr.io/bar/some/subdir/path/a"}},
-				srcRegistry: &srcRC},
-			SyncContext{
-				Inv: MasterInventory{
-					"gcr.io/foo": RegInvImage{
-						"a": DigestTags{
-							"sha256:000": TagSlice{"0.9"}}},
-					"gcr.io/bar": RegInvImage{
-						"some/subdir/path/a": DigestTags{
-							"sha256:111": TagSlice{"0.8"}}},
-					"gcr.io/cat": RegInvImage{
-						"a": DigestTags{
-							"sha256:000": TagSlice{"0.9"}}}}},
-			nil,
-			CapturedRequests{PromotionRequest{
-				TagOp:          Add,
-				RegistrySrc:    srcRegName,
-				RegistryDest:   registries[0].Name,
-				ServiceAccount: registries[0].ServiceAccount,
-				ImageNameSrc:   "a",
-				ImageNameDest:  "some/subdir/path/a",
-				Digest:         "sha256:000",
-				Tag:            "0.9"}: 1},
-		},
-		{
-			"Promote 1 tag via rename (move image)",
-			Manifest{
-				Registries: registries,
-				Images: []Image{
-					{
-						ImageName: "a",
-						Dmap: DigestTags{
-							"sha256:000": TagSlice{"0.9"}}}},
-				Renames: []Rename{
-					[]RegistryImagePath{
-						"gcr.io/foo/a",
-						"gcr.io/bar/some/subdir/path/a"}},
-				srcRegistry: &srcRC},
-			SyncContext{
-				Inv: MasterInventory{
-					"gcr.io/foo": RegInvImage{
-						"a": DigestTags{
-							"sha256:000": TagSlice{"0.9"}}},
-					"gcr.io/bar": RegInvImage{
-						"some/subdir/path/a": DigestTags{
-							"sha256:111": TagSlice{"0.9"}}},
-					"gcr.io/cat": RegInvImage{
-						"a": DigestTags{
-							"sha256:000": TagSlice{"0.9"}}}}},
-			nil,
-			CapturedRequests{PromotionRequest{
-				TagOp:          Move,
-				RegistrySrc:    srcRegName,
-				RegistryDest:   registries[0].Name,
-				ServiceAccount: registries[0].ServiceAccount,
-				ImageNameSrc:   "a",
-				ImageNameDest:  "some/subdir/path/a",
-				Digest:         "sha256:000",
-				DigestOld:      "sha256:111",
-				Tag:            "0.9"}: 1},
-		},
-		{
-			"Promote 1 tag via rename (1 dest should be renamed, another should share the same name as src)",
-			Manifest{
-				Registries: registries,
-				Images: []Image{
-					{
-						ImageName: "a",
-						Dmap: DigestTags{
-							"sha256:000": TagSlice{"0.9"}}}},
-				Renames: []Rename{
-					[]RegistryImagePath{
-						"gcr.io/foo/a",
-						"gcr.io/bar/some/subdir/path/a"}},
-				srcRegistry: &srcRC},
-			SyncContext{
-				Inv: MasterInventory{
-					"gcr.io/foo": RegInvImage{
-						"a": DigestTags{
-							"sha256:000": TagSlice{"0.9"}}},
-					"gcr.io/bar": RegInvImage{
-						"some/subdir/path/a": DigestTags{
-							"sha256:111": TagSlice{"0.8"}}},
-					"gcr.io/cat": RegInvImage{
-						"b": DigestTags{
-							"sha256:000": TagSlice{"0.9"}}}}},
-			nil,
-			CapturedRequests{
-				PromotionRequest{
-					TagOp:          Add,
-					RegistrySrc:    srcRegName,
-					RegistryDest:   registries[0].Name,
-					ServiceAccount: registries[0].ServiceAccount,
-					ImageNameSrc:   "a",
-					ImageNameDest:  "some/subdir/path/a",
-					Digest:         "sha256:000",
-					Tag:            "0.9"}: 1,
-				PromotionRequest{
-					TagOp:          Add,
-					RegistrySrc:    srcRegName,
-					RegistryDest:   registries[2].Name,
-					ServiceAccount: registries[2].ServiceAccount,
-					ImageNameSrc:   "a",
-					ImageNameDest:  "a",
-					Digest:         "sha256:000",
-					Tag:            "0.9"}: 1,
-			},
-		},
-		{
 			"Promote 1 tag as a 'rebase'",
 			Manifest{
 				Registries: registriesRebase,
@@ -2654,10 +2455,8 @@ func TestPromotion(t *testing.T) {
 		srcReg, err := getSrcRegistry(registries)
 		checkError(t, err,
 			fmt.Sprintf("checkError (srcReg): test: %v\n", test.name))
-		rd, err := DenormalizeRenames(test.inputM, srcReg.Name)
 		checkError(t, err,
 			fmt.Sprintf("checkError (rd): test: %v\n", test.name))
-		test.inputM.renamesDenormalized = rd
 		test.inputSc.SrcRegistry = srcReg
 
 		// Simulate bad network conditions.

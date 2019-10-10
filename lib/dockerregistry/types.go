@@ -211,9 +211,8 @@ type Manifest struct {
 	// Hidden fields; these are data structure optimizations that are populated
 	// from the fields above. As they are redundant, there is no point in
 	// storing this information in YAML.
-	renamesDenormalized RenamesDenormalized
-	srcRegistry         *RegistryContext
-	filepath            string
+	srcRegistry *RegistryContext
+	filepath    string
 }
 
 // RenamesDenormalized is a lookup-optimized data structure of rename
