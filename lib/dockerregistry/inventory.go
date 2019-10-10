@@ -75,11 +75,6 @@ func MakeSyncContext(
 		for _, r := range mfest.Registries {
 			registriesSeen[r] = nil
 		}
-
-		// Populate rename info found across all manifests.
-		for k, v := range mfest.renamesDenormalized {
-			sc.RenamesDenormalized[k] = v
-		}
 	}
 
 	// Populate SyncContext with registries found across all manifests.
@@ -145,12 +140,6 @@ func (m *Manifest) finalize() error {
 	}
 	m.srcRegistry = srcRegistry
 
-	rd, err := DenormalizeRenames(*m, srcRegistry.Name)
-	if err != nil {
-		return err
-	}
-	m.renamesDenormalized = rd
-
 	return nil
 }
 
@@ -208,34 +197,6 @@ func ParseManifestsFromDir(dir string) ([]Manifest, error) {
 	return mfests, nil
 }
 
-// ValidateManifestsFromDir parses checks for errors found in the manifests,
-// taken as a whole.
-//
-// nolint[gocyclo]
-func ValidateManifestsFromDir(mfests []Manifest) error {
-	if len(mfests) == 0 {
-		return fmt.Errorf("no manifests to validate")
-	}
-
-	// If two manifests are renaming images, then they should not share any
-	// rename information (should be mutually exclusive). We use a separate loop
-	// for clarity.
-	renamesSeen := make(map[RegistryImagePath]string)
-	for _, mfest := range mfests {
-		for _, rename := range mfest.Renames {
-			for _, regImgPath := range rename {
-				if mfestFilepath, seen := renamesSeen[regImgPath]; seen {
-					// nolint[lll]
-					return fmt.Errorf("rename key '%s' found in multiple manifests:\n- '%s'\n- '%s'\n", regImgPath, mfestFilepath, mfest.filepath)
-				}
-				renamesSeen[regImgPath] = mfest.filepath
-			}
-		}
-	}
-
-	return nil
-}
-
 // ToPromotionEdges converts a list of manifests to a set of edges we want to
 // try promoting.
 func ToPromotionEdges(
@@ -257,8 +218,7 @@ func ToPromotionEdges(
 								destRC,
 								image.ImageName,
 								digest,
-								tag,
-								mfest.renamesDenormalized)
+								tag)
 							edges[edge] = nil
 						}
 					} else {
@@ -270,8 +230,7 @@ func ToPromotionEdges(
 							destRC,
 							image.ImageName,
 							digest,
-							"", // No associated tag; still promote!
-							mfest.renamesDenormalized)
+							"") // No associated tag; still promote!
 						edges[edge] = nil
 					}
 				}
@@ -286,8 +245,7 @@ func mkPromotionEdge(
 	srcRC, dstRC RegistryContext,
 	srcImageName ImageName,
 	digest Digest,
-	tag Tag,
-	rd RenamesDenormalized) PromotionEdge {
+	tag Tag) PromotionEdge {
 
 	edge := PromotionEdge{
 		SrcRegistry: srcRC,
@@ -298,20 +256,7 @@ func mkPromotionEdge(
 		DstRegistry: dstRC,
 	}
 
-	// Renames change how edges are created.
-	// nolint[lll]
-	regImgPath := RegistryImagePath(srcRC.Name) + "/" + RegistryImagePath(srcImageName)
-	if renames, ok := rd[regImgPath]; ok {
-		if imgName, ok := renames[dstRC.Name]; ok {
-			edge.DstImageTag = ImageTag{
-				ImageName: imgName,
-				Tag:       tag}
-			return edge
-		}
-	}
-
-	// Without renames, the name in the destination is the same as the name in
-	// the source.
+	// The name in the destination is the same as the name in the source.
 	edge.DstImageTag = ImageTag{
 		ImageName: srcImageName,
 		Tag:       tag}

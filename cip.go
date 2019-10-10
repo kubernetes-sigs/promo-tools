@@ -195,11 +195,6 @@ func main() {
 			klog.Exitln(err)
 		}
 
-		err = reg.ValidateManifestsFromDir(mfests)
-		if err != nil {
-			klog.Exitln(err)
-		}
-
 		sc, err = reg.MakeSyncContext(
 			mfests,
 			*verbosityPtr,
