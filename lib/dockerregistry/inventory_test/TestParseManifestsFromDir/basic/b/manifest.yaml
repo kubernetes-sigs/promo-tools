@@ -12,8 +12,3 @@ images:
 - name: bar-controller
   dmap:
     "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": ["1.0"]
-renames:
-- - "gcr.io/bar-staging/bar-controller"
-  - "us.gcr.io/some-prod/bar/bar-controller"
-  - "eu.gcr.io/some-prod/bar/bar-controller"
-  - "asia.gcr.io/some-prod/bar/bar-controller"

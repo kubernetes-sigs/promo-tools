@@ -261,79 +261,6 @@ images:
 			t,
 			eqErr,
 			fmt.Sprintf("Test: %v (Manifest)\n", test.name))
-
-		// Perform some extra testing for the `renames` field.
-		if test.name == "Basic manifest" {
-			shouldBeValid := []string{
-				// Change the image path.
-				`renames:
-- ["gcr.io/foo/banana", "gcr.io/bar/some/subdir/banana"]`,
-				// Change the base image name. This is allowed.
-				`renames:
-- ["gcr.io/foo/banana", "gcr.io/bar/carrot"]`,
-			}
-			for _, validInput := range shouldBeValid {
-				b := []byte(test.input + validInput)
-				_, err := ParseManifestYAML(b)
-				checkError(
-					t,
-					err,
-					fmt.Sprintf(
-						"Test: %v: (renames field parse failure (should be valid)\n",
-						test.name+": "+validInput))
-			}
-
-			shouldBeInvalid := []struct {
-				name  string
-				input string
-				err   error
-			}{
-				{
-					name: "Only 1 path (need at least 2)",
-					input: `renames:
-- ["gcr.io/foo/banana"]`,
-					err: fmt.Errorf("a rename entry must have at least 2 paths, one for the source, another for at least 1 dest registry"),
-				},
-				{
-					name: "Multiple renames for a single registry",
-					input: `renames:
-- ["gcr.io/foo/banana", "gcr.io/bar/subdir/A/banana", "gcr.io/bar/subdir/B/banana"]`,
-					err: fmt.Errorf("multiple renames found for registry 'gcr.io/bar' in 'renames', for image subdir/B/banana"),
-				},
-				{
-					name: "Unknown registry",
-					input: `renames:
-- ["gcr.io/foo/banana", "gcr.io/cat/subdir/A/banana"]`,
-					err: fmt.Errorf(`could not determine registry name for 'gcr.io/cat/subdir/A/banana'
-unknown registry '' in 'renames' (not defined in 'registries')`),
-				},
-				{
-					name: "No source registry",
-					input: `renames:
-- ["gcr.io/bar/banana", "gcr.io/cat/subdir/A/banana"]`,
-					err: fmt.Errorf(`could not determine registry name for 'gcr.io/cat/subdir/A/banana'
-unknown registry '' in 'renames' (not defined in 'registries')
-could not find source registry in '[gcr.io/bar/banana gcr.io/cat/subdir/A/banana]'`),
-				},
-				{
-					name: "Redundant rename",
-					input: `renames:
-- ["gcr.io/bar/banana", "gcr.io/foo/banana"]`,
-					err: fmt.Errorf(`redundant rename for [gcr.io/bar/banana gcr.io/foo/banana]`),
-				},
-			}
-			for _, invalid := range shouldBeInvalid {
-				b := []byte(test.input + invalid.input)
-				_, got := ParseManifestYAML(b)
-				eqErr := checkEqual(got, invalid.err)
-				checkError(
-					t,
-					eqErr,
-					fmt.Sprintf(
-						"Test: %v: (renames field parse failure)\n",
-						test.name+": "+invalid.name))
-			}
-		}
 	}
 }
 
@@ -384,12 +311,6 @@ func TestParseManifestsFromDir(t *testing.T) {
 							},
 						},
 					},
-					Renames: []Rename{
-						[]RegistryImagePath{
-							"gcr.io/foo-staging/foo-controller",
-							"us.gcr.io/some-prod/foo/foo-controller",
-							"eu.gcr.io/some-prod/foo/foo-controller",
-							"asia.gcr.io/some-prod/foo/foo-controller"}},
 					filepath: "a/manifest.yaml",
 				},
 			},
@@ -426,12 +347,6 @@ func TestParseManifestsFromDir(t *testing.T) {
 							},
 						},
 					},
-					Renames: []Rename{
-						[]RegistryImagePath{
-							"gcr.io/foo-staging/foo-controller",
-							"us.gcr.io/some-prod/foo/foo-controller",
-							"eu.gcr.io/some-prod/foo/foo-controller",
-							"asia.gcr.io/some-prod/foo/foo-controller"}},
 					filepath: "a/manifest.yaml"},
 				{
 					Registries: []RegistryContext{
@@ -460,12 +375,6 @@ func TestParseManifestsFromDir(t *testing.T) {
 							},
 						},
 					},
-					Renames: []Rename{
-						[]RegistryImagePath{
-							"gcr.io/cat-staging/cat-controller",
-							"us.gcr.io/some-prod/cat/cat-controller",
-							"eu.gcr.io/some-prod/cat/cat-controller",
-							"asia.gcr.io/some-prod/cat/cat-controller"}},
 					filepath: "b/c/manifest.yaml"},
 				{
 					Registries: []RegistryContext{
@@ -494,12 +403,6 @@ func TestParseManifestsFromDir(t *testing.T) {
 							},
 						},
 					},
-					Renames: []Rename{
-						[]RegistryImagePath{
-							"gcr.io/bar-staging/bar-controller",
-							"us.gcr.io/some-prod/bar/bar-controller",
-							"eu.gcr.io/some-prod/bar/bar-controller",
-							"asia.gcr.io/some-prod/bar/bar-controller"}},
 					filepath: "b/manifest.yaml"},
 				{
 					Registries: []RegistryContext{
@@ -528,12 +431,6 @@ func TestParseManifestsFromDir(t *testing.T) {
 							},
 						},
 					},
-					Renames: []Rename{
-						[]RegistryImagePath{
-							"gcr.io/qux-staging/qux-controller",
-							"us.gcr.io/some-prod/qux/qux-controller",
-							"eu.gcr.io/some-prod/qux/qux-controller",
-							"asia.gcr.io/some-prod/qux/qux-controller"}},
 					filepath: "manifest.yaml"},
 			},
 			nil,
@@ -686,23 +583,6 @@ func TestValidateManifestsFromDir(t *testing.T) {
 			"empty",
 			fmt.Errorf("no manifests found in dir: %s", filepath.Join(pwd, "invalid/empty")),
 			nil,
-			nil,
-		},
-		{
-			// For this one, the manifest b/manifest.yaml is already invalid.
-			"overlapping-renames-invalid-manifest",
-			fmt.Errorf("multiple renames found for registry 'asia.gcr.io/some-prod' in 'renames', for image foo/foo-controller"),
-			nil,
-			nil,
-		},
-		{
-			"overlapping-renames-across-manifests",
-			nil,
-			fmt.Errorf(
-				"rename key '%s' found in multiple manifests:\n- '%s'\n- '%s'\n",
-				"asia.gcr.io/some-prod/foo/foo-controller",
-				filepath.Join(pwd, "invalid/overlapping-renames-across-manifests/a/manifest.yaml"),
-				filepath.Join(pwd, "invalid/overlapping-renames-across-manifests/b/manifest.yaml")),
 			nil,
 		},
 		{
@@ -954,7 +834,7 @@ func TestCommandGeneration(t *testing.T) {
 		ServiceAccount: "robot"}
 	var srcRegName RegistryName = "gcr.io/bar"
 	var srcImageName ImageName = "baz"
-	var destImageName ImageName = "baz" // simple case (no rename)
+	var destImageName ImageName = "baz"
 	var digest Digest = "sha256:000"
 	var tag Tag = "1.0"
 	var tp TagOp
@@ -1457,89 +1337,6 @@ func TestSetManipulationsRegistryInventories(t *testing.T) {
 	}
 }
 
-func TestDenormalizeRenames(t *testing.T) {
-	srcRegName := RegistryName("gcr.io/foo")
-	destRegName := RegistryName("gcr.io/bar")
-	destRegName2 := RegistryName("gcr.io/cat")
-	destRC := RegistryContext{
-		Name:           destRegName,
-		ServiceAccount: "robot",
-	}
-	destRC2 := RegistryContext{
-		Name:           destRegName2,
-		ServiceAccount: "robot",
-	}
-	srcRC := RegistryContext{
-		Name:           srcRegName,
-		ServiceAccount: "robot",
-		Src:            true,
-	}
-	registries := []RegistryContext{srcRC, destRC, destRC2}
-	var tests = []struct {
-		name           string
-		input          Manifest
-		expectedOutput RenamesDenormalized
-	}{
-		{
-			"Simple case: 1 rename",
-			Manifest{
-				Registries: registries,
-				Images: []Image{
-					{
-						ImageName: "a",
-						Dmap: DigestTags{
-							"sha256:000": TagSlice{"0.9"}}}},
-				Renames: []Rename{
-					[]RegistryImagePath{
-						"gcr.io/foo/a",
-						"gcr.io/bar/some/subdir/a"}}},
-			RenamesDenormalized{
-				"gcr.io/foo/a": map[RegistryName]ImageName{
-					"gcr.io/bar": "some/subdir/a"},
-				"gcr.io/bar/some/subdir/a": map[RegistryName]ImageName{
-					"gcr.io/foo": "a"}},
-		},
-		{
-			"2 renames, 2 different dest repos",
-			Manifest{
-				Registries: registries,
-				Images: []Image{
-					{
-						ImageName: "a",
-						Dmap: DigestTags{
-							"sha256:000": TagSlice{"0.9"}}}},
-				Renames: []Rename{
-					[]RegistryImagePath{
-						"gcr.io/foo/a",
-						"gcr.io/bar/some/subdir/a",
-						"gcr.io/cat/different/path/a",
-					}}},
-			RenamesDenormalized{
-				"gcr.io/foo/a": map[RegistryName]ImageName{
-					"gcr.io/bar": "some/subdir/a",
-					"gcr.io/cat": "different/path/a"},
-				"gcr.io/bar/some/subdir/a": map[RegistryName]ImageName{
-					"gcr.io/foo": "a",
-					"gcr.io/cat": "different/path/a",
-				},
-				"gcr.io/cat/different/path/a": map[RegistryName]ImageName{
-					"gcr.io/foo": "a",
-					"gcr.io/bar": "some/subdir/a",
-				}},
-		},
-	}
-
-	for _, test := range tests {
-		got, err := DenormalizeRenames(test.input, srcRegName)
-		checkError(t, err, fmt.Sprintf(
-			"Test (denormalization): %v\n", test.name))
-		expected := test.expectedOutput
-		err = checkEqual(got, expected)
-		checkError(t, err, fmt.Sprintf(
-			"Test (equality): %v\n", test.name))
-	}
-}
-
 func TestSetManipulationsTags(t *testing.T) {
 	var tests = []struct {
 		name           string
@@ -1825,7 +1622,7 @@ func TestToPromotionEdges(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		// Finalize Manifests (in particular, populaze renamesDenormalized map).
+		// Finalize Manifests.
 		for i := range test.input {
 			// Skip errors.
 			_ = test.input[i].finalize()
@@ -2583,77 +2380,6 @@ func TestGarbageCollection(t *testing.T) {
 					ImageNameSrc:   "",
 					ImageNameDest:  "z",
 					Digest:         "sha256:000",
-					Tag:            ""}: 1,
-			},
-		},
-		{
-			"Garbage collection with renames present (only garbage-collect *renamed* paths in dest)",
-			Manifest{
-				Registries: registries,
-				Images: []Image{
-					{
-						ImageName: "a",
-						Dmap: DigestTags{
-							"sha256:000": TagSlice{"000"},
-							"sha256:333": TagSlice{"333"},
-						}},
-					{
-						ImageName: "b",
-						Dmap: DigestTags{
-							"sha256:bbb": TagSlice{"bbb"}}}},
-				Renames: []Rename{
-					[]RegistryImagePath{
-						"gcr.io/foo/a",
-						"gcr.io/bar/some/subdir/path/a"}}},
-			SyncContext{
-				Inv: MasterInventory{
-					// Source repo has both images accounted for in the manifest
-					// but also images extraneouc of the manifest. These
-					// extraneous images should not affect garbage-collection at
-					// all.
-					"gcr.io/foo": RegInvImage{
-						"a": DigestTags{
-							"sha256:000": nil,
-							"sha256:333": nil,
-						},
-						"b": DigestTags{
-							"sha256:bbb": nil},
-						"c": DigestTags{
-							"sha256:000": nil},
-						"d": DigestTags{
-							"sha256:bbb": nil}},
-					"gcr.io/bar": RegInvImage{
-						"some/subdir/path/a": DigestTags{
-							"sha256:000": TagSlice{"000"},
-							"sha256:111": nil,
-						},
-						"b": DigestTags{
-							"sha256:333": TagSlice{"bbb"}}},
-					"gcr.io/cat": RegInvImage{
-						"a": DigestTags{
-							"sha256:fff": nil},
-						"b": DigestTags{
-							"sha256:bbb": TagSlice{"bbb"}}}}},
-			CapturedRequests{
-				// Delete an extra tag from the renamed path.
-				PromotionRequest{
-					TagOp:          Delete,
-					RegistrySrc:    srcRegName,
-					RegistryDest:   registries[1].Name,
-					ServiceAccount: registries[1].ServiceAccount,
-					ImageNameSrc:   "",
-					ImageNameDest:  "some/subdir/path/a",
-					Digest:         "sha256:111",
-					Tag:            ""}: 1,
-				// Delete a tag on a non-renamed  path (different dest)}.
-				PromotionRequest{
-					TagOp:          Delete,
-					RegistrySrc:    srcRegName,
-					RegistryDest:   registries[2].Name,
-					ServiceAccount: registries[2].ServiceAccount,
-					ImageNameSrc:   "",
-					ImageNameDest:  "a",
-					Digest:         "sha256:fff",
 					Tag:            ""}: 1,
 			},
 		},

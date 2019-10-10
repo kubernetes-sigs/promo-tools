@@ -12,8 +12,3 @@ images:
 - name: foo-controller
   dmap:
     "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": ["1.0"]
-renames:
-- - "gcr.io/foo-staging/foo-controller"
-  - "us.gcr.io/some-prod/foo/foo-controller"
-  - "eu.gcr.io/some-prod/foo/foo-controller"
-  - "asia.gcr.io/some-prod/foo/foo-controller"
