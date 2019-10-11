@@ -224,9 +224,10 @@ func ParseManifestsFromDir(
 			return nil
 		}
 
-		// First try to parse the path as a manifest file. The only requirement
-		// is that the file must be named "promoter-manifest.yaml".
-		if !strings.HasSuffix(path, "/promoter-manifest.yaml") {
+		// First try to parse the path as a manifest file, which must be named
+		// "promoter-manifest.yaml". This restriction is in place to limit the
+		// scope of what is read in as a promoter manifest.
+		if filepath.Base(path) != "promoter-manifest.yaml" {
 			return nil
 		}
 
