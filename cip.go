@@ -46,7 +46,11 @@ func main() {
 	manifestDirPtr := flag.String(
 		"manifest-dir",
 		"",
-		"recursively read in all manifests within a folder; it is an error if two manifests specify conflicting intent (e.g., promotion of the same image)")
+		"(DEPRECATED; please use -thin-manifest-dir instead) recursively read in all manifests within a folder; it is an error if two manifests specify conflicting intent (e.g., promotion of the same image); manifests inside this directory *MUST* be named 'promoter-manifest.yaml'")
+	thinManifestDirPtr := flag.String(
+		"thin-manifest-dir",
+		"",
+		"recursively read in all manifests within a folder, but all manifests MUST be 'thin' manifests named 'promoter-manifest.yaml', which are like regular manifests but instead of defining the 'images: ...' field directly, the 'imagesPath' field must be defined that points to another YAML file containing the 'images: ...' contents")
 	threadsPtr := flag.Int(
 		"threads",
 		10, "number of concurrent goroutines to use when talking to GCR")
@@ -164,8 +168,8 @@ func main() {
 			},
 		}
 	} else {
-		if *manifestPtr == "" && *manifestDirPtr == "" {
-			klog.Fatal(fmt.Errorf("-manifest=... or -manifestDir=... flag is required"))
+		if *manifestPtr == "" && *manifestDirPtr == "" && *thinManifestDirPtr == "" {
+			klog.Fatal(fmt.Errorf("one of -manifest, -manifest-dir, or -thin-manifest-dir is required"))
 		}
 	}
 
@@ -189,8 +193,12 @@ func main() {
 			klog.Fatal(err)
 		}
 		doingPromotion = true
-	} else if *manifestDirPtr != "" {
-		mfests, err = reg.ParseManifestsFromDir(*manifestDirPtr)
+	} else if *manifestDirPtr != "" || *thinManifestDirPtr != "" {
+		if *manifestDirPtr != "" {
+			mfests, err = reg.ParseManifestsFromDir(*manifestDirPtr, reg.ParseManifestFromFile)
+		} else {
+			mfests, err = reg.ParseManifestsFromDir(*thinManifestDirPtr, reg.ParseThinManifestFromFile)
+		}
 		if err != nil {
 			klog.Exitln(err)
 		}

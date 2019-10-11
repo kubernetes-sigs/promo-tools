@@ -311,7 +311,7 @@ func TestParseManifestsFromDir(t *testing.T) {
 							},
 						},
 					},
-					filepath: "a/manifest.yaml",
+					filepath: "a/promoter-manifest.yaml",
 				},
 			},
 			nil,
@@ -347,7 +347,7 @@ func TestParseManifestsFromDir(t *testing.T) {
 							},
 						},
 					},
-					filepath: "a/manifest.yaml"},
+					filepath: "a/promoter-manifest.yaml"},
 				{
 					Registries: []RegistryContext{
 						{
@@ -375,7 +375,7 @@ func TestParseManifestsFromDir(t *testing.T) {
 							},
 						},
 					},
-					filepath: "b/c/manifest.yaml"},
+					filepath: "b/c/promoter-manifest.yaml"},
 				{
 					Registries: []RegistryContext{
 						{
@@ -403,7 +403,7 @@ func TestParseManifestsFromDir(t *testing.T) {
 							},
 						},
 					},
-					filepath: "b/manifest.yaml"},
+					filepath: "b/promoter-manifest.yaml"},
 				{
 					Registries: []RegistryContext{
 						{
@@ -431,7 +431,7 @@ func TestParseManifestsFromDir(t *testing.T) {
 							},
 						},
 					},
-					filepath: "manifest.yaml"},
+					filepath: "promoter-manifest.yaml"},
 			},
 			nil,
 		},
@@ -466,7 +466,7 @@ func TestParseManifestsFromDir(t *testing.T) {
 							},
 						},
 					},
-					filepath: "a/manifest.yaml",
+					filepath: "a/promoter-manifest.yaml",
 				},
 				{
 					Registries: []RegistryContext{
@@ -495,8 +495,127 @@ func TestParseManifestsFromDir(t *testing.T) {
 							},
 						},
 					},
-					filepath: "b/manifest.yaml",
+					filepath: "b/promoter-manifest.yaml",
 				},
+			},
+			nil,
+		},
+		{
+			"Basic (multiple thin manifests)",
+			"basic-thin",
+			[]Manifest{
+				{
+					Registries: []RegistryContext{
+						{
+							Name:           "gcr.io/foo-staging",
+							ServiceAccount: "sa@robot.com",
+							Src:            true,
+						},
+						{
+							Name:           "us.gcr.io/some-prod",
+							ServiceAccount: "sa@robot.com",
+						},
+						{
+							Name:           "eu.gcr.io/some-prod",
+							ServiceAccount: "sa@robot.com",
+						},
+						{
+							Name:           "asia.gcr.io/some-prod",
+							ServiceAccount: "sa@robot.com",
+						},
+					},
+					Images: []Image{
+						{ImageName: "foo-controller",
+							Dmap: DigestTags{
+								"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": {"1.0"},
+							},
+						},
+					},
+					filepath: "thin-manifests/a/promoter-manifest.yaml"},
+				{
+					Registries: []RegistryContext{
+						{
+							Name:           "gcr.io/cat-staging",
+							ServiceAccount: "sa@robot.com",
+							Src:            true,
+						},
+						{
+							Name:           "us.gcr.io/some-prod",
+							ServiceAccount: "sa@robot.com",
+						},
+						{
+							Name:           "eu.gcr.io/some-prod",
+							ServiceAccount: "sa@robot.com",
+						},
+						{
+							Name:           "asia.gcr.io/some-prod",
+							ServiceAccount: "sa@robot.com",
+						},
+					},
+					Images: []Image{
+						{ImageName: "cat-controller",
+							Dmap: DigestTags{
+								"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc": {"1.0"},
+							},
+						},
+					},
+					filepath: "thin-manifests/b/c/promoter-manifest.yaml"},
+				{
+					Registries: []RegistryContext{
+						{
+							Name:           "gcr.io/bar-staging",
+							ServiceAccount: "sa@robot.com",
+							Src:            true,
+						},
+						{
+							Name:           "us.gcr.io/some-prod",
+							ServiceAccount: "sa@robot.com",
+						},
+						{
+							Name:           "eu.gcr.io/some-prod",
+							ServiceAccount: "sa@robot.com",
+						},
+						{
+							Name:           "asia.gcr.io/some-prod",
+							ServiceAccount: "sa@robot.com",
+						},
+					},
+					Images: []Image{
+						{ImageName: "bar-controller",
+							Dmap: DigestTags{
+								"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": {"1.0"},
+							},
+						},
+					},
+					filepath: "thin-manifests/b/promoter-manifest.yaml"},
+				{
+					Registries: []RegistryContext{
+						{
+							Name:           "gcr.io/qux-staging",
+							ServiceAccount: "sa@robot.com",
+							Src:            true,
+						},
+						{
+							Name:           "us.gcr.io/some-prod",
+							ServiceAccount: "sa@robot.com",
+						},
+						{
+							Name:           "eu.gcr.io/some-prod",
+							ServiceAccount: "sa@robot.com",
+						},
+						{
+							Name:           "asia.gcr.io/some-prod",
+							ServiceAccount: "sa@robot.com",
+						},
+					},
+					Images: []Image{
+						{ImageName: "qux-controller",
+							Dmap: DigestTags{
+								"sha256:0000000000000000000000000000000000000000000000000000000000000000": {"1.0"},
+							},
+						},
+					},
+					filepath: "thin-manifests/promoter-manifest.yaml"},
 			},
 			nil,
 		},
@@ -512,7 +631,12 @@ func TestParseManifestsFromDir(t *testing.T) {
 			expectedModified = append(expectedModified, mfest)
 		}
 
-		got, err := ParseManifestsFromDir(fixtureDir)
+		parseManifestFunc := ParseManifestFromFile
+		if test.input == "basic-thin" {
+			parseManifestFunc = ParseThinManifestFromFile
+		}
+
+		got, err := ParseManifestsFromDir(fixtureDir, parseManifestFunc)
 
 		// Clear private fields (redundant data) that are calculated on-the-fly
 		// (it's too verbose to include them here; besides, it's not what we're
@@ -556,7 +680,7 @@ func TestValidateManifestsFromDir(t *testing.T) {
 	for _, testInput := range shouldBeValid {
 		fixtureDir := filepath.Join(pwd, "valid", testInput)
 
-		mfests, errParse := ParseManifestsFromDir(fixtureDir)
+		mfests, errParse := ParseManifestsFromDir(fixtureDir, ParseManifestFromFile)
 		eqErr := checkEqual(errParse, nil)
 		checkError(
 			t,
@@ -602,7 +726,7 @@ func TestValidateManifestsFromDir(t *testing.T) {
 		// It could be that a manifest, taken individually, failed on its own,
 		// before we even get to ValidateManifestsFromDir(). So handle these
 		// cases as well.
-		mfests, errParse := ParseManifestsFromDir(fixtureDir)
+		mfests, errParse := ParseManifestsFromDir(fixtureDir, ParseManifestFromFile)
 		eqErr = checkEqual(errParse, test.expectedParseError)
 		checkError(
 			t,
