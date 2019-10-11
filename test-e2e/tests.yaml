@@ -68,3 +68,47 @@
   - name: asia.gcr.io/k8s-cip-test-prod/some/subdir
     before: []
     after: *golden-images-recursive
+- name: "recursive-thin"
+  registries:
+  - name: gcr.io/k8s-staging-cip-test
+    service-account: k8s-infra-gcr-promoter@k8s-cip-test-prod.iam.gserviceaccount.com
+  - name: us.gcr.io/k8s-cip-test-prod
+    service-account: k8s-infra-gcr-promoter@k8s-cip-test-prod.iam.gserviceaccount.com
+  - name: eu.gcr.io/k8s-cip-test-prod
+    service-account: k8s-infra-gcr-promoter@k8s-cip-test-prod.iam.gserviceaccount.com
+  - name: asia.gcr.io/k8s-cip-test-prod
+    service-account: k8s-infra-gcr-promoter@k8s-cip-test-prod.iam.gserviceaccount.com
+  invocation:
+  - "-thin-manifest-dir=$PWD/test-e2e/fixture/recursive-thin"
+  snapshots:
+  - name: us.gcr.io/k8s-cip-test-prod/golden-bar
+    before: []
+    after: &golden-images-recursive-bar
+    - name: bar
+      dmap:
+        sha256:408d6837313f95f081d5d02cc2691344c5781d43e98653f4af6cf9c1b8d26166:
+        - 1.0
+  - name: eu.gcr.io/k8s-cip-test-prod/golden-bar
+    before: []
+    after: *golden-images-recursive-bar
+  - name: asia.gcr.io/k8s-cip-test-prod/golden-bar
+    before: []
+    after: *golden-images-recursive-bar
+  - name: us.gcr.io/k8s-cip-test-prod/golden-foo
+    before: []
+    after: &golden-images-recursive-foo
+    - name: foo
+      dmap:
+        sha256:a42e27f5d18d51c581efef2584ff9aebbfeffcb3145e81e52b1dccf62915e4a3:
+        - 1.0
+        sha256:2af5205553239e0eb17c544bc1e90c2d6173012a191f0a44131aa2f9c44bb511:
+        - 1.0-linux_amd64
+        sha256:2740382935148a02bf425a893d14848dd6238e405935440ce5c13b771a33f2fd:
+        - 1.0-linux_s390x
+        sha256:03aec0c717de7850ee3e3165ecdf73cf1abf0bdb5b6cce04695eeb80637360f8: []
+  - name: eu.gcr.io/k8s-cip-test-prod/golden-foo
+    before: []
+    after: *golden-images-recursive-foo
+  - name: asia.gcr.io/k8s-cip-test-prod/golden-foo
+    before: []
+    after: *golden-images-recursive-foo
