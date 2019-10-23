@@ -5,6 +5,7 @@ go 1.13
 require (
 	cloud.google.com/go/pubsub v1.0.1
 	cloud.google.com/go/storage v1.1.2
+	github.com/google/btree v1.0.0 // indirect
 	github.com/google/go-containerregistry v0.0.0-20191023194145-7683b4ee5f61
 	golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45
 	google.golang.org/api v0.11.0

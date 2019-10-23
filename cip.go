@@ -23,6 +23,7 @@ import (
 
 	// nolint[lll]
 	"k8s.io/klog"
+	"sigs.k8s.io/k8s-container-image-promoter/lib/audit"
 	reg "sigs.k8s.io/k8s-container-image-promoter/lib/dockerregistry"
 	"sigs.k8s.io/k8s-container-image-promoter/lib/stream"
 	"sigs.k8s.io/k8s-container-image-promoter/pkg/gcloud"
@@ -112,6 +113,22 @@ func main() {
 	useServiceAccount := false
 	flag.BoolVar(&useServiceAccount, "use-service-account", false,
 		"pass '--account=...' to all gcloud calls (default: false)")
+	auditorPtr := flag.Bool(
+		"audit",
+		false,
+		"stand up an HTTP server that responds to Pub/Sub push events for auditing")
+	auditManifestRepoUrlPtr := flag.String(
+		"audit-manifest-repo-url",
+		os.Getenv("CIP_AUDIT_MANIFEST_REPO_URL"),
+		"https://... address of the repository that holds the promoter manifests")
+	auditManifestRepoBranchPtr := flag.String(
+		"audit-manifest-repo-branch",
+		os.Getenv("CIP_AUDIT_MANIFEST_REPO_BRANCH"),
+		"Git branch to check out (use) for -audit-manifest-repo")
+	auditManifestPathPtr := flag.String(
+		"audit-manifest-path",
+		os.Getenv("CIP_AUDIT_MANIFEST_REPO_MANIFEST_DIR"),
+		"path (relative to the root of -audit-manifest-repo) to the manifests directory")
 	flag.Parse()
 
 	if len(os.Args) == 1 {
@@ -128,6 +145,10 @@ func main() {
 	if *versionPtr {
 		printVersion()
 		os.Exit(0)
+	}
+
+	if *auditorPtr {
+		audit.Auditor(*auditManifestRepoUrlPtr, *auditManifestRepoBranchPtr, *auditManifestPathPtr)
 	}
 
 	// Activate service accounts.

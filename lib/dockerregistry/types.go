@@ -318,6 +318,17 @@ type digest struct {
 	tags []string
 }
 
+// GCRPubSubPayload is the message payload sent to a Pub/Sub topic by a GCR.
+// nolint[lll]
+type GCRPubSubPayload struct {
+	Action string `json:"action"`
+	// Digest is always a FQIN. E.g.,
+	// "gcr.io/linusa/small@sha256:35f442d8d56cc7a2d4000f3417d71f44a730b900f3df440c09a9c40c42c40f86".
+	Digest string `json:"digest,omitempty"`
+	// Tag is always a PQIN. E.g., "gcr.io/linusa/small:a".
+	Tag string `json:"tag,omitempty"`
+}
+
 // Various conversion functions.
 
 // ToRegInvImageDigest converts a Manifest to a RegInvImageDigest.
