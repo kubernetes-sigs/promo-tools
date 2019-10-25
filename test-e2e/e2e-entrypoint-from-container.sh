@@ -28,13 +28,10 @@ set -o xtrace
 
 SCRIPT_ROOT=$(dirname "$(readlink -f "$0")")
 
-# Turn on experimental Docker features. This enables the "docker manifest"
-# subcommand.
-mkdir -p $HOME/.docker
-echo '{"experimental":"enabled"}' > $HOME/.docker/config.json
-
-# Make Docker use gcloud as a credential helper when pushing to GCR.
-gcloud auth configure-docker --quiet
+# Populate creds and turn on experimental docker features to support the "docker
+# manifest" subcommand.
+mkdir -p "${HOME}"/.docker
+cp -f "${SCRIPT_ROOT}/../docker/config.json" "${HOME}/.docker"
 
 # Invoke the e2e test!
 make -C "${SCRIPT_ROOT}/.." test-e2e

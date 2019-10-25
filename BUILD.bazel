@@ -24,8 +24,18 @@ container_image(
         "/bin/bash",
         "-c",
     ],
-    env = {"PATH": "/cip:${PATH}"},
+    env = {
+        "PATH": "/cip:${PATH}",
+        "HOME": "/",
+    },
+    layers = [":cip-docker-creds"],
     symlinks = {"/cip/cip": "/app/cip-docker-image.binary"},
+)
+
+container_layer(
+    name = "cip-docker-creds",
+    directory = "/.docker",
+    files = ["docker/config.json"],
 )
 
 # Invoke with "bazel build //:cip-docker-loadable.tar". Then you can run "docker
