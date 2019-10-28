@@ -26,18 +26,17 @@ images:
     "sha256:06fdf10aae2eeeac5a82c213e4693f82ab05b3b09b820fce95a7cac0bbdad534": ["1.2", "latest"]
 ```
 
-Here, the Manifest cares about 3 images --- `apple`, `banana`, and `cherry`. The
-`registries` field lists all destination registries and also the source registry
-where the images should be promoted from. To earmark the source registry, it is
-called out on its own under the `src-registry` field. In the Example, the
-promoter will scan `gcr.io/myproject-staging-area` (*src-registry*) and promote
-the images found under `images` to `gcr.io/myproject-production`.
+Here, the Manifest cares about 3 images --- `apple`, `banana`, and `cherry`.
+The `registries` field lists all destination registries and also the source
+registry where the images should be promoted from. To earmark the source
+registry, it has `src: true` as a property. In the Example, the promoter will
+scan `gcr.io/myproject-staging-area` and promote the images found under
+`images` to `gcr.io/myproject-production`.
 
-The `src-registry` (staging registry) will always be read-only for the promoter.
-Because of this, it's OK to not provide a `service-account` field for it in
-`registries`. But in the event that you are trying to promote from one private
-registry to another, you would still provide a `service-account` for the staging
-registry.
+The source registry will always be read-only for the promoter.  Because of
+this, it's OK to not provide a `service-account` field for it in `registries`.
+But in the event that you are trying to promote from one private registry to
+another, you would still provide a `service-account` for the staging registry.
 
 Currently only Google Container Registry (GCR) is supported.
 
