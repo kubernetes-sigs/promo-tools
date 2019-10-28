@@ -2210,7 +2210,7 @@ func (sc *SyncContext) ClearRepository(
 					continue
 				}
 				for imageName, digestTags := range sc.Inv[registry.Name] {
-					for digest, _ := range digestTags {
+					for digest := range digestTags {
 						mediaType, ok := sc.DigestMediaType[digest]
 						if !ok {
 							fmt.Println("could not detect MediaType of digest", digest)
