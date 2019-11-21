@@ -34,6 +34,7 @@ import (
 	"k8s.io/klog"
 
 	"github.com/google/go-containerregistry/pkg/crane"
+	ggcrV1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/google"
 	cr "github.com/google/go-containerregistry/pkg/v1/types"
 	cipJson "sigs.k8s.io/k8s-container-image-promoter/lib/json"
@@ -836,9 +837,9 @@ func getRegistryTagsFrom(req stream.ExternalRequest) (*google.Tags, error) {
 }
 
 func getGCRManifestListWrapper(
-	req stream.ExternalRequest) (*GCRManifestList, error) {
+	req stream.ExternalRequest) (*ggcrV1.IndexManifest, error) {
 
-	var gcrManifestList *GCRManifestList
+	var gcrManifestList *ggcrV1.IndexManifest
 
 	var getGCRManifestListCondition wait.ConditionFunc = func() (bool, error) {
 		var err error
@@ -875,7 +876,7 @@ func getGCRManifestListWrapper(
 }
 
 func getGCRManifestListFrom(
-	req stream.ExternalRequest) (*GCRManifestList, error) {
+	req stream.ExternalRequest) (*ggcrV1.IndexManifest, error) {
 
 	reader, _, err := req.StreamProducer.Produce()
 	if err != nil {
@@ -1280,7 +1281,7 @@ func (sc *SyncContext) ReadGCRManifestLists(
 
 			for _, gManifest := range gcrManifestList.Manifests {
 				mutex.Lock()
-				sc.ParentDigest[gManifest.Digest] = gmlc.Digest
+				sc.ParentDigest[(Digest)((gManifest.Digest.Algorithm)+":"+(gManifest.Digest.Hex))] = gmlc.Digest
 				mutex.Unlock()
 			}
 
@@ -1522,9 +1523,9 @@ func extractRegistryTags(reader io.Reader) (*google.Tags, error) {
 	return &tags, nil
 }
 
-func extractGCRManifestList(reader io.Reader) (*GCRManifestList, error) {
+func extractGCRManifestList(reader io.Reader) (*ggcrV1.IndexManifest, error) {
 
-	gcrManifestList := GCRManifestList{}
+	gcrManifestList := ggcrV1.IndexManifest{}
 	decoder := json.NewDecoder(reader)
 	decoder.DisallowUnknownFields()
 
