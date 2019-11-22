@@ -996,6 +996,8 @@ func (sc *SyncContext) PopulateTokens() error {
 			rc.ServiceAccount,
 			sc.UseServiceAccount)
 		if err != nil {
+			klog.Errorf("could not get service account token for %v",
+				rc.ServiceAccount)
 			return err
 		}
 		tokenKey, _, _ := GetTokenKeyDomainRepoPath(rc.Name)
