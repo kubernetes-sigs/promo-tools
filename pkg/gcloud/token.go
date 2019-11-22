@@ -54,6 +54,7 @@ func GetServiceAccountToken(
 
 	err := cmd.Run()
 	if err != nil {
+		klog.Errorf("could not execute cmd %v", cmd)
 		return "", err
 	}
 
