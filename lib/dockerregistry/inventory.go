@@ -35,8 +35,8 @@ import (
 
 	"github.com/google/go-containerregistry/pkg/crane"
 	ggcrV1 "github.com/google/go-containerregistry/pkg/v1"
-	"github.com/google/go-containerregistry/pkg/v1/google"
-	cr "github.com/google/go-containerregistry/pkg/v1/types"
+	ggcrV1Google "github.com/google/go-containerregistry/pkg/v1/google"
+	ggcrV1Types "github.com/google/go-containerregistry/pkg/v1/types"
 	cipJson "sigs.k8s.io/k8s-container-image-promoter/lib/json"
 	"sigs.k8s.io/k8s-container-image-promoter/lib/stream"
 	"sigs.k8s.io/k8s-container-image-promoter/pkg/gcloud"
@@ -782,9 +782,10 @@ func (riid *RegInvImageDigest) PrettyValue() string {
 	return b.String()
 }
 
-func getRegistryTagsWrapper(req stream.ExternalRequest) (*google.Tags, error) {
+func getRegistryTagsWrapper(req stream.ExternalRequest,
+) (*ggcrV1Google.Tags, error) {
 
-	var googleTags *google.Tags
+	var googleTags *ggcrV1Google.Tags
 
 	var getRegistryTagsCondition wait.ConditionFunc = func() (bool, error) {
 		var err error
@@ -815,12 +816,13 @@ func getRegistryTagsWrapper(req stream.ExternalRequest) (*google.Tags, error) {
 	return googleTags, nil
 }
 
-func getRegistryTagsFrom(req stream.ExternalRequest) (*google.Tags, error) {
+func getRegistryTagsFrom(req stream.ExternalRequest,
+) (*ggcrV1Google.Tags, error) {
 	reader, _, err := req.StreamProducer.Produce()
 	if err != nil {
 		klog.Warning("error reading from stream:", err)
-		// Skip google.Tags JSON parsing if there were errors reading from the
-		// HTTP stream.
+		// Skip ggcrV1Google.Tags JSON parsing if there were errors reading from
+		// the HTTP stream.
 		return nil, err
 	}
 
@@ -829,7 +831,8 @@ func getRegistryTagsFrom(req stream.ExternalRequest) (*google.Tags, error) {
 
 	tags, err := extractRegistryTags(reader)
 	if err != nil {
-		klog.Warning("error parsing *google.Tags from io.Reader handle:", err)
+		klog.Warning("error parsing *ggcrV1Google.Tags from io.Reader handle:",
+			err)
 		return nil, err
 	}
 
@@ -1216,7 +1219,7 @@ func (sc *SyncContext) ReadGCRManifestLists(
 		reqs chan<- stream.ExternalRequest,
 		wg *sync.WaitGroup) {
 
-		// Find all images that are of cr.MediaType == DockerManifestList; these
+		// Find all images that are of ggcrV1Types.MediaType == DockerManifestList; these
 		// images will be queried.
 		for registryName, rii := range sc.Inv {
 			var rc RegistryContext
@@ -1227,7 +1230,7 @@ func (sc *SyncContext) ReadGCRManifestLists(
 			}
 			for imageName, digestTags := range rii {
 				for digest, tagSlice := range digestTags {
-					if sc.DigestMediaType[digest] == cr.DockerManifestList {
+					if sc.DigestMediaType[digest] == ggcrV1Types.DockerManifestList {
 						// Create the request.
 						var req stream.ExternalRequest
 						var tag Tag
@@ -1504,9 +1507,9 @@ func (sc *SyncContext) ExecRequests(
 	close(requestResults)
 }
 
-func extractRegistryTags(reader io.Reader) (*google.Tags, error) {
+func extractRegistryTags(reader io.Reader) (*ggcrV1Google.Tags, error) {
 
-	tags := google.Tags{}
+	tags := ggcrV1Google.Tags{}
 	decoder := json.NewDecoder(reader)
 	decoder.DisallowUnknownFields()
 
@@ -2172,18 +2175,19 @@ func (sc *SyncContext) GarbageCollect(
 	}
 }
 
-func supportedMediaType(v string) (cr.MediaType, error) {
-	switch cr.MediaType(v) {
-	case cr.DockerManifestList:
-		return cr.DockerManifestList, nil
-	case cr.DockerManifestSchema1:
-		return cr.DockerManifestSchema1, nil
-	case cr.DockerManifestSchema1Signed:
-		return cr.DockerManifestSchema1Signed, nil
-	case cr.DockerManifestSchema2:
-		return cr.DockerManifestSchema2, nil
+func supportedMediaType(v string) (ggcrV1Types.MediaType, error) {
+	switch ggcrV1Types.MediaType(v) {
+	case ggcrV1Types.DockerManifestList:
+		return ggcrV1Types.DockerManifestList, nil
+	case ggcrV1Types.DockerManifestSchema1:
+		return ggcrV1Types.DockerManifestSchema1, nil
+	case ggcrV1Types.DockerManifestSchema1Signed:
+		return ggcrV1Types.DockerManifestSchema1Signed, nil
+	case ggcrV1Types.DockerManifestSchema2:
+		return ggcrV1Types.DockerManifestSchema2, nil
 	default:
-		return cr.MediaType(""), fmt.Errorf("unsupported MediaType %s", v)
+		return ggcrV1Types.MediaType(""),
+			fmt.Errorf("unsupported MediaType %s", v)
 	}
 }
 
@@ -2199,7 +2203,7 @@ func (sc *SyncContext) ClearRepository(
 
 	// deleteRequestsPopulator returns a PopulateRequests that
 	// varies by a predicate. Closure city!
-	var deleteRequestsPopulator func(func(cr.MediaType) bool) PopulateRequests = func(predicate func(cr.MediaType) bool) PopulateRequests {
+	var deleteRequestsPopulator func(func(ggcrV1Types.MediaType) bool) PopulateRequests = func(predicate func(ggcrV1Types.MediaType) bool) PopulateRequests {
 
 		var populateRequests PopulateRequests = func(
 			sc *SyncContext,
@@ -2292,14 +2296,14 @@ func (sc *SyncContext) ClearRepository(
 		processRequest = *customProcessRequest
 	}
 
-	var isEqualTo (func(cr.MediaType) func(cr.MediaType) bool) = func(want cr.MediaType) func(cr.MediaType) bool {
-		return func(got cr.MediaType) bool {
+	var isEqualTo (func(ggcrV1Types.MediaType) func(ggcrV1Types.MediaType) bool) = func(want ggcrV1Types.MediaType) func(ggcrV1Types.MediaType) bool {
+		return func(got ggcrV1Types.MediaType) bool {
 			return want == got
 		}
 	}
 
-	var isNotEqualTo (func(cr.MediaType) func(cr.MediaType) bool) = func(want cr.MediaType) func(cr.MediaType) bool {
-		return func(got cr.MediaType) bool {
+	var isNotEqualTo (func(ggcrV1Types.MediaType) func(ggcrV1Types.MediaType) bool) = func(want ggcrV1Types.MediaType) func(ggcrV1Types.MediaType) bool {
+		return func(got ggcrV1Types.MediaType) bool {
 			return want != got
 		}
 	}
@@ -2307,9 +2311,9 @@ func (sc *SyncContext) ClearRepository(
 	// Avoid the GCR error that complains if you try to delete an image which is
 	// referenced by a DockerManifestList, by first deleting all such manifest
 	// lists.
-	deleteManifestLists := deleteRequestsPopulator(isEqualTo(cr.DockerManifestList))
+	deleteManifestLists := deleteRequestsPopulator(isEqualTo(ggcrV1Types.DockerManifestList))
 	sc.ExecRequests(deleteManifestLists, processRequest)
-	deleteOthers := deleteRequestsPopulator(isNotEqualTo(cr.DockerManifestList))
+	deleteOthers := deleteRequestsPopulator(isNotEqualTo(ggcrV1Types.DockerManifestList))
 	sc.ExecRequests(deleteOthers, processRequest)
 
 	if sc.DryRun {
