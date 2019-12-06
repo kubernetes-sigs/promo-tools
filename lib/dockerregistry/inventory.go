@@ -107,7 +107,7 @@ func MakeSyncContext(
 }
 
 // ParseManifestFromFile parses a Manifest from a filepath.
-func ParseManifestFromFile(filePath string) (Manifest, error) {
+func ParseManifestFromFile(filePath string, _ string) (Manifest, error) {
 
 	var mfest Manifest
 	var empty Manifest
@@ -134,7 +134,9 @@ func ParseManifestFromFile(filePath string) (Manifest, error) {
 
 // ParseThinManifestFromFile parses a ThinManifest from a filepath and generates
 // a Manifest.
-func ParseThinManifestFromFile(filePath string) (Manifest, error) {
+func ParseThinManifestFromFile(
+	filePath string,
+	thinManifestDir string) (Manifest, error) {
 
 	var thinManifest ThinManifest
 	var mfest Manifest
@@ -150,13 +152,17 @@ func ParseThinManifestFromFile(filePath string) (Manifest, error) {
 		return empty, err
 	}
 
-	imagesPath := thinManifest.ImagesPath
-	// Handle a relative path for "ImagesPath", if necessary.
-	if strings.HasPrefix(thinManifest.ImagesPath, ".") {
-		imagesPath = filepath.Join(
-			filepath.Dir(filePath),
-			thinManifest.ImagesPath)
+	imagesPath := filepath.Join(filepath.Dir(filePath), thinManifest.ImagesPath)
+	relativeImagesPath, err := filepath.Rel(thinManifestDir, imagesPath)
+	if err != nil {
+		return empty, err
 	}
+
+	if len(strings.Split(relativeImagesPath, "../")) > 1 {
+		return empty, fmt.Errorf(
+			"imagesPath (%s) has to be inside %s", imagesPath, thinManifestDir)
+	}
+
 	images, err := ParseImagesFromFile(imagesPath)
 	if err != nil {
 		return empty, err
@@ -208,7 +214,8 @@ func (m *Manifest) finalize() error {
 // (there can only be 1 source registry).
 func ParseManifestsFromDir(
 	dir string,
-	parseManifestFunc func(string) (Manifest, error)) ([]Manifest, error) {
+	parseManifestFunc func(string,
+		string) (Manifest, error)) ([]Manifest, error) {
 	mfests := make([]Manifest, 0)
 
 	var parseAsManifest filepath.WalkFunc = func(path string,
@@ -232,7 +239,7 @@ func ParseManifestsFromDir(
 			return nil
 		}
 
-		mfest, errParse := parseManifestFunc(path)
+		mfest, errParse := parseManifestFunc(path, dir)
 		if errParse != nil {
 			klog.Errorf("could not parse manifest file '%s'\n", path)
 			return errParse

@@ -175,7 +175,7 @@ func main() {
 
 	doingPromotion := false
 	if *manifestPtr != "" {
-		mfest, err = reg.ParseManifestFromFile(*manifestPtr)
+		mfest, err = reg.ParseManifestFromFile(*manifestPtr, "")
 		if err != nil {
 			klog.Fatal(err)
 		}
