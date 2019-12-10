@@ -248,6 +248,7 @@ func runPromotion(repoRoot string, t E2ETest) error {
 		"--",
 		"-dry-run=false",
 		"-verbosity=3",
+		"-use-service-account",
 		// There is no need to use -key-files=... because we already activated
 		// the 1 service account we need during e2e tests with our own -key-file
 		// flag.

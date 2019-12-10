@@ -109,9 +109,9 @@ func main() {
 		"manifest-based-snapshot-of",
 		"",
 		"read all images in either -manifest or -manifest-dir and print all images that will be promoted to the given registry; this is like -snapshot, but instead of reading from a registry, it reads from the manifests those images that need to be promoted to the given registry")
-	noSvcAcc := false
-	flag.BoolVar(&noSvcAcc, "no-service-account", false,
-		"do not pass '--account=...' to all gcloud calls (default: false)")
+	useServiceAccount := false
+	flag.BoolVar(&useServiceAccount, "use-service-account", false,
+		"pass '--account=...' to all gcloud calls (default: false)")
 	flag.Parse()
 
 	if len(os.Args) == 1 {
@@ -131,7 +131,7 @@ func main() {
 	}
 
 	// Activate service accounts.
-	if len(*keyFilesPtr) > 0 {
+	if useServiceAccount && len(*keyFilesPtr) > 0 {
 		if err := gcloud.ActivateServiceAccounts(*keyFilesPtr); err != nil {
 			klog.Exitln(err)
 		}
@@ -188,7 +188,7 @@ func main() {
 			*verbosityPtr,
 			*threadsPtr,
 			*dryRunPtr,
-			!noSvcAcc)
+			useServiceAccount)
 		if err != nil {
 			klog.Fatal(err)
 		}
@@ -208,7 +208,7 @@ func main() {
 			*verbosityPtr,
 			*threadsPtr,
 			*dryRunPtr,
-			!noSvcAcc)
+			useServiceAccount)
 		if err != nil {
 			klog.Fatal(err)
 		}
@@ -274,7 +274,7 @@ func main() {
 				*verbosityPtr,
 				*threadsPtr,
 				*dryRunPtr,
-				!noSvcAcc)
+				useServiceAccount)
 			if err != nil {
 				klog.Fatal(err)
 			}
