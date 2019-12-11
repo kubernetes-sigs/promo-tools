@@ -328,7 +328,9 @@ func mkPromotionEdge(
 // nolint[funlen]
 // nolint[gocyclo]
 func (sc *SyncContext) getPromotionCandidates(
-	edges map[PromotionEdge]interface{}) map[PromotionEdge]interface{} {
+	edges map[PromotionEdge]interface{}) (map[PromotionEdge]interface{}, bool) {
+
+	clean := true
 
 	// Create lookup-optimized structure for images to ignore.
 	ignoreMap := make(map[ImageName]interface{})
@@ -373,9 +375,17 @@ func (sc *SyncContext) getPromotionCandidates(
 
 		if dp.PqinExists {
 			if dp.DigestExists {
-				// NOP (already promoted).
-				klog.Infof("edge %s: skipping because it was already promoted (case 2)\n", edge)
-				continue
+				// If the destination already has the digest, but is pointing to
+				// a different tag, then it's an error.
+				if dp.PqinDigestMatch {
+					// NOP (already promoted).
+					klog.Infof("edge %s: skipping because it was already promoted (case 2)\n", edge)
+					continue
+				} else {
+					klog.Errorf("edge %s: tag %s: tag move detected from %s to %s", edge, edge.DstImageTag.Tag, edge.Digest, *sc.getDigestForTag(edge.DstImageTag.Tag))
+					clean = false
+					continue
+				}
 			} else {
 				// Pqin points to the wrong digest.
 				klog.Warningf("edge %s: tag %s points to the wrong digest; moving\n, dp.BadDigest")
@@ -384,7 +394,7 @@ func (sc *SyncContext) getPromotionCandidates(
 			if dp.DigestExists {
 				// Digest exists in dst, but the pqin we desire does not
 				// exist. Just add the pqin to this existing digest.
-				klog.Infof("edge %s: digest %s already exists, but does not have the pqin we want (%s)\n", edge, dp.OtherTags)
+				klog.Infof("edge %s: digest %q already exists, but does not have the pqin we want (%s)\n", edge, edge.Digest, dp.OtherTags)
 			} else {
 				// Neither the digest nor the pqin exists in dst.
 				klog.Infof("edge %s: regular promotion (neither digest nor pqin exists in dst)\n", edge)
@@ -394,7 +404,22 @@ func (sc *SyncContext) getPromotionCandidates(
 		toPromote[edge] = nil
 	}
 
-	return toPromote
+	return toPromote, clean
+}
+
+func (sc *SyncContext) getDigestForTag(inputTag Tag) *Digest {
+	for _, rii := range sc.Inv {
+		for _, digestTags := range rii {
+			for digest, tagSlice := range digestTags {
+				for _, tag := range tagSlice {
+					if tag == inputTag {
+						return &digest
+					}
+				}
+			}
+		}
+	}
+	return nil
 }
 
 // checkOverlappingEdges checks to ensure that all the edges taken together as a
@@ -1716,9 +1741,8 @@ func mkPopulateRequestsForPromotionEdges(
 			if dp.PqinExists {
 				if !dp.DigestExists {
 					// Pqin points to the wrong digest.
-					klog.Warningf("edge %s: tag %s points to the wrong digest; moving\n, dp.BadDigest")
-					tp = Move
-					oldDigest = dp.BadDigest
+					klog.Error("edge %s: tag %s points to the wrong digest %s; however tag moves are not supported\n", promoteMe, promoteMe.DstImageTag.Tag, promoteMe.Digest)
+					continue
 				}
 			}
 
@@ -1753,7 +1777,6 @@ func mkPopulateRequestsForPromotionEdges(
 			}
 			wg.Add(1)
 			reqs <- req
-
 		}
 	}
 }
@@ -1762,7 +1785,7 @@ func mkPopulateRequestsForPromotionEdges(
 func (sc *SyncContext) FilterPromotionEdges(
 	edges map[PromotionEdge]interface{},
 	readRepos bool,
-) map[PromotionEdge]interface{} {
+) (map[PromotionEdge]interface{}, bool) {
 
 	if readRepos {
 		regs := getRegistriesToRead(edges)
@@ -1916,8 +1939,8 @@ func (sc *SyncContext) Promote(
 			var stderrReader io.Reader
 
 			rpr := req.RequestParams.(PromotionRequest)
-			if rpr.TagOp == Move || rpr.TagOp == Add {
-
+			switch rpr.TagOp {
+			case Add:
 				srcVertex := ToFQIN(rpr.RegistrySrc, rpr.ImageNameSrc, rpr.Digest)
 
 				var dstVertex string
@@ -1943,8 +1966,9 @@ func (sc *SyncContext) Promote(
 						Context: "running writeImage()",
 						Error:   err})
 				}
-
-			} else {
+			case Move:
+				klog.Infof("tag moves are no longer supported")
+			case Delete:
 				stdoutReader, stderrReader, err = req.StreamProducer.Produce()
 				if err != nil {
 					errors = append(errors, Error{
@@ -1975,6 +1999,7 @@ func (sc *SyncContext) Promote(
 						Error:   err})
 				}
 			}
+
 			reqRes.Errors = errors
 			requestResults <- reqRes
 			wg.Add(-1)

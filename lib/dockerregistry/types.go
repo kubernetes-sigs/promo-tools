@@ -148,8 +148,9 @@ const (
 	// overwrite (we are only adding tags).
 	Add TagOp = iota
 	// Move represents those tags that conflict with existing digests, and so
-	// must be move to re-point to the digest that we want to promote as defined
-	// in the manifest. It can be thought of a Delete followed by an Add.
+	// should be moved to re-point to the digest that we want to promote as
+	// defined in the manifest. It can be thought of a Delete followed by an
+	// Add.
 	Move = iota
 	// Delete represents those tags that are not in the manifest and should thus
 	// be removed and deleted. This is a kind of "demotion".

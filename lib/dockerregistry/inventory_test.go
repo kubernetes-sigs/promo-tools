@@ -1662,22 +1662,32 @@ func TestToPromotionEdges(t *testing.T) {
 		Inv: MasterInventory{
 			"gcr.io/foo": RegInvImage{
 				"a": DigestTags{
-					"sha256:000": TagSlice{"0.9"}}},
+					"sha256:000": TagSlice{"0.9"}},
+				"c": DigestTags{
+					"sha256:222": TagSlice{"2.0"},
+					"sha256:333": TagSlice{"3.0"}}},
 			"gcr.io/bar": RegInvImage{
 				"a": DigestTags{
 					"sha256:000": TagSlice{"0.9"}},
 				"b": DigestTags{
-					"sha256:111": TagSlice{}}},
+					"sha256:111": TagSlice{}},
+				"c": DigestTags{
+					"sha256:222": TagSlice{"2.0"},
+					"sha256:333": TagSlice{"3.0"}}},
 			"gcr.io/cat": RegInvImage{
 				"a": DigestTags{
-					"sha256:000": TagSlice{"0.9"}}}}}
+					"sha256:000": TagSlice{"0.9"}},
+				"c": DigestTags{
+					"sha256:222": TagSlice{"2.0"},
+					"sha256:333": TagSlice{"3.0"}}}}}
 
 	var tests = []struct {
-		name               string
-		input              []Manifest
-		expectedInitial    map[PromotionEdge]interface{}
-		expectedInitialErr error
-		expectedFiltered   map[PromotionEdge]interface{}
+		name                  string
+		input                 []Manifest
+		expectedInitial       map[PromotionEdge]interface{}
+		expectedInitialErr    error
+		expectedFiltered      map[PromotionEdge]interface{}
+		expectedFilteredClean bool
 	}{
 		{
 			"Basic case (1 new edge; already promoted)",
@@ -1705,6 +1715,7 @@ func TestToPromotionEdges(t *testing.T) {
 			},
 			nil,
 			make(map[PromotionEdge]interface{}),
+			true,
 		},
 		{
 			"Basic case (2 new edges; already promoted)",
@@ -1742,6 +1753,66 @@ func TestToPromotionEdges(t *testing.T) {
 			},
 			nil,
 			make(map[PromotionEdge]interface{}),
+			true,
+		},
+		{
+			"Tag move (tag swap image c:2.0 and c:3.0)",
+			[]Manifest{
+				{
+					Registries: registries2,
+					Images: []Image{
+						{
+							ImageName: "c",
+							Dmap: DigestTags{
+								"sha256:222": TagSlice{"3.0"},
+								"sha256:333": TagSlice{"2.0"}}}},
+					srcRegistry: &srcRC},
+			},
+			map[PromotionEdge]interface{}{
+				{
+					SrcRegistry: srcRC,
+					SrcImageTag: ImageTag{
+						ImageName: "c",
+						Tag:       "2.0"},
+					Digest:      "sha256:333",
+					DstRegistry: destRC,
+					DstImageTag: ImageTag{
+						ImageName: "c",
+						Tag:       "2.0"}}: nil,
+				{
+					SrcRegistry: srcRC,
+					SrcImageTag: ImageTag{
+						ImageName: "c",
+						Tag:       "3.0"},
+					Digest:      "sha256:222",
+					DstRegistry: destRC,
+					DstImageTag: ImageTag{
+						ImageName: "c",
+						Tag:       "3.0"}}: nil,
+				{
+					SrcRegistry: srcRC,
+					SrcImageTag: ImageTag{
+						ImageName: "c",
+						Tag:       "2.0"},
+					Digest:      "sha256:333",
+					DstRegistry: destRC2,
+					DstImageTag: ImageTag{
+						ImageName: "c",
+						Tag:       "2.0"}}: nil,
+				{
+					SrcRegistry: srcRC,
+					SrcImageTag: ImageTag{
+						ImageName: "c",
+						Tag:       "3.0"},
+					Digest:      "sha256:222",
+					DstRegistry: destRC2,
+					DstImageTag: ImageTag{
+						ImageName: "c",
+						Tag:       "3.0"}}: nil,
+			},
+			nil,
+			make(map[PromotionEdge]interface{}),
+			false,
 		},
 	}
 
@@ -1758,9 +1829,12 @@ func TestToPromotionEdges(t *testing.T) {
 		err = checkEqual(gotErr, test.expectedInitialErr)
 		checkError(t, err, fmt.Sprintf("checkError: test: %v (ToPromotionEdges (error mismatch)\n", test.name))
 
-		got = sc.getPromotionCandidates(got)
+		got, gotClean := sc.getPromotionCandidates(got)
 		err = checkEqual(got, test.expectedFiltered)
 		checkError(t, err, fmt.Sprintf("checkError: test: %v (getPromotionCandidates)\n", test.name))
+
+		err = checkEqual(gotClean, test.expectedFilteredClean)
+		checkError(t, err, fmt.Sprintf("checkError: test: %v (getPromotionCandidates (cleanliness mismatch)\n", test.name))
 	}
 }
 
@@ -1989,11 +2063,12 @@ func TestPromotion(t *testing.T) {
 		srcRC}
 
 	var tests = []struct {
-		name         string
-		inputM       Manifest
-		inputSc      SyncContext
-		badReads     []RegistryName
-		expectedReqs CapturedRequests
+		name                  string
+		inputM                Manifest
+		inputSc               SyncContext
+		badReads              []RegistryName
+		expectedReqs          CapturedRequests
+		expectedFilteredClean bool
 	}{
 		{
 			// TODO: Use quickcheck to ensure certain properties.
@@ -2002,6 +2077,7 @@ func TestPromotion(t *testing.T) {
 			SyncContext{},
 			nil,
 			CapturedRequests{},
+			true,
 		},
 		{
 			"No promotion; tag is already promoted",
@@ -2028,6 +2104,7 @@ func TestPromotion(t *testing.T) {
 							"sha256:000": TagSlice{"0.9"}}}}},
 			nil,
 			CapturedRequests{},
+			true,
 		},
 		{
 			"No promotion; network errors reading from src registry for all images",
@@ -2053,6 +2130,7 @@ func TestPromotion(t *testing.T) {
 				InvIgnore: []ImageName{}},
 			[]RegistryName{"gcr.io/foo/a", "gcr.io/foo/b", "gcr.io/foo/c"},
 			CapturedRequests{},
+			true,
 		},
 		{
 			"Promote 1 tag; image digest does not exist in dest",
@@ -2085,6 +2163,7 @@ func TestPromotion(t *testing.T) {
 				ImageNameDest:  "a",
 				Digest:         "sha256:000",
 				Tag:            "0.9"}: 1},
+			true,
 		},
 		{
 			"Promote 1 tag; image already exists in dest, but digest does not",
@@ -2117,6 +2196,7 @@ func TestPromotion(t *testing.T) {
 				ImageNameDest:  "a",
 				Digest:         "sha256:000",
 				Tag:            "0.9"}: 1},
+			true,
 		},
 		{
 			"Promote 1 tag; tag already exists in dest but is pointing to a different digest (move tag)",
@@ -2126,30 +2206,30 @@ func TestPromotion(t *testing.T) {
 					{
 						ImageName: "a",
 						Dmap: DigestTags{
-							"sha256:000": TagSlice{"0.9"}}}},
+							// sha256:bad is a bad image uploaded by a
+							// compromised account. "good" is a good tag that is
+							// already known and used for this image "a" (and in
+							// both gcr.io/bar and gcr.io/cat, point to a known
+							// good digest, 600d.).
+							"sha256:bad": TagSlice{"good"}}}},
 				srcRegistry: &srcRC},
 			SyncContext{
 				Inv: MasterInventory{
 					"gcr.io/foo": RegInvImage{
 						"a": DigestTags{
-							"sha256:000": TagSlice{"0.9"}}},
+							// Malicious image.
+							"sha256:bad": TagSlice{"some-other-tag"}}},
 					"gcr.io/bar": RegInvImage{
 						"a": DigestTags{
-							"sha256:111": TagSlice{"0.9"}}},
+							"sha256:bad":  TagSlice{"some-other-tag"},
+							"sha256:600d": TagSlice{"good"}}},
 					"gcr.io/cat": RegInvImage{
 						"a": DigestTags{
-							"sha256:000": TagSlice{"0.9"}}}}},
+							"sha256:bad":  TagSlice{"some-other-tag"},
+							"sha256:600d": TagSlice{"good"}}}}},
 			nil,
-			CapturedRequests{PromotionRequest{
-				TagOp:          Move,
-				RegistrySrc:    srcRegName,
-				RegistryDest:   registries[0].Name,
-				ServiceAccount: registries[0].ServiceAccount,
-				ImageNameSrc:   "a",
-				ImageNameDest:  "a",
-				Digest:         "sha256:000",
-				DigestOld:      "sha256:111",
-				Tag:            "0.9"}: 1},
+			CapturedRequests{},
+			false,
 		},
 		{
 			"Promote 1 tag as a 'rebase'",
@@ -2180,6 +2260,7 @@ func TestPromotion(t *testing.T) {
 				ImageNameDest:  "a",
 				Digest:         "sha256:000",
 				Tag:            "0.9"}: 1},
+			true,
 		},
 		{
 			"Promote 1 digest (tagless promotion)",
@@ -2215,6 +2296,7 @@ func TestPromotion(t *testing.T) {
 					Digest:         "sha256:000",
 					Tag:            ""}: 1,
 			},
+			true,
 		},
 		{
 			"NOP; dest has extra tag, but NOP because -delete-extra-tags NOT specified",
@@ -2239,6 +2321,7 @@ func TestPromotion(t *testing.T) {
 							"sha256:000": TagSlice{"0.9"}}}}},
 			nil,
 			CapturedRequests{},
+			true,
 		},
 		{
 			"NOP (src registry does not have any of the images we want to promote)",
@@ -2268,6 +2351,7 @@ func TestPromotion(t *testing.T) {
 							"sha256:333": TagSlice{"0.8"}}}}},
 			nil,
 			CapturedRequests{},
+			true,
 		},
 		{
 			"Add 1 tag for 2 registries",
@@ -2311,6 +2395,7 @@ func TestPromotion(t *testing.T) {
 					Digest:         "sha256:000",
 					Tag:            "1.0"}: 1,
 			},
+			true,
 		},
 		{
 			"Add 1 tag for 1 registry",
@@ -2346,6 +2431,7 @@ func TestPromotion(t *testing.T) {
 					Digest:         "sha256:000",
 					Tag:            "1.0"}: 1,
 			},
+			true,
 		},
 	}
 
@@ -2391,9 +2477,12 @@ func TestPromotion(t *testing.T) {
 		eqErr := checkEqual(err, nil)
 		checkError(t, eqErr, fmt.Sprintf("Test: %v: (unexpected error getting promotion edges)\n", test.name))
 
-		filteredEdges := test.inputSc.FilterPromotionEdges(
+		filteredEdges, gotClean := test.inputSc.FilterPromotionEdges(
 			edges,
 			false)
+		err = checkEqual(gotClean, test.expectedFilteredClean)
+		checkError(t, err, fmt.Sprintf("checkError: test: %v (edge filtering cleanliness mismatch)\n", test.name))
+
 		test.inputSc.Promote(
 			filteredEdges,
 			nopStream,
