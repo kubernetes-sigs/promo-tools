@@ -24,6 +24,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 
 	git "gopkg.in/src-d/go-git.v4"
 	"gopkg.in/src-d/go-git.v4/plumbing"
@@ -221,6 +222,11 @@ func ParsePubSubMessage(r *http.Request) (*reg.GCRPubSubPayload, error) {
 // other.
 // nolint[funlen]
 func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println("stacktrace from panic: \n" + string(debug.Stack()))
+		}
+	}()
 	// (1) Parse request payload.
 	gcrPayload, err := ParsePubSubMessage(r)
 	if err != nil {
@@ -230,7 +236,7 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 		msg := fmt.Sprintf("TRANSACTION REJECTED: parse failure: %v", err)
 		klog.Errorf(msg)
 		_, _ = w.Write([]byte(msg))
-		return
+		panic(msg)
 	}
 
 	// (2) Re-pull the existing git repo (or clone it if it doesn't exist).
@@ -285,4 +291,5 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 	// "Terminating" the auditing here simplifies debugging as well, because the
 	// same message is not repeated over and over again in the logs.
 	_, _ = w.Write([]byte(msg))
+	panic(msg)
 }
