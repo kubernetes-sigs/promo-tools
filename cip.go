@@ -129,6 +129,10 @@ func main() {
 		"audit-manifest-path",
 		os.Getenv("CIP_AUDIT_MANIFEST_REPO_MANIFEST_DIR"),
 		"path (relative to the root of -audit-manifest-repo) to the manifests directory")
+	auditGcpProjectID := flag.String(
+		"audit-gcp-project-id",
+		os.Getenv("CIP_AUDIT_GCP_PROJECT_ID"),
+		"GCP project ID (name); used for labeling error reporting logs to GCP")
 	flag.Parse()
 
 	if len(os.Args) == 1 {
@@ -148,7 +152,7 @@ func main() {
 	}
 
 	if *auditorPtr {
-		audit.Auditor(*auditManifestRepoUrlPtr, *auditManifestRepoBranchPtr, *auditManifestPathPtr)
+		audit.Auditor(*auditGcpProjectID, *auditManifestRepoUrlPtr, *auditManifestRepoBranchPtr, *auditManifestPathPtr)
 	}
 
 	// Activate service accounts.

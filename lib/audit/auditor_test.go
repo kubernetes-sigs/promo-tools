@@ -112,7 +112,7 @@ func TestParsePubSubMessage(t *testing.T) {
 			reg.GCRPubSubPayload{
 				Action: "DELETE",
 				Digest: "gcr.io/foo/bar@sha256:0000000000000000000000000000000000000000000000000000000000000000"},
-			fmt.Errorf("TRANSACTION REJECTED: {DELETE gcr.io/foo/bar@sha256:0000000000000000000000000000000000000000000000000000000000000000 }: deletions are prohibited"),
+			fmt.Errorf("{DELETE gcr.io/foo/bar@sha256:0000000000000000000000000000000000000000000000000000000000000000 }: deletions are prohibited"),
 		},
 		{
 			reg.GCRPubSubPayload{

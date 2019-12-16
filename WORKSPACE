@@ -1053,13 +1053,6 @@ go_repository(
 )
 
 go_repository(
-    name = "io_rsc_binaryregexp",
-    importpath = "rsc.io/binaryregexp",
-    sum = "h1:HfqmD5MEmC0zvwBuF187nq9mdnXjXsSivRiXN7SmRkE=",
-    version = "v0.2.0",
-)
-
-go_repository(
     name = "org_golang_google_api",
     importpath = "google.golang.org/api",
     sum = "h1:n/qM3q0/rV2F0pox7o0CvNhlPvZAo7pLbef122cbLJ0=",
@@ -1190,4 +1183,11 @@ go_repository(
     importpath = "gotest.tools",
     sum = "h1:VsBPFP1AI068pPrMxtb/S8Zkgf9xEmTLJjfM+P5UIEo=",
     version = "v2.2.0+incompatible",
+)
+
+go_repository(
+    name = "com_google_cloud_go_logging",
+    importpath = "cloud.google.com/go/logging",
+    sum = "h1:kaunpnoEh9L4hu6JUsBa8Y20LBfKnCuDhKUgdZp7oK8=",
+    version = "v1.0.0",
 )

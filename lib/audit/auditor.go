@@ -17,6 +17,7 @@ limitations under the License.
 package audit
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -26,21 +27,24 @@ import (
 	"path/filepath"
 	"runtime/debug"
 
+	"cloud.google.com/go/errorreporting"
+	"cloud.google.com/go/logging"
 	git "gopkg.in/src-d/go-git.v4"
 	"gopkg.in/src-d/go-git.v4/plumbing"
 	"k8s.io/klog"
-
 	reg "sigs.k8s.io/k8s-container-image-promoter/lib/dockerregistry"
 )
 
 // ServerContext holds all of the initialization data for the server to start
 // up.
 type ServerContext struct {
-	RepoURL             *url.URL
-	RepoBranch          string
-	ThinManifestDirPath string
-	Repo                *git.Repository
-	RepoPath            string
+	RepoURL              *url.URL
+	RepoBranch           string
+	ThinManifestDirPath  string
+	Repo                 *git.Repository
+	RepoPath             string
+	ErrorReportingClient *errorreporting.Client
+	LogClient            *logging.Client
 }
 
 // PubSubMessageInner is the inner struct that holds the actual Pub/Sub
@@ -57,7 +61,7 @@ type PubSubMessage struct {
 }
 
 func initServerContext(
-	repoURLStr, branch, path string,
+	gcpProjectID, repoURLStr, branch, path string,
 ) (*ServerContext, error) {
 
 	repoURL, err := url.Parse(repoURLStr)
@@ -71,27 +75,71 @@ func initServerContext(
 		return nil, err
 	}
 
+	erc := initErrorReportingClient(gcpProjectID)
+	logClient := initLogClient(gcpProjectID)
+
 	serverContext := ServerContext{
-		RepoURL:             repoURL,
-		RepoBranch:          branch,
-		ThinManifestDirPath: path,
-		Repo:                r,
-		RepoPath:            repoPath,
+		RepoURL:              repoURL,
+		RepoBranch:           branch,
+		ThinManifestDirPath:  path,
+		Repo:                 r,
+		RepoPath:             repoPath,
+		ErrorReportingClient: erc,
+		LogClient:            logClient,
 	}
 
 	return &serverContext, nil
 }
 
+// initLogClient creates a logging client that performs better logging than the
+// default behavior on GCP Stackdriver. For instance, logs sent with this client
+// are not split up over newlines, and also the severity levels are actually
+// understood by Stackdriver.
+func initLogClient(projectID string) *logging.Client {
+
+	ctx := context.Background()
+
+	// Creates a client.
+	client, err := logging.NewClient(ctx, projectID)
+	if err != nil {
+		klog.Fatalf("Failed to create client: %v", err)
+	}
+
+	return client
+}
+
+func initErrorReportingClient(projectID string) *errorreporting.Client {
+
+	ctx := context.Background()
+
+	erc, err := errorreporting.NewClient(ctx, projectID, errorreporting.Config{
+		ServiceName: "cip-auditor",
+		OnError: func(err error) {
+			klog.Errorf("Could not log error: %v", err)
+		},
+	})
+	if err != nil {
+		klog.Fatalf("Failed to create errorreporting client: %v", err)
+	}
+
+	return erc
+}
+
 // Auditor runs an HTTP server.
-func Auditor(repoURL, branch, path string) {
+func Auditor(gcpProjectID, repoURL, branch, path string) {
 	klog.Info("Starting Auditor")
-	serverContext, err := initServerContext(repoURL, branch, path)
+	serverContext, err := initServerContext(gcpProjectID, repoURL, branch, path)
 	if err != nil {
 		klog.Exitln(err)
 	}
 
 	klog.Infoln(serverContext)
 	klog.Infoln(serverContext.Repo)
+
+	// nolint[errcheck]
+	defer serverContext.LogClient.Close()
+	// nolint[errcheck]
+	defer serverContext.ErrorReportingClient.Close()
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		serverContext.Audit(w, r)
@@ -118,7 +166,7 @@ func cloneToTempDir(
 
 	r, err := git.PlainClone(tdir, false, &git.CloneOptions{
 		URL:           repoURL.String(),
-		ReferenceName: (plumbing.ReferenceName)(branch),
+		ReferenceName: (plumbing.ReferenceName)("refs/heads/" + branch),
 	})
 	if err != nil {
 		return nil, "", err
@@ -149,11 +197,17 @@ func cloneOrPull(repoURL fmt.Stringer,
 
 		klog.Info("pulling")
 		err = wt.Pull(&git.PullOptions{RemoteName: "origin"})
-		if err != nil && err != git.NoErrAlreadyUpToDate {
+		switch err {
+		case git.NoErrAlreadyUpToDate:
+			fallthrough
+		case git.ErrNonFastForwardUpdate:
+			fallthrough
+		case nil:
+			klog.Info("pull OK")
+		default:
 			klog.Error(err)
 			return r, repoPath, err
 		}
-		klog.Info("pull OK")
 
 		sha, err := getHeadSha(r)
 		if err == nil {
@@ -207,7 +261,7 @@ func ParsePubSubMessage(r *http.Request) (*reg.GCRPubSubPayload, error) {
 		// Even though this is an error, we successfully processed this message,
 		// so exit with an error.
 		return nil, fmt.Errorf(
-			"TRANSACTION REJECTED: %v: deletions are prohibited", gcrPayload)
+			"%v: deletions are prohibited", gcrPayload)
 	case "INSERT":
 		return &gcrPayload, nil
 	default:
@@ -222,9 +276,24 @@ func ParsePubSubMessage(r *http.Request) (*reg.GCRPubSubPayload, error) {
 // other.
 // nolint[funlen]
 func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
+	logInfo := s.LogClient.Logger("audit-log").StandardLogger(logging.Info)
+	logError := s.LogClient.Logger("audit-log").StandardLogger(logging.Error)
+	logAlert := s.LogClient.Logger("audit-log").StandardLogger(logging.Alert)
+
 	defer func() {
-		if r := recover(); r != nil {
-			fmt.Println("stacktrace from panic: \n" + string(debug.Stack()))
+		if msg := recover(); msg != nil {
+			panicStr := msg.(string)
+
+			stacktrace := debug.Stack()
+
+			s.ErrorReportingClient.Report(errorreporting.Entry{
+				Req:   r,
+				Error: fmt.Errorf("%s", panicStr),
+				Stack: stacktrace,
+			})
+
+			logAlert.Printf("%s\n%s\n", panicStr, string(stacktrace))
+
 		}
 	}()
 	// (1) Parse request payload.
@@ -234,7 +303,6 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 		// notifies us of any changes in how the messages are created in the
 		// first place.
 		msg := fmt.Sprintf("TRANSACTION REJECTED: parse failure: %v", err)
-		klog.Errorf(msg)
 		_, _ = w.Write([]byte(msg))
 		panic(msg)
 	}
@@ -242,7 +310,7 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 	// (2) Re-pull the existing git repo (or clone it if it doesn't exist).
 	s.Repo, s.RepoPath, err = cloneOrPull(s.RepoURL, s.RepoBranch, s.RepoPath)
 	if err != nil {
-		klog.Error(err)
+		logError.Println(err)
 		// Return an HTTP error, so that this pubsub message may get retried
 		// (this is the behavior of Cloud Run). We need to retry it because a
 		// well-formed request should not fail to be processed because of a
@@ -252,18 +320,18 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Debug info.
-	klog.Infof("gcrPayload: %v", gcrPayload)
-	klog.Infof("s.RepoURL: %v", s.RepoURL)
-	klog.Infof("s.RepoBranch: %v", s.RepoBranch)
-	klog.Infof("s.ThinManifestDirPath: %v", s.ThinManifestDirPath)
-	klog.Infof("s.Repo: %v", s.Repo)
-	klog.Infof("s.RepoPath: %v", s.RepoPath)
+	logInfo.Printf("gcrPayload: %v", gcrPayload)
+	logInfo.Printf("s.RepoURL: %v", s.RepoURL)
+	logInfo.Printf("s.RepoBranch: %v", s.RepoBranch)
+	logInfo.Printf("s.ThinManifestDirPath: %v", s.ThinManifestDirPath)
+	logInfo.Printf("s.Repo: %v", s.Repo)
+	logInfo.Printf("s.RepoPath: %v", s.RepoPath)
 
 	mfests, err := reg.ParseManifestsFromDir(
 		filepath.Join(s.RepoPath, s.ThinManifestDirPath),
 		reg.ParseThinManifestFromFile)
 	if err != nil {
-		klog.Error(err)
+		logError.Println(err)
 		// Similar to the error from cloneOrPull(), respond with an HTTP error
 		// so that the Pub/Sub message may be retried. This gracefully handles
 		// the case where the Pub/Sub message is well-formed, but the promoter
@@ -278,7 +346,7 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 		if mfest.Contains(*gcrPayload) {
 			msg := fmt.Sprintf(
 				"TRANSACTION VERIFIED: %v: agrees with manifest\n", gcrPayload)
-			klog.Info(msg)
+			logInfo.Println(msg)
 			_, _ = w.Write([]byte(msg))
 			return
 		}
@@ -286,7 +354,6 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 
 	msg := fmt.Sprintf(
 		"TRANSACTION REJECTED: %v: could not validate", gcrPayload)
-	klog.Error(msg)
 	// Return 200 OK, because we don't want to re-process this transaction.
 	// "Terminating" the auditing here simplifies debugging as well, because the
 	// same message is not repeated over and over again in the logs.
