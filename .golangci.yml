@@ -70,5 +70,6 @@ issues:
     - dupl
     - errcheck
     - funlen
+    - gomnd
     - lll
     - staticcheck

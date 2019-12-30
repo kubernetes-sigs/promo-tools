@@ -58,6 +58,10 @@ type PubSubMessage struct {
 	Subscription string             `json:"subscription"`
 }
 
+const (
+	cloneDepth = 1
+)
+
 func initServerContext(
 	gcpProjectID, repoURLStr, branch, path string,
 ) (*ServerContext, error) {
@@ -156,7 +160,7 @@ func cloneToTempDir(
 	r, err := git.PlainClone(tdir, false, &git.CloneOptions{
 		URL:           repoURL.String(),
 		ReferenceName: (plumbing.ReferenceName)("refs/heads/" + branch),
-		Depth:         1,
+		Depth:         cloneDepth,
 	})
 	if err != nil {
 		return "", err

@@ -231,6 +231,7 @@ func getBazelOption(repoRoot, o string) string {
 	for _, line := range strings.Split(strings.TrimSuffix(stdout, "\n"), "\n") {
 		if strings.Contains(line, o) {
 			words := strings.Split(line, " ")
+			// nolint[gomnd]
 			if len(words) == 2 {
 				return words[1]
 			}
