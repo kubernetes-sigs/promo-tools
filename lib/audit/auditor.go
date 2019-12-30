@@ -167,6 +167,7 @@ func cloneToTempDir(
 	r, err := git.PlainClone(tdir, false, &git.CloneOptions{
 		URL:           repoURL.String(),
 		ReferenceName: (plumbing.ReferenceName)("refs/heads/" + branch),
+		Depth:         1,
 	})
 	if err != nil {
 		return nil, "", err
