@@ -2858,6 +2858,98 @@ func TestParseContainerParts(t *testing.T) {
 	}
 }
 
+func TestContains(t *testing.T) {
+	inputMfest := Manifest{
+		Registries: []RegistryContext{
+			{
+				Name:           "gcr.io/foo-staging",
+				ServiceAccount: "sa@robot.com",
+				Src:            true,
+			},
+			{
+				Name:           "us.gcr.io/some-prod",
+				ServiceAccount: "sa@robot.com",
+			},
+			{
+				Name:           "eu.gcr.io/some-prod",
+				ServiceAccount: "sa@robot.com",
+			},
+			{
+				Name:           "asia.gcr.io/some-prod",
+				ServiceAccount: "sa@robot.com",
+			},
+		},
+		Images: []Image{
+			{ImageName: "foo-controller",
+				Dmap: DigestTags{
+					"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": {"1.0"},
+				},
+			},
+		},
+		filepath: "a/promoter-manifest.yaml"}
+	var tests = []struct {
+		name             string
+		mfest            Manifest
+		gcrPayload       GCRPubSubPayload
+		expectedContains bool
+	}{
+		{
+			"INSERT message contains both Digest and Tag",
+			inputMfest,
+			GCRPubSubPayload{
+				Action: "INSERT",
+				Digest: "us.gcr.io/some-prod/foo-controller@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+				Tag:    "us.gcr.io/some-prod/foo-controller:1.0",
+			},
+			true,
+		},
+		{
+			"INSERT message only contains Digest",
+			inputMfest,
+			GCRPubSubPayload{
+				Action: "INSERT",
+				Digest: "us.gcr.io/some-prod/foo-controller@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			},
+			true,
+		},
+		{
+			"INSERT's digest is not in Manifest (digest only)",
+			inputMfest,
+			GCRPubSubPayload{
+				Action: "INSERT",
+				Digest: "us.gcr.io/some-prod/foo-controller@sha256:000",
+			},
+			false,
+		},
+		{
+			"INSERT's digest is not in Manifest (tag specified)",
+			inputMfest,
+			GCRPubSubPayload{
+				Action: "INSERT",
+				Digest: "us.gcr.io/some-prod/foo-controller@sha256:000",
+				Tag:    "us.gcr.io/some-prod/foo-controller:1.0",
+			},
+			false,
+		},
+		{
+			"INSERT's digest is not in Manifest (tag specified)",
+			inputMfest,
+			GCRPubSubPayload{
+				Action: "INSERT",
+				Digest: "us.gcr.io/some-prod/foo-controller@sha256:000",
+				Tag:    "us.gcr.io/some-prod/foo-controller:1.0",
+			},
+			false,
+		},
+	}
+
+	for _, test := range tests {
+		contains := test.mfest.Contains(test.gcrPayload)
+		errEqual := checkEqual(contains, test.expectedContains)
+		checkError(t, errEqual, fmt.Sprintf("checkError: test %q: shouldBeValid\n", test.name))
+	}
+}
+
 // Helper functions.
 
 func bazelTestPath(testName string, paths ...string) string {

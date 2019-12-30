@@ -2378,3 +2378,43 @@ func GetDeleteCmd(
 		useServiceAccount,
 		cmd)
 }
+
+// Contains checks whether a given Manifest mentions the contents of a
+// gcrPayload (re-interpreted as a FQIN or PQIN).
+// nolint[gocyclo]
+func (m Manifest) Contains(gcrPayload GCRPubSubPayload) bool {
+	fqinOnly := len(gcrPayload.Tag) == 0
+
+	for _, rc := range m.Registries {
+		if rc.Src {
+			continue
+		}
+		// Speed up the search by skipping over registry names whose leading
+		// characters do not match.
+		if !strings.HasPrefix(gcrPayload.Digest, (string)(rc.Name)) {
+			continue
+		}
+
+		for _, image := range m.Images {
+			if !strings.Contains(gcrPayload.Digest, (string)(image.ImageName)) {
+				continue
+			}
+			for digest, tags := range image.Dmap {
+				fqin := ToFQIN(rc.Name, image.ImageName, digest)
+				if fqinOnly {
+					if gcrPayload.Digest == fqin {
+						return true
+					}
+				} else {
+					for _, tag := range tags {
+						pqin := ToPQIN(rc.Name, image.ImageName, tag)
+						if gcrPayload.Tag == pqin {
+							return gcrPayload.Digest == fqin
+						}
+					}
+				}
+			}
+		}
+	}
+	return false
+}

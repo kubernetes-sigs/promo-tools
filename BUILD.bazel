@@ -38,6 +38,30 @@ container_layer(
     files = ["docker/config.json"],
 )
 
+# Like cip-docker-image, but does not use gcloud as the base. This is because
+# the auditor does not require gcloud.
+go_image(
+    name = "cip-docker-image-no-gcloud",
+    embed = [":go_default_library"],
+    importpath = "sigs.k8s.io/k8s-container-image-promoter",
+    goarch = "amd64",
+    goos = "linux",
+    pure = "on",
+)
+
+container_image(
+    name = "cip-auditor",
+    base = ":cip-docker-image-no-gcloud",
+    entrypoint = [
+        "/app/cip-docker-image-no-gcloud.binary",
+        "-audit",
+    ],
+    env = {
+        "HOME": "/",
+    },
+    layers = [":cip-docker-creds"],
+)
+
 # Invoke with "bazel build //:cip-docker-loadable.tar". Then you can run "docker
 # load -i bazel-bin/cip-docker-loadable.tar" to load it into the local Docker
 # daemon.
@@ -46,6 +70,8 @@ container_bundle(
     images = {
         "{STABLE_IMG_REGISTRY}/{STABLE_IMG_REPOSITORY}/{STABLE_IMG_NAME}:latest": "//:cip-with-gcloud",
         "{STABLE_IMG_REGISTRY}/{STABLE_IMG_REPOSITORY}/{STABLE_IMG_NAME}:{IMG_TAG}": "//:cip-with-gcloud",
+        "{STABLE_IMG_REGISTRY}/{STABLE_IMG_REPOSITORY}/{STABLE_IMG_NAME}-auditor:latest": "//:cip-auditor",
+        "{STABLE_IMG_REGISTRY}/{STABLE_IMG_REPOSITORY}/{STABLE_IMG_NAME}-auditor:{IMG_TAG}": "//:cip-auditor",
     },
 )
 
@@ -65,6 +91,7 @@ go_library(
         "main.TimestampUtcRfc3339": "{TIMESTAMP_UTC_RFC3339}",
     },
     deps = [
+        "//lib/audit:go_default_library",
         "//lib/dockerregistry:go_default_library",
         "//lib/stream:go_default_library",
         "//pkg/gcloud:go_default_library",
