@@ -1020,6 +1020,7 @@ func GetTokenKeyDomainRepoPath(
 	s := string(registryName)
 	i := strings.IndexByte(s, '/')
 	key := ""
+	// nolint[gomnd]
 	if strings.Count(s, "/") < 2 {
 		key = s
 	} else {

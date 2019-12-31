@@ -56,6 +56,7 @@ func main() {
 	ctx := context.Background()
 	if err := cmd.RunPromoteFiles(ctx, options); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
+		// nolint[gomnd]
 		os.Exit(1)
 	} else {
 		os.Exit(0)

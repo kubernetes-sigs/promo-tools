@@ -48,6 +48,8 @@ type ExternalRequest struct {
 }
 
 // BackoffDefault is the default Backoff behavior for network call retries.
+//
+// nolint[gomnd]
 var BackoffDefault = wait.Backoff{
 	Duration: time.Second,
 	Factor:   2,

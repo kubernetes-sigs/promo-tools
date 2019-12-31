@@ -26,26 +26,21 @@ import (
 	"k8s.io/klog"
 )
 
-// Checks is from https://stackoverflow.com/a/40398093/437583.
-func Checks(fs ...func() error) {
-	for i := len(fs) - 1; i >= 0; i-- {
-		if err := fs[i](); err != nil {
-			fmt.Println("Received error:", err)
-		}
-	}
-}
-
 // HTTP is a wrapper around the net/http's Request type.
 type HTTP struct {
 	Req *http.Request
 	Res *http.Response
 }
 
+const (
+	requestTimeoutSeconds = 3
+)
+
 // Produce runs the external process and returns two io.Readers (to stdout and
 // stderr). In this case we equate the http.Respose "Body" with stdout.
 func (h *HTTP) Produce() (io.Reader, io.Reader, error) {
 	client := http.Client{
-		Timeout: time.Second * 3, // 3-second timeout
+		Timeout: time.Second * requestTimeoutSeconds,
 	}
 
 	var err error
@@ -58,7 +53,7 @@ func (h *HTTP) Produce() (io.Reader, io.Reader, error) {
 		return nil, nil, err
 	}
 
-	if h.Res.StatusCode == 200 {
+	if h.Res.StatusCode == http.StatusOK {
 		return h.Res.Body, nil, nil
 	}
 

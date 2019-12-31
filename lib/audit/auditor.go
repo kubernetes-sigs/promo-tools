@@ -41,8 +41,6 @@ type ServerContext struct {
 	RepoURL              *url.URL
 	RepoBranch           string
 	ThinManifestDirPath  string
-	Repo                 *git.Repository
-	RepoPath             string
 	ErrorReportingClient *errorreporting.Client
 	LogClient            *logging.Client
 }
@@ -60,17 +58,15 @@ type PubSubMessage struct {
 	Subscription string             `json:"subscription"`
 }
 
+const (
+	cloneDepth = 1
+)
+
 func initServerContext(
 	gcpProjectID, repoURLStr, branch, path string,
 ) (*ServerContext, error) {
 
 	repoURL, err := url.Parse(repoURLStr)
-	if err != nil {
-		return nil, err
-	}
-
-	// This creates a full-blown clone to a temp dir.
-	r, repoPath, err := cloneToTempDir(repoURL, branch)
 	if err != nil {
 		return nil, err
 	}
@@ -82,8 +78,6 @@ func initServerContext(
 		RepoURL:              repoURL,
 		RepoBranch:           branch,
 		ThinManifestDirPath:  path,
-		Repo:                 r,
-		RepoPath:             repoPath,
 		ErrorReportingClient: erc,
 		LogClient:            logClient,
 	}
@@ -134,7 +128,6 @@ func Auditor(gcpProjectID, repoURL, branch, path string) {
 	}
 
 	klog.Infoln(serverContext)
-	klog.Infoln(serverContext.Repo)
 
 	// nolint[errcheck]
 	defer serverContext.LogClient.Close()
@@ -158,65 +151,27 @@ func Auditor(gcpProjectID, repoURL, branch, path string) {
 func cloneToTempDir(
 	repoURL fmt.Stringer,
 	branch string,
-) (*git.Repository, string, error) {
+) (string, error) {
 	tdir, err := ioutil.TempDir("", "k8s.io-")
 	if err != nil {
-		return nil, "", err
+		return "", err
 	}
 
 	r, err := git.PlainClone(tdir, false, &git.CloneOptions{
 		URL:           repoURL.String(),
 		ReferenceName: (plumbing.ReferenceName)("refs/heads/" + branch),
+		Depth:         cloneDepth,
 	})
 	if err != nil {
-		return nil, "", err
+		return "", err
 	}
 
 	sha, err := getHeadSha(r)
 	if err == nil {
-		klog.Infof("updated %v to revision %v", tdir, sha)
+		klog.Infof("cloned %v at revision %v", tdir, sha)
 	}
 
-	return r, tdir, nil
-}
-
-// Check if the given path already has a git repository. If it does, just use
-// that. Otherwise, clone a repo to a new temporary path.
-func cloneOrPull(repoURL fmt.Stringer,
-	branch,
-	repoPath string,
-) (*git.Repository, string, error) {
-	r, err := git.PlainOpen(repoPath)
-	if err == nil {
-		// Pull
-		wt, err := r.Worktree()
-		if err != nil {
-			klog.Error("worktree error!! can't retrieve it!", err)
-			return r, repoPath, err
-		}
-
-		klog.Info("pulling")
-		err = wt.Pull(&git.PullOptions{RemoteName: "origin"})
-		switch err {
-		case git.NoErrAlreadyUpToDate:
-			fallthrough
-		case git.ErrNonFastForwardUpdate:
-			fallthrough
-		case nil:
-			klog.Info("pull OK")
-		default:
-			klog.Error(err)
-			return r, repoPath, err
-		}
-
-		sha, err := getHeadSha(r)
-		if err == nil {
-			klog.Infof("updated %v to revision %v", repoPath, sha)
-		}
-		return r, repoPath, nil
-	}
-
-	return cloneToTempDir(repoURL, branch)
+	return tdir, nil
 }
 
 func getHeadSha(repo *git.Repository) (string, error) {
@@ -307,8 +262,9 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 		panic(msg)
 	}
 
-	// (2) Re-pull the existing git repo (or clone it if it doesn't exist).
-	s.Repo, s.RepoPath, err = cloneOrPull(s.RepoURL, s.RepoBranch, s.RepoPath)
+	// (2) Clone fresh repo.
+	var repoPath string
+	repoPath, err = cloneToTempDir(s.RepoURL, s.RepoBranch)
 	if err != nil {
 		logError.Println(err)
 		// Return an HTTP error, so that this pubsub message may get retried
@@ -324,21 +280,29 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 	logInfo.Printf("s.RepoURL: %v", s.RepoURL)
 	logInfo.Printf("s.RepoBranch: %v", s.RepoBranch)
 	logInfo.Printf("s.ThinManifestDirPath: %v", s.ThinManifestDirPath)
-	logInfo.Printf("s.Repo: %v", s.Repo)
-	logInfo.Printf("s.RepoPath: %v", s.RepoPath)
+	logInfo.Printf("s.RepoPath: %v", repoPath)
 
 	mfests, err := reg.ParseManifestsFromDir(
-		filepath.Join(s.RepoPath, s.ThinManifestDirPath),
+		filepath.Join(repoPath, s.ThinManifestDirPath),
 		reg.ParseThinManifestFromFile)
 	if err != nil {
 		logError.Println(err)
-		// Similar to the error from cloneOrPull(), respond with an HTTP error
+		// Similar to the error from cloneToTempDir(), respond with an HTTP error
 		// so that the Pub/Sub message may be retried. This gracefully handles
 		// the case where the Pub/Sub message is well-formed, but the promoter
 		// manifests are in a bad state (perhaps due to a faulty merge (e.g., a
 		// merge that forgot to remove conflict markers)).
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+
+	// Garbage-collect freshly-cloned repo (we don't need it any more).
+	err = os.RemoveAll(repoPath)
+	if err != nil {
+		// We don't really care too much about failures about removing the
+		// (temporary) repoPath directory, because we'll clone a fresh one
+		// anyway in the future.
+		klog.Errorf("Could not remove temporary Git repo %v: %v", repoPath, err)
 	}
 
 	// (3) Compare GCR state change with the intent of the promoter manifests.
