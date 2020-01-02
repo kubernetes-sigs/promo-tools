@@ -157,6 +157,19 @@ const (
 	Delete = iota
 )
 
+const (
+	// ThinManifestDepth specifies the number of items in a path if we split the
+	// path into its parts, starting from the "topmost" folder given as an
+	// argument to -thin-manifest-dir. E.g., a well-formed path is something
+	// like:
+	//
+	//  ["", "manifests", "foo", "promoter-manifests.yaml"]
+	//
+	// . This is a result of some path handling/parsing logic in
+	// ValidateThinManifestDirectoryStructure().
+	ThinManifestDepth = 4
+)
+
 // PromotionRequest contains all the information required for any type of
 // promotion (or demotion!) (involving any TagOp).
 type PromotionRequest struct {

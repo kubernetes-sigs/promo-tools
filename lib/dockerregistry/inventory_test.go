@@ -270,15 +270,19 @@ func TestParseThinManifestsFromDir(t *testing.T) {
 	var tests = []struct {
 		name string
 		// "input" is folder name, relative to the location of this source file.
-		input          string
-		expectedOutput []Manifest
-		expectedError  error
+		input              string
+		expectedOutput     []Manifest
+		expectedParseError error
 	}{
 		{
 			"No manifests found (invalid)",
 			"empty",
 			[]Manifest{},
-			fmt.Errorf("no manifests found in dir: %s/%s", pwd, "empty"),
+			&os.PathError{
+				Op:   "stat",
+				Path: filepath.Join(pwd, "empty/images"),
+				Err:  fmt.Errorf("no such file or directory"),
+			},
 		},
 		{
 			"Singleton (single manifest)",
@@ -512,7 +516,7 @@ func TestParseThinManifestsFromDir(t *testing.T) {
 			expectedModified = append(expectedModified, mfest)
 		}
 
-		got, err := ParseThinManifestsFromDir(fixtureDir)
+		got, errParse := ParseThinManifestsFromDir(fixtureDir)
 
 		// Clear private fields (redundant data) that are calculated on-the-fly
 		// (it's too verbose to include them here; besides, it's not what we're
@@ -525,11 +529,19 @@ func TestParseThinManifestsFromDir(t *testing.T) {
 
 		// Check the error as well (at the very least, we can check that the
 		// error was nil).
-		eqErr := checkEqual(err, test.expectedError)
+		var errParseStr string
+		var expectedParseErrorStr string
+		if errParse != nil {
+			errParseStr = errParse.Error()
+		}
+		if test.expectedParseError != nil {
+			expectedParseErrorStr = test.expectedParseError.Error()
+		}
+		eqErr := checkEqual(errParseStr, expectedParseErrorStr)
 		checkError(t, eqErr, fmt.Sprintf("Test: %v (error)\n", test.name))
 
 		// There is nothing more to check if we expected a parse failure.
-		if test.expectedError != nil {
+		if test.expectedParseError != nil {
 			continue
 		}
 
@@ -573,24 +585,43 @@ func TestValidateThinManifestsFromDir(t *testing.T) {
 
 	// nolint[golint]
 	var shouldBeInvalid = []struct {
-		dirName               string
-		expectedParseError    error
-		expectedValidateError error
-		expectedEdgeError     error
+		dirName            string
+		expectedParseError error
+		expectedEdgeError  error
 	}{
 		{
 			"empty",
-			fmt.Errorf("no manifests found in dir: %s", filepath.Join(pwd, "invalid/empty")),
-			nil,
+			&os.PathError{
+				Op:   "stat",
+				Path: filepath.Join(pwd, "invalid/empty/images"),
+				Err:  fmt.Errorf("no such file or directory"),
+			},
 			nil,
 		},
 		{
 
 			"overlapping-destination-vertices-different-digest",
 			nil,
-			nil,
 			fmt.Errorf(
 				"overlapping edges detected"),
+		},
+		{
+
+			"malformed-directory-tree-structure",
+			fmt.Errorf("corresponding file %q does not exist", filepath.Join(pwd, "invalid/malformed-directory-tree-structure/images/b/images.yaml")),
+			nil,
+		},
+		{
+
+			"malformed-directory-tree-structure-nested",
+			fmt.Errorf("unexpected manifest path %q", filepath.Join(pwd, "invalid/malformed-directory-tree-structure-nested/manifests/b/c/promoter-manifest.yaml")),
+			nil,
+		},
+		{
+
+			"malformed-directory-tree-structure-bad-prefix",
+			fmt.Errorf("unexpected manifest path (bad prefix) %q", filepath.Join(pwd, "invalid/malformed-directory-tree-structure-bad-prefix/manifest/b/promoter-manifest.yaml")),
+			nil,
 		},
 	}
 
@@ -602,14 +633,20 @@ func TestValidateThinManifestsFromDir(t *testing.T) {
 		// before we even get to ValidateThinManifestsFromDir(). So handle these
 		// cases as well.
 		mfests, errParse := ParseThinManifestsFromDir(fixtureDir)
-		eqErr = checkEqual(errParse, test.expectedParseError)
+
+		var errParseStr string
+		var expectedParseErrorStr string
+		if errParse != nil {
+			errParseStr = errParse.Error()
+		}
+		if test.expectedParseError != nil {
+			expectedParseErrorStr = test.expectedParseError.Error()
+		}
+		eqErr = checkEqual(errParseStr, expectedParseErrorStr)
 		checkError(
 			t,
 			eqErr,
 			fmt.Sprintf("Test: `%v' should be invalid (ParseThinManifestsFromDir)\n", test.dirName))
-		if errParse != nil {
-			continue
-		}
 
 		_, edgeErr := ToPromotionEdges(mfests)
 		eqErr = checkEqual(edgeErr, test.expectedEdgeError)

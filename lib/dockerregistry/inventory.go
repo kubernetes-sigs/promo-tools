@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"sort"
 	"strings"
@@ -205,6 +206,8 @@ func (m *Manifest) finalize() error {
 // ParseThinManifestsFromDir parses all thin Manifest files within a directory.
 // We effectively have to create a map of manifests, keyed by the source
 // registry (there can only be 1 source registry).
+//
+// nolint[funlen]
 func ParseThinManifestsFromDir(
 	dir string,
 ) ([]Manifest, error) {
@@ -213,6 +216,9 @@ func ParseThinManifestsFromDir(
 	// Check that the thin manifests dir follows a regular, predefined format.
 	// This is to ensure that there isn't any funny business going on around
 	// paths.
+	if err := ValidateThinManifestDirectoryStructure(dir); err != nil {
+		return mfests, err
+	}
 
 	var parseAsManifest filepath.WalkFunc = func(path string,
 		info os.FileInfo,
@@ -233,6 +239,21 @@ func ParseThinManifestsFromDir(
 		// scope of what is read in as a promoter manifest.
 		if filepath.Base(path) != "promoter-manifest.yaml" {
 			return nil
+		}
+
+		// If there are any files named "promoter-manifest.yaml", they must be
+		// inside a subfolder within "manifests/<dir>" --- any other paths are
+		// forbidden.
+		shortened := strings.TrimPrefix(path, dir)
+		shortenedList := strings.Split(shortened, "/")
+		if len(shortenedList) != ThinManifestDepth {
+			return fmt.Errorf("unexpected manifest path %q",
+				path)
+		}
+
+		if !reflect.DeepEqual(shortenedList[0:2], []string{"", "manifests"}) {
+			return fmt.Errorf("unexpected manifest path (bad prefix) %q",
+				path)
 		}
 
 		mfest, errParse := ParseThinManifestFromFile(path)
@@ -256,6 +277,76 @@ func ParseThinManifestsFromDir(
 	}
 
 	return mfests, nil
+}
+
+// ValidateThinManifestDirectoryStructure enforces a particular directory
+// structure for thin manifests. Most importantly, it requires that if a file
+// named "foo/manifests/bar/promoter-manifest.yaml" exists, that a corresponding
+// file named "foo/images/bar/promoter-manifest.yaml" must also exist.
+//
+// nolint[gocyclo]
+func ValidateThinManifestDirectoryStructure(
+	dir string,
+) error {
+	// First, enforce that there are directories named "images" and "manifests".
+	dirExists, err := directoryExists(filepath.Join(dir, "images"))
+	if !dirExists || err != nil {
+		return err
+	}
+
+	mfestDir := filepath.Join(dir, "manifests")
+	dirExists, err = directoryExists(mfestDir)
+	if !dirExists || err != nil {
+		return err
+	}
+
+	// For every subfolder in <dir>/manifests, ensure that a
+	// "promoter-manifest.yaml" file exists, and also that a corresponding file
+	// exists in the "images" folder.
+	files, err := ioutil.ReadDir(mfestDir)
+	if err != nil {
+		return err
+	}
+	for _, file := range files {
+		p, err := os.Stat(filepath.Join(mfestDir, file.Name()))
+		if err != nil {
+			return err
+		}
+
+		// Only check for directory files.
+		if p.IsDir() {
+			// Check if "promoter-manifest.yaml" exists here.
+			if _, err := os.Stat(
+				filepath.Join(mfestDir,
+					file.Name(),
+					"promoter-manifest.yaml")); os.IsNotExist(err) {
+				continue
+			}
+
+			// Check for corresponding images file.
+			imagesPath := filepath.Join(dir,
+				"images",
+				file.Name(), // wrong; include all parent dirs up to dir
+				"images.yaml")
+			if _, err := os.Stat(imagesPath); os.IsNotExist(err) {
+				return fmt.Errorf("corresponding file %q does not exist",
+					imagesPath)
+			}
+		}
+	}
+
+	return nil
+}
+
+func directoryExists(dir string) (bool, error) {
+	p, err := os.Stat(filepath.Join(dir))
+	if err != nil {
+		return false, err
+	}
+	if !p.IsDir() {
+		return false, fmt.Errorf("%q does not exist", dir)
+	}
+	return true, nil
 }
 
 // ToPromotionEdges converts a list of manifests to a set of edges we want to
