@@ -531,35 +531,7 @@ func TestParseManifestsFromDir(t *testing.T) {
 							},
 						},
 					},
-					filepath: "thin-manifests/a/promoter-manifest.yaml"},
-				{
-					Registries: []RegistryContext{
-						{
-							Name:           "gcr.io/cat-staging",
-							ServiceAccount: "sa@robot.com",
-							Src:            true,
-						},
-						{
-							Name:           "us.gcr.io/some-prod",
-							ServiceAccount: "sa@robot.com",
-						},
-						{
-							Name:           "eu.gcr.io/some-prod",
-							ServiceAccount: "sa@robot.com",
-						},
-						{
-							Name:           "asia.gcr.io/some-prod",
-							ServiceAccount: "sa@robot.com",
-						},
-					},
-					Images: []Image{
-						{ImageName: "cat-controller",
-							Dmap: DigestTags{
-								"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc": {"1.0"},
-							},
-						},
-					},
-					filepath: "thin-manifests/b/c/promoter-manifest.yaml"},
+					filepath: "manifests/a/promoter-manifest.yaml"},
 				{
 					Registries: []RegistryContext{
 						{
@@ -587,7 +559,35 @@ func TestParseManifestsFromDir(t *testing.T) {
 							},
 						},
 					},
-					filepath: "thin-manifests/b/promoter-manifest.yaml"},
+					filepath: "manifests/b/promoter-manifest.yaml"},
+				{
+					Registries: []RegistryContext{
+						{
+							Name:           "gcr.io/cat-staging",
+							ServiceAccount: "sa@robot.com",
+							Src:            true,
+						},
+						{
+							Name:           "us.gcr.io/some-prod",
+							ServiceAccount: "sa@robot.com",
+						},
+						{
+							Name:           "eu.gcr.io/some-prod",
+							ServiceAccount: "sa@robot.com",
+						},
+						{
+							Name:           "asia.gcr.io/some-prod",
+							ServiceAccount: "sa@robot.com",
+						},
+					},
+					Images: []Image{
+						{ImageName: "cat-controller",
+							Dmap: DigestTags{
+								"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc": {"1.0"},
+							},
+						},
+					},
+					filepath: "manifests/c/promoter-manifest.yaml"},
 				{
 					Registries: []RegistryContext{
 						{
@@ -615,7 +615,7 @@ func TestParseManifestsFromDir(t *testing.T) {
 							},
 						},
 					},
-					filepath: "thin-manifests/promoter-manifest.yaml"},
+					filepath: "manifests/d/promoter-manifest.yaml"},
 			},
 			nil,
 		},

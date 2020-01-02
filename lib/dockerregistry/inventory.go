@@ -150,13 +150,12 @@ func ParseThinManifestFromFile(filePath string) (Manifest, error) {
 		return empty, err
 	}
 
-	imagesPath := thinManifest.ImagesPath
-	// Handle a relative path for "ImagesPath", if necessary.
-	if strings.HasPrefix(thinManifest.ImagesPath, ".") {
-		imagesPath = filepath.Join(
-			filepath.Dir(filePath),
-			thinManifest.ImagesPath)
-	}
+	// Get directory name holding this thin manifest.
+	subProject := filepath.Base(filepath.Dir(filePath))
+	imagesPath := filepath.Join(filepath.Dir(filePath),
+		"../../images",
+		subProject,
+		"images.yaml")
 	images, err := ParseImagesFromFile(imagesPath)
 	if err != nil {
 		return empty, err

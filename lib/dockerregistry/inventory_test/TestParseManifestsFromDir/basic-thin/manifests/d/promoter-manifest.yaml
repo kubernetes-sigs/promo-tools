@@ -8,4 +8,3 @@ registries:
   service-account: sa@robot.com
 - name: asia.gcr.io/some-prod
   service-account: sa@robot.com
-imagesPath: "../images/root.yaml"
