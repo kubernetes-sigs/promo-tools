@@ -264,8 +264,8 @@ images:
 	}
 }
 
-func TestParseManifestsFromDir(t *testing.T) {
-	pwd := bazelTestPath("TestParseManifestsFromDir")
+func TestParseThinManifestsFromDir(t *testing.T) {
+	pwd := bazelTestPath("TestParseThinManifestsFromDir")
 
 	var tests = []struct {
 		name string
@@ -311,127 +311,8 @@ func TestParseManifestsFromDir(t *testing.T) {
 							},
 						},
 					},
-					filepath: "a/promoter-manifest.yaml",
+					filepath: "manifests/a/promoter-manifest.yaml",
 				},
-			},
-			nil,
-		},
-		{
-			"Basic (multiple manifests)",
-			"basic",
-			[]Manifest{
-				{
-					Registries: []RegistryContext{
-						{
-							Name:           "gcr.io/foo-staging",
-							ServiceAccount: "sa@robot.com",
-							Src:            true,
-						},
-						{
-							Name:           "us.gcr.io/some-prod",
-							ServiceAccount: "sa@robot.com",
-						},
-						{
-							Name:           "eu.gcr.io/some-prod",
-							ServiceAccount: "sa@robot.com",
-						},
-						{
-							Name:           "asia.gcr.io/some-prod",
-							ServiceAccount: "sa@robot.com",
-						},
-					},
-					Images: []Image{
-						{ImageName: "foo-controller",
-							Dmap: DigestTags{
-								"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": {"1.0"},
-							},
-						},
-					},
-					filepath: "a/promoter-manifest.yaml"},
-				{
-					Registries: []RegistryContext{
-						{
-							Name:           "gcr.io/cat-staging",
-							ServiceAccount: "sa@robot.com",
-							Src:            true,
-						},
-						{
-							Name:           "us.gcr.io/some-prod",
-							ServiceAccount: "sa@robot.com",
-						},
-						{
-							Name:           "eu.gcr.io/some-prod",
-							ServiceAccount: "sa@robot.com",
-						},
-						{
-							Name:           "asia.gcr.io/some-prod",
-							ServiceAccount: "sa@robot.com",
-						},
-					},
-					Images: []Image{
-						{ImageName: "cat-controller",
-							Dmap: DigestTags{
-								"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc": {"1.0"},
-							},
-						},
-					},
-					filepath: "b/c/promoter-manifest.yaml"},
-				{
-					Registries: []RegistryContext{
-						{
-							Name:           "gcr.io/bar-staging",
-							ServiceAccount: "sa@robot.com",
-							Src:            true,
-						},
-						{
-							Name:           "us.gcr.io/some-prod",
-							ServiceAccount: "sa@robot.com",
-						},
-						{
-							Name:           "eu.gcr.io/some-prod",
-							ServiceAccount: "sa@robot.com",
-						},
-						{
-							Name:           "asia.gcr.io/some-prod",
-							ServiceAccount: "sa@robot.com",
-						},
-					},
-					Images: []Image{
-						{ImageName: "bar-controller",
-							Dmap: DigestTags{
-								"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": {"1.0"},
-							},
-						},
-					},
-					filepath: "b/promoter-manifest.yaml"},
-				{
-					Registries: []RegistryContext{
-						{
-							Name:           "gcr.io/qux-staging",
-							ServiceAccount: "sa@robot.com",
-							Src:            true,
-						},
-						{
-							Name:           "us.gcr.io/some-prod",
-							ServiceAccount: "sa@robot.com",
-						},
-						{
-							Name:           "eu.gcr.io/some-prod",
-							ServiceAccount: "sa@robot.com",
-						},
-						{
-							Name:           "asia.gcr.io/some-prod",
-							ServiceAccount: "sa@robot.com",
-						},
-					},
-					Images: []Image{
-						{ImageName: "qux-controller",
-							Dmap: DigestTags{
-								"sha256:0000000000000000000000000000000000000000000000000000000000000000": {"1.0"},
-							},
-						},
-					},
-					filepath: "promoter-manifest.yaml"},
 			},
 			nil,
 		},
@@ -466,7 +347,7 @@ func TestParseManifestsFromDir(t *testing.T) {
 							},
 						},
 					},
-					filepath: "a/promoter-manifest.yaml",
+					filepath: "manifests/a/promoter-manifest.yaml",
 				},
 				{
 					Registries: []RegistryContext{
@@ -495,7 +376,7 @@ func TestParseManifestsFromDir(t *testing.T) {
 							},
 						},
 					},
-					filepath: "b/promoter-manifest.yaml",
+					filepath: "manifests/b/promoter-manifest.yaml",
 				},
 			},
 			nil,
@@ -622,7 +503,7 @@ func TestParseManifestsFromDir(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		fixtureDir := bazelTestPath("TestParseManifestsFromDir", test.input)
+		fixtureDir := bazelTestPath("TestParseThinManifestsFromDir", test.input)
 
 		// Fixup expected filepaths to match bazel's testing directory.
 		expectedModified := test.expectedOutput[:0]
@@ -631,12 +512,7 @@ func TestParseManifestsFromDir(t *testing.T) {
 			expectedModified = append(expectedModified, mfest)
 		}
 
-		parseManifestFunc := ParseManifestFromFile
-		if test.input == "basic-thin" {
-			parseManifestFunc = ParseThinManifestFromFile
-		}
-
-		got, err := ParseManifestsFromDir(fixtureDir, parseManifestFunc)
+		got, err := ParseThinManifestsFromDir(fixtureDir)
 
 		// Clear private fields (redundant data) that are calculated on-the-fly
 		// (it's too verbose to include them here; besides, it's not what we're
@@ -665,27 +541,26 @@ func TestParseManifestsFromDir(t *testing.T) {
 	}
 }
 
-func TestValidateManifestsFromDir(t *testing.T) {
+func TestValidateThinManifestsFromDir(t *testing.T) {
 
 	var shouldBeValid = []string{
-		"basic",
 		"singleton",
 		"multiple-rebases",
 		"overlapping-src-registries",
 		"overlapping-destination-vertices-same-digest",
 	}
 
-	pwd := bazelTestPath("TestValidateManifestsFromDir")
+	pwd := bazelTestPath("TestValidateThinManifestsFromDir")
 
 	for _, testInput := range shouldBeValid {
 		fixtureDir := filepath.Join(pwd, "valid", testInput)
 
-		mfests, errParse := ParseManifestsFromDir(fixtureDir, ParseManifestFromFile)
+		mfests, errParse := ParseThinManifestsFromDir(fixtureDir)
 		eqErr := checkEqual(errParse, nil)
 		checkError(
 			t,
 			eqErr,
-			fmt.Sprintf("Test: `%v' should be valid (ParseManifestsFromDir)\n", testInput))
+			fmt.Sprintf("Test: `%v' should be valid (ParseThinManifestsFromDir)\n", testInput))
 
 		_, edgeErr := ToPromotionEdges(mfests)
 		eqErr = checkEqual(edgeErr, nil)
@@ -720,18 +595,18 @@ func TestValidateManifestsFromDir(t *testing.T) {
 	}
 
 	for _, test := range shouldBeInvalid {
-		fixtureDir := bazelTestPath("TestValidateManifestsFromDir", "invalid", test.dirName)
+		fixtureDir := bazelTestPath("TestValidateThinManifestsFromDir", "invalid", test.dirName)
 		var eqErr error
 
 		// It could be that a manifest, taken individually, failed on its own,
-		// before we even get to ValidateManifestsFromDir(). So handle these
+		// before we even get to ValidateThinManifestsFromDir(). So handle these
 		// cases as well.
-		mfests, errParse := ParseManifestsFromDir(fixtureDir, ParseManifestFromFile)
+		mfests, errParse := ParseThinManifestsFromDir(fixtureDir)
 		eqErr = checkEqual(errParse, test.expectedParseError)
 		checkError(
 			t,
 			eqErr,
-			fmt.Sprintf("Test: `%v' should be invalid (ParseManifestsFromDir)\n", test.dirName))
+			fmt.Sprintf("Test: `%v' should be invalid (ParseThinManifestsFromDir)\n", test.dirName))
 		if errParse != nil {
 			continue
 		}

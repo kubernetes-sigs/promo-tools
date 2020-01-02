@@ -202,13 +202,17 @@ func (m *Manifest) finalize() error {
 	return nil
 }
 
-// ParseManifestsFromDir parses all Manifest files within a directory. We
-// effectively have to create a map of manifests, keyed by the source registry
-// (there can only be 1 source registry).
-func ParseManifestsFromDir(
+// ParseThinManifestsFromDir parses all thin Manifest files within a directory.
+// We effectively have to create a map of manifests, keyed by the source
+// registry (there can only be 1 source registry).
+func ParseThinManifestsFromDir(
 	dir string,
-	parseManifestFunc func(string) (Manifest, error)) ([]Manifest, error) {
+) ([]Manifest, error) {
 	mfests := make([]Manifest, 0)
+
+	// Check that the thin manifests dir follows a regular, predefined format.
+	// This is to ensure that there isn't any funny business going on around
+	// paths.
 
 	var parseAsManifest filepath.WalkFunc = func(path string,
 		info os.FileInfo,
@@ -231,7 +235,7 @@ func ParseManifestsFromDir(
 			return nil
 		}
 
-		mfest, errParse := parseManifestFunc(path)
+		mfest, errParse := ParseThinManifestFromFile(path)
 		if errParse != nil {
 			klog.Errorf("could not parse manifest file '%s'\n", path)
 			return errParse
