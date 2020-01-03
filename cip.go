@@ -105,7 +105,7 @@ func main() {
 	manifestBasedSnapshotOf := flag.String(
 		"manifest-based-snapshot-of",
 		"",
-		"read all images in either -manifest or -manifest-dir and print all images that should be promoted to the given registry (assuming the given registry is empty); this is like -snapshot, but instead of reading over the network from a registry, it reads from the local manifests only")
+		"read all images in either -manifest or -thin-manifest-dir and print all images that should be promoted to the given registry (assuming the given registry is empty); this is like -snapshot, but instead of reading over the network from a registry, it reads from the local manifests only")
 	useServiceAccount := false
 	flag.BoolVar(&useServiceAccount, "use-service-account", false,
 		"pass '--account=...' to all gcloud calls (default: false)")
@@ -190,7 +190,7 @@ func main() {
 		}
 	} else {
 		if *manifestPtr == "" && *thinManifestDirPtr == "" {
-			klog.Fatal(fmt.Errorf("one of -manifest, -manifest-dir, or -thin-manifest-dir is required"))
+			klog.Fatal(fmt.Errorf("one of -manifest or -thin-manifest-dir is required"))
 		}
 	}
 

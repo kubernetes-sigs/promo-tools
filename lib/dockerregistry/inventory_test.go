@@ -560,6 +560,7 @@ func TestValidateThinManifestsFromDir(t *testing.T) {
 		"multiple-rebases",
 		"overlapping-src-registries",
 		"overlapping-destination-vertices-same-digest",
+		"malformed-directory-tree-structure-bad-prefix-is-ignored",
 	}
 
 	pwd := bazelTestPath("TestValidateThinManifestsFromDir")
@@ -615,12 +616,6 @@ func TestValidateThinManifestsFromDir(t *testing.T) {
 
 			"malformed-directory-tree-structure-nested",
 			fmt.Errorf("unexpected manifest path %q", filepath.Join(pwd, "invalid/malformed-directory-tree-structure-nested/manifests/b/c/promoter-manifest.yaml")),
-			nil,
-		},
-		{
-
-			"malformed-directory-tree-structure-bad-prefix",
-			fmt.Errorf("unexpected manifest path (bad prefix) %q", filepath.Join(pwd, "invalid/malformed-directory-tree-structure-bad-prefix/manifest/b/promoter-manifest.yaml")),
 			nil,
 		},
 	}

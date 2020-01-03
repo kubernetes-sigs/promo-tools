@@ -24,7 +24,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"reflect"
 	"regexp"
 	"sort"
 	"strings"
@@ -251,11 +250,6 @@ func ParseThinManifestsFromDir(
 				path)
 		}
 
-		if !reflect.DeepEqual(shortenedList[0:2], []string{"", "manifests"}) {
-			return fmt.Errorf("unexpected manifest path (bad prefix) %q",
-				path)
-		}
-
 		mfest, errParse := ParseThinManifestFromFile(path)
 		if errParse != nil {
 			klog.Errorf("could not parse manifest file '%s'\n", path)
@@ -268,7 +262,9 @@ func ParseThinManifestsFromDir(
 		return nil
 	}
 
-	if err := filepath.Walk(dir, parseAsManifest); err != nil {
+	// Only look at manifests starting with the "manifests" subfolder (no need
+	// to walk any other toplevel subfolder).
+	if err := filepath.Walk(filepath.Join(dir, "manifests"), parseAsManifest); err != nil {
 		return mfests, err
 	}
 
@@ -289,64 +285,85 @@ func ValidateThinManifestDirectoryStructure(
 	dir string,
 ) error {
 	// First, enforce that there are directories named "images" and "manifests".
-	dirExists, err := directoryExists(filepath.Join(dir, "images"))
-	if !dirExists || err != nil {
+	if err := validateIsDirectory(filepath.Join(dir, "images")); err != nil {
 		return err
 	}
 
-	mfestDir := filepath.Join(dir, "manifests")
-	dirExists, err = directoryExists(mfestDir)
-	if !dirExists || err != nil {
+	manifestDir := filepath.Join(dir, "manifests")
+	if err := validateIsDirectory(manifestDir); err != nil {
 		return err
 	}
 
 	// For every subfolder in <dir>/manifests, ensure that a
 	// "promoter-manifest.yaml" file exists, and also that a corresponding file
 	// exists in the "images" folder.
-	files, err := ioutil.ReadDir(mfestDir)
+	files, err := ioutil.ReadDir(manifestDir)
 	if err != nil {
 		return err
 	}
+
+	fmt.Printf("*looking at %q\n", dir)
 	for _, file := range files {
-		p, err := os.Stat(filepath.Join(mfestDir, file.Name()))
+		fmt.Printf("looking at %q\n", file.Name())
+		p, err := os.Stat(filepath.Join(manifestDir, file.Name()))
 		if err != nil {
 			return err
 		}
 
-		// Only check for directory files.
-		if p.IsDir() {
-			// Check if "promoter-manifest.yaml" exists here.
-			if _, err := os.Stat(
-				filepath.Join(mfestDir,
-					file.Name(),
-					"promoter-manifest.yaml")); os.IsNotExist(err) {
-				continue
-			}
+		// Skip non-directory sub-paths.
+		if !p.IsDir() {
+			continue
+		}
 
-			// Check for corresponding images file.
-			imagesPath := filepath.Join(dir,
-				"images",
-				file.Name(), // wrong; include all parent dirs up to dir
-				"images.yaml")
-			if _, err := os.Stat(imagesPath); os.IsNotExist(err) {
+		// Search for a "promoter-manifest.yaml" file under this directory.
+		manifestInfo, err := os.Stat(
+			filepath.Join(manifestDir,
+				file.Name(),
+				"promoter-manifest.yaml"))
+		if err != nil {
+			klog.Warningln(err)
+			continue
+		}
+		if !manifestInfo.Mode().IsRegular() {
+			klog.Warningf("ignoring irregular file %q", manifestInfo)
+			continue
+		}
+
+		// "promoter-manifest.yaml" exists, so check for corresponding images
+		// file, which MUST exist. This is why we fail early if we detect an
+		// error here.
+		imagesPath := filepath.Join(dir,
+			"images",
+			file.Name(),
+			"images.yaml")
+		imagesInfo, err := os.Stat(imagesPath)
+		if err != nil {
+			if os.IsNotExist(err) {
 				return fmt.Errorf("corresponding file %q does not exist",
 					imagesPath)
 			}
+			return err
+		}
+
+		if !imagesInfo.Mode().IsRegular() {
+			return fmt.Errorf("corresponding file %q is not a regular file",
+				imagesPath)
 		}
 	}
 
 	return nil
 }
 
-func directoryExists(dir string) (bool, error) {
+// validateIsDirectory returns nil if it does exist, otherwise a non-nil error.
+func validateIsDirectory(dir string) error {
 	p, err := os.Stat(filepath.Join(dir))
 	if err != nil {
-		return false, err
+		return err
 	}
 	if !p.IsDir() {
-		return false, fmt.Errorf("%q does not exist", dir)
+		return fmt.Errorf("%q is not a directory", dir)
 	}
-	return true, nil
+	return nil
 }
 
 // ToPromotionEdges converts a list of manifests to a set of edges we want to
