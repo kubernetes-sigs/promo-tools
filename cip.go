@@ -44,10 +44,6 @@ func main() {
 
 	manifestPtr := flag.String(
 		"manifest", "", "the manifest file to load")
-	manifestDirPtr := flag.String(
-		"manifest-dir",
-		"",
-		"(DEPRECATED; please use -thin-manifest-dir instead) recursively read in all manifests within a folder; it is an error if two manifests specify conflicting intent (e.g., promotion of the same image); manifests inside this directory *MUST* be named 'promoter-manifest.yaml'")
 	thinManifestDirPtr := flag.String(
 		"thin-manifest-dir",
 		"",
@@ -109,7 +105,7 @@ func main() {
 	manifestBasedSnapshotOf := flag.String(
 		"manifest-based-snapshot-of",
 		"",
-		"read all images in either -manifest or -manifest-dir and print all images that should be promoted to the given registry (assuming the given registry is empty); this is like -snapshot, but instead of reading over the network from a registry, it reads from the local manifests only")
+		"read all images in either -manifest or -thin-manifest-dir and print all images that should be promoted to the given registry (assuming the given registry is empty); this is like -snapshot, but instead of reading over the network from a registry, it reads from the local manifests only")
 	useServiceAccount := false
 	flag.BoolVar(&useServiceAccount, "use-service-account", false,
 		"pass '--account=...' to all gcloud calls (default: false)")
@@ -193,8 +189,8 @@ func main() {
 			},
 		}
 	} else {
-		if *manifestPtr == "" && *manifestDirPtr == "" && *thinManifestDirPtr == "" {
-			klog.Fatal(fmt.Errorf("one of -manifest, -manifest-dir, or -thin-manifest-dir is required"))
+		if *manifestPtr == "" && *thinManifestDirPtr == "" {
+			klog.Fatal(fmt.Errorf("one of -manifest or -thin-manifest-dir is required"))
 		}
 	}
 
@@ -218,12 +214,8 @@ func main() {
 			klog.Fatal(err)
 		}
 		doingPromotion = true
-	} else if *manifestDirPtr != "" || *thinManifestDirPtr != "" {
-		if *manifestDirPtr != "" {
-			mfests, err = reg.ParseManifestsFromDir(*manifestDirPtr, reg.ParseManifestFromFile)
-		} else {
-			mfests, err = reg.ParseManifestsFromDir(*thinManifestDirPtr, reg.ParseThinManifestFromFile)
-		}
+	} else if *thinManifestDirPtr != "" {
+		mfests, err = reg.ParseThinManifestsFromDir(*thinManifestDirPtr)
 		if err != nil {
 			klog.Exitln(err)
 		}

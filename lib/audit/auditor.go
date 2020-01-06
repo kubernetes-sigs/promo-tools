@@ -282,9 +282,8 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 	logInfo.Printf("s.ThinManifestDirPath: %v", s.ThinManifestDirPath)
 	logInfo.Printf("s.RepoPath: %v", repoPath)
 
-	mfests, err := reg.ParseManifestsFromDir(
-		filepath.Join(repoPath, s.ThinManifestDirPath),
-		reg.ParseThinManifestFromFile)
+	mfests, err := reg.ParseThinManifestsFromDir(
+		filepath.Join(repoPath, s.ThinManifestDirPath))
 	if err != nil {
 		logError.Println(err)
 		// Similar to the error from cloneToTempDir(), respond with an HTTP error

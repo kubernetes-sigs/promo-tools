@@ -150,13 +150,12 @@ func ParseThinManifestFromFile(filePath string) (Manifest, error) {
 		return empty, err
 	}
 
-	imagesPath := thinManifest.ImagesPath
-	// Handle a relative path for "ImagesPath", if necessary.
-	if strings.HasPrefix(thinManifest.ImagesPath, ".") {
-		imagesPath = filepath.Join(
-			filepath.Dir(filePath),
-			thinManifest.ImagesPath)
-	}
+	// Get directory name holding this thin manifest.
+	subProject := filepath.Base(filepath.Dir(filePath))
+	imagesPath := filepath.Join(filepath.Dir(filePath),
+		"../../images",
+		subProject,
+		"images.yaml")
 	images, err := ParseImagesFromFile(imagesPath)
 	if err != nil {
 		return empty, err
@@ -203,13 +202,22 @@ func (m *Manifest) finalize() error {
 	return nil
 }
 
-// ParseManifestsFromDir parses all Manifest files within a directory. We
-// effectively have to create a map of manifests, keyed by the source registry
-// (there can only be 1 source registry).
-func ParseManifestsFromDir(
+// ParseThinManifestsFromDir parses all thin Manifest files within a directory.
+// We effectively have to create a map of manifests, keyed by the source
+// registry (there can only be 1 source registry).
+//
+// nolint[funlen]
+func ParseThinManifestsFromDir(
 	dir string,
-	parseManifestFunc func(string) (Manifest, error)) ([]Manifest, error) {
+) ([]Manifest, error) {
 	mfests := make([]Manifest, 0)
+
+	// Check that the thin manifests dir follows a regular, predefined format.
+	// This is to ensure that there isn't any funny business going on around
+	// paths.
+	if err := ValidateThinManifestDirectoryStructure(dir); err != nil {
+		return mfests, err
+	}
 
 	var parseAsManifest filepath.WalkFunc = func(path string,
 		info os.FileInfo,
@@ -232,7 +240,17 @@ func ParseManifestsFromDir(
 			return nil
 		}
 
-		mfest, errParse := parseManifestFunc(path)
+		// If there are any files named "promoter-manifest.yaml", they must be
+		// inside a subfolder within "manifests/<dir>" --- any other paths are
+		// forbidden.
+		shortened := strings.TrimPrefix(path, dir)
+		shortenedList := strings.Split(shortened, "/")
+		if len(shortenedList) != ThinManifestDepth {
+			return fmt.Errorf("unexpected manifest path %q",
+				path)
+		}
+
+		mfest, errParse := ParseThinManifestFromFile(path)
 		if errParse != nil {
 			klog.Errorf("could not parse manifest file '%s'\n", path)
 			return errParse
@@ -244,7 +262,9 @@ func ParseManifestsFromDir(
 		return nil
 	}
 
-	if err := filepath.Walk(dir, parseAsManifest); err != nil {
+	// Only look at manifests starting with the "manifests" subfolder (no need
+	// to walk any other toplevel subfolder).
+	if err := filepath.Walk(filepath.Join(dir, "manifests"), parseAsManifest); err != nil {
 		return mfests, err
 	}
 
@@ -253,6 +273,97 @@ func ParseManifestsFromDir(
 	}
 
 	return mfests, nil
+}
+
+// ValidateThinManifestDirectoryStructure enforces a particular directory
+// structure for thin manifests. Most importantly, it requires that if a file
+// named "foo/manifests/bar/promoter-manifest.yaml" exists, that a corresponding
+// file named "foo/images/bar/promoter-manifest.yaml" must also exist.
+//
+// nolint[gocyclo]
+func ValidateThinManifestDirectoryStructure(
+	dir string,
+) error {
+	// First, enforce that there are directories named "images" and "manifests".
+	if err := validateIsDirectory(filepath.Join(dir, "images")); err != nil {
+		return err
+	}
+
+	manifestDir := filepath.Join(dir, "manifests")
+	if err := validateIsDirectory(manifestDir); err != nil {
+		return err
+	}
+
+	// For every subfolder in <dir>/manifests, ensure that a
+	// "promoter-manifest.yaml" file exists, and also that a corresponding file
+	// exists in the "images" folder.
+	files, err := ioutil.ReadDir(manifestDir)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("*looking at %q\n", dir)
+	for _, file := range files {
+		fmt.Printf("looking at %q\n", file.Name())
+		p, err := os.Stat(filepath.Join(manifestDir, file.Name()))
+		if err != nil {
+			return err
+		}
+
+		// Skip non-directory sub-paths.
+		if !p.IsDir() {
+			continue
+		}
+
+		// Search for a "promoter-manifest.yaml" file under this directory.
+		manifestInfo, err := os.Stat(
+			filepath.Join(manifestDir,
+				file.Name(),
+				"promoter-manifest.yaml"))
+		if err != nil {
+			klog.Warningln(err)
+			continue
+		}
+		if !manifestInfo.Mode().IsRegular() {
+			klog.Warningf("ignoring irregular file %q", manifestInfo)
+			continue
+		}
+
+		// "promoter-manifest.yaml" exists, so check for corresponding images
+		// file, which MUST exist. This is why we fail early if we detect an
+		// error here.
+		imagesPath := filepath.Join(dir,
+			"images",
+			file.Name(),
+			"images.yaml")
+		imagesInfo, err := os.Stat(imagesPath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				return fmt.Errorf("corresponding file %q does not exist",
+					imagesPath)
+			}
+			return err
+		}
+
+		if !imagesInfo.Mode().IsRegular() {
+			return fmt.Errorf("corresponding file %q is not a regular file",
+				imagesPath)
+		}
+	}
+
+	return nil
+}
+
+// validateIsDirectory returns nil if it does exist, otherwise a non-nil error.
+func validateIsDirectory(dir string) error {
+	p, err := os.Stat(filepath.Join(dir))
+	if err != nil {
+		return err
+	}
+	if !p.IsDir() {
+		return fmt.Errorf("%q is not a directory", dir)
+	}
+	return nil
 }
 
 // ToPromotionEdges converts a list of manifests to a set of edges we want to

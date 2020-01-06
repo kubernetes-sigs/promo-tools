@@ -157,6 +157,19 @@ const (
 	Delete = iota
 )
 
+const (
+	// ThinManifestDepth specifies the number of items in a path if we split the
+	// path into its parts, starting from the "topmost" folder given as an
+	// argument to -thin-manifest-dir. E.g., a well-formed path is something
+	// like:
+	//
+	//  ["", "manifests", "foo", "promoter-manifests.yaml"]
+	//
+	// . This is a result of some path handling/parsing logic in
+	// ValidateThinManifestDirectoryStructure().
+	ThinManifestDepth = 4
+)
+
 // PromotionRequest contains all the information required for any type of
 // promotion (or demotion!) (involving any TagOp).
 type PromotionRequest struct {
@@ -196,6 +209,36 @@ type Manifest struct {
 type ThinManifest struct {
 	Registries []RegistryContext `yaml:"registries,omitempty"`
 	// Store actual image data somewhere else.
+	//
+	// NOTE: "ImagesPath" is deprecated. It does nothing and will be
+	// removed in a future release. The images are always stored in a
+	// directory structure as follows:
+	//
+	//       foo
+	//       ├── images
+	//       │   ├── a
+	//       │   │   └── images.yaml
+	//       │   ├── b
+	//       │   │   └── images.yaml
+	//       │   ├── c
+	//       │   │   └── images.yaml
+	//       │   └── d
+	//       │       └── images.yaml
+	//       └── manifests
+	//           ├── a
+	//           │   └── promoter-manifest.yaml
+	//           ├── b
+	//           │   └── promoter-manifest.yaml
+	//           ├── c
+	//           │   └── promoter-manifest.yaml
+	//           └── d
+	//               └── promoter-manifest.yaml
+	//
+	// where "foo" is the toplevel folder holding all thin manifsets.
+	// That is, every manifest must be bifurcated into 2 parts, the
+	// "image" and "manifest" part, and these parts must be stored
+	// separately.
+
 	ImagesPath string `yaml:"imagesPath,omitempty"`
 }
 
