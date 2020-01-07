@@ -7,7 +7,7 @@ steps:
 - name: 'gcr.io/k8s-testimages/bazelbuild:v20190916-ec59af8-0.29.1'
   entrypoint: make
   env:
-  - VERSION=$_GIT_TAG
+  - PROW_GIT_TAG=$_GIT_TAG
   - PULL_BASE_REF=$_PULL_BASE_REF
   args:
   - image-push

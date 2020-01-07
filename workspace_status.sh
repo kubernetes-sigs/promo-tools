@@ -19,21 +19,21 @@ p_() {
     fi
 }
 
-# If a _GIT_TAG variable is provided by Prow's staging image building mechanism,
-# use it instead of asking `git` directly, because the repo we are in might not
-# actually be a Git repo.
-if [[ -n "${_GIT_TAG:-}" ]]; then
-    # Ensure that the _GIT_TAG fits a known pattern of vYYYYMMDD-tag-n-ghash.
+# If a PROW_GIT_TAG variable is provided by Prow's staging image building
+# mechanism, use it instead of asking `git` directly, because the repo we are in
+# might not actually be a Git repo.
+if [[ -n "${PROW_GIT_TAG:-}" ]]; then
+    # Ensure that the PROW_GIT_TAG fits a known pattern of vYYYYMMDD-tag-n-ghash.
     regex="v[0-9]{8}-[^-]+-[0-9]+-g[0-9a-f]{7}"
-    if ! [[ "${_GIT_TAG}" =~ $regex ]]; then
-        echo >&2 "could not extract git hash from _GIT_TAG ${_GIT_TAG}"
+    if ! [[ "${PROW_GIT_TAG}" =~ $regex ]]; then
+        echo >&2 "could not extract git hash from PROW_GIT_TAG ${PROW_GIT_TAG}"
         exit 1
     fi
 
     # Extract the last 7 characters.
-    git_commit="${_GIT_TAG:(-7)}"
-    # Skip built-in date in _GIT_TAG.
-    git_desc="${_GIT_TAG:(10)}"
+    git_commit="${PROW_GIT_TAG:(-7)}"
+    # Skip built-in date in PROW_GIT_TAG.
+    git_desc="${PROW_GIT_TAG:(10)}"
     timestamp_utc_rfc3339=$(date -u +"%Y-%m-%d %H:%M:%S%z")
     timestamp_utc_date_dashes="${timestamp_utc_rfc3339% *}"
     timestamp_utc_date_no_dashes="${timestamp_utc_date_dashes//-/}"
