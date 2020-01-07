@@ -2,6 +2,11 @@
 timeout: 1200s
 options:
   substitution_option: ALLOW_LOOSE
+  # Need a VM with bigger memory. Machine types are documented in
+  # https://cloud.google.com/compute/docs/machine-types, but the only ones
+  # supported in GCB are found in
+  # https://cloud.google.com/cloud-build/docs/api/reference/rest/Shared.Types/MachineType.
+  machineType: N1_HIGHCPU_32
 steps:
 # Start by just pushing the image
 - name: 'gcr.io/k8s-testimages/bazelbuild:v20190916-ec59af8-0.29.1'
