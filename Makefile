@@ -1,4 +1,4 @@
-REPO_ROOT:=$(shell git rev-parse --show-toplevel)
+REPO_ROOT:=$(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
 BAZEL_BUILD_OPTS:=--workspace_status_command=$(REPO_ROOT)/workspace_status.sh \
 	--host_force_python=PY2 \
 	--stamp
