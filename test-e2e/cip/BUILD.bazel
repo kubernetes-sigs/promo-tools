@@ -6,7 +6,7 @@ load("@io_bazel_rules_docker//contrib:push-all.bzl", "docker_push")
 go_library(
     name = "go_default_library",
     srcs = ["e2e.go"],
-    importpath = "sigs.k8s.io/k8s-container-image-promoter/test-e2e",
+    importpath = "sigs.k8s.io/k8s-container-image-promoter/test-e2e/cip",
     visibility = ["//visibility:public"],
     deps = [
         "//lib/dockerregistry:go_default_library",
@@ -104,14 +104,14 @@ container_image(
 container_bundle(
     name = "golden-images-loadable",
     images = {
-        "{STABLE_TEST_STAGING_IMG_REPOSITORY}/golden-foo/foo:1.0-linux_amd64": "//test-e2e:golden-image-foo-1.0-linux_amd64",
-        "{STABLE_TEST_STAGING_IMG_REPOSITORY}/golden-foo/foo:1.0-linux_s390x": "//test-e2e:golden-image-foo-1.0-linux_s390x",
+        "{STABLE_TEST_STAGING_IMG_REPOSITORY}/golden-foo/foo:1.0-linux_amd64": "//test-e2e/cip:golden-image-foo-1.0-linux_amd64",
+        "{STABLE_TEST_STAGING_IMG_REPOSITORY}/golden-foo/foo:1.0-linux_s390x": "//test-e2e/cip:golden-image-foo-1.0-linux_s390x",
         # We are forced to tag this image by Bazel in order to push it up (the
         # container_push() rule will also reject images with an empty tag
         # argument). In the e2e binary, we have to then strip the tag manually
         # afterwards.
-        "{STABLE_TEST_STAGING_IMG_REPOSITORY}/golden-foo/foo:NOTAG-0": "//test-e2e:golden-image-foo-NOTAG-0",
-        "{STABLE_TEST_STAGING_IMG_REPOSITORY}/golden-bar/bar:1.0": "//test-e2e:golden-image-bar-1.0",
+        "{STABLE_TEST_STAGING_IMG_REPOSITORY}/golden-foo/foo:NOTAG-0": "//test-e2e/cip:golden-image-foo-NOTAG-0",
+        "{STABLE_TEST_STAGING_IMG_REPOSITORY}/golden-bar/bar:1.0": "//test-e2e/cip:golden-image-bar-1.0",
     },
 )
 

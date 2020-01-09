@@ -138,7 +138,7 @@ func testSetup(repoRoot string, t E2ETest) error {
 			fmt.Sprintf(
 				"--workspace_status_command=%s/workspace_status.sh",
 				repoRoot),
-			"//test-e2e:push-golden",
+			"//test-e2e/cip:push-golden",
 		},
 		{
 			"docker",
