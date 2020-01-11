@@ -350,7 +350,7 @@ func main() {
 	// If any funny business was detected during a comparison of the manifests
 	// with the state of the registries, then exit immediately.
 	if !ok {
-		klog.Exitln(err)
+		klog.Exitln("encountered errors during edge filtering")
 	}
 	err = sc.Promote(promotionEdges, mkProducer, nil)
 	if err != nil {

@@ -493,8 +493,11 @@ func (sc *SyncContext) getPromotionCandidates(
 					klog.Infof("edge %s: skipping because it was already promoted (case 2)\n", edge)
 					continue
 				} else {
-					klog.Errorf("edge %s: tag %s: tag move detected from %s to %s", edge, edge.DstImageTag.Tag, edge.Digest, *sc.getDigestForTag(edge.DstImageTag.Tag))
+					klog.Errorf("edge %s: tag %s: ERROR: tag move detected from %s to %s", edge, edge.DstImageTag.Tag, edge.Digest, *sc.getDigestForTag(edge.DstImageTag.Tag))
 					clean = false
+					// We continue instead of returning early, because we want
+					// to see and log as many errors as possible as we go
+					// through each promotion edge.
 					continue
 				}
 			} else {
