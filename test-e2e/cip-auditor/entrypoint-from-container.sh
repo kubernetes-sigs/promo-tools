@@ -33,5 +33,4 @@ SCRIPT_ROOT=$(dirname "$(readlink -f "$0")")
 mkdir -p "${HOME}"/.docker
 cp -f "${SCRIPT_ROOT}/../../docker/config.json" "${HOME}/.docker"
 
-# TODO: Invoke the e2e test when it is ready.
-#make -C "${SCRIPT_ROOT}/../.." test-e2e-cip-auditor
+make -C "${SCRIPT_ROOT}/../.." test-e2e-cip-auditor

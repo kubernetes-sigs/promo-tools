@@ -1,0 +1,50 @@
+# Although the test framework allows for multiple test cases, we can test quite
+# a lot with just 1 test case. This is because we can do N mutations in a single
+# test case.
+- name: "basic"
+  # Registries listed here are WIPED before the test as part of test setup!
+  registries:
+  # Staging.
+  - name: gcr.io/k8s-gcr-audit-test-prod
+    service-account: k8s-infra-gcr-promoter@k8s-gcr-audit-test-prod.iam.gserviceaccount.com
+  # Prod.
+  - name: us.gcr.io/k8s-gcr-audit-test-prod
+    service-account: k8s-infra-gcr-promoter@k8s-gcr-audit-test-prod.iam.gserviceaccount.com
+  # This is the path to the manifests on local disk that the auditor image
+  # should be pointed to when it is deployed to Cloud Run as part of the E2E
+  # test. We build 1 cip-auditor-test image, but we re-deploy it for each test
+  # case, passing in this manifestDir argument each time (to make it point to
+  # the correct set of manifests).
+  manifestDir: "/e2e-fixtures/basic"
+  # This is used to set up the GCR state before the auditor is turned on. The
+  # main reason is because the promoter itself is very good at copying things
+  # from A to B in a declarative manner. This is arguably more elegant (and
+  # faster, as the promoter works in parallel) than writing N serial copy
+  # commands using either gcloud or otherwise.
+  #
+  # This can be an empty list if we want to start out with an empty GCR state.
+  setupCip: []
+  # Commands to invoke for setting up the prod registry *before* the Cloud Run
+  # application is started. This is useful because some tests will require that
+  # we delete an *already-existing* image.
+  setupExtra: []
+  mutations:
+  # "Promote" an image by copying it in manually to production.
+  - - "gcloud"
+    - "--quiet"
+    - "container"
+    - "images"
+    - "add-tag"
+    - "gcr.io/k8s-gcr-audit-test-prod/golden-bar/bar@sha256:408d6837313f95f081d5d02cc2691344c5781d43e98653f4af6cf9c1b8d26166"
+    - "us.gcr.io/k8s-gcr-audit-test-prod/golden-bar/bar:1.0"
+  # Bad image push (2.0 tag is not in manifest).
+  - - "gcloud"
+    - "--quiet"
+    - "container"
+    - "images"
+    - "add-tag"
+    - "gcr.io/k8s-gcr-audit-test-prod/golden-bar/bar@sha256:408d6837313f95f081d5d02cc2691344c5781d43e98653f4af6cf9c1b8d26166"
+    - "us.gcr.io/k8s-gcr-audit-test-prod/golden-bar/bar:2.0"
+  logMatch:
+  - "TRANSACTION VERIFIED: &{INSERT us.gcr.io/k8s-gcr-audit-test-prod/golden-bar/bar@sha256:408d6837313f95f081d5d02cc2691344c5781d43e98653f4af6cf9c1b8d26166 us.gcr.io/k8s-gcr-audit-test-prod/golden-bar/bar:1.0}: agrees with manifest"
+  - "TRANSACTION REJECTED: &{INSERT us.gcr.io/k8s-gcr-audit-test-prod/golden-bar/bar@sha256:408d6837313f95f081d5d02cc2691344c5781d43e98653f4af6cf9c1b8d26166 us.gcr.io/k8s-gcr-audit-test-prod/golden-bar/bar:2.0}: could not validate"

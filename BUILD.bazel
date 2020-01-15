@@ -60,6 +60,7 @@ container_image(
         "HOME": "/",
     },
     layers = [":cip-docker-creds"],
+    visibility = ["//visibility:public"],
 )
 
 # Invoke with "bazel build //:cip-docker-loadable.tar". Then you can run "docker
