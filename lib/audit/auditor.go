@@ -26,6 +26,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime/debug"
+	"strings"
 
 	"cloud.google.com/go/errorreporting"
 	"cloud.google.com/go/logging"
@@ -307,6 +308,10 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 		panic(msg)
 	}
 
+	msg := fmt.Sprintf(
+		"(%s) HANDLING MESSAGE: %v\n", s.ID, gcrPayload)
+	logInfo.Println(msg)
+
 	// (2) Clone fresh repo (or use one already on disk).
 	manifests, err := s.getManifests()
 	if err != nil {
@@ -335,7 +340,88 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	msg := fmt.Sprintf(
+	// (4) It could be that the manifest is a child manifest (part of a fat
+	// manifest). This is the case where the user only specifies the digest of
+	// the parent image, but not the child image. When the promoter copies over
+	// the entirety of the fat manifest, it will necessarily copy over the child
+	// images as part of the transaction. To validate child images, we have to
+	// first scan the source repository (from where the child image is being
+	// promoted from) and then run reg.ReadGCRManifestLists to populate the
+	// parent/child relationship maps of all relevant fat manifests.
+	//
+	// Because the subproject is gcr.io/k8s-artifacts-prod/<subproject>/foo...,
+	// we can search for the matching subproject and run
+	// reg.ReadGCRManifestLists.
+	sc, err := reg.MakeSyncContext(
+		manifests,
+		// verbosity
+		2,
+		// threads
+		10,
+		// dry run (although not necessary as we'll only be doing image reads,
+		// it doesn't hurt)
+		true,
+		// useServiceAccount
+		false)
+	if err != nil {
+		// Retry Pub/Sub message if the above fails (it shouldn't because
+		// MakeSyncContext can only error out if the useServiceAccount bool is
+		// set to True).
+		logError.Println(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	// Find the subproject's registry.
+	var srcRegistry reg.RegistryContext
+	for _, rc := range sc.RegistryContexts {
+		if !rc.Src {
+			continue
+		}
+		rcNameParts := strings.Split(string(rc.Name), "/")
+		if len(rcNameParts) < 3 {
+			continue
+		}
+		// Find the subproject key from the pub/sub message.
+		klog.Infof("subproject name: %s", rcNameParts[2])
+		if strings.HasSuffix(string(rc.Name), rcNameParts[2]) {
+			rcBound := rc // Avoid loop reference variable.
+			srcRegistry = rcBound
+			break
+		}
+	}
+	// If we can't find the source registry for this image, then reject the
+	// transaction.
+	if string(srcRegistry.Name) == "" {
+		msg := fmt.Sprintf("(%s) TRANSACTION REJECTED: could not determine source registry: %v", s.ID)
+		_, _ = w.Write([]byte(msg))
+		panic(msg)
+	}
+	sc.ReadRegistries(
+		[]reg.RegistryContext{srcRegistry},
+		true,
+		reg.MkReadRepositoryCmdReal)
+	sc.ReadGCRManifestLists(reg.MkReadManifestListCmdReal)
+	klog.Infof("sc.ParentDigest is: %v", sc.ParentDigest)
+	var childDigest reg.Digest
+	childImageParts := strings.Split(gcrPayload.Digest, "@")
+	if len(childImageParts) != 2 {
+		msg := fmt.Sprintf("(%s) TRANSACTION REJECTED: could not split child digest information: %v", s.ID, gcrPayload.Digest)
+		_, _ = w.Write([]byte(msg))
+		panic(msg)
+	}
+	childDigest = reg.Digest(childImageParts[1])
+	klog.Infof("looking for child digest %v", childDigest)
+	if parentDigest, hasParent := sc.ParentDigest[childDigest]; hasParent {
+		msg := fmt.Sprintf(
+			"(%s) TRANSACTION VERIFIED: %v: agrees with manifest (parent digest %v)\n", s.ID, gcrPayload, parentDigest)
+		logInfo.Println(msg)
+		_, _ = w.Write([]byte(msg))
+		return
+	}
+
+	// (5) If all of the above checks fail, then this transaction is unable tobe
+	// verified.
+	msg = fmt.Sprintf(
 		"(%s) TRANSACTION REJECTED: %v: could not validate", s.ID, gcrPayload)
 	// Return 200 OK, because we don't want to re-process this transaction.
 	// "Terminating" the auditing here simplifies debugging as well, because the
