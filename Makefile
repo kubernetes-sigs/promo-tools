@@ -32,7 +32,7 @@ test-ci: download
 test-e2e-cip:
 	bazel run $(BAZEL_BUILD_OPTS) //test-e2e/cip:e2e -- -tests=$(REPO_ROOT)/test-e2e/cip/tests.yaml -repo-root=$(REPO_ROOT) -key-file=$(CIP_E2E_KEY_FILE)
 test-e2e-cip-auditor:
-	bazel run $(BAZEL_BUILD_OPTS) //test-e2e/cip-auditor:cip-auditor-e2e -- -tests=$(REPO_ROOT)/test-e2e/cip-auditor/tests.yaml -repo-root=$(REPO_ROOT) -key-file=$(CIP_E2E_KEY_FILE)
+	bazel run $(BAZEL_BUILD_OPTS) //test-e2e/cip-auditor:cip-auditor-e2e -- -tests=$(REPO_ROOT)/test-e2e/cip-auditor/tests.yaml -repo-root=$(REPO_ROOT)
 download:
 	GO111MODULE=on go mod download
 update:
