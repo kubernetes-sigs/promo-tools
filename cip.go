@@ -148,7 +148,11 @@ func main() {
 	}
 
 	if *auditorPtr {
-		audit.Auditor(*auditGcpProjectID, *auditManifestRepoUrlPtr, *auditManifestRepoBranchPtr, *auditManifestPathPtr)
+		uuid := os.Getenv("CIP_AUDIT_TESTCASE_UUID")
+		if len(uuid) > 0 {
+			klog.Infof("Starting auditor in Test Mode (%s)", uuid)
+		}
+		audit.Auditor(*auditGcpProjectID, *auditManifestRepoUrlPtr, *auditManifestRepoBranchPtr, *auditManifestPathPtr, uuid)
 	}
 
 	// Activate service accounts.

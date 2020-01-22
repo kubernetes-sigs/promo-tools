@@ -115,7 +115,30 @@ container_bundle(
     },
 )
 
+# These images are identical to the list in "golden-images-loadable", but their
+# repository name points to the testing environment used by the auditng e2e
+# test. This is because, for better or worse, Docker associates images with the
+# repositories where they should be pushed to.
+container_bundle(
+    name = "golden-images-loadable-audit",
+    images = {
+        "{STABLE_TEST_AUDIT_STAGING_IMG_REPOSITORY}/golden-foo/foo:1.0-linux_amd64": "//test-e2e/cip:golden-image-foo-1.0-linux_amd64",
+        "{STABLE_TEST_AUDIT_STAGING_IMG_REPOSITORY}/golden-foo/foo:1.0-linux_s390x": "//test-e2e/cip:golden-image-foo-1.0-linux_s390x",
+        # We are forced to tag this image by Bazel in order to push it up (the
+        # container_push() rule will also reject images with an empty tag
+        # argument). In the e2e binary, we have to then strip the tag manually
+        # afterwards.
+        "{STABLE_TEST_AUDIT_STAGING_IMG_REPOSITORY}/golden-foo/foo:NOTAG-0": "//test-e2e/cip:golden-image-foo-NOTAG-0",
+        "{STABLE_TEST_AUDIT_STAGING_IMG_REPOSITORY}/golden-bar/bar:1.0": "//test-e2e/cip:golden-image-bar-1.0",
+    },
+)
+
 docker_push(
     name = "push-golden",
     bundle = "golden-images-loadable",
+)
+
+docker_push(
+    name = "push-golden-audit",
+    bundle = "golden-images-loadable-audit",
 )

@@ -26,6 +26,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime/debug"
+	"strings"
 
 	"cloud.google.com/go/errorreporting"
 	"cloud.google.com/go/logging"
@@ -38,6 +39,7 @@ import (
 // ServerContext holds all of the initialization data for the server to start
 // up.
 type ServerContext struct {
+	ID                   string
 	RepoURL              *url.URL
 	RepoBranch           string
 	ThinManifestDirPath  string
@@ -60,10 +62,13 @@ type PubSubMessage struct {
 
 const (
 	cloneDepth = 1
+	// LogName is the auditing log name to use. This is the name that comes up
+	// for "gcloud logging logs list".
+	LogName = "cip-audit-log"
 )
 
 func initServerContext(
-	gcpProjectID, repoURLStr, branch, path string,
+	gcpProjectID, repoURLStr, branch, path, uuid string,
 ) (*ServerContext, error) {
 
 	repoURL, err := url.Parse(repoURLStr)
@@ -75,6 +80,7 @@ func initServerContext(
 	logClient := initLogClient(gcpProjectID)
 
 	serverContext := ServerContext{
+		ID:                   uuid,
 		RepoURL:              repoURL,
 		RepoBranch:           branch,
 		ThinManifestDirPath:  path,
@@ -120,9 +126,10 @@ func initErrorReportingClient(projectID string) *errorreporting.Client {
 }
 
 // Auditor runs an HTTP server.
-func Auditor(gcpProjectID, repoURL, branch, path string) {
+func Auditor(gcpProjectID, repoURL, branch, path, uuid string) {
 	klog.Info("Starting Auditor")
-	serverContext, err := initServerContext(gcpProjectID, repoURL, branch, path)
+	serverContext, err := initServerContext(
+		gcpProjectID, repoURL, branch, path, uuid)
 	if err != nil {
 		klog.Exitln(err)
 	}
@@ -172,6 +179,45 @@ func cloneToTempDir(
 	}
 
 	return tdir, nil
+}
+
+// It could be the case that the repository is defined simply as a local path on
+// disk (in the case of e2e tests where we do not have a full-fledghed online
+// repository for the manifests we want to audit) --- in such cases, we have to
+// use the local path instead of freshly cloning a remote repo.
+func (s *ServerContext) getManifests() ([]reg.Manifest, error) {
+	// There is no remote; use the local path directly.
+	if len(s.RepoURL.String()) == 0 {
+		manifests, err := reg.ParseThinManifestsFromDir(s.ThinManifestDirPath)
+		if err != nil {
+			return nil, err
+		}
+
+		return manifests, nil
+	}
+
+	var repoPath string
+	repoPath, err := cloneToTempDir(s.RepoURL, s.RepoBranch)
+	if err != nil {
+		return nil, err
+	}
+
+	manifests, err := reg.ParseThinManifestsFromDir(
+		filepath.Join(repoPath, s.ThinManifestDirPath))
+	if err != nil {
+		return nil, err
+	}
+
+	// Garbage-collect freshly-cloned repo (we don't need it any more).
+	err = os.RemoveAll(repoPath)
+	if err != nil {
+		// We don't really care too much about failures about removing the
+		// (temporary) repoPath directory, because we'll clone a fresh one
+		// anyway in the future. So don't return an error even if this fails.
+		klog.Errorf("Could not remove temporary Git repo %v: %v", repoPath, err)
+	}
+
+	return manifests, nil
 }
 
 func getHeadSha(repo *git.Repository) (string, error) {
@@ -231,9 +277,9 @@ func ParsePubSubMessage(r *http.Request) (*reg.GCRPubSubPayload, error) {
 // other.
 // nolint[funlen]
 func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
-	logInfo := s.LogClient.Logger("audit-log").StandardLogger(logging.Info)
-	logError := s.LogClient.Logger("audit-log").StandardLogger(logging.Error)
-	logAlert := s.LogClient.Logger("audit-log").StandardLogger(logging.Alert)
+	logInfo := s.LogClient.Logger(LogName).StandardLogger(logging.Info)
+	logError := s.LogClient.Logger(LogName).StandardLogger(logging.Error)
+	logAlert := s.LogClient.Logger(LogName).StandardLogger(logging.Alert)
 
 	defer func() {
 		if msg := recover(); msg != nil {
@@ -257,66 +303,126 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 		// It's important to fail any message we cannot parse, because this
 		// notifies us of any changes in how the messages are created in the
 		// first place.
-		msg := fmt.Sprintf("TRANSACTION REJECTED: parse failure: %v", err)
+		msg := fmt.Sprintf("(%s) TRANSACTION REJECTED: parse failure: %v", s.ID, err)
 		_, _ = w.Write([]byte(msg))
 		panic(msg)
 	}
 
-	// (2) Clone fresh repo.
-	var repoPath string
-	repoPath, err = cloneToTempDir(s.RepoURL, s.RepoBranch)
+	msg := fmt.Sprintf(
+		"(%s) HANDLING MESSAGE: %v\n", s.ID, gcrPayload)
+	logInfo.Println(msg)
+
+	// (2) Clone fresh repo (or use one already on disk).
+	manifests, err := s.getManifests()
 	if err != nil {
 		logError.Println(err)
-		// Return an HTTP error, so that this pubsub message may get retried
-		// (this is the behavior of Cloud Run). We need to retry it because a
-		// well-formed request should not fail to be processed because of a
-		// separate Git syncing failure.
+		// If there is an error, return an HTTP error so that the Pub/Sub
+		// message may be retried (this is a behavior of Cloud Run's handling of
+		// Pub/Sub messages that are converted into HTTP messages).
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	// Debug info.
-	logInfo.Printf("gcrPayload: %v", gcrPayload)
-	logInfo.Printf("s.RepoURL: %v", s.RepoURL)
-	logInfo.Printf("s.RepoBranch: %v", s.RepoBranch)
-	logInfo.Printf("s.ThinManifestDirPath: %v", s.ThinManifestDirPath)
-	logInfo.Printf("s.RepoPath: %v", repoPath)
-
-	mfests, err := reg.ParseThinManifestsFromDir(
-		filepath.Join(repoPath, s.ThinManifestDirPath))
-	if err != nil {
-		logError.Println(err)
-		// Similar to the error from cloneToTempDir(), respond with an HTTP error
-		// so that the Pub/Sub message may be retried. This gracefully handles
-		// the case where the Pub/Sub message is well-formed, but the promoter
-		// manifests are in a bad state (perhaps due to a faulty merge (e.g., a
-		// merge that forgot to remove conflict markers)).
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	// Garbage-collect freshly-cloned repo (we don't need it any more).
-	err = os.RemoveAll(repoPath)
-	if err != nil {
-		// We don't really care too much about failures about removing the
-		// (temporary) repoPath directory, because we'll clone a fresh one
-		// anyway in the future.
-		klog.Errorf("Could not remove temporary Git repo %v: %v", repoPath, err)
-	}
+	logInfo.Printf("(%s) gcrPayload: %v", s.ID, gcrPayload)
+	logInfo.Printf("(%s) s.RepoURL: %v", s.ID, s.RepoURL)
+	logInfo.Printf("(%s) s.RepoBranch: %v", s.ID, s.RepoBranch)
+	logInfo.Printf("(%s) s.ThinManifestDirPath: %v", s.ID, s.ThinManifestDirPath)
 
 	// (3) Compare GCR state change with the intent of the promoter manifests.
-	for _, mfest := range mfests {
-		if mfest.Contains(*gcrPayload) {
+	for _, manifest := range manifests {
+		if manifest.Contains(*gcrPayload) {
 			msg := fmt.Sprintf(
-				"TRANSACTION VERIFIED: %v: agrees with manifest\n", gcrPayload)
+				"(%s) TRANSACTION VERIFIED: %v: agrees with manifest\n", s.ID, gcrPayload)
 			logInfo.Println(msg)
 			_, _ = w.Write([]byte(msg))
 			return
 		}
 	}
 
-	msg := fmt.Sprintf(
-		"TRANSACTION REJECTED: %v: could not validate", gcrPayload)
+	// (4) It could be that the manifest is a child manifest (part of a fat
+	// manifest). This is the case where the user only specifies the digest of
+	// the parent image, but not the child image. When the promoter copies over
+	// the entirety of the fat manifest, it will necessarily copy over the child
+	// images as part of the transaction. To validate child images, we have to
+	// first scan the source repository (from where the child image is being
+	// promoted from) and then run reg.ReadGCRManifestLists to populate the
+	// parent/child relationship maps of all relevant fat manifests.
+	//
+	// Because the subproject is gcr.io/k8s-artifacts-prod/<subproject>/foo...,
+	// we can search for the matching subproject and run
+	// reg.ReadGCRManifestLists.
+	sc, err := reg.MakeSyncContext(
+		manifests,
+		// verbosity
+		2,
+		// threads
+		10,
+		// dry run (although not necessary as we'll only be doing image reads,
+		// it doesn't hurt)
+		true,
+		// useServiceAccount
+		false)
+	if err != nil {
+		// Retry Pub/Sub message if the above fails (it shouldn't because
+		// MakeSyncContext can only error out if the useServiceAccount bool is
+		// set to True).
+		logError.Println(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	// Find the subproject's registry.
+	var srcRegistry reg.RegistryContext
+	for _, rc := range sc.RegistryContexts {
+		if !rc.Src {
+			continue
+		}
+		rcNameParts := strings.Split(string(rc.Name), "/")
+		if len(rcNameParts) < 3 {
+			continue
+		}
+		// Find the subproject key from the pub/sub message.
+		klog.Infof("subproject name: %s", rcNameParts[2])
+		if strings.HasSuffix(string(rc.Name), rcNameParts[2]) {
+			rcBound := rc // Avoid loop reference variable.
+			srcRegistry = rcBound
+			break
+		}
+	}
+	// If we can't find the source registry for this image, then reject the
+	// transaction.
+	if string(srcRegistry.Name) == "" {
+		msg := fmt.Sprintf("(%s) TRANSACTION REJECTED: could not determine source registry: %v", s.ID)
+		_, _ = w.Write([]byte(msg))
+		panic(msg)
+	}
+	sc.ReadRegistries(
+		[]reg.RegistryContext{srcRegistry},
+		true,
+		reg.MkReadRepositoryCmdReal)
+	sc.ReadGCRManifestLists(reg.MkReadManifestListCmdReal)
+	klog.Infof("sc.ParentDigest is: %v", sc.ParentDigest)
+	var childDigest reg.Digest
+	childImageParts := strings.Split(gcrPayload.Digest, "@")
+	if len(childImageParts) != 2 {
+		msg := fmt.Sprintf("(%s) TRANSACTION REJECTED: could not split child digest information: %v", s.ID, gcrPayload.Digest)
+		_, _ = w.Write([]byte(msg))
+		panic(msg)
+	}
+	childDigest = reg.Digest(childImageParts[1])
+	klog.Infof("looking for child digest %v", childDigest)
+	if parentDigest, hasParent := sc.ParentDigest[childDigest]; hasParent {
+		msg := fmt.Sprintf(
+			"(%s) TRANSACTION VERIFIED: %v: agrees with manifest (parent digest %v)\n", s.ID, gcrPayload, parentDigest)
+		logInfo.Println(msg)
+		_, _ = w.Write([]byte(msg))
+		return
+	}
+
+	// (5) If all of the above checks fail, then this transaction is unable tobe
+	// verified.
+	msg = fmt.Sprintf(
+		"(%s) TRANSACTION REJECTED: %v: could not validate", s.ID, gcrPayload)
 	// Return 200 OK, because we don't want to re-process this transaction.
 	// "Terminating" the auditing here simplifies debugging as well, because the
 	// same message is not repeated over and over again in the logs.
