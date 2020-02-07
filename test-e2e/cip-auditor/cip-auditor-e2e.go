@@ -122,6 +122,10 @@ func runE2ETests(testsFile, repoRoot string) {
 			"could not dereference STABLE_TEST_AUDIT_STAGING_IMG_REPOSITORY")
 	}
 
+	if err := enableCloudResourceManagerAPI(projectID); err != nil {
+		klog.Fatal("error enabling Cloud Resource Manager API", err)
+	}
+
 	// Allow Pub/Sub to create auth tokens for the project.
 	if err := enablePubSubTokenCreation(projectNumber, projectID); err != nil {
 		klog.Fatal("error giving token creation permissions to Pub/Sub account", err)
@@ -420,6 +424,17 @@ func (t *E2ETest) clearRepositories() error {
 		clearRepository(rc.Name, &sc)
 	}
 	return nil
+}
+
+func getCmdEnableService(projectID, service string) []string {
+	return []string{
+		"gcloud",
+		"--quiet",
+		"services",
+		"enable",
+		service,
+		fmt.Sprintf("--project=%s", projectID),
+	}
 }
 
 func getCmdListLogs(projectID string) []string {
@@ -772,6 +787,16 @@ func enablePubSubTokenCreation(
 	projectID string,
 ) error {
 	args := getCmdEnablePubSubTokenCreation(projectNumber, projectID)
+	_, _, err := execCommand("", args...)
+	return err
+}
+
+func enableCloudResourceManagerAPI(
+	projectID string,
+) error {
+	args := getCmdEnableService(
+		projectID,
+		"cloudresourcemanager.googleapis.com")
 	_, _, err := execCommand("", args...)
 	return err
 }
