@@ -122,6 +122,11 @@ func runE2ETests(testsFile, repoRoot string) {
 			"could not dereference STABLE_TEST_AUDIT_STAGING_IMG_REPOSITORY")
 	}
 
+	// Enable some APIs. These are required in order to run some of the other
+	// commands below.
+	if err := enableServiceUsageAPI(projectID); err != nil {
+		klog.Fatal("error enabling Service Usage API", err)
+	}
 	if err := enableCloudResourceManagerAPI(projectID); err != nil {
 		klog.Fatal("error enabling Cloud Resource Manager API", err)
 	}
@@ -797,6 +802,16 @@ func enableCloudResourceManagerAPI(
 	args := getCmdEnableService(
 		projectID,
 		"cloudresourcemanager.googleapis.com")
+	_, _, err := execCommand("", args...)
+	return err
+}
+
+func enableServiceUsageAPI(
+	projectID string,
+) error {
+	args := getCmdEnableService(
+		projectID,
+		"serviceusage.googleapis.com")
 	_, _, err := execCommand("", args...)
 	return err
 }
