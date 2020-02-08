@@ -132,7 +132,7 @@ func runE2ETests(testsFile, repoRoot string) {
 	// we create below. Some examples of extraneous messages are those Pub/Sub
 	// messages relating to the pushing of golden images that are not part of
 	// the test case per se.
-	if err := clearPubSubTopic("gcr"); err != nil {
+	if err := clearPubSubTopic(projectID, "gcr"); err != nil {
 		klog.Fatal("error resetting Pub/Sub topic 'gcr'", err)
 	}
 
@@ -176,18 +176,21 @@ func runE2ETests(testsFile, repoRoot string) {
 
 		// Give the service account permissions to invoke the instance we just
 		// deployed.
-		if err := empowerServiceAccount(invokerServiceAccount); err != nil {
+		if err := empowerServiceAccount(
+			projectID, invokerServiceAccount); err != nil {
 			klog.Fatal("error with empowering the invoker service account:", err)
 		}
 
 		// Create a Pub/Sub subscription with the service account.
-		if err := createPubSubSubscription(invokerServiceAccount); err != nil {
+		if err := createPubSubSubscription(
+			projectID,
+			invokerServiceAccount); err != nil {
 			klog.Fatal("error with creating the Pub/Sub subscription:", err)
 		}
 
 		// Purge all pending Pub/Sub messages up to this point (just before we
 		// start mutating state in GCR) because it can make the logs noisy.
-		if err := clearPubSubMessages(); err != nil {
+		if err := clearPubSubMessages(projectID); err != nil {
 			klog.Fatal("error with purging pre-test Pub/Sub messages:", err)
 		}
 
@@ -239,17 +242,17 @@ func testSetup(
 	}
 
 	// Clear Cloud Run logs.
-	if err := clearLogs(); err != nil {
+	if err := clearLogs(projectID); err != nil {
 		return err
 	}
 
 	// Clear Error Reporting events.
-	if err := clearErrorReporting(); err != nil {
+	if err := clearErrorReporting(projectID); err != nil {
 		return err
 	}
 
 	// Clear any existing Cloud Run instance.
-	if err := clearCloudRun(); err != nil {
+	if err := clearCloudRun(projectID); err != nil {
 		return err
 	}
 
@@ -257,7 +260,7 @@ func testSetup(
 	// endpoints of old Cloud Run instances (from previous tests). Even though
 	// we'll be creating a new subscription with the same name, it's OK
 	// according to the documentation.
-	if err := clearSubscription(); err != nil {
+	if err := clearSubscription(projectID); err != nil {
 		return err
 	}
 
@@ -419,17 +422,18 @@ func (t *E2ETest) clearRepositories() error {
 	return nil
 }
 
-func getCmdListLogs() []string {
+func getCmdListLogs(projectID string) []string {
 	return []string{
 		"gcloud",
 		"logging",
 		"logs",
 		"list",
+		fmt.Sprintf("--project=%s", projectID),
 	}
 }
 
 // nolint[lll]
-func getCmdDeleteLogs() []string {
+func getCmdDeleteLogs(projectID string) []string {
 	return []string{
 		"gcloud",
 		"--quiet",
@@ -437,10 +441,11 @@ func getCmdDeleteLogs() []string {
 		"logs",
 		"delete",
 		auditLogName,
+		fmt.Sprintf("--project=%s", projectID),
 	}
 }
 
-func getCmdDeleteErrorReportingEvents() []string {
+func getCmdDeleteErrorReportingEvents(projectID string) []string {
 	return []string{
 		"gcloud",
 		"--quiet",
@@ -448,10 +453,11 @@ func getCmdDeleteErrorReportingEvents() []string {
 		"error-reporting",
 		"events",
 		"delete",
+		fmt.Sprintf("--project=%s", projectID),
 	}
 }
 
-func getCmdListCloudRunServices() []string {
+func getCmdListCloudRunServices(projectID string) []string {
 	return []string{
 		"gcloud",
 		"--quiet",
@@ -459,10 +465,11 @@ func getCmdListCloudRunServices() []string {
 		"services",
 		"--platform=managed",
 		"list",
+		fmt.Sprintf("--project=%s", projectID),
 	}
 }
 
-func getCmdDeleteCloudRunServices() []string {
+func getCmdDeleteCloudRunServices(projectID string) []string {
 	return []string{
 		"gcloud",
 		"--quiet",
@@ -471,10 +478,11 @@ func getCmdDeleteCloudRunServices() []string {
 		"--platform=managed",
 		"delete",
 		auditorName,
+		fmt.Sprintf("--project=%s", projectID),
 	}
 }
 
-func getCmdListSubscriptions() []string {
+func getCmdListSubscriptions(projectID string) []string {
 	return []string{
 		"gcloud",
 		"--quiet",
@@ -482,20 +490,22 @@ func getCmdListSubscriptions() []string {
 		"subscriptions",
 		"list",
 		"--format=value(name)",
+		fmt.Sprintf("--project=%s", projectID),
 	}
 }
 
-func getCmdDeleteSubscription() []string {
+func getCmdDeleteSubscription(projectID string) []string {
 	return []string{
 		"gcloud",
 		"pubsub",
 		"subscriptions",
 		"delete",
 		subscriptionName,
+		fmt.Sprintf("--project=%s", projectID),
 	}
 }
 
-func getCmdListTopics() []string {
+func getCmdListTopics(projectID string) []string {
 	return []string{
 		"gcloud",
 		"--quiet",
@@ -503,26 +513,29 @@ func getCmdListTopics() []string {
 		"topics",
 		"list",
 		"--format=value(name)",
+		fmt.Sprintf("--project=%s", projectID),
 	}
 }
 
-func getCmdDeleteTopic(topic string) []string {
+func getCmdDeleteTopic(projectID, topic string) []string {
 	return []string{
 		"gcloud",
 		"pubsub",
 		"topics",
 		"delete",
 		topic,
+		fmt.Sprintf("--project=%s", projectID),
 	}
 }
 
-func getCmdCreateTopic(topic string) []string {
+func getCmdCreateTopic(projectID, topic string) []string {
 	return []string{
 		"gcloud",
 		"pubsub",
 		"topics",
 		"create",
 		topic,
+		fmt.Sprintf("--project=%s", projectID),
 	}
 }
 
@@ -543,8 +556,9 @@ func getCmdEnablePubSubTokenCreation(
 	}
 }
 
-func getCmdEmpowerServiceAccount(invokerServiceAccount string) []string {
-
+func getCmdEmpowerServiceAccount(
+	projectID, invokerServiceAccount string,
+) []string {
 	return []string{
 		"gcloud",
 		"run",
@@ -554,10 +568,11 @@ func getCmdEmpowerServiceAccount(invokerServiceAccount string) []string {
 		fmt.Sprintf("--member=serviceAccount:%s", invokerServiceAccount),
 		"--role=roles/run.invoker",
 		"--platform=managed",
+		fmt.Sprintf("--project=%s", projectID),
 	}
 }
 
-func getCmdPurgePubSubMessages() []string {
+func getCmdPurgePubSubMessages(projectID string) []string {
 	return []string{
 		"gcloud",
 		"pubsub",
@@ -565,10 +580,11 @@ func getCmdPurgePubSubMessages() []string {
 		"seek",
 		subscriptionName,
 		"--time=+p1y",
+		fmt.Sprintf("--project=%s", projectID),
 	}
 }
 
-func getCmdCloudRunPushEndpoint() []string {
+func getCmdCloudRunPushEndpoint(projectID string) []string {
 	return []string{
 		"gcloud",
 		"run",
@@ -577,10 +593,12 @@ func getCmdCloudRunPushEndpoint() []string {
 		auditorName,
 		"--platform=managed",
 		"--format=value(status.url)",
+		fmt.Sprintf("--project=%s", projectID),
 	}
 }
 
 func getCmdCreatePubSubSubscription(
+	projectID,
 	pushEndpoint,
 	invokerServiceAccount string,
 ) []string {
@@ -594,6 +612,7 @@ func getCmdCreatePubSubSubscription(
 		"--expiration-period=never",
 		fmt.Sprintf("--push-auth-service-account=%s", invokerServiceAccount),
 		fmt.Sprintf("--push-endpoint=%s", pushEndpoint),
+		fmt.Sprintf("--project=%s", projectID),
 	}
 }
 
@@ -606,6 +625,7 @@ func getCmdShowLogs(projectID, uuid, pattern string) []string {
 		"read",
 		"--format=value(textPayload)",
 		fmt.Sprintf("resource.type=project logName=%s resource.labels.project_id=%s \"(%s) %s\"", fullLogName, projectID, uuid, pattern),
+		fmt.Sprintf("--project=%s", projectID),
 	}
 }
 
@@ -647,19 +667,20 @@ func getCmdsDeployCloudRun(
 			),
 			"--platform=managed",
 			"--no-allow-unauthenticated",
+			fmt.Sprintf("--project=%s", projectID),
 		},
 	}
 }
 
-func clearLogs() error {
-	args := getCmdListLogs()
+func clearLogs(projectID string) error {
+	args := getCmdListLogs(projectID)
 	stdout, _, err := execCommand("", args...)
 	if err != nil {
 		return err
 	}
 
 	if strings.Contains(stdout, auditLogName) {
-		args = getCmdDeleteLogs()
+		args = getCmdDeleteLogs(projectID)
 		if _, _, err = execCommand("", args...); err != nil {
 			return err
 		}
@@ -668,18 +689,18 @@ func clearLogs() error {
 	return nil
 }
 
-func clearErrorReporting() error {
-	args := getCmdDeleteErrorReportingEvents()
+func clearErrorReporting(projectID string) error {
+	args := getCmdDeleteErrorReportingEvents(projectID)
 	_, _, err := execCommand("", args...)
 	return err
 }
 
-func clearCloudRun() error {
-	args := getCmdListCloudRunServices()
+func clearCloudRun(projectID string) error {
+	args := getCmdListCloudRunServices(projectID)
 	stdout, _, err := execCommand("", args...)
 
 	if strings.Contains(stdout, auditorName) {
-		args = getCmdDeleteCloudRunServices()
+		args = getCmdDeleteCloudRunServices(projectID)
 		if _, _, err = execCommand("", args...); err != nil {
 			return err
 		}
@@ -707,15 +728,15 @@ func deployCloudRun(
 }
 
 // clearSubscription deletes the existing subscription.
-func clearSubscription() error {
-	args := getCmdListSubscriptions()
+func clearSubscription(projectID string) error {
+	args := getCmdListSubscriptions(projectID)
 	stdout, _, err := execCommand("", args...)
 	if err != nil {
 		return err
 	}
 
 	if strings.Contains(stdout, subscriptionName) {
-		args = getCmdDeleteSubscription()
+		args = getCmdDeleteSubscription(projectID)
 		if _, _, err = execCommand("", args...); err != nil {
 			return err
 		}
@@ -724,20 +745,20 @@ func clearSubscription() error {
 	return nil
 }
 
-func clearPubSubTopic(topic string) error {
-	args := getCmdListTopics()
+func clearPubSubTopic(projectID, topic string) error {
+	args := getCmdListTopics(projectID)
 	stdout, _, err := execCommand("", args...)
 	if err != nil {
 		return err
 	}
 
 	if strings.Contains(stdout, topic) {
-		args = getCmdDeleteTopic(topic)
+		args = getCmdDeleteTopic(projectID, topic)
 		if _, _, err = execCommand("", args...); err != nil {
 			return err
 		}
 
-		args = getCmdCreateTopic(topic)
+		args = getCmdCreateTopic(projectID, topic)
 		if _, _, err = execCommand("", args...); err != nil {
 			return err
 		}
@@ -755,26 +776,27 @@ func enablePubSubTokenCreation(
 	return err
 }
 
-func empowerServiceAccount(invokerServiceAccount string) error {
-	args := getCmdEmpowerServiceAccount(invokerServiceAccount)
+func empowerServiceAccount(projectID, invokerServiceAccount string) error {
+	args := getCmdEmpowerServiceAccount(projectID, invokerServiceAccount)
 	_, _, err := execCommand("", args...)
 	return err
 }
 
-func clearPubSubMessages() error {
-	args := getCmdPurgePubSubMessages()
+func clearPubSubMessages(projectID string) error {
+	args := getCmdPurgePubSubMessages(projectID)
 	_, _, err := execCommand("", args...)
 	return err
 }
 
-func createPubSubSubscription(invokerServiceAccount string) error {
-	args := getCmdCloudRunPushEndpoint()
+func createPubSubSubscription(projectID, invokerServiceAccount string) error {
+	args := getCmdCloudRunPushEndpoint(projectID)
 	pushEndpoint, _, err := execCommand("", args...)
 	if err != nil {
 		return err
 	}
 
 	args = getCmdCreatePubSubSubscription(
+		projectID,
 		strings.TrimSpace(pushEndpoint),
 		invokerServiceAccount)
 	_, _, err = execCommand("", args...)
