@@ -178,7 +178,8 @@ func runE2ETests(testsFile, repoRoot string) {
 			pushRepo,
 			t.ManifestDir,
 			projectID,
-			uuid); err != nil {
+			uuid,
+			invokerServiceAccount); err != nil {
 			klog.Fatal("error with deploying Cloud Run service:", err)
 		}
 
@@ -674,7 +675,8 @@ func getCmdsDeployCloudRun(
 	pushRepo,
 	projectID,
 	manifestDir,
-	uuid string,
+	uuid,
+	invokerServiceAccount string,
 ) [][]string {
 	auditorImg := fmt.Sprintf("%s/%s:latest", pushRepo, auditorName)
 	return [][]string{
@@ -703,6 +705,7 @@ func getCmdsDeployCloudRun(
 			"--no-allow-unauthenticated",
 			"--region=us-central1",
 			fmt.Sprintf("--project=%s", projectID),
+			fmt.Sprintf("--service-account=%s", invokerServiceAccount),
 		},
 	}
 }
@@ -749,10 +752,16 @@ func deployCloudRun(
 	pushRepo,
 	manifestDir,
 	projectID,
-	uuid string,
+	uuid,
+	invokerServiceAccount string,
 ) error {
 
-	argss := getCmdsDeployCloudRun(pushRepo, projectID, manifestDir, uuid)
+	argss := getCmdsDeployCloudRun(
+		pushRepo,
+		projectID,
+		manifestDir,
+		uuid,
+		invokerServiceAccount)
 	for _, args := range argss {
 		if _, _, err := execCommand(repoRoot, args...); err != nil {
 			return err
