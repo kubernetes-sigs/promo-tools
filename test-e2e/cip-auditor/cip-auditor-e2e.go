@@ -951,9 +951,15 @@ func clearRepository(regName reg.RegistryName,
 func checkLogs(projectID, uuid string, patterns []string) error {
 	for _, pattern := range patterns {
 		args := getCmdShowLogs(projectID, uuid, pattern)
-		matched, _, err := execCommand("", args...)
+		matched, stderr, err := execCommand("", args...)
 		if err != nil {
 			return err
+		}
+
+		if len(stderr) > 0 {
+			return fmt.Errorf(
+				"encountered stderr while searching logs: '%s'",
+				stderr)
 		}
 
 		if len(matched) == 0 {
