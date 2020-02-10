@@ -224,18 +224,19 @@ func runE2ETests(testsFile, repoRoot string) {
 		// Pub/Sub message from GCR gets processed into an HTTP request to the
 		// Cloud Run instance (courtesy of Cloud Run's backend). So we have to
 		// allow for some delay. We try 3 times, waiting 6 seconds each time.
-		for i := 1; i <= 3; i++ {
+		for i := 1; i <= maxLogMatchAttempts; i++ {
 			time.Sleep(15 * time.Second)
 			if err := checkLogs(projectID, uuid, t.LogMatch); err != nil {
-				msg := "error with checking the logs ((%s), attempt #%d of 3): %s"
-				if i == 3 {
-					klog.Fatalf(msg, uuid, i, err)
+				msg := "error with checking the logs ((%s), attempt #%d of %d): %s"
+				if i == maxLogMatchAttempts {
+					klog.Fatalf(msg, uuid, i, maxLogMatchAttempts, err)
 				}
-				klog.Warningf(msg, uuid, i, err)
+				klog.Warningf(msg, uuid, i, maxLogMatchAttempts, err)
+			} else {
+				klog.Infof("checkLogs succeeded for %s", t.LogMatch)
+				break
 			}
 		}
-
-		klog.Infof("checkLogs succeeded for %s", t.LogMatch)
 
 		fmt.Printf("\n===> e2e test '%s' (%s): OK\n", t.Name, uuid)
 	}
@@ -662,9 +663,10 @@ func getCmdShowLogs(projectID, uuid, pattern string) []string {
 }
 
 const (
-	subscriptionName = "cip-auditor-test-invoker"
-	auditorName      = "cip-auditor-test"
-	auditLogName     = audit.LogName
+	subscriptionName    = "cip-auditor-test-invoker"
+	auditorName         = "cip-auditor-test"
+	auditLogName        = audit.LogName
+	maxLogMatchAttempts = 10
 )
 
 // nolint[lll]
