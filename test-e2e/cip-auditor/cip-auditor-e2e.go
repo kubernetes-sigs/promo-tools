@@ -508,6 +508,7 @@ func getCmdDeleteCloudRunServices(projectID string) []string {
 		"delete",
 		auditorName,
 		fmt.Sprintf("--project=%s", projectID),
+		"--region=us-central1",
 	}
 }
 
@@ -598,6 +599,7 @@ func getCmdEmpowerServiceAccount(
 		"--role=roles/run.invoker",
 		"--platform=managed",
 		fmt.Sprintf("--project=%s", projectID),
+		"--region=us-central1",
 	}
 }
 
@@ -623,6 +625,7 @@ func getCmdCloudRunPushEndpoint(projectID string) []string {
 		"--platform=managed",
 		"--format=value(status.url)",
 		fmt.Sprintf("--project=%s", projectID),
+		"--region=us-central1",
 	}
 }
 
@@ -696,6 +699,7 @@ func getCmdsDeployCloudRun(
 			),
 			"--platform=managed",
 			"--no-allow-unauthenticated",
+			"--region=us-central1",
 			fmt.Sprintf("--project=%s", projectID),
 		},
 	}
