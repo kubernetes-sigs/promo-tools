@@ -136,6 +136,9 @@ func runE2ETests(testsFile, repoRoot string) {
 	if err := enableStackdriverErrorReportingAPI(projectID); err != nil {
 		klog.Fatal("error enabling Stackdriver Error Reporting API", err)
 	}
+	if err := enableCloudRunAPI(projectID); err != nil {
+		klog.Fatal("error enabling Cloud Run API", err)
+	}
 
 	// Allow Pub/Sub to create auth tokens for the project.
 	if err := enablePubSubTokenCreation(projectNumber, projectID); err != nil {
@@ -828,6 +831,16 @@ func enableStackdriverErrorReportingAPI(
 	args := getCmdEnableService(
 		projectID,
 		"clouderrorreporting.googleapis.com")
+	_, _, err := execCommand("", args...)
+	return err
+}
+
+func enableCloudRunAPI(
+	projectID string,
+) error {
+	args := getCmdEnableService(
+		projectID,
+		"run.googleapis.com")
 	_, _, err := execCommand("", args...)
 	return err
 }
