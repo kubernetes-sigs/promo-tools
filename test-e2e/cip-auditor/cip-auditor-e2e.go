@@ -130,6 +130,9 @@ func runE2ETests(testsFile, repoRoot string) {
 	if err := enableCloudResourceManagerAPI(projectID); err != nil {
 		klog.Fatal("error enabling Cloud Resource Manager API", err)
 	}
+	if err := enableStackdriverAPI(projectID); err != nil {
+		klog.Fatal("error enabling Stackdriver API", err)
+	}
 
 	// Allow Pub/Sub to create auth tokens for the project.
 	if err := enablePubSubTokenCreation(projectNumber, projectID); err != nil {
@@ -802,6 +805,16 @@ func enableCloudResourceManagerAPI(
 	args := getCmdEnableService(
 		projectID,
 		"cloudresourcemanager.googleapis.com")
+	_, _, err := execCommand("", args...)
+	return err
+}
+
+func enableStackdriverAPI(
+	projectID string,
+) error {
+	args := getCmdEnableService(
+		projectID,
+		"stackdriver.googleapis.com")
 	_, _, err := execCommand("", args...)
 	return err
 }
