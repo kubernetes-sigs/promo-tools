@@ -63,12 +63,26 @@ func openFilestore(
 			filestore.Base, err)
 	}
 
-	if u.Scheme != "gs" {
-		return nil, fmt.Errorf(
-			"unrecognized scheme %q (supported schemes: gs://)",
-			filestore.Base)
+	if u.Scheme == "gs" {
+		return openFilestoreGS(ctx, filestore, useServiceAccount, u)
 	}
 
+	if u.Scheme == "file" {
+		s := &fsSyncFilestore{
+			basedir: u.Path,
+		}
+		return s, nil
+	}
+
+	return nil, fmt.Errorf(
+		"unrecognized scheme %q (supported schemes: gs://, file://)",
+		filestore.Base)
+}
+
+func openFilestoreGS(ctx context.Context,
+	filestore *api.Filestore,
+	useServiceAccount bool,
+	u *url.URL) (syncFilestore, error) {
 	var opts []option.ClientOption
 	if useServiceAccount && filestore.ServiceAccount != "" {
 		ts := &gcloudTokenSource{ServiceAccount: filestore.ServiceAccount}

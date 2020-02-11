@@ -31,6 +31,7 @@ import (
 	api "sigs.k8s.io/k8s-container-image-promoter/pkg/api/files"
 )
 
+// gcsSyncFilestore is a syncFilestore backed by Google Cloud Storage (GCS)
 type gcsSyncFilestore struct {
 	filestore *api.Filestore
 	client    *storage.Client

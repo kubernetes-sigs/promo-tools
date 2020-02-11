@@ -50,8 +50,8 @@ func validateFilestores(filestores []Filestore) error {
 			return fmt.Errorf("filestore did not have base set")
 		}
 
-		// Currently the only backend supported is GCS
-		if !strings.HasPrefix(filestore.Base, "gs://") {
+		// Currently the only backends supported are GCS (gs://) & files (file://)
+		if !strings.HasPrefix(filestore.Base, "gs://") && !strings.HasPrefix(filestore.Base, "file://") {
 			return fmt.Errorf(
 				"filestore has unsupported scheme in base %q",
 				filestore.Base)
