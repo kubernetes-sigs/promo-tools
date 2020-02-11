@@ -30,8 +30,8 @@ import (
 
 // PromoteFilesOptions holds the flag-values for a file promotion
 type PromoteFilesOptions struct {
-	// ManifestPath is the path to the manifest file to run
-	ManifestPath string
+	// Manifest is the manifest that we should apply
+	Manifest *api.Manifest
 
 	// DryRun (if set) will not perform operations, but print them instead
 	DryRun bool
@@ -40,8 +40,11 @@ type PromoteFilesOptions struct {
 	// This gives some protection against a hostile manifest.
 	UseServiceAccount bool
 
-	// Out is the destination for "normal" output (such as dry-run)
+	// Out is the destination for "real" output (such as dry-run)
 	Out io.Writer
+
+	// ErrOut is the destination for "diagnostic" output (e.g. progress messages)
+	ErrOut io.Writer
 }
 
 // PopulateDefaults sets the default values for PromoteFilesOptions
@@ -49,38 +52,32 @@ func (o *PromoteFilesOptions) PopulateDefaults() {
 	o.DryRun = true
 	o.UseServiceAccount = false
 	o.Out = os.Stdout
+	o.ErrOut = os.Stderr
 }
 
 // RunPromoteFiles executes a file promotion command
 // nolint[gocyclo]
 func RunPromoteFiles(ctx context.Context, options PromoteFilesOptions) error {
-	manifest, err := readManifest(options.ManifestPath)
-	if err != nil {
-		return err
-	}
-
 	if options.DryRun {
 		fmt.Fprintf(
-			options.Out,
-			"********** START (DRY RUN): %s **********\n",
-			options.ManifestPath)
+			options.ErrOut,
+			"********** START (DRY RUN) **********\n")
 	} else {
 		fmt.Fprintf(
-			options.Out,
-			"********** START: %s **********\n",
-			options.ManifestPath)
+			options.ErrOut,
+			"********** START **********\n")
 	}
 
 	promoter := &filepromoter.ManifestPromoter{
-		Manifest:          manifest,
+		Manifest:          options.Manifest,
 		UseServiceAccount: options.UseServiceAccount,
 	}
 
 	ops, err := promoter.BuildOperations(ctx)
 	if err != nil {
 		return fmt.Errorf(
-			"error building operations for %q: %v",
-			options.ManifestPath, err)
+			"error building operations: %v",
+			err)
 	}
 
 	// So that we can support future parallel execution, an error
@@ -88,26 +85,30 @@ func RunPromoteFiles(ctx context.Context, options PromoteFilesOptions) error {
 	// remaining operations
 	var errors []error
 	for _, op := range ops {
-		if _, err := fmt.Fprintf(options.Out, "%v\n", op); err != nil {
-			errors = append(errors, fmt.Errorf(
-				"error writing to output: %v", err))
-		}
-
 		if !options.DryRun {
+			if _, err := fmt.Fprintf(options.ErrOut, "%v\n", op); err != nil {
+				errors = append(errors, fmt.Errorf(
+					"error writing to output: %v", err))
+			}
+
 			if err := op.Run(ctx); err != nil {
 				klog.Warningf("error copying file: %v", err)
 				errors = append(errors, err)
+			}
+		} else {
+			if _, err := fmt.Fprintf(options.Out, "%v\n", op); err != nil {
+				errors = append(errors, fmt.Errorf(
+					"error writing to output: %v", err))
 			}
 		}
 	}
 
 	if len(errors) != 0 {
 		fmt.Fprintf(
-			options.Out,
-			"********** FINISHED WITH ERRORS: %s **********\n",
-			options.ManifestPath)
+			options.ErrOut,
+			"********** FINISHED WITH ERRORS **********\n")
 		for _, err := range errors {
-			fmt.Fprintf(options.Out, "%v\n", err)
+			fmt.Fprintf(options.ErrOut, "%v\n", err)
 		}
 
 		return errors[0]
@@ -115,20 +116,19 @@ func RunPromoteFiles(ctx context.Context, options PromoteFilesOptions) error {
 
 	if options.DryRun {
 		fmt.Fprintf(
-			options.Out,
-			"********** FINISHED (DRY RUN): %s **********\n",
-			options.ManifestPath)
+			options.ErrOut,
+			"********** FINISHED (DRY RUN) **********\n")
 	} else {
 		fmt.Fprintf(
-			options.Out,
-			"********** FINISHED: %s **********\n",
-			options.ManifestPath)
+			options.ErrOut,
+			"********** FINISHED **********\n")
 	}
 
 	return nil
 }
 
-func readManifest(p string) (*api.Manifest, error) {
+// ReadManifest reads the manifest from the path
+func ReadManifest(p string) (*api.Manifest, error) {
 	if p == "" {
 		return nil, fmt.Errorf("-manifest=... is required")
 	}

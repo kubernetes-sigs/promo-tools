@@ -63,39 +63,46 @@ func openFilestore(
 			filestore.Base, err)
 	}
 
-	if u.Scheme != "gs" {
-		return nil, fmt.Errorf(
-			"unrecognized scheme %q (supported schemes: gs://)",
-			filestore.Base)
+	if u.Scheme == "gs" {
+		var opts []option.ClientOption
+		if useServiceAccount && filestore.ServiceAccount != "" {
+			ts := &gcloudTokenSource{ServiceAccount: filestore.ServiceAccount}
+			opts = append(opts, option.WithTokenSource(ts))
+		} else {
+			opts = append(opts, option.WithoutAuthentication())
+		}
+
+		client, err := storage.NewClient(ctx, opts...)
+		if err != nil {
+			return nil, fmt.Errorf("error building GCS client: %v", err)
+		}
+
+		prefix := strings.TrimPrefix(u.Path, "/")
+		if prefix != "" && !strings.HasSuffix(prefix, "/") {
+			prefix += "/"
+		}
+
+		bucket := u.Host
+
+		s := &gcsSyncFilestore{
+			filestore: filestore,
+			client:    client,
+			bucket:    bucket,
+			prefix:    prefix,
+		}
+		return s, nil
 	}
 
-	var opts []option.ClientOption
-	if useServiceAccount && filestore.ServiceAccount != "" {
-		ts := &gcloudTokenSource{ServiceAccount: filestore.ServiceAccount}
-		opts = append(opts, option.WithTokenSource(ts))
-	} else {
-		opts = append(opts, option.WithoutAuthentication())
+	if u.Scheme == "file" {
+		s := &fsStore{
+			basedir: u.Path,
+		}
+		return s, nil
 	}
 
-	client, err := storage.NewClient(ctx, opts...)
-	if err != nil {
-		return nil, fmt.Errorf("error building GCS client: %v", err)
-	}
-
-	prefix := strings.TrimPrefix(u.Path, "/")
-	if prefix != "" && !strings.HasSuffix(prefix, "/") {
-		prefix += "/"
-	}
-
-	bucket := u.Host
-
-	s := &gcsSyncFilestore{
-		filestore: filestore,
-		client:    client,
-		bucket:    bucket,
-		prefix:    prefix,
-	}
-	return s, nil
+	return nil, fmt.Errorf(
+		"unrecognized scheme %q (supported schemes: gs://, file://)",
+		filestore.Base)
 }
 
 // computeNeededOperations determines the list of files that need to be copied

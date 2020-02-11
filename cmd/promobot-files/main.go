@@ -32,10 +32,11 @@ func main() {
 	var options cmd.PromoteFilesOptions
 	options.PopulateDefaults()
 
+	manifestPath := ""
 	flag.StringVar(
-		&options.ManifestPath,
+		&manifestPath,
 		"manifest",
-		options.ManifestPath,
+		manifestPath,
 		"the manifest file to load (REQUIRED)")
 	flag.BoolVar(
 		&options.DryRun,
@@ -52,6 +53,14 @@ func main() {
 			" (default: false)")
 
 	flag.Parse()
+
+	manifest, err := cmd.ReadManifest(manifestPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
+		// nolint[gomnd]
+		os.Exit(1)
+	}
+	options.Manifest = manifest
 
 	ctx := context.Background()
 	if err := cmd.RunPromoteFiles(ctx, options); err != nil {

@@ -18,9 +18,11 @@ package filepromoter
 
 import (
 	"context"
+	"crypto/md5"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"hash"
 	"io"
 	"io/ioutil"
 	"os"
@@ -44,9 +46,26 @@ type syncFileInfo struct {
 	filestore syncFilestore
 }
 
+func (f *syncFileInfo) Open(ctx context.Context) (io.ReadCloser, error) {
+	return f.filestore.OpenReader(ctx, f.RelativePath)
+}
+
+func (f *syncFileInfo) Path() string {
+	return f.AbsolutePath
+}
+
+// SourceFile represents a file on GCS
+type SourceFile interface {
+	// Open returns a stream to read the contents of the file
+	Open(ctx context.Context) (io.ReadCloser, error)
+
+	// Path returns the absolute path to the file for log messages
+	Path() string
+}
+
 // copyFileOp manages copying a single file
 type copyFileOp struct {
-	Source *syncFileInfo
+	Source SourceFile
 	Dest   *syncFileInfo
 
 	ManifestFile *api.File
@@ -78,16 +97,16 @@ func (o *copyFileOp) Run(ctx context.Context) error {
 		}
 	}()
 
-	in, err := o.Source.filestore.OpenReader(ctx, o.Source.RelativePath)
+	in, err := o.Source.Open(ctx)
 	if err != nil {
-		return fmt.Errorf("error reading %q: %v", o.Source.AbsolutePath, err)
+		return fmt.Errorf("error reading %q: %v", o.Source.Path(), err)
 	}
 	defer in.Close()
 
 	if _, err := io.Copy(f, in); err != nil {
 		return fmt.Errorf(
 			"error downloading %s: %v",
-			o.Source.AbsolutePath, err)
+			o.Source.Path(), err)
 	}
 	// We close the file to be sure it is fully written
 	if err := f.Close(); err != nil {
@@ -96,14 +115,14 @@ func (o *copyFileOp) Run(ctx context.Context) error {
 	f = nil
 
 	// Verify the source hash
-	sha256, err := computeSHA256ForFile(tempFilename)
+	sha256, err := ComputeSHA256ForFile(tempFilename)
 	if err != nil {
 		return err
 	}
 	if sha256 != o.ManifestFile.SHA256 {
 		return fmt.Errorf(
 			"sha256 did not match for file %q: actual=%q expected=%q",
-			o.Source.AbsolutePath, sha256, o.ManifestFile.SHA256)
+			o.Source.Path(), sha256, o.ManifestFile.SHA256)
 	}
 
 	// Upload to the destination
@@ -119,10 +138,20 @@ func (o *copyFileOp) Run(ctx context.Context) error {
 func (o *copyFileOp) String() string {
 	return fmt.Sprintf(
 		"COPY %q to %q",
-		o.Source.AbsolutePath, o.Dest.AbsolutePath)
+		o.Source.Path(), o.Dest.AbsolutePath)
 }
 
-func computeSHA256ForFile(filename string) (string, error) {
+func ComputeSHA256ForFile(filename string) (string, error) {
+	hasher := sha256.New()
+	return computeHashForFile(filename, hasher)
+}
+
+func ComputeMD5ForFile(filename string) (string, error) {
+	hasher := md5.New()
+	return computeHashForFile(filename, hasher)
+}
+
+func computeHashForFile(filename string, hasher hash.Hash) (string, error) {
 	f, err := os.Open(filename)
 	if err != nil {
 		return "", fmt.Errorf(
@@ -137,7 +166,6 @@ func computeSHA256ForFile(filename string) (string, error) {
 		}
 	}()
 
-	hasher := sha256.New()
 	if _, err := io.Copy(hasher, f); err != nil {
 		return "", fmt.Errorf("error hashing file %q: %v", filename, err)
 	}

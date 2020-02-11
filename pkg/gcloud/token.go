@@ -25,6 +25,7 @@ import (
 	"os/exec"
 	"strings"
 
+	"golang.org/x/xerrors"
 	"k8s.io/klog"
 )
 
@@ -114,4 +115,32 @@ func ActivateServiceAccount(keyFilePath string) error {
 	}
 
 	return nil
+}
+
+// CurrentAccount gets the active account in gcloud.
+func CurrentAccount() (string, error) {
+	cmd := exec.Command("gcloud",
+		"auth",
+		"list",
+		"--filter=status:ACTIVE",
+		"--format=value(account)")
+
+	var stdout bytes.Buffer
+
+	cmd.Stdout = &stdout
+	cmd.Stderr = os.Stderr
+
+	err := cmd.Run()
+	if err != nil {
+		return "", err
+	}
+
+	s := stdout.String()
+	s = strings.TrimSpace(s)
+
+	if s == "" {
+		return "", xerrors.New("unable to get activate service-account from gcloud")
+	}
+
+	return s, nil
 }

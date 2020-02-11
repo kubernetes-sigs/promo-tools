@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "file.go",
         "filestore.go",
+        "fsstore.go",
         "gcs.go",
         "interfaces.go",
         "manifest.go",
