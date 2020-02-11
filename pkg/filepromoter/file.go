@@ -96,7 +96,7 @@ func (o *copyFileOp) Run(ctx context.Context) error {
 	f = nil
 
 	// Verify the source hash
-	sha256, err := computeSHA256ForFile(tempFilename)
+	sha256, err := ComputeSHA256ForFile(tempFilename)
 	if err != nil {
 		return err
 	}
@@ -122,7 +122,9 @@ func (o *copyFileOp) String() string {
 		o.Source.AbsolutePath, o.Dest.AbsolutePath)
 }
 
-func computeSHA256ForFile(filename string) (string, error) {
+// nolint[lll]
+// ComputeSHA256ForFile returns the hex-encoded sha256 hash of the file named filename
+func ComputeSHA256ForFile(filename string) (string, error) {
 	f, err := os.Open(filename)
 	if err != nil {
 		return "", fmt.Errorf(
