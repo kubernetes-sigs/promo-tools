@@ -1855,7 +1855,7 @@ func mkPopulateRequestsForPromotionEdges(
 			if dp.PqinExists {
 				if !dp.DigestExists {
 					// Pqin points to the wrong digest.
-					klog.Error("edge %s: tag %s points to the wrong digest %s; however tag moves are not supported\n", promoteMe, promoteMe.DstImageTag.Tag, promoteMe.Digest)
+					klog.Errorf("edge %s: tag '%s' in dest points to %s, not %s (as per the manifest), but tag moves are not supported; skipping\n", promoteMe, promoteMe.DstImageTag.Tag, dp.BadDigest, promoteMe.Digest)
 					continue
 				}
 			}
