@@ -454,7 +454,7 @@ func (sc *SyncContext) getPromotionCandidates(
 		// If the edge should be ignored because of a bad read in sc.Inv, drop
 		// it (complain with klog though).
 		if img, ok := ignoreMap[edge.SrcImageTag.ImageName]; ok {
-			klog.Warningf("edge %s: ignoring because src image could not be read: %s\n", edge, img)
+			klog.Warningf("edge %v: ignoring because src image could not be read: %s\n", edge, img)
 			continue
 		}
 
@@ -462,7 +462,7 @@ func (sc *SyncContext) getPromotionCandidates(
 
 		// If dst vertex exists, NOP.
 		if dp.PqinDigestMatch {
-			klog.Infof("edge %s: skipping because it was already promoted (case 1)\n", edge)
+			klog.Infof("edge %v: skipping because it was already promoted (case 1)\n", edge)
 			continue
 		}
 
@@ -471,7 +471,7 @@ func (sc *SyncContext) getPromotionCandidates(
 		if edge.DstImageTag.Tag == "" && dp.DigestExists {
 			// Still, log a warning if the source is missing the image.
 			if !sp.DigestExists {
-				klog.Errorf("edge %s: skipping %s/%s@%s because it was already promoted, but it is still _LOST_ (can't find it in src registry! please backfill it!)\n", edge, edge.SrcRegistry.Name, edge.SrcImageTag.ImageName, edge.Digest)
+				klog.Errorf("edge %v: skipping %s/%s@%s because it was already promoted, but it is still _LOST_ (can't find it in src registry! please backfill it!)\n", edge, edge.SrcRegistry.Name, edge.SrcImageTag.ImageName, edge.Digest)
 			}
 			continue
 		}
@@ -479,7 +479,7 @@ func (sc *SyncContext) getPromotionCandidates(
 		// If src vertex missing, LOST && NOP. We just need the digest to exist
 		// in src (we don't care if it points to the wrong tag).
 		if !sp.DigestExists {
-			klog.Errorf("edge %s: skipping %s/%s@%s because it is _LOST_ (can't find it in src registry!)\n", edge, edge.SrcRegistry.Name, edge.SrcImageTag.ImageName, edge.Digest)
+			klog.Errorf("edge %v: skipping %s/%s@%s because it is _LOST_ (can't find it in src registry!)\n", edge, edge.SrcRegistry.Name, edge.SrcImageTag.ImageName, edge.Digest)
 			continue
 		}
 
@@ -489,10 +489,10 @@ func (sc *SyncContext) getPromotionCandidates(
 				// a different tag, then it's an error.
 				if dp.PqinDigestMatch {
 					// NOP (already promoted).
-					klog.Infof("edge %s: skipping because it was already promoted (case 2)\n", edge)
+					klog.Infof("edge %v: skipping because it was already promoted (case 2)\n", edge)
 					continue
 				} else {
-					klog.Errorf("edge %s: tag %s: ERROR: tag move detected from %s to %s", edge, edge.DstImageTag.Tag, edge.Digest, *sc.getDigestForTag(edge.DstImageTag.Tag))
+					klog.Errorf("edge %v: tag %s: ERROR: tag move detected from %s to %s", edge, edge.DstImageTag.Tag, edge.Digest, *sc.getDigestForTag(edge.DstImageTag.Tag))
 					clean = false
 					// We continue instead of returning early, because we want
 					// to see and log as many errors as possible as we go
@@ -501,16 +501,16 @@ func (sc *SyncContext) getPromotionCandidates(
 				}
 			} else {
 				// Pqin points to the wrong digest.
-				klog.Warningf("edge %s: tag %s points to the wrong digest; moving\n, dp.BadDigest")
+				klog.Warningf("edge %v: tag %s points to the wrong digest; moving\n, dp.BadDigest")
 			}
 		} else {
 			if dp.DigestExists {
 				// Digest exists in dst, but the pqin we desire does not
 				// exist. Just add the pqin to this existing digest.
-				klog.Infof("edge %s: digest %q already exists, but does not have the pqin we want (%s)\n", edge, edge.Digest, dp.OtherTags)
+				klog.Infof("edge %v: digest %q already exists, but does not have the pqin we want (%s)\n", edge, edge.Digest, dp.OtherTags)
 			} else {
 				// Neither the digest nor the pqin exists in dst.
-				klog.Infof("edge %s: regular promotion (neither digest nor pqin exists in dst)\n", edge)
+				klog.Infof("edge %v: regular promotion (neither digest nor pqin exists in dst)\n", edge)
 			}
 		}
 
