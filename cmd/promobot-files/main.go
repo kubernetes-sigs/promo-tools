@@ -33,10 +33,15 @@ func main() {
 	options.PopulateDefaults()
 
 	flag.StringVar(
-		&options.ManifestPath,
-		"manifest",
-		options.ManifestPath,
-		"the manifest file to load (REQUIRED)")
+		&options.FilestoresPath,
+		"filestores",
+		options.FilestoresPath,
+		"the manifest of filestores (REQUIRED)")
+	flag.StringVar(
+		&options.FilesPath,
+		"files",
+		options.FilesPath,
+		"path to the files manifest (REQUIRED).  A directory can be specified.")
 	flag.BoolVar(
 		&options.DryRun,
 		"dry-run",

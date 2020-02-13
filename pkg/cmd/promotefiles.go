@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// nolint[lll]
 package cmd
 
 import (
@@ -22,7 +23,10 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"path/filepath"
+	"sort"
 
+	"golang.org/x/xerrors"
 	"k8s.io/klog"
 	api "sigs.k8s.io/k8s-container-image-promoter/pkg/api/files"
 	"sigs.k8s.io/k8s-container-image-promoter/pkg/filepromoter"
@@ -30,8 +34,11 @@ import (
 
 // PromoteFilesOptions holds the flag-values for a file promotion
 type PromoteFilesOptions struct {
-	// ManifestPath is the path to the manifest file to run
-	ManifestPath string
+	// FilestoresPath is the path to the manifest file containing the filestores section
+	FilestoresPath string
+
+	// FilesPath specifies a path to manifest files containing the files section.
+	FilesPath string
 
 	// DryRun (if set) will not perform operations, but print them instead
 	DryRun bool
@@ -54,7 +61,7 @@ func (o *PromoteFilesOptions) PopulateDefaults() {
 // RunPromoteFiles executes a file promotion command
 // nolint[gocyclo]
 func RunPromoteFiles(ctx context.Context, options PromoteFilesOptions) error {
-	manifest, err := readManifest(options.ManifestPath)
+	manifest, err := readManifest(options)
 	if err != nil {
 		return err
 	}
@@ -62,13 +69,11 @@ func RunPromoteFiles(ctx context.Context, options PromoteFilesOptions) error {
 	if options.DryRun {
 		fmt.Fprintf(
 			options.Out,
-			"********** START (DRY RUN): %s **********\n",
-			options.ManifestPath)
+			"********** START (DRY RUN) **********\n")
 	} else {
 		fmt.Fprintf(
 			options.Out,
-			"********** START: %s **********\n",
-			options.ManifestPath)
+			"********** START **********\n")
 	}
 
 	promoter := &filepromoter.ManifestPromoter{
@@ -79,8 +84,8 @@ func RunPromoteFiles(ctx context.Context, options PromoteFilesOptions) error {
 	ops, err := promoter.BuildOperations(ctx)
 	if err != nil {
 		return fmt.Errorf(
-			"error building operations for %q: %v",
-			options.ManifestPath, err)
+			"error building operations: %v",
+			err)
 	}
 
 	// So that we can support future parallel execution, an error
@@ -104,8 +109,7 @@ func RunPromoteFiles(ctx context.Context, options PromoteFilesOptions) error {
 	if len(errors) != 0 {
 		fmt.Fprintf(
 			options.Out,
-			"********** FINISHED WITH ERRORS: %s **********\n",
-			options.ManifestPath)
+			"********** FINISHED WITH ERRORS **********\n")
 		for _, err := range errors {
 			fmt.Fprintf(options.Out, "%v\n", err)
 		}
@@ -116,21 +120,43 @@ func RunPromoteFiles(ctx context.Context, options PromoteFilesOptions) error {
 	if options.DryRun {
 		fmt.Fprintf(
 			options.Out,
-			"********** FINISHED (DRY RUN): %s **********\n",
-			options.ManifestPath)
+			"********** FINISHED (DRY RUN) **********\n")
 	} else {
 		fmt.Fprintf(
 			options.Out,
-			"********** FINISHED: %s **********\n",
-			options.ManifestPath)
+			"********** FINISHED **********\n")
 	}
 
 	return nil
 }
 
-func readManifest(p string) (*api.Manifest, error) {
+func readManifest(options PromoteFilesOptions) (*api.Manifest, error) {
+	merged := &api.Manifest{}
+
+	filestores, err := readFilestores(options.FilestoresPath)
+	if err != nil {
+		return nil, err
+	}
+	merged.Filestores = filestores
+
+	files, err := readFiles(options.FilesPath)
+	if err != nil {
+		return nil, err
+	}
+	merged.Files = files
+
+	// Validate the merged manifest
+	if err := merged.Validate(); err != nil {
+		return nil, fmt.Errorf("error validating merged manifest: %v", err)
+	}
+
+	return merged, nil
+}
+
+// readFilestores reads a filestores manifest
+func readFilestores(p string) ([]api.Filestore, error) {
 	if p == "" {
-		return nil, fmt.Errorf("-manifest=... is required")
+		return nil, fmt.Errorf("FilestoresPath is required")
 	}
 
 	b, err := ioutil.ReadFile(p)
@@ -142,9 +168,56 @@ func readManifest(p string) (*api.Manifest, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error parsing manifest %q: %v", p, err)
 	}
-	if err := manifest.Validate(); err != nil {
-		return nil, fmt.Errorf("error validating manifest %q: %v", p, err)
+
+	if len(manifest.Files) != 0 {
+		return nil, xerrors.Errorf(
+			"files should not be present in filestore manifest %q",
+			p)
 	}
 
-	return manifest, nil
+	return manifest.Filestores, nil
+}
+
+// readFiles reads and merges the file manifests from the file or directory filesPath
+func readFiles(filesPath string) ([]api.File, error) {
+	// We first list and sort the paths, for a consistent ordering
+	var paths []string
+	err := filepath.Walk(filesPath, func(p string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if info.IsDir() {
+			return nil
+		}
+
+		paths = append(paths, p)
+		return nil
+	})
+	if err != nil {
+		return nil, xerrors.Errorf("error listing file manifests: %w", err)
+	}
+
+	sort.Strings(paths)
+
+	var files []api.File
+	for _, p := range paths {
+		b, err := ioutil.ReadFile(p)
+		if err != nil {
+			return nil, xerrors.Errorf("error reading file %q: %w", p, err)
+		}
+
+		manifest, err := api.ParseManifest(b)
+		if err != nil {
+			return nil, xerrors.Errorf("error parsing manifest %q: %v", p, err)
+		}
+
+		if len(manifest.Filestores) != 0 {
+			return nil, xerrors.Errorf("filestores should not be present in manifest %q", p)
+		}
+
+		files = append(files, manifest.Files...)
+	}
+
+	return files, nil
 }
