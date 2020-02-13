@@ -2,12 +2,16 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = ["promotefiles.go"],
+    srcs = [
+        "hash.go",
+        "promotefiles.go",
+    ],
     importpath = "sigs.k8s.io/k8s-container-image-promoter/pkg/cmd",
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/api/files:go_default_library",
         "//pkg/filepromoter:go_default_library",
         "@io_k8s_klog//:go_default_library",
+        "@org_golang_x_xerrors//:go_default_library",
     ],
 )
