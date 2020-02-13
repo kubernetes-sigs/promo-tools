@@ -19,7 +19,7 @@ package cmd
 import (
 	"testing"
 
-	"sigs.k8s.io/yaml"
+	"sigs.k8s.io/k8s-container-image-promoter/pkg/golden"
 )
 
 func TestReadManifests(t *testing.T) {
@@ -51,12 +51,7 @@ func TestReadManifests(t *testing.T) {
 				t.Fatalf("failed to read manifest: %v", err)
 			}
 
-			manifestYAML, err := yaml.Marshal(manifest)
-			if err != nil {
-				t.Fatalf("error serializing manifest: %v", err)
-			}
-
-			AssertMatchesFile(t, string(manifestYAML), g.Expected)
+			golden.AssertMatchesFile(t, manifest, g.Expected)
 		})
 	}
 }

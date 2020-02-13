@@ -24,8 +24,5 @@ go_test(
     ],
     data = glob(["testdata/**"]),
     embed = [":go_default_library"],
-    deps = [
-        "@io_k8s_sigs_yaml//:go_default_library",
-        "@io_k8s_utils//diff:go_default_library",
-    ],
+    deps = ["//pkg/golden:go_default_library"],
 )

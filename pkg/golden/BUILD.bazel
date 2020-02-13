@@ -1,0 +1,12 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "go_default_library",
+    srcs = ["helpers.go"],
+    importpath = "sigs.k8s.io/k8s-container-image-promoter/pkg/golden",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@io_k8s_sigs_yaml//:go_default_library",
+        "@io_k8s_utils//diff:go_default_library",
+    ],
+)
