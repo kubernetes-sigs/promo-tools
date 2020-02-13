@@ -76,8 +76,8 @@ func (s *fsSyncFilestore) ListFiles(
 		}
 
 		file := &syncFileInfo{}
-		file.AbsolutePath = "file://" + basedir
 		file.RelativePath = strings.TrimPrefix(p, basedir)
+		file.AbsolutePath = "file://" + basedir + file.RelativePath
 		file.MD5 = md5
 		file.Size = info.Size()
 		file.filestore = s
