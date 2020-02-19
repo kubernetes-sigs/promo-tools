@@ -8,14 +8,6 @@ http_archive(
     sha256 = "4ba8f4ab0ff85f2484287ab06c0d871dcb31cc54d439457d28fd4ae14b18450a",
 )
 
-git_repository(
-    name = "bazel_skylib",
-    remote = "https://github.com/bazelbuild/bazel-skylib.git",
-    # Use 0.8.0 insteaf of 0.9.0 because of
-    # https://github.com/bazelbuild/bazel-skylib/issues/163#issuecomment-511408099
-    tag = "0.8.0",
-)
-
 # You *must* import the Go rules before setting up the go_image rules.
 http_archive(
     name = "io_bazel_rules_go",
