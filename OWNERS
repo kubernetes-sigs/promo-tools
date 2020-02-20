@@ -5,12 +5,14 @@ approvers:
 - hh
 - listx
 - tpepper
+- bartsmykla
 reviewers:
 - dims
 - hh
 - listx
 - tpepper
 - ps882
+- bartsmykla
 
 labels:
 - sig/release
