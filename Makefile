@@ -3,7 +3,7 @@ BAZEL_BUILD_OPTS:=--workspace_status_command=$(REPO_ROOT)/workspace_status.sh \
 	--host_force_python=PY2 \
 	--stamp
 
-all: test build
+all: test
 build:
 	bazel build $(BAZEL_BUILD_OPTS) //:cip \
 		//test-e2e/cip:e2e \
@@ -24,7 +24,7 @@ lint:
 	GO111MODULE=on golangci-lint run
 lint-ci: download
 	make lint
-test:
+test: build
 	bazel test $(BAZEL_BUILD_OPTS) --test_output=all //...
 test-ci: download
 	make build
