@@ -25,7 +25,7 @@ lint:
 lint-ci: download
 	make lint
 test:
-	bazel test --test_output=all //...
+	bazel test $(BAZEL_BUILD_OPTS) --test_output=all //...
 test-ci: download
 	make build
 	make test
