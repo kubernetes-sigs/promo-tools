@@ -5,10 +5,10 @@ BAZEL_BUILD_OPTS:=--workspace_status_command=$(REPO_ROOT)/workspace_status.sh \
 
 all: test build
 build:
-	bazel build $(BAZEL_BUILD_OPTS) //:cip
-	bazel build $(BAZEL_BUILD_OPTS) //test-e2e/cip:e2e
-	bazel build $(BAZEL_BUILD_OPTS) //test-e2e/cip-auditor:cip-auditor-e2e
-	bazel build $(BAZEL_BUILD_OPTS) //cmd/promobot-files:promobot-files
+	bazel build $(BAZEL_BUILD_OPTS) //:cip \
+		//test-e2e/cip:e2e \
+		//test-e2e/cip-auditor:cip-auditor-e2e \
+		//cmd/promobot-files:promobot-files
 image:
 	bazel build $(BAZEL_BUILD_OPTS) //:cip-docker-loadable.tar
 image-load: image
@@ -25,7 +25,7 @@ lint:
 lint-ci: download
 	make lint
 test:
-	bazel test --test_output=all //lib/...
+	bazel test $(BAZEL_BUILD_OPTS) --test_output=all //...
 test-ci: download
 	make build
 	make test

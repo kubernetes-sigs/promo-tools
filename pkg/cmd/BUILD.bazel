@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
@@ -13,5 +13,19 @@ go_library(
         "//pkg/filepromoter:go_default_library",
         "@io_k8s_klog//:go_default_library",
         "@org_golang_x_xerrors//:go_default_library",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = [
+        "hash_test.go",
+        "readmanifest_test.go",
+    ],
+    data = glob(["testdata/**"]),
+    embed = [":go_default_library"],
+    deps = [
+        "@io_k8s_sigs_yaml//:go_default_library",
+        "@io_k8s_utils//diff:go_default_library",
     ],
 )
