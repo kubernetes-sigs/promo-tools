@@ -152,8 +152,7 @@ func main() {
 		uuid := os.Getenv("CIP_AUDIT_TESTCASE_UUID")
 		if len(uuid) > 0 {
 			klog.Infof("Starting auditor in Test Mode (%s)", uuid)
-		}
-		if uuid == "" {
+		} else {
 			uuid = guuid.New().String()
 			klog.Infof("Starting auditor in Regular Mode (%s)", uuid)
 		}
