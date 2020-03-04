@@ -22,6 +22,7 @@ import (
 	"os"
 
 	// nolint[lll]
+	guuid "github.com/google/uuid"
 	"k8s.io/klog"
 	"sigs.k8s.io/k8s-container-image-promoter/lib/audit"
 	reg "sigs.k8s.io/k8s-container-image-promoter/lib/dockerregistry"
@@ -151,6 +152,10 @@ func main() {
 		uuid := os.Getenv("CIP_AUDIT_TESTCASE_UUID")
 		if len(uuid) > 0 {
 			klog.Infof("Starting auditor in Test Mode (%s)", uuid)
+		}
+		if uuid == "" {
+			uuid = guuid.New().String()
+			klog.Infof("Starting auditor in Regular Mode (%s)", uuid)
 		}
 		audit.Auditor(*auditGcpProjectID, *auditManifestRepoUrlPtr, *auditManifestRepoBranchPtr, *auditManifestPathPtr, uuid)
 	}
