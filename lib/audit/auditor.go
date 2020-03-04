@@ -392,7 +392,7 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 	// If we can't find the source registry for this image, then reject the
 	// transaction.
 	if string(srcRegistry.Name) == "" {
-		msg := fmt.Sprintf("(%s) TRANSACTION REJECTED: could not determine source registry: %v", s.ID)
+		msg := fmt.Sprintf("(%s) TRANSACTION REJECTED: could not determine source registry: %v", s.ID, gcrPayload)
 		_, _ = w.Write([]byte(msg))
 		panic(msg)
 	}
