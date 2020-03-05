@@ -1489,11 +1489,20 @@ func SplitByKnownRegistries(
 		if strings.HasPrefix(string(r), string(rc.Name)) {
 			trimmed := strings.TrimPrefix(string(r), string(rc.Name))
 
-			// Remove leading "/" character, if any.
-			if trimmed[0] == '/' {
+			// nolint[gocritic]
+			if trimmed == "" {
+				// The unparsed full image path `r` and rc.Name is the same ---
+				// this happens for images pushed to the root directory. Just
+				// get everything past the last '/' seen in `r` to get the image
+				// name.
+				i := strings.LastIndex(string(r), "/")
+				return rc.Name[:i], ImageName(string(r)[i+1:]), nil
+			} else if trimmed[0] == '/' {
+				// Remove leading "/" character, if any.
 				return rc.Name, ImageName(trimmed[1:]), nil
+			} else {
+				return rc.Name, ImageName(trimmed), nil
 			}
-			return rc.Name, ImageName(trimmed), nil
 		}
 	}
 
