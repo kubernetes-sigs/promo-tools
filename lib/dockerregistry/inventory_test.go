@@ -859,6 +859,54 @@ func TestSplitRegistryImagePath(t *testing.T) {
 	}
 }
 
+func TestSplitByKnownRegistries(t *testing.T) {
+	knownRegistryNames := []RegistryName{
+		// See
+		// https://github.com/kubernetes-sigs/k8s-container-image-promoter/issues/188.
+		`us.gcr.io/k8s-artifacts-prod/kube-state-metrics`,
+	}
+	knownRegistryContexts := make([]RegistryContext, 0)
+	for _, knownRegistryName := range knownRegistryNames {
+		rc := RegistryContext{}
+		rc.Name = knownRegistryName
+		knownRegistryContexts = append(knownRegistryContexts, rc)
+	}
+
+	var tests = []struct {
+		name                 string
+		input                RegistryName
+		expectedRegistryName RegistryName
+		expectedImageName    ImageName
+		expectedErr          error
+	}{
+		{
+			`image at toplevel root path`,
+			`us.gcr.io/k8s-artifacts-prod/kube-state-metrics`,
+			`us.gcr.io/k8s-artifacts-prod`,
+			`kube-state-metrics`,
+			nil,
+		},
+	}
+	for _, test := range tests {
+		rootReg, imageName, err := SplitByKnownRegistries(test.input, knownRegistryContexts)
+		eqErr := checkEqual(rootReg, test.expectedRegistryName)
+		checkError(
+			t,
+			eqErr,
+			fmt.Sprintf("Test: `%v' failure (registry name mismatch)\n", test.input))
+		eqErr = checkEqual(imageName, test.expectedImageName)
+		checkError(
+			t,
+			eqErr,
+			fmt.Sprintf("Test: `%v' failure (image name mismatch)\n", test.input))
+		eqErr = checkEqual(err, test.expectedErr)
+		checkError(
+			t,
+			eqErr,
+			fmt.Sprintf("Test: `%v' failure (error mismatch)\n", test.input))
+	}
+}
+
 func TestCommandGeneration(t *testing.T) {
 	destRC := RegistryContext{
 		Name:           "gcr.io/foo",
