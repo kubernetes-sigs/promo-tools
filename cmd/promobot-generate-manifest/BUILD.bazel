@@ -14,7 +14,7 @@ go_library(
 )
 
 go_binary(
-    name = "promobot-files",
+    name = "promobot-generate-manifest",
     embed = [":go_default_library"],
     visibility = ["//visibility:public"],
 )
