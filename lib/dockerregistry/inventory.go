@@ -302,7 +302,7 @@ func ValidateThinManifestDirectoryStructure(
 		return err
 	}
 
-	fmt.Printf("*looking at %q\n", dir)
+	klog.Infof("*looking at %q", dir)
 	for _, file := range files {
 		p, err := os.Stat(filepath.Join(manifestDir, file.Name()))
 		if err != nil {
