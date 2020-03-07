@@ -2,7 +2,10 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
-    srcs = ["auditor.go"],
+    srcs = [
+        "auditor.go",
+        "types.go",
+    ],
     importpath = "sigs.k8s.io/k8s-container-image-promoter/lib/audit",
     visibility = ["//visibility:public"],
     deps = [

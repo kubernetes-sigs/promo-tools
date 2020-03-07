@@ -36,37 +36,6 @@ import (
 	reg "sigs.k8s.io/k8s-container-image-promoter/lib/dockerregistry"
 )
 
-// ServerContext holds all of the initialization data for the server to start
-// up.
-type ServerContext struct {
-	ID                   string
-	RepoURL              *url.URL
-	RepoBranch           string
-	ThinManifestDirPath  string
-	ErrorReportingClient *errorreporting.Client
-	LogClient            *logging.Client
-}
-
-// PubSubMessageInner is the inner struct that holds the actual Pub/Sub
-// information.
-type PubSubMessageInner struct {
-	Data []byte `json:"data,omitempty"`
-	ID   string `json:"id"`
-}
-
-// PubSubMessage is the payload of a Pub/Sub event.
-type PubSubMessage struct {
-	Message      PubSubMessageInner `json:"message"`
-	Subscription string             `json:"subscription"`
-}
-
-const (
-	cloneDepth = 1
-	// LogName is the auditing log name to use. This is the name that comes up
-	// for "gcloud logging logs list".
-	LogName = "cip-audit-log"
-)
-
 func initServerContext(
 	gcpProjectID, repoURLStr, branch, path, uuid string,
 ) (*ServerContext, error) {
