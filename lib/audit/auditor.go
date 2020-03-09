@@ -17,7 +17,6 @@ limitations under the License.
 package audit
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -34,6 +33,7 @@ import (
 	"k8s.io/klog"
 	reg "sigs.k8s.io/k8s-container-image-promoter/lib/dockerregistry"
 	"sigs.k8s.io/k8s-container-image-promoter/lib/logclient"
+	"sigs.k8s.io/k8s-container-image-promoter/lib/report"
 )
 
 func initServerContext(
@@ -45,7 +45,8 @@ func initServerContext(
 		return nil, err
 	}
 
-	erc := initErrorReportingClient(gcpProjectID)
+	reportingFacility := report.NewGcpErrorReportingClient(
+		gcpProjectID, "cip-auditor")
 	loggingFacility, err := logclient.NewGcpLogClient(
 		gcpProjectID, LogName)
 	if err != nil {
@@ -53,32 +54,15 @@ func initServerContext(
 	}
 
 	serverContext := ServerContext{
-		ID:                   uuid,
-		RepoURL:              repoURL,
-		RepoBranch:           branch,
-		ThinManifestDirPath:  path,
-		ErrorReportingClient: erc,
-		LoggingFacility:      loggingFacility,
+		ID:                     uuid,
+		RepoURL:                repoURL,
+		RepoBranch:             branch,
+		ThinManifestDirPath:    path,
+		ErrorReportingFacility: reportingFacility,
+		LoggingFacility:        loggingFacility,
 	}
 
 	return &serverContext, nil
-}
-
-func initErrorReportingClient(projectID string) *errorreporting.Client {
-
-	ctx := context.Background()
-
-	erc, err := errorreporting.NewClient(ctx, projectID, errorreporting.Config{
-		ServiceName: "cip-auditor",
-		OnError: func(err error) {
-			klog.Errorf("Could not log error: %v", err)
-		},
-	})
-	if err != nil {
-		klog.Fatalf("Failed to create errorreporting client: %v", err)
-	}
-
-	return erc
 }
 
 // Auditor runs an HTTP server.
@@ -95,7 +79,7 @@ func Auditor(gcpProjectID, repoURL, branch, path, uuid string) {
 	// nolint[errcheck]
 	defer serverContext.LoggingFacility.Close()
 	// nolint[errcheck]
-	defer serverContext.ErrorReportingClient.Close()
+	defer serverContext.ErrorReportingFacility.Close()
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		serverContext.Audit(w, r)
@@ -243,7 +227,7 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 
 			stacktrace := debug.Stack()
 
-			s.ErrorReportingClient.Report(errorreporting.Entry{
+			s.ErrorReportingFacility.Report(errorreporting.Entry{
 				Req:   r,
 				Error: fmt.Errorf("%s", panicStr),
 				Stack: stacktrace,
