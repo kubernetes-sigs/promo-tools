@@ -20,20 +20,18 @@ import (
 	"net/url"
 
 	"cloud.google.com/go/errorreporting"
-	"cloud.google.com/go/logging"
+	"sigs.k8s.io/k8s-container-image-promoter/lib/logclient"
 )
 
 // ServerContext holds all of the initialization data for the server to start
 // up.
 type ServerContext struct {
-	ID                  string
-	RepoURL             *url.URL
-	RepoBranch          string
-	ThinManifestDirPath string
-	// TODO: Change ErrorReportingClient and LogClient into interfaces. Then use
-	// dependency injection to make unit tests for the Audit() function.
+	ID                   string
+	RepoURL              *url.URL
+	RepoBranch           string
+	ThinManifestDirPath  string
 	ErrorReportingClient *errorreporting.Client
-	LogClient            *logging.Client
+	LoggingFacility      *logclient.LoggingFacility
 }
 
 // PubSubMessageInner is the inner struct that holds the actual Pub/Sub

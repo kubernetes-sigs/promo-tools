@@ -29,11 +29,11 @@ import (
 	"strings"
 
 	"cloud.google.com/go/errorreporting"
-	"cloud.google.com/go/logging"
 	git "gopkg.in/src-d/go-git.v4"
 	"gopkg.in/src-d/go-git.v4/plumbing"
 	"k8s.io/klog"
 	reg "sigs.k8s.io/k8s-container-image-promoter/lib/dockerregistry"
+	"sigs.k8s.io/k8s-container-image-promoter/lib/logclient"
 )
 
 func initServerContext(
@@ -46,7 +46,7 @@ func initServerContext(
 	}
 
 	erc := initErrorReportingClient(gcpProjectID)
-	logClient := initLogClient(gcpProjectID)
+	loggingFacility := logclient.NewGcpLoggingFacility(gcpProjectID, LogName)
 
 	serverContext := ServerContext{
 		ID:                   uuid,
@@ -54,27 +54,10 @@ func initServerContext(
 		RepoBranch:           branch,
 		ThinManifestDirPath:  path,
 		ErrorReportingClient: erc,
-		LogClient:            logClient,
+		LoggingFacility:      loggingFacility,
 	}
 
 	return &serverContext, nil
-}
-
-// initLogClient creates a logging client that performs better logging than the
-// default behavior on GCP Stackdriver. For instance, logs sent with this client
-// are not split up over newlines, and also the severity levels are actually
-// understood by Stackdriver.
-func initLogClient(projectID string) *logging.Client {
-
-	ctx := context.Background()
-
-	// Creates a client.
-	client, err := logging.NewClient(ctx, projectID)
-	if err != nil {
-		klog.Fatalf("Failed to create client: %v", err)
-	}
-
-	return client
 }
 
 func initErrorReportingClient(projectID string) *errorreporting.Client {
@@ -106,7 +89,7 @@ func Auditor(gcpProjectID, repoURL, branch, path, uuid string) {
 	klog.Infoln(serverContext)
 
 	// nolint[errcheck]
-	defer serverContext.LogClient.Close()
+	defer serverContext.LoggingFacility.Close()
 	// nolint[errcheck]
 	defer serverContext.ErrorReportingClient.Close()
 
@@ -246,9 +229,9 @@ func ParsePubSubMessage(r *http.Request) (*reg.GCRPubSubPayload, error) {
 // other.
 // nolint[funlen]
 func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
-	logInfo := s.LogClient.Logger(LogName).StandardLogger(logging.Info)
-	logError := s.LogClient.Logger(LogName).StandardLogger(logging.Error)
-	logAlert := s.LogClient.Logger(LogName).StandardLogger(logging.Alert)
+	logInfo := s.LoggingFacility.LogInfo
+	logError := s.LoggingFacility.LogError
+	logAlert := s.LoggingFacility.LogAlert
 
 	defer func() {
 		if msg := recover(); msg != nil {
