@@ -19,19 +19,19 @@ package audit
 import (
 	"net/url"
 
-	"cloud.google.com/go/errorreporting"
 	"sigs.k8s.io/k8s-container-image-promoter/lib/logclient"
+	"sigs.k8s.io/k8s-container-image-promoter/lib/report"
 )
 
 // ServerContext holds all of the initialization data for the server to start
 // up.
 type ServerContext struct {
-	ID                   string
-	RepoURL              *url.URL
-	RepoBranch           string
-	ThinManifestDirPath  string
-	ErrorReportingClient *errorreporting.Client
-	LoggingFacility      logclient.LoggingFacility
+	ID                     string
+	RepoURL                *url.URL
+	RepoBranch             string
+	ThinManifestDirPath    string
+	ErrorReportingFacility report.ReportingFacility
+	LoggingFacility        logclient.LoggingFacility
 }
 
 // PubSubMessageInner is the inner struct that holds the actual Pub/Sub
