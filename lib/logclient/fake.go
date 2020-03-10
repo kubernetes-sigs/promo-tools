@@ -21,20 +21,40 @@ import (
 	"os"
 )
 
-// FakeLogClient is a fake log client. Its sole purpose is to implement a NOP
-// "Close()" method, for tests.
-type FakeLogClient struct{}
+// FakeLogClient is a fake log client.
+type FakeLogClient struct {
+	// Because this is fake, there is no actual logging client.
+	loggers [3]*log.Logger
+}
 
 // Close is a NOP (there is nothing to close).
-func (fakeLogClient *FakeLogClient) Close() error { return nil }
+func (c *FakeLogClient) Close() error { return nil }
 
-// NewFakeLoggingFacility returns a new LoggingFacility, but whose resources are
-// all local (stdout), with a FakeLogClient.
-func NewFakeLoggingFacility() *LoggingFacility {
+// GetInfoLogger exposes the internal Info logger.
+func (c *FakeLogClient) GetInfoLogger() *log.Logger {
+	return c.loggers[IndexLogInfo]
+}
 
-	logInfo := log.New(os.Stderr, "FAKE-INFO", log.LstdFlags)
-	logError := log.New(os.Stderr, "FAKE-ERROR", log.LstdFlags)
-	logAlert := log.New(os.Stderr, "FAKE-ALERT", log.LstdFlags)
+// GetErrorLogger exposes the internal Error logger.
+func (c *FakeLogClient) GetErrorLogger() *log.Logger {
+	return c.loggers[IndexLogError]
+}
 
-	return New(logInfo, logError, logAlert, &FakeLogClient{})
+// GetAlertLogger exposes the internal Alert logger.
+func (c *FakeLogClient) GetAlertLogger() *log.Logger {
+	return c.loggers[IndexLogAlert]
+}
+
+// NewFakeLogClient returns a new FakeLogClient.
+func NewFakeLogClient() *FakeLogClient {
+	c := FakeLogClient{}
+
+	c.loggers[IndexLogInfo] = log.
+		New(os.Stderr, "FAKE-INFO", log.LstdFlags)
+	c.loggers[IndexLogError] = log.
+		New(os.Stderr, "FAKE-ERROR", log.LstdFlags)
+	c.loggers[IndexLogAlert] = log.
+		New(os.Stderr, "FAKE-ALERT", log.LstdFlags)
+
+	return &c
 }

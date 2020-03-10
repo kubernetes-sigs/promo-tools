@@ -31,7 +31,7 @@ type ServerContext struct {
 	RepoBranch           string
 	ThinManifestDirPath  string
 	ErrorReportingClient *errorreporting.Client
-	LoggingFacility      *logclient.LoggingFacility
+	LoggingFacility      logclient.LoggingFacility
 }
 
 // PubSubMessageInner is the inner struct that holds the actual Pub/Sub
