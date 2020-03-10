@@ -32,9 +32,9 @@ func (fakeLogClient *FakeLogClient) Close() error { return nil }
 // all local (stdout), with a FakeLogClient.
 func NewFakeLoggingFacility() *LoggingFacility {
 
-	logInfo := log.New(os.Stdout, "FAKE-INFO", log.LstdFlags)
-	logError := log.New(os.Stdout, "FAKE-ERROR", log.LstdFlags)
-	logAlert := log.New(os.Stdout, "FAKE-ALERT", log.LstdFlags)
+	logInfo := log.New(os.Stderr, "FAKE-INFO", log.LstdFlags)
+	logError := log.New(os.Stderr, "FAKE-ERROR", log.LstdFlags)
+	logAlert := log.New(os.Stderr, "FAKE-ALERT", log.LstdFlags)
 
 	return New(logInfo, logError, logAlert, &FakeLogClient{})
 }
