@@ -46,7 +46,11 @@ func initServerContext(
 	}
 
 	erc := initErrorReportingClient(gcpProjectID)
-	loggingFacility := logclient.NewGcpLoggingFacility(gcpProjectID, LogName)
+	loggingFacility, err := logclient.NewGcpLoggingFacility(
+		gcpProjectID, LogName)
+	if err != nil {
+		return nil, err
+	}
 
 	serverContext := ServerContext{
 		ID:                   uuid,

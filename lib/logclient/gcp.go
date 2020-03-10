@@ -20,35 +20,35 @@ import (
 	"context"
 
 	"cloud.google.com/go/logging"
-	"k8s.io/klog"
 )
 
 // NewGcpLoggingFacility returns a new LoggingFacility that logs to GCP
 // resources. As such, it requires the GCP projectID as well as the logName to
 // log to.
-func NewGcpLoggingFacility(projectID, logName string) *LoggingFacility {
-	gcpLogClient := initGcpLogClient(projectID)
+func NewGcpLoggingFacility(
+	projectID, logName string,
+) (*LoggingFacility, error) {
+
+	gcpLogClient, err := initGcpLogClient(projectID)
+	if err != nil {
+		return nil, err
+	}
 
 	logInfo := gcpLogClient.Logger(logName).StandardLogger(logging.Info)
 	logError := gcpLogClient.Logger(logName).StandardLogger(logging.Error)
 	logAlert := gcpLogClient.Logger(logName).StandardLogger(logging.Alert)
 
-	return New(logInfo, logError, logAlert, gcpLogClient)
+	return New(logInfo, logError, logAlert, gcpLogClient), nil
 }
 
 // initGcpLogClient creates a logging client that performs better logging than
 // the default behavior on GCP Stackdriver. For instance, logs sent with this
 // client are not split up over newlines, and also the severity levels are
 // actually understood by Stackdriver.
-func initGcpLogClient(projectID string) *logging.Client {
+func initGcpLogClient(projectID string) (*logging.Client, error) {
 
 	ctx := context.Background()
 
 	// Creates a client.
-	client, err := logging.NewClient(ctx, projectID)
-	if err != nil {
-		klog.Fatalf("Failed to create client: %v", err)
-	}
-
-	return client
+	return logging.NewClient(ctx, projectID)
 }
