@@ -33,7 +33,8 @@ func NewGcpErrorReportingClient(
 	erc, err := errorreporting.NewClient(ctx, projectID, errorreporting.Config{
 		ServiceName: serviceName,
 		OnError: func(err error) {
-			klog.Errorf("Could not log error: %v", err)
+			// nolint[lll]
+			klog.Errorf("Could not log error to GCP Stackdriver Error Reporting: %v", err)
 		},
 	})
 	if err != nil {
