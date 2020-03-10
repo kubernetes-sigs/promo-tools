@@ -46,7 +46,7 @@ func initServerContext(
 	}
 
 	erc := initErrorReportingClient(gcpProjectID)
-	loggingFacility, err := logclient.NewGcpLoggingFacility(
+	loggingFacility, err := logclient.NewGcpLogClient(
 		gcpProjectID, LogName)
 	if err != nil {
 		return nil, err
@@ -233,9 +233,9 @@ func ParsePubSubMessage(r *http.Request) (*reg.GCRPubSubPayload, error) {
 // other.
 // nolint[funlen]
 func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
-	logInfo := s.LoggingFacility.LogInfo
-	logError := s.LoggingFacility.LogError
-	logAlert := s.LoggingFacility.LogAlert
+	logInfo := s.LoggingFacility.GetInfoLogger()
+	logError := s.LoggingFacility.GetErrorLogger()
+	logAlert := s.LoggingFacility.GetAlertLogger()
 
 	defer func() {
 		if msg := recover(); msg != nil {

@@ -21,30 +21,23 @@ import (
 	"log"
 )
 
+// These constants refer to the logging levels.
+const (
+	IndexLogInfo = 0
+	IndexLogError
+	IndexLogAlert
+)
+
+// GetLoggers extracts 3 loggers, corresponding to the logging levels defined
+// above.
+type GetLoggers interface {
+	GetInfoLogger() *log.Logger
+	GetErrorLogger() *log.Logger
+	GetAlertLogger() *log.Logger
+}
+
 // LoggingFacility bundles 3 loggers together.
-type LoggingFacility struct {
-	LogInfo  *log.Logger
-	LogError *log.Logger
-	LogAlert *log.Logger
-
-	logClient io.Closer
-}
-
-// New returns a new LoggingFacility, based on the given loggers.
-func New(
-	logInfo, logError, logAlert *log.Logger,
-	logClient io.Closer,
-) *LoggingFacility {
-	return &LoggingFacility{
-		LogInfo:   logInfo,
-		LogError:  logError,
-		LogAlert:  logAlert,
-		logClient: logClient,
-	}
-}
-
-// Close implements the "Close" method for the LoggingFacility. This just calls
-// Close() on the "logClient".
-func (loggingFacility *LoggingFacility) Close() error {
-	return loggingFacility.logClient.Close()
+type LoggingFacility interface {
+	GetLoggers
+	io.Closer
 }
