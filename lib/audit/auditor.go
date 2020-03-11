@@ -21,18 +21,15 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"net/url"
 	"os"
-	"path/filepath"
 	"runtime/debug"
 	"strings"
 
 	"cloud.google.com/go/errorreporting"
-	git "gopkg.in/src-d/go-git.v4"
-	"gopkg.in/src-d/go-git.v4/plumbing"
 	"k8s.io/klog"
 	reg "sigs.k8s.io/k8s-container-image-promoter/lib/dockerregistry"
 	"sigs.k8s.io/k8s-container-image-promoter/lib/logclient"
+	"sigs.k8s.io/k8s-container-image-promoter/lib/remotemanifest"
 	"sigs.k8s.io/k8s-container-image-promoter/lib/report"
 )
 
@@ -40,11 +37,13 @@ func initServerContext(
 	gcpProjectID, repoURLStr, branch, path, uuid string,
 ) (*ServerContext, error) {
 
-	repoURL, err := url.Parse(repoURLStr)
+	remoteManifestFacility, err := remotemanifest.NewGit(
+		repoURLStr,
+		branch,
+		path)
 	if err != nil {
 		return nil, err
 	}
-
 	reportingFacility := report.NewGcpErrorReportingClient(
 		gcpProjectID, "cip-auditor")
 	loggingFacility, err := logclient.NewGcpLogClient(
@@ -55,9 +54,7 @@ func initServerContext(
 
 	serverContext := ServerContext{
 		ID:                     uuid,
-		RepoURL:                repoURL,
-		RepoBranch:             branch,
-		ThinManifestDirPath:    path,
+		RemoteManifestFacility: remoteManifestFacility,
 		ErrorReportingFacility: reportingFacility,
 		LoggingFacility:        loggingFacility,
 	}
@@ -93,80 +90,6 @@ func Auditor(gcpProjectID, repoURL, branch, path, uuid string) {
 	// Start HTTP server.
 	klog.Infof("Listening on port %s", port)
 	klog.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", port), nil))
-}
-
-func cloneToTempDir(
-	repoURL fmt.Stringer,
-	branch string,
-) (string, error) {
-	tdir, err := ioutil.TempDir("", "k8s.io-")
-	if err != nil {
-		return "", err
-	}
-
-	r, err := git.PlainClone(tdir, false, &git.CloneOptions{
-		URL:           repoURL.String(),
-		ReferenceName: (plumbing.ReferenceName)("refs/heads/" + branch),
-		Depth:         cloneDepth,
-	})
-	if err != nil {
-		return "", err
-	}
-
-	sha, err := getHeadSha(r)
-	if err == nil {
-		klog.Infof("cloned %v at revision %v", tdir, sha)
-	}
-
-	return tdir, nil
-}
-
-// It could be the case that the repository is defined simply as a local path on
-// disk (in the case of e2e tests where we do not have a full-fledghed online
-// repository for the manifests we want to audit) --- in such cases, we have to
-// use the local path instead of freshly cloning a remote repo.
-func (s *ServerContext) getManifests() ([]reg.Manifest, error) {
-	// There is no remote; use the local path directly.
-	if len(s.RepoURL.String()) == 0 {
-		manifests, err := reg.ParseThinManifestsFromDir(s.ThinManifestDirPath)
-		if err != nil {
-			return nil, err
-		}
-
-		return manifests, nil
-	}
-
-	var repoPath string
-	repoPath, err := cloneToTempDir(s.RepoURL, s.RepoBranch)
-	if err != nil {
-		return nil, err
-	}
-
-	manifests, err := reg.ParseThinManifestsFromDir(
-		filepath.Join(repoPath, s.ThinManifestDirPath))
-	if err != nil {
-		return nil, err
-	}
-
-	// Garbage-collect freshly-cloned repo (we don't need it any more).
-	err = os.RemoveAll(repoPath)
-	if err != nil {
-		// We don't really care too much about failures about removing the
-		// (temporary) repoPath directory, because we'll clone a fresh one
-		// anyway in the future. So don't return an error even if this fails.
-		klog.Errorf("Could not remove temporary Git repo %v: %v", repoPath, err)
-	}
-
-	return manifests, nil
-}
-
-func getHeadSha(repo *git.Repository) (string, error) {
-	head, err := repo.Head()
-	if err != nil {
-		return "", err
-	}
-
-	return head.Hash().String(), nil
 }
 
 // ParsePubSubMessage parses an HTTP request body into a reg.GCRPubSubPayload.
@@ -253,7 +176,7 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 	logInfo.Println(msg)
 
 	// (2) Clone fresh repo (or use one already on disk).
-	manifests, err := s.getManifests()
+	manifests, err := s.RemoteManifestFacility.Fetch()
 	if err != nil {
 		logError.Println(err)
 		// If there is an error, return an HTTP error so that the Pub/Sub
@@ -265,9 +188,7 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 
 	// Debug info.
 	logInfo.Printf("(%s) gcrPayload: %v", s.ID, gcrPayload)
-	logInfo.Printf("(%s) s.RepoURL: %v", s.ID, s.RepoURL)
-	logInfo.Printf("(%s) s.RepoBranch: %v", s.ID, s.RepoBranch)
-	logInfo.Printf("(%s) s.ThinManifestDirPath: %v", s.ID, s.ThinManifestDirPath)
+	logInfo.Printf("(%s) RemoteManifestFacility: %v", s.ID, s.RemoteManifestFacility)
 
 	// (3) Compare GCR state change with the intent of the promoter manifests.
 	for _, manifest := range manifests {

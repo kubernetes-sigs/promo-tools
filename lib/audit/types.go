@@ -17,9 +17,8 @@ limitations under the License.
 package audit
 
 import (
-	"net/url"
-
 	"sigs.k8s.io/k8s-container-image-promoter/lib/logclient"
+	"sigs.k8s.io/k8s-container-image-promoter/lib/remotemanifest"
 	"sigs.k8s.io/k8s-container-image-promoter/lib/report"
 )
 
@@ -27,9 +26,7 @@ import (
 // up.
 type ServerContext struct {
 	ID                     string
-	RepoURL                *url.URL
-	RepoBranch             string
-	ThinManifestDirPath    string
+	RemoteManifestFacility remotemanifest.Facility
 	ErrorReportingFacility report.ReportingFacility
 	LoggingFacility        logclient.LoggingFacility
 }
@@ -48,7 +45,6 @@ type PubSubMessage struct {
 }
 
 const (
-	cloneDepth = 1
 	// LogName is the auditing log name to use. This is the name that comes up
 	// for "gcloud logging logs list".
 	LogName = "cip-audit-log"
