@@ -156,7 +156,17 @@ func main() {
 			uuid = guuid.New().String()
 			klog.Infof("Starting auditor in Regular Mode (%s)", uuid)
 		}
-		audit.Auditor(*auditGcpProjectID, *auditManifestRepoUrlPtr, *auditManifestRepoBranchPtr, *auditManifestPathPtr, uuid)
+
+		auditServerContext, err := audit.InitRealServerContext(
+			*auditGcpProjectID,
+			*auditManifestRepoUrlPtr,
+			*auditManifestRepoBranchPtr,
+			*auditManifestPathPtr,
+			uuid)
+		if err != nil {
+			klog.Exitln(err)
+		}
+		auditServerContext.RunAuditor()
 	}
 
 	// Activate service accounts.

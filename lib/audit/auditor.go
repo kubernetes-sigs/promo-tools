@@ -33,7 +33,10 @@ import (
 	"sigs.k8s.io/k8s-container-image-promoter/lib/report"
 )
 
-func initServerContext(
+// InitRealServerContext creates a ServerContext with facilities that are meant
+// for production use (going over the network to fetch actual official promoter
+// manifests from GitHub, for example).
+func InitRealServerContext(
 	gcpProjectID, repoURLStr, branch, path, uuid string,
 ) (*ServerContext, error) {
 
@@ -57,29 +60,27 @@ func initServerContext(
 		RemoteManifestFacility: remoteManifestFacility,
 		ErrorReportingFacility: reportingFacility,
 		LoggingFacility:        loggingFacility,
+		GcrReadingFacility: GcrReadingFacility{
+			ReadRepo:         reg.MkReadRepositoryCmdReal,
+			ReadManifestList: reg.MkReadManifestListCmdReal,
+		},
 	}
 
 	return &serverContext, nil
 }
 
-// Auditor runs an HTTP server.
-func Auditor(gcpProjectID, repoURL, branch, path, uuid string) {
+// RunAuditor runs an HTTP server.
+func (s *ServerContext) RunAuditor() {
 	klog.Info("Starting Auditor")
-	serverContext, err := initServerContext(
-		gcpProjectID, repoURL, branch, path, uuid)
-	if err != nil {
-		klog.Exitln(err)
-	}
-
-	klog.Infoln(serverContext)
+	klog.Infoln(s)
 
 	// nolint[errcheck]
-	defer serverContext.LoggingFacility.Close()
+	defer s.LoggingFacility.Close()
 	// nolint[errcheck]
-	defer serverContext.ErrorReportingFacility.Close()
+	defer s.ErrorReportingFacility.Close()
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		serverContext.Audit(w, r)
+		s.Audit(w, r)
 	})
 	// Determine port for HTTP service.
 	port := os.Getenv("PORT")
