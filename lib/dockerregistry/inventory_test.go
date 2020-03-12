@@ -2932,10 +2932,10 @@ func TestMatch(t *testing.T) {
 		},
 		filepath: "a/promoter-manifest.yaml"}
 	var tests = []struct {
-		name             string
-		mfest            Manifest
-		gcrPayload       GCRPubSubPayload
-		expectedContains GcrPayloadMatch
+		name          string
+		mfest         Manifest
+		gcrPayload    GCRPubSubPayload
+		expectedMatch GcrPayloadMatch
 	}{
 		{
 			"INSERT message contains both Digest and Tag",
@@ -2957,7 +2957,7 @@ func TestMatch(t *testing.T) {
 			FlagPathMatched | FlagDigestMatched,
 		},
 		{
-			"INSERT's digest is not in Manifest (digest only, but path matched)",
+			"INSERT's digest is not in Manifest (digest mismatch, but path matched)",
 			inputMfest,
 			GCRPubSubPayload{
 				Action: "INSERT",
@@ -2966,7 +2966,7 @@ func TestMatch(t *testing.T) {
 			FlagPathMatched,
 		},
 		{
-			"INSERT's digest is not in Manifest (tag specified, but path matched)",
+			"INSERT's digest is not in Manifest (neither digest nor tag match, but path matched)",
 			inputMfest,
 			GCRPubSubPayload{
 				Action: "INSERT",
@@ -2976,20 +2976,20 @@ func TestMatch(t *testing.T) {
 			FlagPathMatched,
 		},
 		{
-			"INSERT's digest is not in Manifest (tag specified, but path matched)",
+			"INSERT's digest is not in Manifest (tag specified, but tag mismatch)",
 			inputMfest,
 			GCRPubSubPayload{
 				Action: "INSERT",
-				Digest: "us.gcr.io/some-prod/foo-controller@sha256:000",
-				Tag:    "us.gcr.io/some-prod/foo-controller:1.0",
+				Digest: "us.gcr.io/some-prod/foo-controller@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+				Tag:    "us.gcr.io/some-prod/foo-controller:white-powder",
 			},
-			FlagPathMatched,
+			FlagPathMatched | FlagDigestMatched | FlagTagMismatch,
 		},
 	}
 
 	for _, test := range tests {
-		contains := test.gcrPayload.Match(test.mfest)
-		errEqual := checkEqual(contains, test.expectedContains)
+		got := test.gcrPayload.Match(test.mfest)
+		errEqual := checkEqual(got, test.expectedMatch)
 		checkError(t, errEqual, fmt.Sprintf("checkError: test %q: shouldBeValid\n", test.name))
 	}
 }
