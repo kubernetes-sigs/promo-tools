@@ -23,7 +23,7 @@ import (
 
 // These constants refer to the logging levels.
 const (
-	IndexLogInfo = 0
+	IndexLogInfo = iota
 	IndexLogError
 	IndexLogAlert
 )

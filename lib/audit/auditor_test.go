@@ -35,6 +35,15 @@ import (
 	"sigs.k8s.io/k8s-container-image-promoter/lib/stream"
 )
 
+func checkMatch(haystack []byte, re *regexp.Regexp) error {
+	if !re.Match(haystack) {
+		return fmt.Errorf(
+			`!!! COULD NOT FIND MATCH FOR %q`,
+			re.String())
+	}
+	return nil
+}
+
 func checkEqual(got, expected interface{}) error {
 	if !reflect.DeepEqual(got, expected) {
 		return fmt.Errorf(
@@ -136,6 +145,7 @@ func TestParsePubSubMessage(t *testing.T) {
 	}
 }
 
+// nolint[gocyclo]
 func TestAudit(t *testing.T) {
 	// Regression test case for
 	// https://github.com/kubernetes-sigs/k8s-container-image-promoter/issues/191.
@@ -163,12 +173,19 @@ func TestAudit(t *testing.T) {
 		},
 	}
 
+	type expectedPatterns struct {
+		report []string
+		info   []string
+		error  []string
+		alert  []string
+	}
+
 	var shouldBeValid = []struct {
 		name             string
 		payload          reg.GCRPubSubPayload
 		readRepo         map[string]string
 		readManifestList map[string]string
-		expectedPattern  string
+		expectedPatterns expectedPatterns
 	}{
 		{
 			"basic child manifest (tagless child image, digest not in promoter manifest, but parent image is in promoter manifest)",
@@ -301,7 +318,12 @@ func TestAudit(t *testing.T) {
    ]
 }`,
 			},
-			`TRANSACTION VERIFIED`,
+			expectedPatterns{
+				report: nil,
+				info:   []string{`TRANSACTION VERIFIED`},
+				error:  nil,
+				alert:  nil,
+			},
 		},
 	}
 
@@ -386,11 +408,54 @@ func TestAudit(t *testing.T) {
 				status, http.StatusOK)
 		}
 
-		infoBuffer := loggingFacility.GetInfoBuffer()
+		// Check all buffers for how the output should look like.
+		reportBuffer := reportingFacility.GetReportBuffer()
+		infoLogBuffer := loggingFacility.GetInfoBuffer()
+		errorLogBuffer := loggingFacility.GetErrorBuffer()
+		alertLogBuffer := loggingFacility.GetAlertBuffer()
 
-		re := regexp.MustCompile(test.expectedPattern)
-		if !re.Match(infoBuffer.Bytes()) {
-			t.Errorf("transaction was not verified")
+		if len(test.expectedPatterns.report) > 0 {
+			for _, pattern := range test.expectedPatterns.report {
+				re := regexp.MustCompile(pattern)
+				err := checkMatch(reportBuffer.Bytes(), re)
+				checkError(t, err, fmt.Sprintf("test: %s (reportBuffer)\n", test.name))
+			}
+		} else {
+			errEqual := checkEqual(reportBuffer.String(), "")
+			checkError(t, errEqual, fmt.Sprintf("test: %s (reportBuffer)\n", test.name))
+		}
+
+		if len(test.expectedPatterns.info) > 0 {
+			for _, pattern := range test.expectedPatterns.info {
+				re := regexp.MustCompile(pattern)
+				err := checkMatch(infoLogBuffer.Bytes(), re)
+				checkError(t, err, fmt.Sprintf("test: %s (infoLogBuffer)\n", test.name))
+			}
+		} else {
+			errEqual := checkEqual(infoLogBuffer.String(), "")
+			checkError(t, errEqual, fmt.Sprintf("test: %s (infoLogBuffer)\n", test.name))
+		}
+
+		if len(test.expectedPatterns.error) > 0 {
+			for _, pattern := range test.expectedPatterns.error {
+				re := regexp.MustCompile(pattern)
+				err := checkMatch(errorLogBuffer.Bytes(), re)
+				checkError(t, err, fmt.Sprintf("test: %s (errorLogBuffer)\n", test.name))
+			}
+		} else {
+			errEqual := checkEqual(errorLogBuffer.String(), "")
+			checkError(t, errEqual, fmt.Sprintf("test: %s (errorLogBuffer)\n", test.name))
+		}
+
+		if len(test.expectedPatterns.alert) > 0 {
+			for _, pattern := range test.expectedPatterns.alert {
+				re := regexp.MustCompile(pattern)
+				err := checkMatch(alertLogBuffer.Bytes(), re)
+				checkError(t, err, fmt.Sprintf("test: %s (alertLogBuffer)\n", test.name))
+			}
+		} else {
+			errEqual := checkEqual(alertLogBuffer.String(), "")
+			checkError(t, errEqual, fmt.Sprintf("test: %s (alertLogBuffer)\n", test.name))
 		}
 	}
 }
