@@ -17,14 +17,15 @@ limitations under the License.
 package logclient
 
 import (
+	"bytes"
 	"log"
-	"os"
 )
 
 // FakeLogClient is a fake log client.
 type FakeLogClient struct {
 	// Because this is fake, there is no actual logging client.
 	loggers [3]*log.Logger
+	buffers [3]bytes.Buffer
 }
 
 // Close is a NOP (there is nothing to close).
@@ -45,16 +46,31 @@ func (c *FakeLogClient) GetAlertLogger() *log.Logger {
 	return c.loggers[IndexLogAlert]
 }
 
+// GetInfoBuffer exposes the internal Info logger's buffer.
+func (c *FakeLogClient) GetInfoBuffer() bytes.Buffer {
+	return c.buffers[IndexLogInfo]
+}
+
+// GetErrorBuffer exposes the internal Error logger's buffer.
+func (c *FakeLogClient) GetErrorBuffer() bytes.Buffer {
+	return c.buffers[IndexLogError]
+}
+
+// GetAlertBuffer exposes the internal Alert logger's buffer.
+func (c *FakeLogClient) GetAlertBuffer() bytes.Buffer {
+	return c.buffers[IndexLogAlert]
+}
+
 // NewFakeLogClient returns a new FakeLogClient.
 func NewFakeLogClient() *FakeLogClient {
 	c := FakeLogClient{}
 
 	c.loggers[IndexLogInfo] = log.
-		New(os.Stderr, "FAKE-INFO", log.LstdFlags)
+		New(&c.buffers[IndexLogInfo], "FAKE-INFO", log.LstdFlags)
 	c.loggers[IndexLogError] = log.
-		New(os.Stderr, "FAKE-ERROR", log.LstdFlags)
+		New(&c.buffers[IndexLogError], "FAKE-ERROR", log.LstdFlags)
 	c.loggers[IndexLogAlert] = log.
-		New(os.Stderr, "FAKE-ALERT", log.LstdFlags)
+		New(&c.buffers[IndexLogAlert], "FAKE-ALERT", log.LstdFlags)
 
 	return &c
 }
