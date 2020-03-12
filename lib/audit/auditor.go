@@ -190,9 +190,10 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 	logInfo.Printf("(%s) gcrPayload: %v", s.ID, gcrPayload)
 	logInfo.Printf("(%s) RemoteManifestFacility: %v", s.ID, s.RemoteManifestFacility)
 
-	// (3) Compare GCR state change with the intent of the promoter manifests.
+	// (3) Compare GCR state change with the intent of the promoter manifests
+	// (exact digest match on a tagged or tagless image).
 	for _, manifest := range manifests {
-		if manifest.Contains(*gcrPayload) {
+		if manifest.Contains(*gcrPayload)&(reg.FlagDigestMatched|reg.FlagTagMatched) != 0 {
 			msg := fmt.Sprintf(
 				"(%s) TRANSACTION VERIFIED: %v: agrees with manifest\n", s.ID, gcrPayload)
 			logInfo.Println(msg)
