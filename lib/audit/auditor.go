@@ -234,28 +234,15 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	// Find the subproject's registry.
-	var srcRegistry reg.RegistryContext
-	for _, rc := range sc.RegistryContexts {
-		if !rc.Src {
-			continue
-		}
-		rcNameParts := strings.Split(string(rc.Name), "/")
-		if len(rcNameParts) < 3 {
-			continue
-		}
-		// Find the subproject key from the pub/sub message.
-		klog.Infof("subproject name: %s", rcNameParts[2])
-		if strings.HasSuffix(string(rc.Name), rcNameParts[2]) {
-			rcBound := rc // Avoid loop reference variable.
-			srcRegistry = rcBound
-			break
-		}
-	}
-	// If we can't find the source registry for this image, then reject the
+	// Find the subproject repository responsible for the GCRPubSubPayload. This
+	// is so that we can query the subproject to figure out all digests that
+	// belong there, so that we can validate the child manifest in the
+	// GCRPubSubPayload.
+	srcRegistry, err := GetMatchingSourceRegistry(manifests, *gcrPayload)
+	// If we can't find any source registry for this image, then reject the
 	// transaction.
-	if string(srcRegistry.Name) == "" {
-		msg := fmt.Sprintf("(%s) TRANSACTION REJECTED: could not determine source registry: %v", s.ID, gcrPayload)
+	if err != nil {
+		msg := fmt.Sprintf("(%s) TRANSACTION REJECTED: %v", s.ID, err)
 		_, _ = w.Write([]byte(msg))
 		panic(msg)
 	}
@@ -291,4 +278,30 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 	// same message is not repeated over and over again in the logs.
 	_, _ = w.Write([]byte(msg))
 	panic(msg)
+}
+
+// GetMatchingSourceRegistry gets the first source repository that matches the
+// image information inside a GCRPubSubPayload.
+func GetMatchingSourceRegistry(
+	manifests []reg.Manifest,
+	gcrPayload reg.GCRPubSubPayload,
+) (reg.RegistryContext, error) {
+
+	for _, manifest := range manifests {
+		if manifest.Contains(gcrPayload) == 0 {
+			continue
+		}
+		// Now that there is a match (at least a FlagPathMatch), just fish out
+		// the source registry in the manifest.
+		for _, rc := range manifest.Registries {
+			if rc.Src {
+				return rc, nil
+			}
+		}
+	}
+
+	return reg.RegistryContext{},
+		fmt.Errorf(
+			"could not find matching source registry for %v",
+			gcrPayload.Digest)
 }
