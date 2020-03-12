@@ -2935,7 +2935,7 @@ func TestContains(t *testing.T) {
 		name             string
 		mfest            Manifest
 		gcrPayload       GCRPubSubPayload
-		expectedContains bool
+		expectedContains GcrPayloadMatch
 	}{
 		{
 			"INSERT message contains both Digest and Tag",
@@ -2945,7 +2945,7 @@ func TestContains(t *testing.T) {
 				Digest: "us.gcr.io/some-prod/foo-controller@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 				Tag:    "us.gcr.io/some-prod/foo-controller:1.0",
 			},
-			true,
+			FlagPathMatched | FlagDigestMatched | FlagTagMatched,
 		},
 		{
 			"INSERT message only contains Digest",
@@ -2954,36 +2954,36 @@ func TestContains(t *testing.T) {
 				Action: "INSERT",
 				Digest: "us.gcr.io/some-prod/foo-controller@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 			},
-			true,
+			FlagPathMatched | FlagDigestMatched,
 		},
 		{
-			"INSERT's digest is not in Manifest (digest only)",
+			"INSERT's digest is not in Manifest (digest only, but path matched)",
 			inputMfest,
 			GCRPubSubPayload{
 				Action: "INSERT",
 				Digest: "us.gcr.io/some-prod/foo-controller@sha256:000",
 			},
-			false,
+			FlagPathMatched,
 		},
 		{
-			"INSERT's digest is not in Manifest (tag specified)",
-			inputMfest,
-			GCRPubSubPayload{
-				Action: "INSERT",
-				Digest: "us.gcr.io/some-prod/foo-controller@sha256:000",
-				Tag:    "us.gcr.io/some-prod/foo-controller:1.0",
-			},
-			false,
-		},
-		{
-			"INSERT's digest is not in Manifest (tag specified)",
+			"INSERT's digest is not in Manifest (tag specified, but path matched)",
 			inputMfest,
 			GCRPubSubPayload{
 				Action: "INSERT",
 				Digest: "us.gcr.io/some-prod/foo-controller@sha256:000",
 				Tag:    "us.gcr.io/some-prod/foo-controller:1.0",
 			},
-			false,
+			FlagPathMatched,
+		},
+		{
+			"INSERT's digest is not in Manifest (tag specified, but path matched)",
+			inputMfest,
+			GCRPubSubPayload{
+				Action: "INSERT",
+				Digest: "us.gcr.io/some-prod/foo-controller@sha256:000",
+				Tag:    "us.gcr.io/some-prod/foo-controller:1.0",
+			},
+			FlagPathMatched,
 		},
 	}
 
