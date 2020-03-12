@@ -2527,8 +2527,11 @@ func GetDeleteCmd(
 		cmd)
 }
 
-// GcrPayloadMatch holds flags for matching a GCRPubSubPayload against a
+// GcrPayloadMatch holds bitwise flags for matching a GCRPubSubPayload against a
 // promoter manifest.
+//
+// For an example of how bitwise flags work, see
+// https://yourbasic.org/golang/bitmask-flag-set-clear/.
 type GcrPayloadMatch uint
 
 const (
