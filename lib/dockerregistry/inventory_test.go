@@ -2902,7 +2902,7 @@ func TestParseContainerParts(t *testing.T) {
 	}
 }
 
-func TestContains(t *testing.T) {
+func TestMatch(t *testing.T) {
 	inputMfest := Manifest{
 		Registries: []RegistryContext{
 			{
@@ -2988,7 +2988,7 @@ func TestContains(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		contains := test.mfest.Contains(test.gcrPayload)
+		contains := test.gcrPayload.Match(test.mfest)
 		errEqual := checkEqual(contains, test.expectedContains)
 		checkError(t, errEqual, fmt.Sprintf("checkError: test %q: shouldBeValid\n", test.name))
 	}

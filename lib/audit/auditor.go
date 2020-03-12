@@ -194,7 +194,9 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 	// (3) Compare GCR state change with the intent of the promoter manifests
 	// (exact digest match on a tagged or tagless image).
 	for _, manifest := range manifests {
-		if manifest.Contains(*gcrPayload)&(reg.FlagDigestMatched|reg.FlagTagMatched) != 0 {
+		m := gcrPayload.Match(manifest)
+		if m&(reg.FlagDigestMatched|reg.FlagTagMatched) != 0 &&
+			m&(reg.FlagTagMismatch) == 0 {
 			msg := fmt.Sprintf(
 				"(%s) TRANSACTION VERIFIED: %v: agrees with manifest\n", s.ID, gcrPayload)
 			logInfo.Println(msg)
@@ -288,7 +290,7 @@ func GetMatchingSourceRegistry(
 ) (reg.RegistryContext, error) {
 
 	for _, manifest := range manifests {
-		if manifest.Contains(gcrPayload) == 0 {
+		if gcrPayload.Match(manifest) == 0 {
 			continue
 		}
 		// Now that there is a match (at least a FlagPathMatch), just fish out

@@ -2543,71 +2543,105 @@ const (
 	FlagDigestMatched
 	// FlagTagMatched is ONLY matched if the digest also matches.
 	FlagTagMatched
+	// FlagTagMismatch is only set if the digest matches, but the tag found in
+	// the payload does NOT match what is found in the promoter manifest for the
+	// digest. This can happen if somone manually tweaks a tag in GCR (assume
+	// bad actor) to something other than what is specified in the promoter
+	// manifest.
+	FlagTagMismatch
 )
 
-// Contains checks whether a given Manifest mentions the contents of a
-// gcrPayload (re-interpreted as a FQIN or PQIN). The "useHash" parameter is
-// whether the FQIN search should include the digest; this should be "false" for
-// cases where we want to check a gcrPayload containing a child image manifest,
-// where the digest is not recorded in the promoter manifest (because it may be
-// that only the parent manifest is recorded).
-//
-// nolint[gocyclo]
-func (m Manifest) Contains(
-	gcrPayload GCRPubSubPayload,
+// Match checks whether a GCRPubSubPayload is mentioned in a Manifest. The
+// degree of the match is reflected in the GcrPayloadMatch result.
+func (payload GCRPubSubPayload) Match(m Manifest) GcrPayloadMatch {
+	var r GcrPayloadMatch
+	for _, rc := range m.Registries {
+		r = payload.matchImages(rc, m.Images)
+		if r&FlagPathMatched != 0 {
+			return r
+		}
+	}
+	return r
+}
+
+func (payload GCRPubSubPayload) matchImages(
+	rc RegistryContext,
+	images []Image,
+) GcrPayloadMatch {
+
+	var r GcrPayloadMatch
+	// We do not look at source registries, because the payload will only
+	// contain the image name as it appears on the destination (production).
+	// So the prefix and substring checks only make sense for the
+	// destination registries.
+	if rc.Src {
+		return r
+	}
+	// Speed up the search by skipping over registry names whose leading
+	// characters do not match.
+	if !strings.HasPrefix(payload.Digest, (string)(rc.Name)) {
+		return r
+	}
+
+	for _, image := range images {
+		r = payload.matchImage(rc, image)
+		// If we have just a path match, return early because we should
+		// limit the scope of the search to just 1 image.
+		if r&FlagPathMatched != 0 {
+			return r
+		}
+	}
+	return r
+}
+
+func (payload GCRPubSubPayload) matchImage(
+	rc RegistryContext,
+	image Image,
 ) GcrPayloadMatch {
 
 	var r GcrPayloadMatch
 
-	for _, rc := range m.Registries {
-		if rc.Src {
+	if !strings.Contains(payload.Digest, (string)(image.ImageName)) {
+		return r
+	}
+	r |= FlagPathMatched
+	for digest, tags := range image.Dmap {
+		fqin := ToFQIN(rc.Name, image.ImageName, digest)
+		// The payload.Digest field actually holds the FQIN.
+		if payload.Digest != fqin {
 			continue
 		}
-		// Speed up the search by skipping over registry names whose leading
-		// characters do not match.
-		if !strings.HasPrefix(gcrPayload.Digest, (string)(rc.Name)) {
+		r |= FlagDigestMatched
+
+		// Now perform an additional check on the Tag, if that field is
+		// available. I.e., if payload.Tag is non-empty, a
+		// particular PQIN change occurred in GCR. Such a change
+		// MUST match both the digest and tag combination as set out
+		// in the manifest.
+		//
+		// Matching solely on the tag (but not digest) or vice versa
+		// goes AGAINST the intent of the promoter manifest and is
+		// cause for alarm!
+		if len(payload.Tag) == 0 {
 			continue
+		}
+		for _, tag := range tags {
+			pqin := ToPQIN(rc.Name, image.ImageName, tag)
+			// The payload.Tag field actually holds the PQIN.
+			if payload.Tag == pqin {
+				r |= FlagTagMatched
+			}
 		}
 
-		for _, image := range m.Images {
-			if !strings.Contains(gcrPayload.Digest, (string)(image.ImageName)) {
-				continue
-			}
-			r |= FlagPathMatched
-			for digest, tags := range image.Dmap {
-				fqin := ToFQIN(rc.Name, image.ImageName, digest)
-				if len(gcrPayload.Tag) == 0 {
-					// The gcrPayload.Digest field actually holds the FQIN.
-					if gcrPayload.Digest == fqin {
-						r |= FlagDigestMatched
-					}
-				} else {
-					// If gcrPayload.Tag is non-empty, then that means a
-					// particular PQIN change occurred in GCR. In this case, it
-					// MUST match both the digest and tag combination as set out
-					// in the manifest.
-					//
-					// Matching solely on the tag (but not digest) or vice versa
-					// goes AGAINST the intent of the promoter manifest and is
-					// cause for alarm!
-					for _, tag := range tags {
-						pqin := ToPQIN(rc.Name, image.ImageName, tag)
-						// The gcrPayload.Tag field actually holds the PQIN.
-						if gcrPayload.Tag == pqin {
-							if gcrPayload.Digest == fqin {
-								r |= FlagDigestMatched
-								r |= FlagTagMatched
-							}
-						}
-					}
-				}
-			}
-			// If we have just a path match, return early because we should
-			// limit the scope of the search to just 1 image.
-			if r&FlagPathMatched != 0 {
-				return r
-			}
+		// If the digest matched, but the tag did NOT match, it's very
+		// bad!
+		if r&FlagTagMatched == 0 {
+			r |= FlagTagMismatch
 		}
+
+		// By this point we have searched as much as we can for the matching
+		// digest, so terminate the search.
+		break
 	}
 	return r
 }
