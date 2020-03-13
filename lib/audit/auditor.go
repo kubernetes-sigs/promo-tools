@@ -213,6 +213,8 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	logInfo.Printf("could not find direct manifest entry for %v; assuming child manifest", gcrPayload)
+
 	// (4) It could be that the manifest is a child manifest (part of a fat
 	// manifest). This is the case where the user only specifies the digest of
 	// the parent image, but not the child image. When the promoter copies over

@@ -150,7 +150,7 @@ func TestParsePubSubMessage(t *testing.T) {
 func TestAudit(t *testing.T) {
 	// Regression test case for
 	// https://github.com/kubernetes-sigs/k8s-container-image-promoter/issues/191.
-	manifests := []reg.Manifest{
+	manifests1 := []reg.Manifest{
 		{
 			Registries: []reg.RegistryContext{
 				{
@@ -174,29 +174,8 @@ func TestAudit(t *testing.T) {
 		},
 	}
 
-	type expectedPatterns struct {
-		report []string
-		info   []string
-		error  []string
-		alert  []string
-	}
-
-	var shouldBeValid = []struct {
-		name             string
-		payload          reg.GCRPubSubPayload
-		readRepo         map[string]string
-		readManifestList map[string]string
-		expectedPatterns expectedPatterns
-	}{
-		{
-			"basic child manifest (tagless child image, digest not in promoter manifest, but parent image is in promoter manifest)",
-			reg.GCRPubSubPayload{
-				Action: "INSERT",
-				FQIN:   "us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent@sha256:8735603bbd7153b8bfc8d2460481282bb44e2e830e5b237738e5c3e2a58c8f45",
-				PQIN:   "",
-			},
-			map[string]string{
-				"gcr.io/k8s-staging-kas-network-proxy": `{
+	readRepo1 := map[string]string{
+		"gcr.io/k8s-staging-kas-network-proxy": `{
   "child": [
     "proxy-agent"
   ],
@@ -204,7 +183,7 @@ func TestAudit(t *testing.T) {
   "name": "k8s-staging-kas-network-proxy",
   "tags": []
 }`,
-				"gcr.io/k8s-staging-kas-network-proxy/proxy-agent": `{
+		"gcr.io/k8s-staging-kas-network-proxy/proxy-agent": `{
   "child": [],
   "manifest": {
     "sha256:43273b274ee48f7fd7fc09bc82e7e75ddc596ca219fd9b522b1701bebec6ceff": {
@@ -263,11 +242,12 @@ func TestAudit(t *testing.T) {
     "v0.0.8"
   ]
 }`,
-			},
-			map[string]string{
-				// This is the response for reading the manifest for the parent
-				// image by digest.
-				"gcr.io/k8s-staging-kas-network-proxy/proxy-agent@sha256:c419394f3fa40c32352be5a6ec5865270376d4351a3756bb1893be3f28fcba32": `{
+	}
+
+	// This is the response for reading the manifest for the parent
+	// image by digest.
+	readManifestList1 := map[string]string{
+		"gcr.io/k8s-staging-kas-network-proxy/proxy-agent@sha256:c419394f3fa40c32352be5a6ec5865270376d4351a3756bb1893be3f28fcba32": `{
    "schemaVersion": 2,
    "mediaType": "application/vnd.docker.distribution.manifest.list.v2+json",
    "manifests": [
@@ -318,7 +298,50 @@ func TestAudit(t *testing.T) {
       }
    ]
 }`,
+	}
+
+	type expectedPatterns struct {
+		report []string
+		info   []string
+		error  []string
+		alert  []string
+	}
+
+	var shouldBeValid = []struct {
+		name             string
+		manifests        []reg.Manifest
+		payload          reg.GCRPubSubPayload
+		readRepo         map[string]string
+		readManifestList map[string]string
+		expectedPatterns expectedPatterns
+	}{
+		{
+			"direct manifest (tagless image)",
+			manifests1,
+			reg.GCRPubSubPayload{
+				Action: "INSERT",
+				FQIN:   "us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent@sha256:c419394f3fa40c32352be5a6ec5865270376d4351a3756bb1893be3f28fcba32",
+				PQIN:   "us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent:v0.0.8",
 			},
+			readRepo1,
+			readManifestList1,
+			expectedPatterns{
+				report: nil,
+				info:   []string{`TRANSACTION VERIFIED`, `proxy-agent:v0.0.8}: agrees with manifest`},
+				error:  nil,
+				alert:  nil,
+			},
+		},
+		{
+			"child manifest (tagless child image, digest not in promoter manifest, but parent image is in promoter manifest)",
+			manifests1,
+			reg.GCRPubSubPayload{
+				Action: "INSERT",
+				FQIN:   "us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent@sha256:8735603bbd7153b8bfc8d2460481282bb44e2e830e5b237738e5c3e2a58c8f45",
+				PQIN:   "",
+			},
+			readRepo1,
+			readManifestList1,
 			expectedPatterns{
 				report: nil,
 				info:   []string{`TRANSACTION VERIFIED`},
@@ -394,7 +417,7 @@ func TestAudit(t *testing.T) {
 		loggingFacility := logclient.NewFakeLogClient()
 
 		s := initFakeServerContext(
-			manifests,
+			test.manifests,
 			reportingFacility,
 			loggingFacility,
 			fakeReadRepo,
