@@ -349,6 +349,23 @@ func TestAudit(t *testing.T) {
 				alert:  nil,
 			},
 		},
+		{
+			"image not found (no path match, even though the digest is found in the promoter manifest)",
+			manifests1,
+			reg.GCRPubSubPayload{
+				Action: "INSERT",
+				Digest: "us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent-white-powder@sha256:c419394f3fa40c32352be5a6ec5865270376d4351a3756bb1893be3f28fcba32",
+				Tag:    "",
+			},
+			readRepo1,
+			readManifestList1,
+			expectedPatterns{
+				report: []string{`TRANSACTION REJECTED`},
+				info:   []string{`c419394f3fa40c32352be5a6ec5865270376d4351a3756bb1893be3f28fcba32 }; assuming child manifest`},
+				error:  nil,
+				alert:  []string{`TRANSACTION REJECTED`, `c419394f3fa40c32352be5a6ec5865270376d4351a3756bb1893be3f28fcba32 }: could not validate`},
+			},
+		},
 	}
 
 	for _, test := range shouldBeValid {
