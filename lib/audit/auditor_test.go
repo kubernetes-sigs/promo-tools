@@ -327,7 +327,7 @@ func TestAudit(t *testing.T) {
 			readManifestList1,
 			expectedPatterns{
 				report: nil,
-				info:   []string{`TRANSACTION VERIFIED`, `proxy-agent:v0.0.8}: agrees with manifest`},
+				info:   []string{`TRANSACTION VERIFIED: &{INSERT us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent@sha256:c419394f3fa40c32352be5a6ec5865270376d4351a3756bb1893be3f28fcba32 us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent:v0.0.8}: agrees with manifest`},
 				error:  nil,
 				alert:  nil,
 			},
@@ -344,7 +344,7 @@ func TestAudit(t *testing.T) {
 			readManifestList1,
 			expectedPatterns{
 				report: nil,
-				info:   []string{`TRANSACTION VERIFIED`},
+				info:   []string{`TRANSACTION VERIFIED: &{INSERT us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent@sha256:8735603bbd7153b8bfc8d2460481282bb44e2e830e5b237738e5c3e2a58c8f45 }: agrees with manifest \(parent digest sha256:c419394f3fa40c32352be5a6ec5865270376d4351a3756bb1893be3f28fcba32\)`},
 				error:  nil,
 				alert:  nil,
 			},
@@ -360,10 +360,10 @@ func TestAudit(t *testing.T) {
 			readRepo1,
 			readManifestList1,
 			expectedPatterns{
-				report: []string{`TRANSACTION REJECTED`},
-				info:   []string{`c419394f3fa40c32352be5a6ec5865270376d4351a3756bb1893be3f28fcba32 }; assuming child manifest`},
+				report: []string{`TRANSACTION REJECTED: &{INSERT us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent-white-powder@sha256:c419394f3fa40c32352be5a6ec5865270376d4351a3756bb1893be3f28fcba32 }: could not validate`},
+				info:   []string{`could not find direct manifest entry for &{INSERT us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent-white-powder@sha256:c419394f3fa40c32352be5a6ec5865270376d4351a3756bb1893be3f28fcba32 }; assuming child manifest`},
 				error:  nil,
-				alert:  []string{`TRANSACTION REJECTED`, `c419394f3fa40c32352be5a6ec5865270376d4351a3756bb1893be3f28fcba32 }: could not validate`},
+				alert:  []string{`TRANSACTION REJECTED: &{INSERT us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent-white-powder@sha256:c419394f3fa40c32352be5a6ec5865270376d4351a3756bb1893be3f28fcba32 }: could not validate`},
 			},
 		},
 	}
