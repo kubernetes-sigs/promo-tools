@@ -38,8 +38,9 @@ import (
 func checkMatch(haystack []byte, re *regexp.Regexp) error {
 	if !re.Match(haystack) {
 		return fmt.Errorf(
-			`!!! COULD NOT FIND MATCH FOR %q`,
-			re.String())
+			"===BEGIN-MESSAGE===\nCOULD NOT FIND MATCH FOR %q IN\n%s\n===END-MESSAGE===",
+			re.String(),
+			haystack)
 	}
 	return nil
 }
