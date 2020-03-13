@@ -253,7 +253,6 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 		true,
 		s.GcrReadingFacility.ReadRepo)
 	sc.ReadGCRManifestLists(s.GcrReadingFacility.ReadManifestList)
-	klog.Infof("sc.ParentDigest is: %v", sc.ParentDigest)
 	var childDigest reg.Digest
 	childImageParts := strings.Split(gcrPayload.Digest, "@")
 	if len(childImageParts) != 2 {
