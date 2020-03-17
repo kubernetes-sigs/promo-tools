@@ -5,9 +5,11 @@ build:
 	bazel build //:cip \
 		//test-e2e/cip:e2e \
 		//test-e2e/cip-auditor:cip-auditor-e2e \
+		//cmd/cip-mm:cip-mm \
 		//cmd/promobot-files:promobot-files
 install:
 	bazel run //:install-cip -c opt -- $(shell go env GOPATH)/bin
+	bazel run //:install-cip-mm -c opt -- $(shell go env GOPATH)/bin
 image:
 	bazel build //:cip-docker-loadable.tar
 image-load: image
