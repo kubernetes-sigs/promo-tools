@@ -2607,40 +2607,39 @@ func (payload GCRPubSubPayload) matchImage(
 		return r
 	}
 	r |= FlagPathMatched
-	for digest, tags := range image.Dmap {
-		if payload.digest != digest {
-			continue
-		}
-		r |= FlagDigestMatched
 
-		// Now perform an additional check on the tag, if that field is
-		// available. The 'tag' field is derived from the PQIN field.
-		//
-		// Note: if payload.PQIN is non-empty, a particular PQIN change occurred
-		// in GCR. Such a change MUST match both the digest and tag combination
-		// as set out in the manifest.
-		//
-		// Matching solely on the tag (but not digest) or vice versa goes
-		// AGAINST the intent of the promoter manifest and is cause for alarm!
-		if payload.tag == "" {
-			continue
-		}
-		for _, tag := range tags {
-			if payload.tag == tag {
-				r |= FlagTagMatched
-			}
-		}
-
-		// If the digest matched, but the tag did NOT match, it's very
-		// bad!
-		if r&FlagTagMatched == 0 {
-			r |= FlagTagMismatch
-		}
-
-		// By this point we have searched as much as we can for the matching
-		// digest, so terminate the search.
-		break
+	tags, ok := image.Dmap[payload.digest]
+	if !ok {
+		return r
 	}
+	r |= FlagDigestMatched
+
+	// Now perform an additional check on the tag, if that field is
+	// available. The 'tag' field is derived from the PQIN field.
+	//
+	// Note: if payload.PQIN is non-empty, a particular PQIN change occurred
+	// in GCR. Such a change MUST match both the digest and tag combination
+	// as set out in the manifest.
+	//
+	// Matching solely on the tag (but not digest) or vice versa goes
+	// AGAINST the intent of the promoter manifest and is cause for alarm!
+	if payload.tag == "" {
+		return r
+	}
+
+	for _, tag := range tags {
+		if payload.tag == tag {
+			r |= FlagTagMatched
+			break
+		}
+	}
+
+	// If the digest matched, but the tag did NOT match, it's very
+	// bad!
+	if r&FlagTagMatched == 0 {
+		r |= FlagTagMismatch
+	}
+
 	return r
 }
 
