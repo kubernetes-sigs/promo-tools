@@ -128,11 +128,17 @@ func ParsePubSubMessage(r *http.Request) (*reg.GCRPubSubPayload, error) {
 		return nil, fmt.Errorf(
 			"%v: deletions are prohibited", gcrPayload)
 	case "INSERT":
-		return &gcrPayload, nil
+		break
 	default:
 		return nil, fmt.Errorf(
 			"gcrPayload: unknown action %q", gcrPayload.Action)
 	}
+
+	if err := gcrPayload.PopulateExtraFields(); err != nil {
+		return nil, err
+	}
+
+	return &gcrPayload, nil
 }
 
 // Audit receives and processes a Pub/Sub push message. It has 3 parts: (1)

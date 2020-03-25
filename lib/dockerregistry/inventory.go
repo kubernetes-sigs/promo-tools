@@ -2643,3 +2643,33 @@ func (payload GCRPubSubPayload) matchImage(
 	}
 	return r
 }
+
+// PopulateExtraFields takes the existing fields in GCRPubSubPayload and uses
+// them to populate the un-exported (hidden) fields. This is because the payload
+// bundles up digests, tags, etc into a single string. Instead of dealing with
+// them later on, we just break them up into the pieces we would like to use.
+func (payload *GCRPubSubPayload) PopulateExtraFields() error {
+	// Populate digest, if found.
+	if len(payload.FQIN) > 0 {
+		parsed := strings.Split(payload.FQIN, "@")
+		// nolint[gomnd]
+		if len(parsed) != 2 {
+			return fmt.Errorf("invalid FQIN: %v", payload.FQIN)
+		}
+		payload.digest = Digest(parsed[1])
+		payload.path = parsed[0]
+	}
+
+	// Populate tag, if found.
+	if len(payload.PQIN) > 0 {
+		parsed := strings.Split(payload.PQIN, ":")
+		// nolint[gomnd]
+		if len(parsed) != 2 {
+			return fmt.Errorf("invalid PQIN: %v", payload.PQIN)
+		}
+		payload.tag = Tag(parsed[1])
+		payload.path = parsed[0]
+	}
+
+	return nil
+}

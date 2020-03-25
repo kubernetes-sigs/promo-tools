@@ -2994,6 +2994,123 @@ func TestMatch(t *testing.T) {
 	}
 }
 
+func TestPopulateExtraFields(t *testing.T) {
+	var shouldBeValid = []struct {
+		name     string
+		input    GCRPubSubPayload
+		expected GCRPubSubPayload
+	}{
+		{
+			"basic",
+			GCRPubSubPayload{
+				"INSERT",
+				"k8s.gcr.io/subproject/foo@sha256:000",
+				"k8s.gcr.io/subproject/foo:1.0",
+				"",
+				"",
+				"",
+			},
+			GCRPubSubPayload{
+				"INSERT",
+				"k8s.gcr.io/subproject/foo@sha256:000",
+				"k8s.gcr.io/subproject/foo:1.0",
+				"k8s.gcr.io/subproject/foo",
+				"sha256:000",
+				"1.0",
+			},
+		},
+		{
+			"only FQIN",
+			GCRPubSubPayload{
+				"INSERT",
+				"k8s.gcr.io/subproject/foo@sha256:000",
+				"",
+				"",
+				"",
+				"",
+			},
+			GCRPubSubPayload{
+				"INSERT",
+				"k8s.gcr.io/subproject/foo@sha256:000",
+				"",
+				"k8s.gcr.io/subproject/foo",
+				"sha256:000",
+				"",
+			},
+		},
+		{
+			"only PQIN",
+			GCRPubSubPayload{
+				"DELETE",
+				"",
+				"k8s.gcr.io/subproject/foo:1.0",
+				"",
+				"",
+				"",
+			},
+			GCRPubSubPayload{
+				"DELETE",
+				"",
+				"k8s.gcr.io/subproject/foo:1.0",
+				"k8s.gcr.io/subproject/foo",
+				"",
+				"1.0",
+			},
+		},
+	}
+
+	for _, test := range shouldBeValid {
+		err := test.input.PopulateExtraFields()
+
+		eqErr := checkEqual(err, nil)
+		checkError(t, eqErr, fmt.Sprintf("checkError: %v: shouldBeValid\n",
+			test.name))
+
+		got := test.input
+		errEqual := checkEqual(got, test.expected)
+		checkError(t, errEqual, fmt.Sprintf("checkError: %v: shouldBeValid\n",
+			test.name))
+	}
+
+	var shouldBeInvalid = []struct {
+		name     string
+		input    GCRPubSubPayload
+		expected error
+	}{
+		{
+			"FQIN missing @-sign",
+			GCRPubSubPayload{
+				"INSERT",
+				"k8s.gcr.io/subproject/foosha256:000",
+				"k8s.gcr.io/subproject/foo:1.0",
+				"",
+				"",
+				"",
+			},
+			fmt.Errorf("invalid FQIN: k8s.gcr.io/subproject/foosha256:000"),
+		},
+		{
+			"PQIN missing colon",
+			GCRPubSubPayload{
+				"INSERT",
+				"k8s.gcr.io/subproject/foo@sha256:000",
+				"k8s.gcr.io/subproject/foo1.0",
+				"",
+				"",
+				"",
+			},
+			fmt.Errorf("invalid PQIN: k8s.gcr.io/subproject/foo1.0"),
+		},
+	}
+
+	for _, test := range shouldBeInvalid {
+		got := test.input.PopulateExtraFields()
+		eqErr := checkEqual(got, test.expected)
+		checkError(t, eqErr, fmt.Sprintf("checkError: %v: shouldInvalid\n",
+			test.name))
+	}
+}
+
 // Helper functions.
 
 func bazelTestPath(testName string, paths ...string) string {
