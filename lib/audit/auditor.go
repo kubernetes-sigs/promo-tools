@@ -111,9 +111,9 @@ func ParsePubSubMessage(r *http.Request) (*reg.GCRPubSubPayload, error) {
 		return nil, fmt.Errorf("json.Unmarshal: %v", err)
 	}
 
-	if len(gcrPayload.Digest) == 0 && len(gcrPayload.Tag) == 0 {
+	if len(gcrPayload.FQIN) == 0 && len(gcrPayload.PQIN) == 0 {
 		return nil, fmt.Errorf(
-			"gcrPayload: neither Digest nor Tag was specified")
+			"gcrPayload: neither 'digest' nor 'tag' was specified")
 	}
 
 	switch gcrPayload.Action {
@@ -254,9 +254,9 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 		s.GcrReadingFacility.ReadRepo)
 	sc.ReadGCRManifestLists(s.GcrReadingFacility.ReadManifestList)
 	var childDigest reg.Digest
-	childImageParts := strings.Split(gcrPayload.Digest, "@")
+	childImageParts := strings.Split(gcrPayload.FQIN, "@")
 	if len(childImageParts) != 2 {
-		msg := fmt.Sprintf("(%s) TRANSACTION REJECTED: could not split child digest information: %v", s.ID, gcrPayload.Digest)
+		msg := fmt.Sprintf("(%s) TRANSACTION REJECTED: could not split child digest information: %v", s.ID, gcrPayload.FQIN)
 		_, _ = w.Write([]byte(msg))
 		panic(msg)
 	}
@@ -304,5 +304,5 @@ func GetMatchingSourceRegistry(
 	return reg.RegistryContext{},
 		fmt.Errorf(
 			"could not find matching source registry for %v",
-			gcrPayload.Digest)
+			gcrPayload.FQIN)
 }

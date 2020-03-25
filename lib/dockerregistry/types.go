@@ -366,11 +366,21 @@ type digest struct {
 // nolint[lll]
 type GCRPubSubPayload struct {
 	Action string `json:"action"`
-	// Digest is always a FQIN. E.g.,
-	// "gcr.io/linusa/small@sha256:35f442d8d56cc7a2d4000f3417d71f44a730b900f3df440c09a9c40c42c40f86".
-	Digest string `json:"digest,omitempty"`
-	// Tag is always a PQIN. E.g., "gcr.io/linusa/small:a".
-	Tag string `json:"tag,omitempty"`
+	// The payload field is "digest", but really it is a FQIN like
+	//  "gcr.io/linusa/small@sha256:35f442d8d56cc7a2d4000f3417d71f44a730b900f3df440c09a9c40c42c40f86".
+	FQIN string `json:"digest,omitempty"`
+	// Similarly, the field "tag is always a PQIN. E.g.,
+	// "gcr.io/linusa/small:a".
+	PQIN string `json:"tag,omitempty"`
+
+	// Everything leading up to either the tag or digest. E.g., given
+	// "us.gcr.io/k8s-artifacts-prod/foo/bar:1.0", this would be
+	// "us.gcr.io/k8s-artifacts-prod/foo/bar".
+	path string
+	// Image digest, if any.
+	digest Digest
+	// Tag, if any.
+	tag Tag
 }
 
 // Various conversion functions.

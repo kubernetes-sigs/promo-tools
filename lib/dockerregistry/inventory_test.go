@@ -2942,8 +2942,8 @@ func TestMatch(t *testing.T) {
 			inputMfest,
 			GCRPubSubPayload{
 				Action: "INSERT",
-				Digest: "us.gcr.io/some-prod/foo-controller@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-				Tag:    "us.gcr.io/some-prod/foo-controller:1.0",
+				FQIN:   "us.gcr.io/some-prod/foo-controller@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+				PQIN:   "us.gcr.io/some-prod/foo-controller:1.0",
 			},
 			FlagPathMatched | FlagDigestMatched | FlagTagMatched,
 		},
@@ -2952,7 +2952,7 @@ func TestMatch(t *testing.T) {
 			inputMfest,
 			GCRPubSubPayload{
 				Action: "INSERT",
-				Digest: "us.gcr.io/some-prod/foo-controller@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+				FQIN:   "us.gcr.io/some-prod/foo-controller@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 			},
 			FlagPathMatched | FlagDigestMatched,
 		},
@@ -2961,7 +2961,7 @@ func TestMatch(t *testing.T) {
 			inputMfest,
 			GCRPubSubPayload{
 				Action: "INSERT",
-				Digest: "us.gcr.io/some-prod/foo-controller@sha256:000",
+				FQIN:   "us.gcr.io/some-prod/foo-controller@sha256:000",
 			},
 			FlagPathMatched,
 		},
@@ -2970,8 +2970,8 @@ func TestMatch(t *testing.T) {
 			inputMfest,
 			GCRPubSubPayload{
 				Action: "INSERT",
-				Digest: "us.gcr.io/some-prod/foo-controller@sha256:000",
-				Tag:    "us.gcr.io/some-prod/foo-controller:1.0",
+				FQIN:   "us.gcr.io/some-prod/foo-controller@sha256:000",
+				PQIN:   "us.gcr.io/some-prod/foo-controller:1.0",
 			},
 			FlagPathMatched,
 		},
@@ -2980,8 +2980,8 @@ func TestMatch(t *testing.T) {
 			inputMfest,
 			GCRPubSubPayload{
 				Action: "INSERT",
-				Digest: "us.gcr.io/some-prod/foo-controller@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-				Tag:    "us.gcr.io/some-prod/foo-controller:white-powder",
+				FQIN:   "us.gcr.io/some-prod/foo-controller@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+				PQIN:   "us.gcr.io/some-prod/foo-controller:white-powder",
 			},
 			FlagPathMatched | FlagDigestMatched | FlagTagMismatch,
 		},

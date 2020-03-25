@@ -74,12 +74,12 @@ func TestParsePubSubMessage(t *testing.T) {
 	shouldBeValid := []reg.GCRPubSubPayload{
 		{
 			Action: "INSERT",
-			Digest: "gcr.io/foo/bar@sha256:0000000000000000000000000000000000000000000000000000000000000000",
+			FQIN:   "gcr.io/foo/bar@sha256:0000000000000000000000000000000000000000000000000000000000000000",
 		},
 		{
 			Action: "INSERT",
-			Digest: "gcr.io/foo/bar@sha256:0000000000000000000000000000000000000000000000000000000000000000",
-			Tag:    "gcr.io/foo/bar:1.0",
+			FQIN:   "gcr.io/foo/bar@sha256:0000000000000000000000000000000000000000000000000000000000000000",
+			PQIN:   "gcr.io/foo/bar:1.0",
 		},
 	}
 
@@ -118,23 +118,23 @@ func TestParsePubSubMessage(t *testing.T) {
 		{
 			reg.GCRPubSubPayload{
 				Action: "INSERT"},
-			fmt.Errorf("gcrPayload: neither Digest nor Tag was specified"),
+			fmt.Errorf("gcrPayload: neither 'digest' nor 'tag' was specified"),
 		},
 		{
 			reg.GCRPubSubPayload{
-				Digest: "gcr.io/foo/bar@sha256:0000000000000000000000000000000000000000000000000000000000000000"},
+				FQIN: "gcr.io/foo/bar@sha256:0000000000000000000000000000000000000000000000000000000000000000"},
 			fmt.Errorf("gcrPayload: Action not specified"),
 		},
 		{
 			reg.GCRPubSubPayload{
 				Action: "DELETE",
-				Digest: "gcr.io/foo/bar@sha256:0000000000000000000000000000000000000000000000000000000000000000"},
-			fmt.Errorf("{DELETE gcr.io/foo/bar@sha256:0000000000000000000000000000000000000000000000000000000000000000 }: deletions are prohibited"),
+				FQIN:   "gcr.io/foo/bar@sha256:0000000000000000000000000000000000000000000000000000000000000000"},
+			fmt.Errorf("{DELETE gcr.io/foo/bar@sha256:0000000000000000000000000000000000000000000000000000000000000000    }: deletions are prohibited"),
 		},
 		{
 			reg.GCRPubSubPayload{
 				Action: "WOOF",
-				Digest: "gcr.io/foo/bar@sha256:0000000000000000000000000000000000000000000000000000000000000000"},
+				FQIN:   "gcr.io/foo/bar@sha256:0000000000000000000000000000000000000000000000000000000000000000"},
 			fmt.Errorf("gcrPayload: unknown action \"WOOF\""),
 		},
 	}
@@ -192,8 +192,8 @@ func TestAudit(t *testing.T) {
 			"basic child manifest (tagless child image, digest not in promoter manifest, but parent image is in promoter manifest)",
 			reg.GCRPubSubPayload{
 				Action: "INSERT",
-				Digest: "us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent@sha256:8735603bbd7153b8bfc8d2460481282bb44e2e830e5b237738e5c3e2a58c8f45",
-				Tag:    "",
+				FQIN:   "us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent@sha256:8735603bbd7153b8bfc8d2460481282bb44e2e830e5b237738e5c3e2a58c8f45",
+				PQIN:   "",
 			},
 			map[string]string{
 				"gcr.io/k8s-staging-kas-network-proxy": `{
