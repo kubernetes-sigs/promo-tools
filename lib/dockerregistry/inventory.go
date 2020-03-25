@@ -2579,7 +2579,7 @@ func (payload GCRPubSubPayload) matchImages(
 	}
 	// Speed up the search by skipping over registry names whose leading
 	// characters do not match.
-	if !strings.HasPrefix(payload.FQIN, (string)(rc.Name)) {
+	if !strings.HasPrefix(payload.path, (string)(rc.Name)) {
 		return r
 	}
 
@@ -2601,32 +2601,32 @@ func (payload GCRPubSubPayload) matchImage(
 
 	var r GcrPayloadMatch
 
-	if !strings.Contains(payload.FQIN, (string)(image.ImageName)) {
+	constructedPath := strings.Join(
+		[]string{string(rc.Name), (string)(image.ImageName)}, "/")
+	if payload.path != constructedPath {
 		return r
 	}
 	r |= FlagPathMatched
 	for digest, tags := range image.Dmap {
-		fqin := ToFQIN(rc.Name, image.ImageName, digest)
-		if payload.FQIN != fqin {
+		if payload.digest != digest {
 			continue
 		}
 		r |= FlagDigestMatched
 
-		// Now perform an additional check on the Tag, if that field is
-		// available. I.e., if payload.PQIN is non-empty, a
-		// particular PQIN change occurred in GCR. Such a change
-		// MUST match both the digest and tag combination as set out
-		// in the manifest.
+		// Now perform an additional check on the tag, if that field is
+		// available. The 'tag' field is derived from the PQIN field.
 		//
-		// Matching solely on the tag (but not digest) or vice versa
-		// goes AGAINST the intent of the promoter manifest and is
-		// cause for alarm!
-		if len(payload.PQIN) == 0 {
+		// Note: if payload.PQIN is non-empty, a particular PQIN change occurred
+		// in GCR. Such a change MUST match both the digest and tag combination
+		// as set out in the manifest.
+		//
+		// Matching solely on the tag (but not digest) or vice versa goes
+		// AGAINST the intent of the promoter manifest and is cause for alarm!
+		if payload.tag == "" {
 			continue
 		}
 		for _, tag := range tags {
-			pqin := ToPQIN(rc.Name, image.ImageName, tag)
-			if payload.PQIN == pqin {
+			if payload.tag == tag {
 				r |= FlagTagMatched
 			}
 		}

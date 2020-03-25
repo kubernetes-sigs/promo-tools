@@ -2988,6 +2988,7 @@ func TestMatch(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test.gcrPayload.PopulateExtraFields()
 		got := test.gcrPayload.Match(test.mfest)
 		errEqual := checkEqual(got, test.expectedMatch)
 		checkError(t, errEqual, fmt.Sprintf("checkError: test %q: shouldBeValid\n", test.name))
