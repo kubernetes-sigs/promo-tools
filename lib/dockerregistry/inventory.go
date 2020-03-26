@@ -2665,3 +2665,16 @@ func (payload *GCRPubSubPayload) PopulateExtraFields() error {
 
 	return nil
 }
+
+// Prettified prints the payload in a way that is stable and which hides extra
+// fields which are redundant.
+func (payload GCRPubSubPayload) String() string {
+	// nolint[lll]
+	return fmt.Sprintf("{Action: %q, FQIN: %q, PQIN: %q, Path: %q, Digest: %q, Tag: %q}",
+		payload.Action,
+		payload.FQIN,
+		payload.PQIN,
+		payload.Path,
+		payload.Digest,
+		payload.Tag)
+}
