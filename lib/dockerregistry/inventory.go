@@ -2523,41 +2523,36 @@ func GetDeleteCmd(
 		cmd)
 }
 
-// GcrPayloadMatch holds bitwise flags for matching a GCRPubSubPayload against a
+// GcrPayloadMatch holds booleans for matching a GCRPubSubPayload against a
 // promoter manifest.
-//
-// For an example of how bitwise flags work, see
-// https://yourbasic.org/golang/bitmask-flag-set-clear/.
-type GcrPayloadMatch uint
-
-const (
-	// FlagPathMatched is set if the registry + image path (everything leading
+type GcrPayloadMatch struct {
+	// Path is true if the registry + image path (everything leading
 	// up to either the digest or a tag) matches.
-	FlagPathMatched GcrPayloadMatch = 1 << iota
-	// FlagDigestMatched is set if the digest in the payload matches a digest in
+	PathMatch bool
+	// Digest is set if the digest in the payload matches a digest in
 	// the promoter manifest. This is ONLY matched if the path also matches.
-	FlagDigestMatched
-	// FlagTagMatched is ONLY matched if the digest also matches.
-	FlagTagMatched
-	// FlagTagMismatch is only set if the digest matches, but the tag found in
+	DigestMatch bool
+	// Tag is ONLY matched if the digest also matches.
+	TagMatch bool
+	// Tag is only true if the digest matches, but the tag found in
 	// the payload does NOT match what is found in the promoter manifest for the
 	// digest. This can happen if somone manually tweaks a tag in GCR (assume
 	// bad actor) to something other than what is specified in the promoter
 	// manifest.
-	FlagTagMismatch
-)
+	TagMismatch bool
+}
 
 // Match checks whether a GCRPubSubPayload is mentioned in a Manifest. The
 // degree of the match is reflected in the GcrPayloadMatch result.
-func (payload GCRPubSubPayload) Match(m Manifest) GcrPayloadMatch {
-	var r GcrPayloadMatch
-	for _, rc := range m.Registries {
-		r = payload.matchImages(rc, m.Images)
-		if r&FlagPathMatched != 0 {
-			return r
+func (payload GCRPubSubPayload) Match(manifest Manifest) GcrPayloadMatch {
+	var m GcrPayloadMatch
+	for _, rc := range manifest.Registries {
+		m = payload.matchImages(rc, manifest.Images)
+		if m.PathMatch {
+			return m
 		}
 	}
-	return r
+	return m
 }
 
 func (payload GCRPubSubPayload) matchImages(
@@ -2565,29 +2560,29 @@ func (payload GCRPubSubPayload) matchImages(
 	images []Image,
 ) GcrPayloadMatch {
 
-	var r GcrPayloadMatch
+	var m GcrPayloadMatch
 	// We do not look at source registries, because the payload will only
 	// contain the image name as it appears on the destination (production).
 	// So the prefix and substring checks only make sense for the
 	// destination registries.
 	if rc.Src {
-		return r
+		return m
 	}
 	// Speed up the search by skipping over registry names whose leading
 	// characters do not match.
 	if !strings.HasPrefix(payload.path, (string)(rc.Name)) {
-		return r
+		return m
 	}
 
 	for _, image := range images {
-		r = payload.matchImage(rc, image)
+		m = payload.matchImage(rc, image)
 		// If we have just a path match, return early because we should
 		// limit the scope of the search to just 1 image.
-		if r&FlagPathMatched != 0 {
-			return r
+		if m.PathMatch {
+			return m
 		}
 	}
-	return r
+	return m
 }
 
 func (payload GCRPubSubPayload) matchImage(
@@ -2595,20 +2590,20 @@ func (payload GCRPubSubPayload) matchImage(
 	image Image,
 ) GcrPayloadMatch {
 
-	var r GcrPayloadMatch
+	var m GcrPayloadMatch
 
 	constructedPath := strings.Join(
 		[]string{string(rc.Name), (string)(image.ImageName)}, "/")
 	if payload.path != constructedPath {
-		return r
+		return m
 	}
-	r |= FlagPathMatched
+	m.PathMatch = true
 
 	tags, ok := image.Dmap[payload.digest]
 	if !ok {
-		return r
+		return m
 	}
-	r |= FlagDigestMatched
+	m.DigestMatch = true
 
 	// Now perform an additional check on the tag, if that field is
 	// available. The 'tag' field is derived from the PQIN field.
@@ -2620,23 +2615,23 @@ func (payload GCRPubSubPayload) matchImage(
 	// Matching solely on the tag (but not digest) or vice versa goes
 	// AGAINST the intent of the promoter manifest and is cause for alarm!
 	if payload.tag == "" {
-		return r
+		return m
 	}
 
 	for _, tag := range tags {
 		if payload.tag == tag {
-			r |= FlagTagMatched
+			m.TagMatch = true
 			break
 		}
 	}
 
 	// If the digest matched, but the tag did NOT match, it's very
 	// bad!
-	if r&FlagTagMatched == 0 {
-		r |= FlagTagMismatch
+	if !m.TagMatch {
+		m.TagMismatch = true
 	}
 
-	return r
+	return m
 }
 
 // PopulateExtraFields takes the existing fields in GCRPubSubPayload and uses

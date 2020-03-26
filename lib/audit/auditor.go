@@ -203,8 +203,8 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 	// (exact digest match on a tagged or tagless image).
 	for _, manifest := range manifests {
 		m := gcrPayload.Match(manifest)
-		if m&(reg.FlagDigestMatched|reg.FlagTagMatched) != 0 &&
-			m&(reg.FlagTagMismatch) == 0 {
+		if (m.DigestMatch || m.TagMatch) &&
+			!m.TagMismatch {
 			msg := fmt.Sprintf(
 				"(%s) TRANSACTION VERIFIED: %v: agrees with manifest\n", s.ID, gcrPayload)
 			logInfo.Println(msg)
@@ -297,10 +297,10 @@ func GetMatchingSourceRegistry(
 ) (reg.RegistryContext, error) {
 
 	for _, manifest := range manifests {
-		if gcrPayload.Match(manifest) == 0 {
+		if !gcrPayload.Match(manifest).PathMatch {
 			continue
 		}
-		// Now that there is a match (at least a FlagPathMatch), just fish out
+		// Now that there is a match (at least a PathMatch), just fish out
 		// the source registry in the manifest.
 		for _, rc := range manifest.Registries {
 			if rc.Src {

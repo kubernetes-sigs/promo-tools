@@ -2937,7 +2937,11 @@ func TestMatch(t *testing.T) {
 				FQIN:   "us.gcr.io/some-prod/foo-controller@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 				PQIN:   "us.gcr.io/some-prod/foo-controller:1.0",
 			},
-			FlagPathMatched | FlagDigestMatched | FlagTagMatched,
+			GcrPayloadMatch{
+				PathMatch:   true,
+				DigestMatch: true,
+				TagMatch:    true,
+			},
 		},
 		{
 			"INSERT message only contains Digest",
@@ -2946,7 +2950,10 @@ func TestMatch(t *testing.T) {
 				Action: "INSERT",
 				FQIN:   "us.gcr.io/some-prod/foo-controller@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 			},
-			FlagPathMatched | FlagDigestMatched,
+			GcrPayloadMatch{
+				PathMatch:   true,
+				DigestMatch: true,
+			},
 		},
 		{
 			"INSERT's digest is not in Manifest (digest mismatch, but path matched)",
@@ -2955,7 +2962,9 @@ func TestMatch(t *testing.T) {
 				Action: "INSERT",
 				FQIN:   "us.gcr.io/some-prod/foo-controller@sha256:000",
 			},
-			FlagPathMatched,
+			GcrPayloadMatch{
+				PathMatch: true,
+			},
 		},
 		{
 			"INSERT's digest is not in Manifest (neither digest nor tag match, but path matched)",
@@ -2965,7 +2974,9 @@ func TestMatch(t *testing.T) {
 				FQIN:   "us.gcr.io/some-prod/foo-controller@sha256:000",
 				PQIN:   "us.gcr.io/some-prod/foo-controller:1.0",
 			},
-			FlagPathMatched,
+			GcrPayloadMatch{
+				PathMatch: true,
+			},
 		},
 		{
 			"INSERT's digest is not in Manifest (tag specified, but tag mismatch)",
@@ -2975,7 +2986,11 @@ func TestMatch(t *testing.T) {
 				FQIN:   "us.gcr.io/some-prod/foo-controller@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 				PQIN:   "us.gcr.io/some-prod/foo-controller:white-powder",
 			},
-			FlagPathMatched | FlagDigestMatched | FlagTagMismatch,
+			GcrPayloadMatch{
+				PathMatch:   true,
+				DigestMatch: true,
+				TagMismatch: true,
+			},
 		},
 	}
 
