@@ -2565,11 +2565,7 @@ func TestGarbageCollection(t *testing.T) {
 		for req := range reqs {
 			pr := req.RequestParams.(PromotionRequest)
 			mutex.Lock()
-			if _, ok := captured[pr]; ok {
-				captured[pr]++
-			} else {
-				captured[pr] = 1
-			}
+			captured[pr]++
 			mutex.Unlock()
 			wg.Add(-1)
 		}
@@ -2705,11 +2701,7 @@ func TestGarbageCollectionMulti(t *testing.T) {
 		for req := range reqs {
 			pr := req.RequestParams.(PromotionRequest)
 			mutex.Lock()
-			if _, ok := captured[pr]; ok {
-				captured[pr]++
-			} else {
-				captured[pr] = 1
-			}
+			captured[pr]++
 			mutex.Unlock()
 			wg.Add(-1)
 		}

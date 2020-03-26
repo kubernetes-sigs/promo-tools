@@ -94,6 +94,8 @@ func (s *ServerContext) RunAuditor() {
 }
 
 // ParsePubSubMessage parses an HTTP request body into a reg.GCRPubSubPayload.
+//
+// nolint[gocyclo]
 func ParsePubSubMessage(r *http.Request) (*reg.GCRPubSubPayload, error) {
 	var psm PubSubMessage
 	var gcrPayload reg.GCRPubSubPayload

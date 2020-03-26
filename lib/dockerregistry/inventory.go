@@ -2220,11 +2220,7 @@ func MkRequestCapturer(captured *CapturedRequests) ProcessRequest {
 		for req := range reqs {
 			pr := req.RequestParams.(PromotionRequest)
 			mutex.Lock()
-			if _, ok := (*captured)[pr]; ok {
-				(*captured)[pr]++
-			} else {
-				(*captured)[pr] = 1
-			}
+			(*captured)[pr]++
 			mutex.Unlock()
 			wg.Add(-1)
 		}
