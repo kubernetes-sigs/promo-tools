@@ -23,7 +23,6 @@ import (
 	"net/http"
 	"os"
 	"runtime/debug"
-	"strings"
 
 	"cloud.google.com/go/errorreporting"
 	"k8s.io/klog"
@@ -263,16 +262,13 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 		true,
 		s.GcrReadingFacility.ReadRepo)
 	sc.ReadGCRManifestLists(s.GcrReadingFacility.ReadManifestList)
-	var childDigest reg.Digest
-	childImageParts := strings.Split(gcrPayload.FQIN, "@")
-	if len(childImageParts) != 2 {
-		msg := fmt.Sprintf("(%s) TRANSACTION REJECTED: could not split child digest information: %v", s.ID, gcrPayload.FQIN)
+	if gcrPayload.Digest == "" {
+		msg := fmt.Sprintf("(%s) TRANSACTION REJECTED: could not find digest information: %v", s.ID, gcrPayload.Digest)
 		_, _ = w.Write([]byte(msg))
 		panic(msg)
 	}
-	childDigest = reg.Digest(childImageParts[1])
-	klog.Infof("looking for child digest %v", childDigest)
-	if parentDigest, hasParent := sc.ParentDigest[childDigest]; hasParent {
+	klog.Infof("looking for child digest %v", gcrPayload.Digest)
+	if parentDigest, hasParent := sc.ParentDigest[gcrPayload.Digest]; hasParent {
 		msg := fmt.Sprintf(
 			"(%s) TRANSACTION VERIFIED: %v: agrees with manifest (parent digest %v)\n", s.ID, gcrPayload, parentDigest)
 		logInfo.Println(msg)

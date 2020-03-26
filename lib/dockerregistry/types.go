@@ -376,11 +376,11 @@ type GCRPubSubPayload struct {
 	// Everything leading up to either the tag or digest. E.g., given
 	// "us.gcr.io/k8s-artifacts-prod/foo/bar:1.0", this would be
 	// "us.gcr.io/k8s-artifacts-prod/foo/bar".
-	path string
+	Path string
 	// Image digest, if any.
-	digest Digest
+	Digest Digest
 	// Tag, if any.
-	tag Tag
+	Tag Tag
 }
 
 // Various conversion functions.
