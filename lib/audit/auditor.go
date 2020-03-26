@@ -112,14 +112,18 @@ func ParsePubSubMessage(r *http.Request) (*reg.GCRPubSubPayload, error) {
 		return nil, fmt.Errorf("json.Unmarshal: %v", err)
 	}
 
-	if len(gcrPayload.FQIN) == 0 && len(gcrPayload.PQIN) == 0 {
+	if gcrPayload.FQIN == "" && gcrPayload.PQIN == "" {
 		return nil, fmt.Errorf(
-			"gcrPayload: neither 'digest' nor 'tag' was specified")
+			"%v: neither 'digest' nor 'tag' was specified", gcrPayload)
+	}
+
+	if err := gcrPayload.PopulateExtraFields(); err != nil {
+		return nil, err
 	}
 
 	switch gcrPayload.Action {
 	case "":
-		return nil, fmt.Errorf("gcrPayload: Action not specified")
+		return nil, fmt.Errorf("%v: Action not specified", gcrPayload)
 	// All deletions will for now be treated as an error. If it's an insertion,
 	// it can either have "digest" with FQIN, or "digest" + "tag" with PQIN. So
 	// we always verify FQIN, and if there is PQIN, verify that as well.
@@ -132,11 +136,7 @@ func ParsePubSubMessage(r *http.Request) (*reg.GCRPubSubPayload, error) {
 		break
 	default:
 		return nil, fmt.Errorf(
-			"gcrPayload: unknown action %q", gcrPayload.Action)
-	}
-
-	if err := gcrPayload.PopulateExtraFields(); err != nil {
-		return nil, err
+			"%v: unknown action %q", gcrPayload, gcrPayload.Action)
 	}
 
 	return &gcrPayload, nil
