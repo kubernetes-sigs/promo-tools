@@ -2220,11 +2220,7 @@ func MkRequestCapturer(captured *CapturedRequests) ProcessRequest {
 		for req := range reqs {
 			pr := req.RequestParams.(PromotionRequest)
 			mutex.Lock()
-			if _, ok := (*captured)[pr]; ok {
-				(*captured)[pr]++
-			} else {
-				(*captured)[pr] = 1
-			}
+			(*captured)[pr]++
 			mutex.Unlock()
 			wg.Add(-1)
 		}
@@ -2527,42 +2523,143 @@ func GetDeleteCmd(
 		cmd)
 }
 
-// Contains checks whether a given Manifest mentions the contents of a
-// gcrPayload (re-interpreted as a FQIN or PQIN).
-// nolint[gocyclo]
-func (m Manifest) Contains(gcrPayload GCRPubSubPayload) bool {
-	fqinOnly := len(gcrPayload.Tag) == 0
+// GcrPayloadMatch holds booleans for matching a GCRPubSubPayload against a
+// promoter manifest.
+type GcrPayloadMatch struct {
+	// Path is true if the registry + image path (everything leading
+	// up to either the digest or a tag) matches.
+	PathMatch bool
+	// Digest is set if the digest in the payload matches a digest in
+	// the promoter manifest. This is ONLY matched if the path also matches.
+	DigestMatch bool
+	// Tag is ONLY matched if the digest also matches.
+	TagMatch bool
+	// Tag is only true if the digest matches, but the tag found in
+	// the payload does NOT match what is found in the promoter manifest for the
+	// digest. This can happen if somone manually tweaks a tag in GCR (assume
+	// bad actor) to something other than what is specified in the promoter
+	// manifest.
+	TagMismatch bool
+}
 
-	for _, rc := range m.Registries {
-		if rc.Src {
-			continue
-		}
-		// Speed up the search by skipping over registry names whose leading
-		// characters do not match.
-		if !strings.HasPrefix(gcrPayload.Digest, (string)(rc.Name)) {
-			continue
-		}
-
-		for _, image := range m.Images {
-			if !strings.Contains(gcrPayload.Digest, (string)(image.ImageName)) {
-				continue
-			}
-			for digest, tags := range image.Dmap {
-				fqin := ToFQIN(rc.Name, image.ImageName, digest)
-				if fqinOnly {
-					if gcrPayload.Digest == fqin {
-						return true
-					}
-				} else {
-					for _, tag := range tags {
-						pqin := ToPQIN(rc.Name, image.ImageName, tag)
-						if gcrPayload.Tag == pqin {
-							return gcrPayload.Digest == fqin
-						}
-					}
-				}
-			}
+// Match checks whether a GCRPubSubPayload is mentioned in a Manifest. The
+// degree of the match is reflected in the GcrPayloadMatch result.
+func (payload GCRPubSubPayload) Match(manifest Manifest) GcrPayloadMatch {
+	var m GcrPayloadMatch
+	for _, rc := range manifest.Registries {
+		m = payload.matchImages(rc, manifest.Images)
+		if m.PathMatch {
+			return m
 		}
 	}
-	return false
+	return m
+}
+
+func (payload GCRPubSubPayload) matchImages(
+	rc RegistryContext,
+	images []Image,
+) GcrPayloadMatch {
+
+	var m GcrPayloadMatch
+	// We do not look at source registries, because the payload will only
+	// contain the image name as it appears on the destination (production).
+	// So the prefix and substring checks only make sense for the
+	// destination registries.
+	if rc.Src {
+		return m
+	}
+	// Speed up the search by skipping over registry names whose leading
+	// characters do not match.
+	if !strings.HasPrefix(payload.path, (string)(rc.Name)) {
+		return m
+	}
+
+	for _, image := range images {
+		m = payload.matchImage(rc, image)
+		// If we have just a path match, return early because we should
+		// limit the scope of the search to just 1 image.
+		if m.PathMatch {
+			return m
+		}
+	}
+	return m
+}
+
+func (payload GCRPubSubPayload) matchImage(
+	rc RegistryContext,
+	image Image,
+) GcrPayloadMatch {
+
+	var m GcrPayloadMatch
+
+	constructedPath := strings.Join(
+		[]string{string(rc.Name), (string)(image.ImageName)}, "/")
+	if payload.path != constructedPath {
+		return m
+	}
+	m.PathMatch = true
+
+	tags, ok := image.Dmap[payload.digest]
+	if !ok {
+		return m
+	}
+	m.DigestMatch = true
+
+	// Now perform an additional check on the tag, if that field is
+	// available. The 'tag' field is derived from the PQIN field.
+	//
+	// Note: if payload.PQIN is non-empty, a particular PQIN change occurred
+	// in GCR. Such a change MUST match both the digest and tag combination
+	// as set out in the manifest.
+	//
+	// Matching solely on the tag (but not digest) or vice versa goes
+	// AGAINST the intent of the promoter manifest and is cause for alarm!
+	if payload.tag == "" {
+		return m
+	}
+
+	for _, tag := range tags {
+		if payload.tag == tag {
+			m.TagMatch = true
+			break
+		}
+	}
+
+	// If the digest matched, but the tag did NOT match, it's very
+	// bad!
+	if !m.TagMatch {
+		m.TagMismatch = true
+	}
+
+	return m
+}
+
+// PopulateExtraFields takes the existing fields in GCRPubSubPayload and uses
+// them to populate the un-exported (hidden) fields. This is because the payload
+// bundles up digests, tags, etc into a single string. Instead of dealing with
+// them later on, we just break them up into the pieces we would like to use.
+func (payload *GCRPubSubPayload) PopulateExtraFields() error {
+	// Populate digest, if found.
+	if len(payload.FQIN) > 0 {
+		parsed := strings.Split(payload.FQIN, "@")
+		// nolint[gomnd]
+		if len(parsed) != 2 {
+			return fmt.Errorf("invalid FQIN: %v", payload.FQIN)
+		}
+		payload.digest = Digest(parsed[1])
+		payload.path = parsed[0]
+	}
+
+	// Populate tag, if found.
+	if len(payload.PQIN) > 0 {
+		parsed := strings.Split(payload.PQIN, ":")
+		// nolint[gomnd]
+		if len(parsed) != 2 {
+			return fmt.Errorf("invalid PQIN: %v", payload.PQIN)
+		}
+		payload.tag = Tag(parsed[1])
+		payload.path = parsed[0]
+	}
+
+	return nil
 }

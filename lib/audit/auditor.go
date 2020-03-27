@@ -33,7 +33,10 @@ import (
 	"sigs.k8s.io/k8s-container-image-promoter/lib/report"
 )
 
-func initServerContext(
+// InitRealServerContext creates a ServerContext with facilities that are meant
+// for production use (going over the network to fetch actual official promoter
+// manifests from GitHub, for example).
+func InitRealServerContext(
 	gcpProjectID, repoURLStr, branch, path, uuid string,
 ) (*ServerContext, error) {
 
@@ -57,29 +60,27 @@ func initServerContext(
 		RemoteManifestFacility: remoteManifestFacility,
 		ErrorReportingFacility: reportingFacility,
 		LoggingFacility:        loggingFacility,
+		GcrReadingFacility: GcrReadingFacility{
+			ReadRepo:         reg.MkReadRepositoryCmdReal,
+			ReadManifestList: reg.MkReadManifestListCmdReal,
+		},
 	}
 
 	return &serverContext, nil
 }
 
-// Auditor runs an HTTP server.
-func Auditor(gcpProjectID, repoURL, branch, path, uuid string) {
+// RunAuditor runs an HTTP server.
+func (s *ServerContext) RunAuditor() {
 	klog.Info("Starting Auditor")
-	serverContext, err := initServerContext(
-		gcpProjectID, repoURL, branch, path, uuid)
-	if err != nil {
-		klog.Exitln(err)
-	}
-
-	klog.Infoln(serverContext)
+	klog.Infoln(s)
 
 	// nolint[errcheck]
-	defer serverContext.LoggingFacility.Close()
+	defer s.LoggingFacility.Close()
 	// nolint[errcheck]
-	defer serverContext.ErrorReportingFacility.Close()
+	defer s.ErrorReportingFacility.Close()
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		serverContext.Audit(w, r)
+		s.Audit(w, r)
 	})
 	// Determine port for HTTP service.
 	port := os.Getenv("PORT")
@@ -93,6 +94,8 @@ func Auditor(gcpProjectID, repoURL, branch, path, uuid string) {
 }
 
 // ParsePubSubMessage parses an HTTP request body into a reg.GCRPubSubPayload.
+//
+// nolint[gocyclo]
 func ParsePubSubMessage(r *http.Request) (*reg.GCRPubSubPayload, error) {
 	var psm PubSubMessage
 	var gcrPayload reg.GCRPubSubPayload
@@ -110,9 +113,9 @@ func ParsePubSubMessage(r *http.Request) (*reg.GCRPubSubPayload, error) {
 		return nil, fmt.Errorf("json.Unmarshal: %v", err)
 	}
 
-	if len(gcrPayload.Digest) == 0 && len(gcrPayload.Tag) == 0 {
+	if len(gcrPayload.FQIN) == 0 && len(gcrPayload.PQIN) == 0 {
 		return nil, fmt.Errorf(
-			"gcrPayload: neither Digest nor Tag was specified")
+			"gcrPayload: neither 'digest' nor 'tag' was specified")
 	}
 
 	switch gcrPayload.Action {
@@ -127,11 +130,17 @@ func ParsePubSubMessage(r *http.Request) (*reg.GCRPubSubPayload, error) {
 		return nil, fmt.Errorf(
 			"%v: deletions are prohibited", gcrPayload)
 	case "INSERT":
-		return &gcrPayload, nil
+		break
 	default:
 		return nil, fmt.Errorf(
 			"gcrPayload: unknown action %q", gcrPayload.Action)
 	}
+
+	if err := gcrPayload.PopulateExtraFields(); err != nil {
+		return nil, err
+	}
+
+	return &gcrPayload, nil
 }
 
 // Audit receives and processes a Pub/Sub push message. It has 3 parts: (1)
@@ -190,9 +199,12 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 	logInfo.Printf("(%s) gcrPayload: %v", s.ID, gcrPayload)
 	logInfo.Printf("(%s) RemoteManifestFacility: %v", s.ID, s.RemoteManifestFacility)
 
-	// (3) Compare GCR state change with the intent of the promoter manifests.
+	// (3) Compare GCR state change with the intent of the promoter manifests
+	// (exact digest match on a tagged or tagless image).
 	for _, manifest := range manifests {
-		if manifest.Contains(*gcrPayload) {
+		m := gcrPayload.Match(manifest)
+		if (m.DigestMatch || m.TagMatch) &&
+			!m.TagMismatch {
 			msg := fmt.Sprintf(
 				"(%s) TRANSACTION VERIFIED: %v: agrees with manifest\n", s.ID, gcrPayload)
 			logInfo.Println(msg)
@@ -232,41 +244,27 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	// Find the subproject's registry.
-	var srcRegistry reg.RegistryContext
-	for _, rc := range sc.RegistryContexts {
-		if !rc.Src {
-			continue
-		}
-		rcNameParts := strings.Split(string(rc.Name), "/")
-		if len(rcNameParts) < 3 {
-			continue
-		}
-		// Find the subproject key from the pub/sub message.
-		klog.Infof("subproject name: %s", rcNameParts[2])
-		if strings.HasSuffix(string(rc.Name), rcNameParts[2]) {
-			rcBound := rc // Avoid loop reference variable.
-			srcRegistry = rcBound
-			break
-		}
-	}
-	// If we can't find the source registry for this image, then reject the
+	// Find the subproject repository responsible for the GCRPubSubPayload. This
+	// is so that we can query the subproject to figure out all digests that
+	// belong there, so that we can validate the child manifest in the
+	// GCRPubSubPayload.
+	srcRegistry, err := GetMatchingSourceRegistry(manifests, *gcrPayload)
+	// If we can't find any source registry for this image, then reject the
 	// transaction.
-	if string(srcRegistry.Name) == "" {
-		msg := fmt.Sprintf("(%s) TRANSACTION REJECTED: could not determine source registry: %v", s.ID, gcrPayload)
+	if err != nil {
+		msg := fmt.Sprintf("(%s) TRANSACTION REJECTED: %v", s.ID, err)
 		_, _ = w.Write([]byte(msg))
 		panic(msg)
 	}
 	sc.ReadRegistries(
 		[]reg.RegistryContext{srcRegistry},
 		true,
-		reg.MkReadRepositoryCmdReal)
-	sc.ReadGCRManifestLists(reg.MkReadManifestListCmdReal)
-	klog.Infof("sc.ParentDigest is: %v", sc.ParentDigest)
+		s.GcrReadingFacility.ReadRepo)
+	sc.ReadGCRManifestLists(s.GcrReadingFacility.ReadManifestList)
 	var childDigest reg.Digest
-	childImageParts := strings.Split(gcrPayload.Digest, "@")
+	childImageParts := strings.Split(gcrPayload.FQIN, "@")
 	if len(childImageParts) != 2 {
-		msg := fmt.Sprintf("(%s) TRANSACTION REJECTED: could not split child digest information: %v", s.ID, gcrPayload.Digest)
+		msg := fmt.Sprintf("(%s) TRANSACTION REJECTED: could not split child digest information: %v", s.ID, gcrPayload.FQIN)
 		_, _ = w.Write([]byte(msg))
 		panic(msg)
 	}
@@ -289,4 +287,30 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 	// same message is not repeated over and over again in the logs.
 	_, _ = w.Write([]byte(msg))
 	panic(msg)
+}
+
+// GetMatchingSourceRegistry gets the first source repository that matches the
+// image information inside a GCRPubSubPayload.
+func GetMatchingSourceRegistry(
+	manifests []reg.Manifest,
+	gcrPayload reg.GCRPubSubPayload,
+) (reg.RegistryContext, error) {
+
+	for _, manifest := range manifests {
+		if !gcrPayload.Match(manifest).PathMatch {
+			continue
+		}
+		// Now that there is a match (at least a PathMatch), just fish out
+		// the source registry in the manifest.
+		for _, rc := range manifest.Registries {
+			if rc.Src {
+				return rc, nil
+			}
+		}
+	}
+
+	return reg.RegistryContext{},
+		fmt.Errorf(
+			"could not find matching source registry for %v",
+			gcrPayload.FQIN)
 }

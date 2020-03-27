@@ -46,8 +46,8 @@
     - "gcr.io/k8s-gcr-audit-test-prod/golden-bar/bar@sha256:408d6837313f95f081d5d02cc2691344c5781d43e98653f4af6cf9c1b8d26166"
     - "us.gcr.io/k8s-gcr-audit-test-prod/golden-bar/bar:2.0"
   logMatch:
-  - "TRANSACTION VERIFIED: &{INSERT us.gcr.io/k8s-gcr-audit-test-prod/golden-bar/bar@sha256:408d6837313f95f081d5d02cc2691344c5781d43e98653f4af6cf9c1b8d26166 us.gcr.io/k8s-gcr-audit-test-prod/golden-bar/bar:1.0}: agrees with manifest"
-  - "TRANSACTION REJECTED: &{INSERT us.gcr.io/k8s-gcr-audit-test-prod/golden-bar/bar@sha256:408d6837313f95f081d5d02cc2691344c5781d43e98653f4af6cf9c1b8d26166 us.gcr.io/k8s-gcr-audit-test-prod/golden-bar/bar:2.0}: could not validate"
+  - "TRANSACTION VERIFIED: &{INSERT us.gcr.io/k8s-gcr-audit-test-prod/golden-bar/bar@sha256:408d6837313f95f081d5d02cc2691344c5781d43e98653f4af6cf9c1b8d26166 us.gcr.io/k8s-gcr-audit-test-prod/golden-bar/bar:1.0 us.gcr.io/k8s-gcr-audit-test-prod/golden-bar/bar sha256:408d6837313f95f081d5d02cc2691344c5781d43e98653f4af6cf9c1b8d26166 1.0}: agrees with manifest"
+  - "TRANSACTION REJECTED: &{INSERT us.gcr.io/k8s-gcr-audit-test-prod/golden-bar/bar@sha256:408d6837313f95f081d5d02cc2691344c5781d43e98653f4af6cf9c1b8d26166 us.gcr.io/k8s-gcr-audit-test-prod/golden-bar/bar:2.0 us.gcr.io/k8s-gcr-audit-test-prod/golden-bar/bar sha256:408d6837313f95f081d5d02cc2691344c5781d43e98653f4af6cf9c1b8d26166 2.0}: could not validate"
 - name: "fatManifest"
   registries:
   # Staging.
@@ -83,7 +83,7 @@
   logMatch:
   # There should be 2 child images that were copied over as a result of copying
   # the fat manifest.
-  - "TRANSACTION VERIFIED: &{INSERT us.gcr.io/k8s-gcr-audit-test-prod/golden-foo/foo@sha256:2af5205553239e0eb17c544bc1e90c2d6173012a191f0a44131aa2f9c44bb511 }: agrees with manifest (parent digest sha256:a42e27f5d18d51c581efef2584ff9aebbfeffcb3145e81e52b1dccf62915e4a3)"
-  - "TRANSACTION VERIFIED: &{INSERT us.gcr.io/k8s-gcr-audit-test-prod/golden-foo/foo@sha256:2740382935148a02bf425a893d14848dd6238e405935440ce5c13b771a33f2fd }: agrees with manifest (parent digest sha256:a42e27f5d18d51c581efef2584ff9aebbfeffcb3145e81e52b1dccf62915e4a3)"
+  - "TRANSACTION VERIFIED: &{INSERT us.gcr.io/k8s-gcr-audit-test-prod/golden-foo/foo@sha256:2af5205553239e0eb17c544bc1e90c2d6173012a191f0a44131aa2f9c44bb511  us.gcr.io/k8s-gcr-audit-test-prod/golden-foo/foo sha256:2af5205553239e0eb17c544bc1e90c2d6173012a191f0a44131aa2f9c44bb511 }: agrees with manifest (parent digest sha256:a42e27f5d18d51c581efef2584ff9aebbfeffcb3145e81e52b1dccf62915e4a3)"
+  - "TRANSACTION VERIFIED: &{INSERT us.gcr.io/k8s-gcr-audit-test-prod/golden-foo/foo@sha256:2740382935148a02bf425a893d14848dd6238e405935440ce5c13b771a33f2fd  us.gcr.io/k8s-gcr-audit-test-prod/golden-foo/foo sha256:2740382935148a02bf425a893d14848dd6238e405935440ce5c13b771a33f2fd }: agrees with manifest (parent digest sha256:a42e27f5d18d51c581efef2584ff9aebbfeffcb3145e81e52b1dccf62915e4a3)"
   # Finally, the parent image itself should be verified.
-  - "TRANSACTION VERIFIED: &{INSERT us.gcr.io/k8s-gcr-audit-test-prod/golden-foo/foo@sha256:a42e27f5d18d51c581efef2584ff9aebbfeffcb3145e81e52b1dccf62915e4a3 us.gcr.io/k8s-gcr-audit-test-prod/golden-foo/foo:1.0}: agrees with manifest"
+  - "TRANSACTION VERIFIED: &{INSERT us.gcr.io/k8s-gcr-audit-test-prod/golden-foo/foo@sha256:a42e27f5d18d51c581efef2584ff9aebbfeffcb3145e81e52b1dccf62915e4a3 us.gcr.io/k8s-gcr-audit-test-prod/golden-foo/foo:1.0 us.gcr.io/k8s-gcr-audit-test-prod/golden-foo/foo sha256:a42e27f5d18d51c581efef2584ff9aebbfeffcb3145e81e52b1dccf62915e4a3 1.0}: agrees with manifest"

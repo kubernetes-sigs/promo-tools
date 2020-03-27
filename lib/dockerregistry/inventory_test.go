@@ -2565,11 +2565,7 @@ func TestGarbageCollection(t *testing.T) {
 		for req := range reqs {
 			pr := req.RequestParams.(PromotionRequest)
 			mutex.Lock()
-			if _, ok := captured[pr]; ok {
-				captured[pr]++
-			} else {
-				captured[pr] = 1
-			}
+			captured[pr]++
 			mutex.Unlock()
 			wg.Add(-1)
 		}
@@ -2705,11 +2701,7 @@ func TestGarbageCollectionMulti(t *testing.T) {
 		for req := range reqs {
 			pr := req.RequestParams.(PromotionRequest)
 			mutex.Lock()
-			if _, ok := captured[pr]; ok {
-				captured[pr]++
-			} else {
-				captured[pr] = 1
-			}
+			captured[pr]++
 			mutex.Unlock()
 			wg.Add(-1)
 		}
@@ -2902,7 +2894,7 @@ func TestParseContainerParts(t *testing.T) {
 	}
 }
 
-func TestContains(t *testing.T) {
+func TestMatch(t *testing.T) {
 	inputMfest := Manifest{
 		Registries: []RegistryContext{
 			{
@@ -2932,65 +2924,198 @@ func TestContains(t *testing.T) {
 		},
 		filepath: "a/promoter-manifest.yaml"}
 	var tests = []struct {
-		name             string
-		mfest            Manifest
-		gcrPayload       GCRPubSubPayload
-		expectedContains bool
+		name          string
+		mfest         Manifest
+		gcrPayload    GCRPubSubPayload
+		expectedMatch GcrPayloadMatch
 	}{
 		{
 			"INSERT message contains both Digest and Tag",
 			inputMfest,
 			GCRPubSubPayload{
 				Action: "INSERT",
-				Digest: "us.gcr.io/some-prod/foo-controller@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-				Tag:    "us.gcr.io/some-prod/foo-controller:1.0",
+				FQIN:   "us.gcr.io/some-prod/foo-controller@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+				PQIN:   "us.gcr.io/some-prod/foo-controller:1.0",
 			},
-			true,
+			GcrPayloadMatch{
+				PathMatch:   true,
+				DigestMatch: true,
+				TagMatch:    true,
+			},
 		},
 		{
 			"INSERT message only contains Digest",
 			inputMfest,
 			GCRPubSubPayload{
 				Action: "INSERT",
-				Digest: "us.gcr.io/some-prod/foo-controller@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+				FQIN:   "us.gcr.io/some-prod/foo-controller@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 			},
-			true,
+			GcrPayloadMatch{
+				PathMatch:   true,
+				DigestMatch: true,
+			},
 		},
 		{
-			"INSERT's digest is not in Manifest (digest only)",
+			"INSERT's digest is not in Manifest (digest mismatch, but path matched)",
 			inputMfest,
 			GCRPubSubPayload{
 				Action: "INSERT",
-				Digest: "us.gcr.io/some-prod/foo-controller@sha256:000",
+				FQIN:   "us.gcr.io/some-prod/foo-controller@sha256:000",
 			},
-			false,
+			GcrPayloadMatch{
+				PathMatch: true,
+			},
 		},
 		{
-			"INSERT's digest is not in Manifest (tag specified)",
+			"INSERT's digest is not in Manifest (neither digest nor tag match, but path matched)",
 			inputMfest,
 			GCRPubSubPayload{
 				Action: "INSERT",
-				Digest: "us.gcr.io/some-prod/foo-controller@sha256:000",
-				Tag:    "us.gcr.io/some-prod/foo-controller:1.0",
+				FQIN:   "us.gcr.io/some-prod/foo-controller@sha256:000",
+				PQIN:   "us.gcr.io/some-prod/foo-controller:1.0",
 			},
-			false,
+			GcrPayloadMatch{
+				PathMatch: true,
+			},
 		},
 		{
-			"INSERT's digest is not in Manifest (tag specified)",
+			"INSERT's digest is not in Manifest (tag specified, but tag mismatch)",
 			inputMfest,
 			GCRPubSubPayload{
 				Action: "INSERT",
-				Digest: "us.gcr.io/some-prod/foo-controller@sha256:000",
-				Tag:    "us.gcr.io/some-prod/foo-controller:1.0",
+				FQIN:   "us.gcr.io/some-prod/foo-controller@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+				PQIN:   "us.gcr.io/some-prod/foo-controller:white-powder",
 			},
-			false,
+			GcrPayloadMatch{
+				PathMatch:   true,
+				DigestMatch: true,
+				TagMismatch: true,
+			},
 		},
 	}
 
 	for _, test := range tests {
-		contains := test.mfest.Contains(test.gcrPayload)
-		errEqual := checkEqual(contains, test.expectedContains)
+		test.gcrPayload.PopulateExtraFields()
+		got := test.gcrPayload.Match(test.mfest)
+		errEqual := checkEqual(got, test.expectedMatch)
 		checkError(t, errEqual, fmt.Sprintf("checkError: test %q: shouldBeValid\n", test.name))
+	}
+}
+
+func TestPopulateExtraFields(t *testing.T) {
+	var shouldBeValid = []struct {
+		name     string
+		input    GCRPubSubPayload
+		expected GCRPubSubPayload
+	}{
+		{
+			"basic",
+			GCRPubSubPayload{
+				"INSERT",
+				"k8s.gcr.io/subproject/foo@sha256:000",
+				"k8s.gcr.io/subproject/foo:1.0",
+				"",
+				"",
+				"",
+			},
+			GCRPubSubPayload{
+				"INSERT",
+				"k8s.gcr.io/subproject/foo@sha256:000",
+				"k8s.gcr.io/subproject/foo:1.0",
+				"k8s.gcr.io/subproject/foo",
+				"sha256:000",
+				"1.0",
+			},
+		},
+		{
+			"only FQIN",
+			GCRPubSubPayload{
+				"INSERT",
+				"k8s.gcr.io/subproject/foo@sha256:000",
+				"",
+				"",
+				"",
+				"",
+			},
+			GCRPubSubPayload{
+				"INSERT",
+				"k8s.gcr.io/subproject/foo@sha256:000",
+				"",
+				"k8s.gcr.io/subproject/foo",
+				"sha256:000",
+				"",
+			},
+		},
+		{
+			"only PQIN",
+			GCRPubSubPayload{
+				"DELETE",
+				"",
+				"k8s.gcr.io/subproject/foo:1.0",
+				"",
+				"",
+				"",
+			},
+			GCRPubSubPayload{
+				"DELETE",
+				"",
+				"k8s.gcr.io/subproject/foo:1.0",
+				"k8s.gcr.io/subproject/foo",
+				"",
+				"1.0",
+			},
+		},
+	}
+
+	for _, test := range shouldBeValid {
+		err := test.input.PopulateExtraFields()
+
+		eqErr := checkEqual(err, nil)
+		checkError(t, eqErr, fmt.Sprintf("checkError: %v: shouldBeValid\n",
+			test.name))
+
+		got := test.input
+		errEqual := checkEqual(got, test.expected)
+		checkError(t, errEqual, fmt.Sprintf("checkError: %v: shouldBeValid\n",
+			test.name))
+	}
+
+	var shouldBeInvalid = []struct {
+		name     string
+		input    GCRPubSubPayload
+		expected error
+	}{
+		{
+			"FQIN missing @-sign",
+			GCRPubSubPayload{
+				"INSERT",
+				"k8s.gcr.io/subproject/foosha256:000",
+				"k8s.gcr.io/subproject/foo:1.0",
+				"",
+				"",
+				"",
+			},
+			fmt.Errorf("invalid FQIN: k8s.gcr.io/subproject/foosha256:000"),
+		},
+		{
+			"PQIN missing colon",
+			GCRPubSubPayload{
+				"INSERT",
+				"k8s.gcr.io/subproject/foo@sha256:000",
+				"k8s.gcr.io/subproject/foo1.0",
+				"",
+				"",
+				"",
+			},
+			fmt.Errorf("invalid PQIN: k8s.gcr.io/subproject/foo1.0"),
+		},
+	}
+
+	for _, test := range shouldBeInvalid {
+		got := test.input.PopulateExtraFields()
+		eqErr := checkEqual(got, test.expected)
+		checkError(t, eqErr, fmt.Sprintf("checkError: %v: shouldInvalid\n",
+			test.name))
 	}
 }
 

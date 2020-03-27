@@ -17,15 +17,21 @@ limitations under the License.
 package report
 
 import (
+	"bytes"
 	"log"
-	"os"
 
 	"cloud.google.com/go/errorreporting"
 )
 
 // FakeReportingClient is a fake reporting client.
 type FakeReportingClient struct {
-	reporter *log.Logger
+	reporter     *log.Logger
+	reportBuffer bytes.Buffer
+}
+
+// GetReportBuffer retrieves the reportBuffer.
+func (c *FakeReportingClient) GetReportBuffer() bytes.Buffer {
+	return c.reportBuffer
 }
 
 // Report simply prints the entry to STDERR. Nothing goes over the network!
@@ -42,8 +48,7 @@ func (c *FakeReportingClient) Close() error { return nil }
 // reporter initialized to a basic logger to STDERR.
 func NewFakeReportingClient() *FakeReportingClient {
 	c := FakeReportingClient{}
-
-	c.reporter = log.New(os.Stderr, "FAKE-REPORT", log.LstdFlags)
+	c.reporter = log.New(&c.reportBuffer, "FAKE-REPORT", log.LstdFlags)
 
 	return &c
 }

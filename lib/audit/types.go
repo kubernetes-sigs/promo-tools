@@ -17,10 +17,21 @@ limitations under the License.
 package audit
 
 import (
+	reg "sigs.k8s.io/k8s-container-image-promoter/lib/dockerregistry"
 	"sigs.k8s.io/k8s-container-image-promoter/lib/logclient"
 	"sigs.k8s.io/k8s-container-image-promoter/lib/remotemanifest"
 	"sigs.k8s.io/k8s-container-image-promoter/lib/report"
+	"sigs.k8s.io/k8s-container-image-promoter/lib/stream"
 )
+
+// GcrReadingFacility holds functions used to create streams for reading the
+// repository and manifest list.
+//
+// nolint[lll]
+type GcrReadingFacility struct {
+	ReadRepo         func(*reg.SyncContext, reg.RegistryContext) stream.Producer
+	ReadManifestList func(*reg.SyncContext, reg.GCRManifestListContext) stream.Producer
+}
 
 // ServerContext holds all of the initialization data for the server to start
 // up.
@@ -29,6 +40,7 @@ type ServerContext struct {
 	RemoteManifestFacility remotemanifest.Facility
 	ErrorReportingFacility report.ReportingFacility
 	LoggingFacility        logclient.LoggingFacility
+	GcrReadingFacility     GcrReadingFacility
 }
 
 // PubSubMessageInner is the inner struct that holds the actual Pub/Sub
