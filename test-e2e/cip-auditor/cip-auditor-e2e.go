@@ -653,12 +653,13 @@ func getCmdCreatePubSubSubscription(
 // nolint[lll]
 func getCmdShowLogs(projectID, uuid, pattern string) []string {
 	fullLogName := fmt.Sprintf("projects/%s/logs/%s", projectID, auditLogName)
+	uuidAndPattern := fmt.Sprintf("(%s) %s", uuid, pattern)
 	return []string{
 		"gcloud",
 		"logging",
 		"read",
 		"--format=value(textPayload)",
-		fmt.Sprintf("resource.type=project logName=%s resource.labels.project_id=%s \"(%s) %s\"", fullLogName, projectID, uuid, pattern),
+		fmt.Sprintf("resource.type=project logName=%s resource.labels.project_id=%s %q", fullLogName, projectID, uuidAndPattern),
 		fmt.Sprintf("--project=%s", projectID),
 	}
 }
