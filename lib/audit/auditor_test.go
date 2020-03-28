@@ -118,24 +118,24 @@ func TestParsePubSubMessage(t *testing.T) {
 		{
 			reg.GCRPubSubPayload{
 				Action: "INSERT"},
-			fmt.Errorf("gcrPayload: neither 'digest' nor 'tag' was specified"),
+			fmt.Errorf(`{Action: "INSERT", FQIN: "", PQIN: "", Path: "", Digest: "", Tag: ""}: neither 'digest' nor 'tag' was specified`),
 		},
 		{
 			reg.GCRPubSubPayload{
 				FQIN: "gcr.io/foo/bar@sha256:0000000000000000000000000000000000000000000000000000000000000000"},
-			fmt.Errorf("gcrPayload: Action not specified"),
+			fmt.Errorf(`{Action: "", FQIN: "gcr.io/foo/bar@sha256:0000000000000000000000000000000000000000000000000000000000000000", PQIN: "", Path: "gcr.io/foo/bar", Digest: "sha256:0000000000000000000000000000000000000000000000000000000000000000", Tag: ""}: Action not specified`),
 		},
 		{
 			reg.GCRPubSubPayload{
 				Action: "DELETE",
 				FQIN:   "gcr.io/foo/bar@sha256:0000000000000000000000000000000000000000000000000000000000000000"},
-			fmt.Errorf("{DELETE gcr.io/foo/bar@sha256:0000000000000000000000000000000000000000000000000000000000000000    }: deletions are prohibited"),
+			fmt.Errorf(`{Action: "DELETE", FQIN: "gcr.io/foo/bar@sha256:0000000000000000000000000000000000000000000000000000000000000000", PQIN: "", Path: "gcr.io/foo/bar", Digest: "sha256:0000000000000000000000000000000000000000000000000000000000000000", Tag: ""}: deletions are prohibited`),
 		},
 		{
 			reg.GCRPubSubPayload{
 				Action: "WOOF",
 				FQIN:   "gcr.io/foo/bar@sha256:0000000000000000000000000000000000000000000000000000000000000000"},
-			fmt.Errorf("gcrPayload: unknown action \"WOOF\""),
+			fmt.Errorf(`{Action: "WOOF", FQIN: "gcr.io/foo/bar@sha256:0000000000000000000000000000000000000000000000000000000000000000", PQIN: "", Path: "gcr.io/foo/bar", Digest: "sha256:0000000000000000000000000000000000000000000000000000000000000000", Tag: ""}: unknown action "WOOF"`),
 		},
 	}
 
@@ -150,7 +150,7 @@ func TestParsePubSubMessage(t *testing.T) {
 func TestAudit(t *testing.T) {
 	// Regression test case for
 	// https://github.com/kubernetes-sigs/k8s-container-image-promoter/issues/191.
-	manifests := []reg.Manifest{
+	manifests1 := []reg.Manifest{
 		{
 			Registries: []reg.RegistryContext{
 				{
@@ -174,29 +174,8 @@ func TestAudit(t *testing.T) {
 		},
 	}
 
-	type expectedPatterns struct {
-		report []string
-		info   []string
-		error  []string
-		alert  []string
-	}
-
-	var shouldBeValid = []struct {
-		name             string
-		payload          reg.GCRPubSubPayload
-		readRepo         map[string]string
-		readManifestList map[string]string
-		expectedPatterns expectedPatterns
-	}{
-		{
-			"basic child manifest (tagless child image, digest not in promoter manifest, but parent image is in promoter manifest)",
-			reg.GCRPubSubPayload{
-				Action: "INSERT",
-				FQIN:   "us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent@sha256:8735603bbd7153b8bfc8d2460481282bb44e2e830e5b237738e5c3e2a58c8f45",
-				PQIN:   "",
-			},
-			map[string]string{
-				"gcr.io/k8s-staging-kas-network-proxy": `{
+	readRepo1 := map[string]string{
+		"gcr.io/k8s-staging-kas-network-proxy": `{
   "child": [
     "proxy-agent"
   ],
@@ -204,7 +183,7 @@ func TestAudit(t *testing.T) {
   "name": "k8s-staging-kas-network-proxy",
   "tags": []
 }`,
-				"gcr.io/k8s-staging-kas-network-proxy/proxy-agent": `{
+		"gcr.io/k8s-staging-kas-network-proxy/proxy-agent": `{
   "child": [],
   "manifest": {
     "sha256:43273b274ee48f7fd7fc09bc82e7e75ddc596ca219fd9b522b1701bebec6ceff": {
@@ -263,11 +242,12 @@ func TestAudit(t *testing.T) {
     "v0.0.8"
   ]
 }`,
-			},
-			map[string]string{
-				// This is the response for reading the manifest for the parent
-				// image by digest.
-				"gcr.io/k8s-staging-kas-network-proxy/proxy-agent@sha256:c419394f3fa40c32352be5a6ec5865270376d4351a3756bb1893be3f28fcba32": `{
+	}
+
+	// This is the response for reading the manifest for the parent
+	// image by digest.
+	readManifestList1 := map[string]string{
+		"gcr.io/k8s-staging-kas-network-proxy/proxy-agent@sha256:c419394f3fa40c32352be5a6ec5865270376d4351a3756bb1893be3f28fcba32": `{
    "schemaVersion": 2,
    "mediaType": "application/vnd.docker.distribution.manifest.list.v2+json",
    "manifests": [
@@ -318,12 +298,157 @@ func TestAudit(t *testing.T) {
       }
    ]
 }`,
+	}
+
+	type expectedPatterns struct {
+		report []string
+		info   []string
+		error  []string
+		alert  []string
+	}
+
+	var shouldBeValid = []struct {
+		name             string
+		manifests        []reg.Manifest
+		payload          reg.GCRPubSubPayload
+		readRepo         map[string]string
+		readManifestList map[string]string
+		expectedPatterns expectedPatterns
+	}{
+		{
+			"direct manifest (tagless image)",
+			manifests1,
+			reg.GCRPubSubPayload{
+				Action: "INSERT",
+				FQIN:   "us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent@sha256:c419394f3fa40c32352be5a6ec5865270376d4351a3756bb1893be3f28fcba32",
+				PQIN:   "us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent:v0.0.8",
 			},
+			readRepo1,
+			readManifestList1,
 			expectedPatterns{
 				report: nil,
-				info:   []string{`TRANSACTION VERIFIED`},
+				info:   []string{`TRANSACTION VERIFIED: {Action: "INSERT", FQIN: "us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent@sha256:c419394f3fa40c32352be5a6ec5865270376d4351a3756bb1893be3f28fcba32", PQIN: "us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent:v0.0.8", Path: "us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent", Digest: "sha256:c419394f3fa40c32352be5a6ec5865270376d4351a3756bb1893be3f28fcba32", Tag: "v0.0.8"}: agrees with manifest`},
 				error:  nil,
 				alert:  nil,
+			},
+		},
+		{
+			"child manifest (tagless child image, digest not in promoter manifest, but parent image is in promoter manifest)",
+			manifests1,
+			reg.GCRPubSubPayload{
+				Action: "INSERT",
+				FQIN:   "us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent@sha256:8735603bbd7153b8bfc8d2460481282bb44e2e830e5b237738e5c3e2a58c8f45",
+				PQIN:   "",
+			},
+			readRepo1,
+			readManifestList1,
+			expectedPatterns{
+				report: nil,
+				info:   []string{`TRANSACTION VERIFIED: {Action: "INSERT", FQIN: "us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent@sha256:8735603bbd7153b8bfc8d2460481282bb44e2e830e5b237738e5c3e2a58c8f45", PQIN: "", Path: "us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent", Digest: "sha256:8735603bbd7153b8bfc8d2460481282bb44e2e830e5b237738e5c3e2a58c8f45", Tag: ""}: agrees with manifest \(parent digest sha256:c419394f3fa40c32352be5a6ec5865270376d4351a3756bb1893be3f28fcba32\)`},
+				error:  nil,
+				alert:  nil,
+			},
+		},
+		{
+			"image not found (no path match, even though the digest is found in the promoter manifest)",
+			manifests1,
+			reg.GCRPubSubPayload{
+				Action: "INSERT",
+				FQIN:   "us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent-white-powder@sha256:c419394f3fa40c32352be5a6ec5865270376d4351a3756bb1893be3f28fcba32",
+				PQIN:   "",
+			},
+			readRepo1,
+			readManifestList1,
+			expectedPatterns{
+				report: []string{`TRANSACTION REJECTED: could not find matching source registry for us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent-white-powder@sha256:c419394f3fa40c32352be5a6ec5865270376d4351a3756bb1893be3f28fcba32`},
+				info:   []string{`could not find direct manifest entry for {Action: "INSERT", FQIN: "us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent-white-powder@sha256:c419394f3fa40c32352be5a6ec5865270376d4351a3756bb1893be3f28fcba32", PQIN: "", Path: "us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent-white-powder", Digest: "sha256:c419394f3fa40c32352be5a6ec5865270376d4351a3756bb1893be3f28fcba32", Tag: ""}; assuming child manifest`},
+				error:  nil,
+				alert:  []string{`TRANSACTION REJECTED: could not find matching source registry for us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent-white-powder@sha256:c419394f3fa40c32352be5a6ec5865270376d4351a3756bb1893be3f28fcba32`},
+			},
+		},
+		{
+			"image not found (path and digest match, but not the tag)",
+			manifests1,
+			reg.GCRPubSubPayload{
+				Action: "INSERT",
+				FQIN:   "us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent@sha256:c419394f3fa40c32352be5a6ec5865270376d4351a3756bb1893be3f28fcba32",
+				PQIN:   "us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent:evil",
+			},
+			readRepo1,
+			readManifestList1,
+			expectedPatterns{
+				report: []string{`TRANSACTION REJECTED: {Action: "INSERT", FQIN: "us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent@sha256:c419394f3fa40c32352be5a6ec5865270376d4351a3756bb1893be3f28fcba32", PQIN: "us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent:evil", Path: "us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent", Digest: "sha256:c419394f3fa40c32352be5a6ec5865270376d4351a3756bb1893be3f28fcba32", Tag: "evil"}: could not validate`},
+				info:   []string{`could not find direct manifest entry for {Action: "INSERT", FQIN: "us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent@sha256:c419394f3fa40c32352be5a6ec5865270376d4351a3756bb1893be3f28fcba32", PQIN: "us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent:evil", Path: "us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent", Digest: "sha256:c419394f3fa40c32352be5a6ec5865270376d4351a3756bb1893be3f28fcba32", Tag: "evil"}; assuming child manifest`},
+				error:  nil,
+				alert:  []string{`TRANSACTION REJECTED: {Action: "INSERT", FQIN: "us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent@sha256:c419394f3fa40c32352be5a6ec5865270376d4351a3756bb1893be3f28fcba32", PQIN: "us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent:evil", Path: "us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent", Digest: "sha256:c419394f3fa40c32352be5a6ec5865270376d4351a3756bb1893be3f28fcba32", Tag: "evil"}: could not validate`},
+			},
+		},
+		{
+			"image has been completely deleted (digest removed)",
+			manifests1,
+			reg.GCRPubSubPayload{
+				Action: "DELETE",
+				FQIN:   "us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent@sha256:c419394f3fa40c32352be5a6ec5865270376d4351a3756bb1893be3f28fcba32",
+				PQIN:   "",
+			},
+			readRepo1,
+			readManifestList1,
+			expectedPatterns{
+				report: []string{`TRANSACTION REJECTED: parse failure: {Action: "DELETE", FQIN: "us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent@sha256:c419394f3fa40c32352be5a6ec5865270376d4351a3756bb1893be3f28fcba32", PQIN: "", Path: "us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent", Digest: "sha256:c419394f3fa40c32352be5a6ec5865270376d4351a3756bb1893be3f28fcba32", Tag: ""}: deletions are prohibited`},
+				info:   nil,
+				error:  nil,
+				alert:  []string{`TRANSACTION REJECTED: parse failure: {Action: "DELETE", FQIN: "us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent@sha256:c419394f3fa40c32352be5a6ec5865270376d4351a3756bb1893be3f28fcba32", PQIN: "", Path: "us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent", Digest: "sha256:c419394f3fa40c32352be5a6ec5865270376d4351a3756bb1893be3f28fcba32", Tag: ""}: deletions are prohibited`},
+			},
+		},
+		{
+			"image has been untagged (tag removed)",
+			manifests1,
+			reg.GCRPubSubPayload{
+				Action: "DELETE",
+				FQIN:   "",
+				PQIN:   "us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent:v0.0.8",
+			},
+			readRepo1,
+			readManifestList1,
+			expectedPatterns{
+				report: []string{`TRANSACTION REJECTED: parse failure: {Action: "DELETE", FQIN: "", PQIN: "us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent:v0.0.8", Path: "us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent", Digest: "", Tag: "v0.0.8"}: deletions are prohibited`},
+				info:   nil,
+				error:  nil,
+				alert:  []string{`TRANSACTION REJECTED: parse failure: {Action: "DELETE", FQIN: "", PQIN: "us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent:v0.0.8", Path: "us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent", Digest: "", Tag: "v0.0.8"}: deletions are prohibited`},
+			},
+		},
+		{
+			"image has been completely deleted (digest removed for UNTRACKED image)",
+			manifests1,
+			reg.GCRPubSubPayload{
+				Action: "DELETE",
+				FQIN:   "us.gcr.io/k8s-artifacts-prod/secret@sha256:c419394f3fa40c32352be5a6ec5865270376d4351a3756bb1893be3f28fcba32",
+				PQIN:   "",
+			},
+			readRepo1,
+			readManifestList1,
+			expectedPatterns{
+				report: []string{`TRANSACTION REJECTED: parse failure: {Action: "DELETE", FQIN: "us.gcr.io/k8s-artifacts-prod/secret@sha256:c419394f3fa40c32352be5a6ec5865270376d4351a3756bb1893be3f28fcba32", PQIN: "", Path: "us.gcr.io/k8s-artifacts-prod/secret", Digest: "sha256:c419394f3fa40c32352be5a6ec5865270376d4351a3756bb1893be3f28fcba32", Tag: ""}: deletions are prohibited`},
+				info:   nil,
+				error:  nil,
+				alert:  []string{`TRANSACTION REJECTED: parse failure: {Action: "DELETE", FQIN: "us.gcr.io/k8s-artifacts-prod/secret@sha256:c419394f3fa40c32352be5a6ec5865270376d4351a3756bb1893be3f28fcba32", PQIN: "", Path: "us.gcr.io/k8s-artifacts-prod/secret", Digest: "sha256:c419394f3fa40c32352be5a6ec5865270376d4351a3756bb1893be3f28fcba32", Tag: ""}: deletions are prohibited`},
+			},
+		},
+		{
+			"image has been untagged (tag removed for UNTRACKED image)",
+			manifests1,
+			reg.GCRPubSubPayload{
+				Action: "DELETE",
+				FQIN:   "",
+				PQIN:   "us.gcr.io/k8s-artifacts-prod/secret:v0.0.8",
+			},
+			readRepo1,
+			readManifestList1,
+			expectedPatterns{
+				report: []string{`TRANSACTION REJECTED: parse failure: {Action: "DELETE", FQIN: "", PQIN: "us.gcr.io/k8s-artifacts-prod/secret:v0.0.8", Path: "us.gcr.io/k8s-artifacts-prod/secret", Digest: "", Tag: "v0.0.8"}: deletions are prohibited`},
+				info:   nil,
+				error:  nil,
+				alert:  []string{`TRANSACTION REJECTED: parse failure: {Action: "DELETE", FQIN: "", PQIN: "us.gcr.io/k8s-artifacts-prod/secret:v0.0.8", Path: "us.gcr.io/k8s-artifacts-prod/secret", Digest: "", Tag: "v0.0.8"}: deletions are prohibited`},
 			},
 		},
 	}
@@ -394,7 +519,7 @@ func TestAudit(t *testing.T) {
 		loggingFacility := logclient.NewFakeLogClient()
 
 		s := initFakeServerContext(
-			manifests,
+			test.manifests,
 			reportingFacility,
 			loggingFacility,
 			fakeReadRepo,

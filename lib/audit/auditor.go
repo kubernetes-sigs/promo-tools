@@ -23,7 +23,6 @@ import (
 	"net/http"
 	"os"
 	"runtime/debug"
-	"strings"
 
 	"cloud.google.com/go/errorreporting"
 	"k8s.io/klog"
@@ -113,14 +112,18 @@ func ParsePubSubMessage(r *http.Request) (*reg.GCRPubSubPayload, error) {
 		return nil, fmt.Errorf("json.Unmarshal: %v", err)
 	}
 
-	if len(gcrPayload.FQIN) == 0 && len(gcrPayload.PQIN) == 0 {
+	if gcrPayload.FQIN == "" && gcrPayload.PQIN == "" {
 		return nil, fmt.Errorf(
-			"gcrPayload: neither 'digest' nor 'tag' was specified")
+			"%v: neither 'digest' nor 'tag' was specified", gcrPayload)
+	}
+
+	if err := gcrPayload.PopulateExtraFields(); err != nil {
+		return nil, err
 	}
 
 	switch gcrPayload.Action {
 	case "":
-		return nil, fmt.Errorf("gcrPayload: Action not specified")
+		return nil, fmt.Errorf("%v: Action not specified", gcrPayload)
 	// All deletions will for now be treated as an error. If it's an insertion,
 	// it can either have "digest" with FQIN, or "digest" + "tag" with PQIN. So
 	// we always verify FQIN, and if there is PQIN, verify that as well.
@@ -133,11 +136,7 @@ func ParsePubSubMessage(r *http.Request) (*reg.GCRPubSubPayload, error) {
 		break
 	default:
 		return nil, fmt.Errorf(
-			"gcrPayload: unknown action %q", gcrPayload.Action)
-	}
-
-	if err := gcrPayload.PopulateExtraFields(); err != nil {
-		return nil, err
+			"%v: unknown action %q", gcrPayload, gcrPayload.Action)
 	}
 
 	return &gcrPayload, nil
@@ -213,6 +212,8 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	logInfo.Printf("could not find direct manifest entry for %v; assuming child manifest", gcrPayload)
+
 	// (4) It could be that the manifest is a child manifest (part of a fat
 	// manifest). This is the case where the user only specifies the digest of
 	// the parent image, but not the child image. When the promoter copies over
@@ -261,16 +262,13 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 		true,
 		s.GcrReadingFacility.ReadRepo)
 	sc.ReadGCRManifestLists(s.GcrReadingFacility.ReadManifestList)
-	var childDigest reg.Digest
-	childImageParts := strings.Split(gcrPayload.FQIN, "@")
-	if len(childImageParts) != 2 {
-		msg := fmt.Sprintf("(%s) TRANSACTION REJECTED: could not split child digest information: %v", s.ID, gcrPayload.FQIN)
+	if gcrPayload.Digest == "" {
+		msg := fmt.Sprintf("(%s) TRANSACTION REJECTED: could not find digest information: %v", s.ID, gcrPayload.Digest)
 		_, _ = w.Write([]byte(msg))
 		panic(msg)
 	}
-	childDigest = reg.Digest(childImageParts[1])
-	klog.Infof("looking for child digest %v", childDigest)
-	if parentDigest, hasParent := sc.ParentDigest[childDigest]; hasParent {
+	klog.Infof("looking for child digest %v", gcrPayload.Digest)
+	if parentDigest, hasParent := sc.ParentDigest[gcrPayload.Digest]; hasParent {
 		msg := fmt.Sprintf(
 			"(%s) TRANSACTION VERIFIED: %v: agrees with manifest (parent digest %v)\n", s.ID, gcrPayload, parentDigest)
 		logInfo.Println(msg)

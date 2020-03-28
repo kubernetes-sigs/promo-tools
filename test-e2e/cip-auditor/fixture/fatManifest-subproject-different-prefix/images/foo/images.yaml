@@ -1,0 +1,5 @@
+- name: foo
+  dmap:
+    # This is a fat manifest.
+    sha256:a42e27f5d18d51c581efef2584ff9aebbfeffcb3145e81e52b1dccf62915e4a3:
+    - 1.0

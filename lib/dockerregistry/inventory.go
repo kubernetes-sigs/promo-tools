@@ -2570,7 +2570,7 @@ func (payload GCRPubSubPayload) matchImages(
 	}
 	// Speed up the search by skipping over registry names whose leading
 	// characters do not match.
-	if !strings.HasPrefix(payload.path, (string)(rc.Name)) {
+	if !strings.HasPrefix(payload.Path, (string)(rc.Name)) {
 		return m
 	}
 
@@ -2594,12 +2594,12 @@ func (payload GCRPubSubPayload) matchImage(
 
 	constructedPath := strings.Join(
 		[]string{string(rc.Name), (string)(image.ImageName)}, "/")
-	if payload.path != constructedPath {
+	if payload.Path != constructedPath {
 		return m
 	}
 	m.PathMatch = true
 
-	tags, ok := image.Dmap[payload.digest]
+	tags, ok := image.Dmap[payload.Digest]
 	if !ok {
 		return m
 	}
@@ -2614,12 +2614,12 @@ func (payload GCRPubSubPayload) matchImage(
 	//
 	// Matching solely on the tag (but not digest) or vice versa goes
 	// AGAINST the intent of the promoter manifest and is cause for alarm!
-	if payload.tag == "" {
+	if payload.Tag == "" {
 		return m
 	}
 
 	for _, tag := range tags {
-		if payload.tag == tag {
+		if payload.Tag == tag {
 			m.TagMatch = true
 			break
 		}
@@ -2635,9 +2635,11 @@ func (payload GCRPubSubPayload) matchImage(
 }
 
 // PopulateExtraFields takes the existing fields in GCRPubSubPayload and uses
-// them to populate the un-exported (hidden) fields. This is because the payload
-// bundles up digests, tags, etc into a single string. Instead of dealing with
-// them later on, we just break them up into the pieces we would like to use.
+// them to populate the extra convenience fields (these fields are derived from
+// the FQIN and PQIN fields, and do not add any new information of their own).
+// This is because the payload bundles up digests, tags, etc into a single
+// string. Instead of dealing with them later on, we just break them up into the
+// pieces we would like to use.
 func (payload *GCRPubSubPayload) PopulateExtraFields() error {
 	// Populate digest, if found.
 	if len(payload.FQIN) > 0 {
@@ -2646,8 +2648,8 @@ func (payload *GCRPubSubPayload) PopulateExtraFields() error {
 		if len(parsed) != 2 {
 			return fmt.Errorf("invalid FQIN: %v", payload.FQIN)
 		}
-		payload.digest = Digest(parsed[1])
-		payload.path = parsed[0]
+		payload.Digest = Digest(parsed[1])
+		payload.Path = parsed[0]
 	}
 
 	// Populate tag, if found.
@@ -2657,9 +2659,22 @@ func (payload *GCRPubSubPayload) PopulateExtraFields() error {
 		if len(parsed) != 2 {
 			return fmt.Errorf("invalid PQIN: %v", payload.PQIN)
 		}
-		payload.tag = Tag(parsed[1])
-		payload.path = parsed[0]
+		payload.Tag = Tag(parsed[1])
+		payload.Path = parsed[0]
 	}
 
 	return nil
+}
+
+// Prettified prints the payload in a way that is stable and which hides extra
+// fields which are redundant.
+func (payload GCRPubSubPayload) String() string {
+	// nolint[lll]
+	return fmt.Sprintf("{Action: %q, FQIN: %q, PQIN: %q, Path: %q, Digest: %q, Tag: %q}",
+		payload.Action,
+		payload.FQIN,
+		payload.PQIN,
+		payload.Path,
+		payload.Digest,
+		payload.Tag)
 }
