@@ -7,7 +7,7 @@ build:
 		//test-e2e/cip-auditor:cip-auditor-e2e \
 		//cmd/promobot-files:promobot-files
 install:
-	bazel run $(BAZEL_BUILD_OPTS) //:install-cip -c opt -- $(shell go env GOPATH)/bin
+	bazel run //:install-cip -c opt -- $(shell go env GOPATH)/bin
 image:
 	bazel build //:cip-docker-loadable.tar
 image-load: image
