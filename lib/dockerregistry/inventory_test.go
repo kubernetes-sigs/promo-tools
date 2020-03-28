@@ -864,6 +864,8 @@ func TestSplitByKnownRegistries(t *testing.T) {
 		// See
 		// https://github.com/kubernetes-sigs/k8s-container-image-promoter/issues/188.
 		`us.gcr.io/k8s-artifacts-prod/kube-state-metrics`,
+		`us.gcr.io/k8s-artifacts-prod/metrics-server`,
+		`us.gcr.io/k8s-artifacts-prod`,
 	}
 	knownRegistryContexts := make([]RegistryContext, 0)
 	for _, knownRegistryName := range knownRegistryNames {
@@ -884,6 +886,13 @@ func TestSplitByKnownRegistries(t *testing.T) {
 			`us.gcr.io/k8s-artifacts-prod/kube-state-metrics`,
 			`us.gcr.io/k8s-artifacts-prod`,
 			`kube-state-metrics`,
+			nil,
+		},
+		{
+			`unclean split (known repo cuts into middle of image name)`,
+			`us.gcr.io/k8s-artifacts-prod/metrics-server-amd64`,
+			`us.gcr.io/k8s-artifacts-prod`,
+			`metrics-server-amd64`,
 			nil,
 		},
 	}

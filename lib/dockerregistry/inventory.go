@@ -1480,7 +1480,9 @@ func (sc *SyncContext) RemoveChildDigestEntries(rii RegInvImage) RegInvImage {
 }
 
 // SplitByKnownRegistries splits a registry name into a RegistryName and
-// ImageName.
+// ImageName. The purpose of this function is to split a long image path into 2
+// pieces --- the repository and the image name. We can't just split by the last
+// "/" all the time, because some manifests have an image with a "/" in it.
 func SplitByKnownRegistries(
 	r RegistryName,
 	rcs []RegistryContext) (RegistryName, ImageName, error) {
@@ -1498,10 +1500,20 @@ func SplitByKnownRegistries(
 				i := strings.LastIndex(string(r), "/")
 				return rc.Name[:i], ImageName(string(r)[i+1:]), nil
 			} else if trimmed[0] == '/' {
-				// Remove leading "/" character, if any.
+				// Remove leading "/" character. This denotes a clean split
+				// along directory boundaries.
 				return rc.Name, ImageName(trimmed[1:]), nil
 			} else {
-				return rc.Name, ImageName(trimmed), nil
+				// This is an unclean split where we cut the string in the
+				// middle of a path name. E.g., if we have
+				//
+				//  rc.Name == "us.gcr.io/k8s-artifacts-prod/metrics-server"
+				//  r       == "us.gcr.io/k8s-artifacts-prod/metrics-server-amd64"
+				//
+				// then we'l get trimmed == "-amd64". In such a case, we don't
+				// make any assumptions about how this should look and delay it
+				// to the next rc.
+				continue
 			}
 		}
 	}
