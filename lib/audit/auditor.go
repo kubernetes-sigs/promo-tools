@@ -165,7 +165,7 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 			})
 
 			logAlert.Printf("%s\n%s\n", panicStr, string(stacktrace))
-
+			klog.Errorln(panicStr)
 		}
 	}()
 	// (1) Parse request payload.
@@ -207,6 +207,7 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 			msg := fmt.Sprintf(
 				"(%s) TRANSACTION VERIFIED: %v: agrees with manifest\n", s.ID, gcrPayload)
 			logInfo.Println(msg)
+			klog.Infoln(msg)
 			_, _ = w.Write([]byte(msg))
 			return
 		}
@@ -272,6 +273,7 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 		msg := fmt.Sprintf(
 			"(%s) TRANSACTION VERIFIED: %v: agrees with manifest (parent digest %v)\n", s.ID, gcrPayload, parentDigest)
 		logInfo.Println(msg)
+		klog.Infoln(msg)
 		_, _ = w.Write([]byte(msg))
 		return
 	}
