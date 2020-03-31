@@ -19,6 +19,7 @@ package audit
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -93,53 +94,69 @@ func (s *ServerContext) RunAuditor() {
 }
 
 // ParsePubSubMessage parses an HTTP request body into a reg.GCRPubSubPayload.
-//
-// nolint[gocyclo]
-func ParsePubSubMessage(r *http.Request) (*reg.GCRPubSubPayload, error) {
-	var psm PubSubMessage
-	var gcrPayload reg.GCRPubSubPayload
+func ParsePubSubMessage(body io.Reader) (*reg.GCRPubSubPayload, error) {
 
 	// Handle basic errors (malformed requests).
-	body, err := ioutil.ReadAll(r.Body)
+	bodyBytes, err := ioutil.ReadAll(body)
 	if err != nil {
 		return nil, fmt.Errorf("iotuil.ReadAll: %v", err)
 	}
+
+	return ParsePubSubMessageBody(bodyBytes)
+}
+
+// ParsePubSubMessageBody parses the body of an HTTP request to be a
+// GCRPubSubPayload.
+func ParsePubSubMessageBody(
+	body []byte,
+) (*reg.GCRPubSubPayload, error) {
+
+	var psm PubSubMessage
+	var gcrPayload reg.GCRPubSubPayload
+
 	if err := json.Unmarshal(body, &psm); err != nil {
-		return nil, fmt.Errorf("json.Unmarshal: %v", err)
+		return nil, fmt.Errorf("json.Unmarshal (request body): %v", err)
 	}
 
 	if err := json.Unmarshal(psm.Message.Data, &gcrPayload); err != nil {
-		return nil, fmt.Errorf("json.Unmarshal: %v", err)
+		return nil, fmt.Errorf("json.Unmarshal (message data): %v", err)
 	}
 
+	return &gcrPayload, nil
+}
+
+// ValidatePayload ensures that the payload is well-formed, per our
+// business-logic needs.
+func ValidatePayload(gcrPayload *reg.GCRPubSubPayload) error {
+
 	if gcrPayload.FQIN == "" && gcrPayload.PQIN == "" {
-		return nil, fmt.Errorf(
+		return fmt.Errorf(
 			"%v: neither 'digest' nor 'tag' was specified", gcrPayload)
 	}
 
 	if err := gcrPayload.PopulateExtraFields(); err != nil {
-		return nil, err
+		return err
 	}
 
 	switch gcrPayload.Action {
 	case "":
-		return nil, fmt.Errorf("%v: Action not specified", gcrPayload)
+		return fmt.Errorf("%v: Action not specified", gcrPayload)
 	// All deletions will for now be treated as an error. If it's an insertion,
 	// it can either have "digest" with FQIN, or "digest" + "tag" with PQIN. So
 	// we always verify FQIN, and if there is PQIN, verify that as well.
 	case "DELETE":
 		// Even though this is an error, we successfully processed this message,
 		// so exit with an error.
-		return nil, fmt.Errorf(
+		return fmt.Errorf(
 			"%v: deletions are prohibited", gcrPayload)
 	case "INSERT":
 		break
 	default:
-		return nil, fmt.Errorf(
+		return fmt.Errorf(
 			"%v: unknown action %q", gcrPayload, gcrPayload.Action)
 	}
 
-	return &gcrPayload, nil
+	return nil
 }
 
 // Audit receives and processes a Pub/Sub push message. It has 3 parts: (1)
@@ -169,12 +186,21 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 	// (1) Parse request payload.
-	gcrPayload, err := ParsePubSubMessage(r)
+	gcrPayload, err := ParsePubSubMessage(r.Body)
 	if err != nil {
 		// It's important to fail any message we cannot parse, because this
 		// notifies us of any changes in how the messages are created in the
 		// first place.
 		msg := fmt.Sprintf("(%s) TRANSACTION REJECTED: parse failure: %v", s.ID, err)
+		_, _ = w.Write([]byte(msg))
+		panic(msg)
+	}
+
+	// Additionally, fail any message that we cannot validate. This is where we
+	// catch things like "DELETE" actions and warn them outright as all
+	// deletions are prohibited.
+	if err := ValidatePayload(gcrPayload); err != nil {
+		msg := fmt.Sprintf("(%s) TRANSACTION REJECTED: validation failure: %v", s.ID, err)
 		_, _ = w.Write([]byte(msg))
 		panic(msg)
 	}
