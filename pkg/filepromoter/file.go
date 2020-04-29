@@ -115,7 +115,7 @@ func (o *copyFileOp) Run(ctx context.Context) error {
 	return nil
 }
 
-// String is the pretty-printer for an operation, as used by dry-run
+// String is the pretty-printer for an operation, as used by dry-run.
 func (o *copyFileOp) String() string {
 	return fmt.Sprintf(
 		"COPY %q to %q",

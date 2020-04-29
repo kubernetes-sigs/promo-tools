@@ -30,7 +30,7 @@ type gcloudTokenSource struct {
 	ServiceAccount string
 }
 
-// Token implements TokenSource.Token
+// Token implements TokenSource.Token.
 func (s *gcloudTokenSource) Token() (*oauth2.Token, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()

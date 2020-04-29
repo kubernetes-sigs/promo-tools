@@ -156,6 +156,7 @@ func TestValidatePayload(t *testing.T) {
 	}
 
 	for _, input := range shouldBeValid {
+		input := input
 		gotErr := ValidatePayload(&input)
 		errEqual := checkEqual(gotErr, nil)
 		checkError(t, errEqual, "checkError: test: shouldBeValid\n")
