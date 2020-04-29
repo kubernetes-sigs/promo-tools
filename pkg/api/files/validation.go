@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package filesapi
+package files
 
 import (
 	"encoding/hex"
@@ -25,17 +25,17 @@ import (
 // Validate checks for semantic errors in the yaml fields (the structure of the
 // yaml is checked during unmarshaling).
 func (m *Manifest) Validate() error {
-	if err := validateFilestores(m.Filestores); err != nil {
+	if err := ValidateFilestores(m.Filestores); err != nil {
 		return err
 	}
-	if err := validateFiles(m.Files); err != nil {
+	if err := ValidateFiles(m.Files); err != nil {
 		return err
 	}
 	return nil
 }
 
-// validateFilestores validates the Filestores field of the manifest.
-func validateFilestores(filestores []Filestore) error {
+// ValidateFilestores validates the Filestores field of the manifest.
+func ValidateFilestores(filestores []Filestore) error {
 	if len(filestores) == 0 {
 		return fmt.Errorf("at least one filestore must be specified")
 	}
@@ -77,8 +77,8 @@ func validateFilestores(filestores []Filestore) error {
 	return nil
 }
 
-// validateFiles validates the Files field of the manifest.
-func validateFiles(files []File) error {
+// ValidateFiles validates the Files field of the manifest.
+func ValidateFiles(files []File) error {
 	if len(files) == 0 {
 		return fmt.Errorf("at least one file must be specified")
 	}

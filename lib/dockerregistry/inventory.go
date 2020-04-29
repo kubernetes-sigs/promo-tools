@@ -42,7 +42,8 @@ import (
 	"sigs.k8s.io/k8s-container-image-promoter/pkg/gcloud"
 )
 
-func getSrcRegistry(rcs []RegistryContext) (*RegistryContext, error) {
+// GetSrcRegistry gets the source registry.
+func GetSrcRegistry(rcs []RegistryContext) (*RegistryContext, error) {
 	for _, registry := range rcs {
 		registry := registry
 		if registry.Src {
@@ -122,9 +123,9 @@ func ParseManifestFromFile(filePath string) (Manifest, error) {
 		return empty, err
 	}
 
-	mfest.filepath = filePath
+	mfest.Filepath = filePath
 
-	err = mfest.finalize()
+	err = mfest.Finalize()
 	if err != nil {
 		return empty, err
 	}
@@ -161,11 +162,11 @@ func ParseThinManifestFromFile(filePath string) (Manifest, error) {
 		return empty, err
 	}
 
-	mfest.filepath = filePath
+	mfest.Filepath = filePath
 	mfest.Images = images
 	mfest.Registries = thinManifest.Registries
 
-	err = mfest.finalize()
+	err = mfest.Finalize()
 	if err != nil {
 		return empty, err
 	}
@@ -191,13 +192,14 @@ func ParseImagesFromFile(filePath string) (Images, error) {
 	return images, nil
 }
 
-func (m *Manifest) finalize() error {
+// Finalize finalizes a Manifest by populating extra fields.
+func (m *Manifest) Finalize() error {
 	// Perform semantic checks (beyond just YAML validation).
-	srcRegistry, err := getSrcRegistry(m.Registries)
+	srcRegistry, err := GetSrcRegistry(m.Registries)
 	if err != nil {
 		return err
 	}
-	m.srcRegistry = srcRegistry
+	m.SrcRegistry = srcRegistry
 
 	return nil
 }
@@ -375,14 +377,14 @@ func ToPromotionEdges(
 		for _, image := range mfest.Images {
 			for digest, tagArray := range image.Dmap {
 				for _, destRC := range mfest.Registries {
-					if destRC == *mfest.srcRegistry {
+					if destRC == *mfest.SrcRegistry {
 						continue
 					}
 
 					if len(tagArray) > 0 {
 						for _, tag := range tagArray {
 							edge := mkPromotionEdge(
-								*mfest.srcRegistry,
+								*mfest.SrcRegistry,
 								destRC,
 								image.ImageName,
 								digest,
@@ -394,7 +396,7 @@ func ToPromotionEdges(
 						// still create a promotion edge for it (tagless
 						// promotion).
 						edge := mkPromotionEdge(
-							*mfest.srcRegistry,
+							*mfest.SrcRegistry,
 							destRC,
 							image.ImageName,
 							digest,
@@ -406,7 +408,7 @@ func ToPromotionEdges(
 		}
 	}
 
-	return checkOverlappingEdges(edges)
+	return CheckOverlappingEdges(edges)
 }
 
 func mkPromotionEdge(
@@ -437,7 +439,7 @@ func mkPromotionEdge(
 //
 // nolint[funlen]
 // nolint[gocyclo]
-func (sc *SyncContext) getPromotionCandidates(
+func (sc *SyncContext) GetPromotionCandidates(
 	edges map[PromotionEdge]interface{}) (map[PromotionEdge]interface{}, bool) {
 
 	clean := true
@@ -535,7 +537,7 @@ func (sc *SyncContext) getDigestForTag(inputTag Tag) *Digest {
 	return nil
 }
 
-// checkOverlappingEdges checks to ensure that all the edges taken together as a
+// CheckOverlappingEdges checks to ensure that all the edges taken together as a
 // whole are consistent. It checks that there are no duplicate promotions
 // desired to the same destination vertex (same destination PQIN). If the
 // digests are the same for those edges, ignore because by definition the
@@ -548,7 +550,7 @@ func (sc *SyncContext) getDigestForTag(inputTag Tag) *Digest {
 // shouldn't own).
 //
 // nolint[gocyclo]
-func checkOverlappingEdges(
+func CheckOverlappingEdges(
 	edges map[PromotionEdge]interface{}) (map[PromotionEdge]interface{}, error) {
 
 	// Build up a "promotionIntent". This will be checked below.
@@ -724,12 +726,12 @@ func (m Manifest) Validate() error {
 func validateImages(images []Image) error {
 	for _, image := range images {
 		for digest, tagSlice := range image.Dmap {
-			if err := validateDigest(digest); err != nil {
+			if err := ValidateDigest(digest); err != nil {
 				return err
 			}
 
 			for _, tag := range tagSlice {
-				if err := validateTag(tag); err != nil {
+				if err := ValidateTag(tag); err != nil {
 					return err
 				}
 			}
@@ -738,7 +740,8 @@ func validateImages(images []Image) error {
 	return nil
 }
 
-func validateDigest(digest Digest) error {
+// ValidateDigest validates the digest.
+func ValidateDigest(digest Digest) error {
 	validDigest := regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
 	if !validDigest.Match([]byte(digest)) {
 		return fmt.Errorf("invalid digest: %v", digest)
@@ -746,7 +749,8 @@ func validateDigest(digest Digest) error {
 	return nil
 }
 
-func validateTag(tag Tag) error {
+// ValidateTag validates the tag.
+func ValidateTag(tag Tag) error {
 	var validTag = regexp.MustCompile(`^[\w][\w.-]{0,127}$`)
 	if !validTag.Match([]byte(tag)) {
 		return fmt.Errorf("invalid tag: %v", tag)
@@ -754,7 +758,8 @@ func validateTag(tag Tag) error {
 	return nil
 }
 
-func validateRegistryImagePath(rip RegistryImagePath) error {
+// ValidateRegistryImagePath validates the RegistryImagePath.
+func ValidateRegistryImagePath(rip RegistryImagePath) error {
 	validRegistryImagePath := regexp.MustCompile(
 		// \w is [0-9a-zA-Z_]
 		`^[\w-]+(\.[\w-]+)+(/[\w-]+)+$`)
@@ -1935,7 +1940,7 @@ func (sc *SyncContext) FilterPromotionEdges(
 			MkReadRepositoryCmdReal)
 	}
 
-	return sc.getPromotionCandidates(edges)
+	return sc.GetPromotionCandidates(edges)
 }
 
 // EdgesToRegInvImage takes the destination endpoints of all edges and converts

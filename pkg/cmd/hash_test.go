@@ -1,4 +1,4 @@
-package cmd
+package cmd_test
 
 import (
 	"context"
@@ -8,17 +8,19 @@ import (
 
 	"k8s.io/utils/diff"
 	"sigs.k8s.io/yaml"
+
+	"sigs.k8s.io/k8s-container-image-promoter/pkg/cmd"
 )
 
 func TestHash(t *testing.T) {
 	ctx := context.Background()
 
-	var opt GenerateManifestOptions
+	var opt cmd.GenerateManifestOptions
 	opt.PopulateDefaults()
 
 	opt.BaseDir = "testdata/files"
 
-	manifest, err := GenerateManifest(ctx, opt)
+	manifest, err := cmd.GenerateManifest(ctx, opt)
 	if err != nil {
 		t.Fatalf("failed to generate manifest: %v", err)
 	}
