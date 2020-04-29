@@ -80,6 +80,24 @@ container_pull(
 #    digest = "sha256:6e6b1e2fd53cb94c4dc2af8381ef50bf4c7ac49bc5c728efda4ab15b41d0b510",
 #)
 
+# Rules for installing binaries into the local filesystem.
+#
+# Replace with http_archive() (official rules install instructions) after
+# https://github.com/google/bazel_rules_install/pull/27 is merged.
+git_repository(
+    name = "com_github_google_rules_install",
+    commit = "84406bab66bbb5061621d3b4b782c453e22c160a",
+    remote = "https://github.com/listx/bazel_rules_install",
+)
+
+load("@com_github_google_rules_install//:deps.bzl", "install_rules_dependencies")
+
+install_rules_dependencies()
+
+load("@com_github_google_rules_install//:setup.bzl", "install_rules_setup")
+
+install_rules_setup()
+
 container_pull(
     name = "distroless-base",
     registry = "gcr.io",
