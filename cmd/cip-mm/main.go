@@ -21,12 +21,9 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"path/filepath"
 
-	"golang.org/x/xerrors"
 	"k8s.io/klog"
 	reg "sigs.k8s.io/k8s-container-image-promoter/lib/dockerregistry"
-	"sigs.k8s.io/yaml"
 )
 
 func main() {
@@ -49,39 +46,49 @@ func run(ctx context.Context) error {
 		"base_dir",
 		baseDir,
 		"the manifest directory to look at and modify")
-	subprojectDir := ""
+	stagingRepo := ""
 	flag.StringVar(
-		&subprojectDir,
-		"subproject_dir",
-		subprojectDir,
-		"the directory <name> under <BASE_DIR>/images/<name>, which we want to modify")
+		&stagingRepo,
+		"staging_repo",
+		stagingRepo,
+		"the staging repo which we want to read from")
+	filterImage := ""
+	flag.StringVar(
+		&filterImage,
+		"filter_image",
+		filterImage,
+		"filter staging repo by this image name")
+	filterDigest := ""
+	flag.StringVar(
+		&filterDigest,
+		"filter_digest",
+		filterDigest,
+		"filter images by this digest")
+	filterTag := ""
+	flag.StringVar(
+		&filterTag,
+		"filter_tag",
+		filterTag,
+		"filter images by this tag")
 
 	flag.Parse()
 
-	if baseDir == "" {
-		return xerrors.New("must specify --base_dir")
-	}
-
-	var opt reg.GrowManifestOptions
-	opt.PopulateDefaults()
-
-	s, err := filepath.Abs(baseDir)
-	if err != nil {
-		return xerrors.Errorf("cannot resolve %q to absolute path: %w", baseDir, err)
-	}
-	opt.BaseDir = s
-
-	manifest, err := reg.GrowManifest(ctx, opt)
-	if err != nil {
+	opt := reg.GrowManifestOptions{}
+	if err := opt.Populate(
+		baseDir,
+		stagingRepo,
+		filterImage,
+		filterDigest,
+		filterTag); err != nil {
 		return err
 	}
 
-	manifestYAML, err := yaml.Marshal(manifest)
-	if err != nil {
-		return xerrors.Errorf("error serializing manifest: %w", err)
+	if err := opt.Validate(); err != nil {
+		return err
 	}
 
-	if _, err := os.Stdout.Write(manifestYAML); err != nil {
+	err := reg.GrowManifest(ctx, opt)
+	if err != nil {
 		return err
 	}
 

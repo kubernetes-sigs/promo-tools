@@ -22,6 +22,7 @@ go_library(
         "@in_gopkg_yaml_v2//:go_default_library",
         "@io_k8s_apimachinery//pkg/util/wait:go_default_library",
         "@io_k8s_klog//:go_default_library",
+        "@org_golang_x_xerrors//:go_default_library",
     ],
 )
 
