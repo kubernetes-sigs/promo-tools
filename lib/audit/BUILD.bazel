@@ -28,5 +28,6 @@ go_test(
         "//lib/logclient:go_default_library",
         "//lib/remotemanifest:go_default_library",
         "//lib/report:go_default_library",
+        "//lib/stream:go_default_library",
     ],
 )

@@ -61,7 +61,7 @@ func (o *PromoteFilesOptions) PopulateDefaults() {
 // RunPromoteFiles executes a file promotion command
 // nolint[gocyclo]
 func RunPromoteFiles(ctx context.Context, options PromoteFilesOptions) error {
-	manifest, err := readManifest(options)
+	manifest, err := ReadManifest(options)
 	if err != nil {
 		return err
 	}
@@ -130,7 +130,8 @@ func RunPromoteFiles(ctx context.Context, options PromoteFilesOptions) error {
 	return nil
 }
 
-func readManifest(options PromoteFilesOptions) (*api.Manifest, error) {
+// ReadManifest reads a manifest.
+func ReadManifest(options PromoteFilesOptions) (*api.Manifest, error) {
 	merged := &api.Manifest{}
 
 	filestores, err := readFilestores(options.FilestoresPath)

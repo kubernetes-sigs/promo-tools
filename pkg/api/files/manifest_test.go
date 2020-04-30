@@ -14,22 +14,24 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package filesapi
+package files_test
 
 import (
 	"fmt"
 	"strings"
 	"testing"
+
+	"sigs.k8s.io/k8s-container-image-promoter/pkg/api/files"
 )
 
 func TestValidateFilestores(t *testing.T) {
 	var tests = []struct {
-		filestores    []Filestore
+		filestores    []files.Filestore
 		expectedError string
 	}{
 		{
 			// Filestores are required
-			filestores:    []Filestore{},
+			filestores:    []files.Filestore{},
 			expectedError: "filestore must be specified",
 		},
 		{
@@ -38,40 +40,40 @@ func TestValidateFilestores(t *testing.T) {
 			expectedError: "filestore must be specified",
 		},
 		{
-			filestores: []Filestore{
+			filestores: []files.Filestore{
 				{Src: true, Base: "gs://src"},
 			},
 			expectedError: "no destination filestores found",
 		},
 		{
-			filestores: []Filestore{
+			filestores: []files.Filestore{
 				{Base: "gs://dest1"},
 			},
 			expectedError: "source filestore not found",
 		},
 		{
-			filestores: []Filestore{
+			filestores: []files.Filestore{
 				{Src: true, Base: "gs://src1"},
 				{Src: true, Base: "gs://src2"},
 			},
 			expectedError: "found multiple source filestores",
 		},
 		{
-			filestores: []Filestore{
+			filestores: []files.Filestore{
 				{Src: true, Base: "gs://src"},
 				{Base: "gs://dest1"},
 				{Base: "gs://dest2"},
 			},
 		},
 		{
-			filestores: []Filestore{
+			filestores: []files.Filestore{
 				{Src: true},
 				{Base: "gs://dest"},
 			},
 			expectedError: "filestore did not have base set",
 		},
 		{
-			filestores: []Filestore{
+			filestores: []files.Filestore{
 				{Src: true, Base: "gs://src"},
 				{Base: "s3://dest"},
 			},
@@ -79,7 +81,7 @@ func TestValidateFilestores(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		err := validateFilestores(test.filestores)
+		err := files.ValidateFilestores(test.filestores)
 		checkErrorMatchesExpected(t, err, test.expectedError)
 
 	}
@@ -89,12 +91,12 @@ func TestValidateFiles(t *testing.T) {
 	oksha := "4f2f040fa2bfe9bea64911a2a756e8a1727a8bfd757c5e031631a6e699fcf246"
 
 	var tests = []struct {
-		files         []File
+		files         []files.File
 		expectedError string
 	}{
 		{
 			// Files are required
-			files:         []File{},
+			files:         []files.File{},
 			expectedError: "file must be specified",
 		},
 		{
@@ -103,37 +105,37 @@ func TestValidateFiles(t *testing.T) {
 			expectedError: "file must be specified",
 		},
 		{
-			files: []File{
+			files: []files.File{
 				{Name: "foo", SHA256: oksha},
 			},
 		},
 		{
-			files: []File{
+			files: []files.File{
 				{SHA256: oksha},
 			},
 			expectedError: "name is required for file",
 		},
 		{
-			files: []File{
+			files: []files.File{
 				{Name: "foo", SHA256: "bad"},
 			},
 			expectedError: "sha256 was not valid (not hex)",
 		},
 		{
-			files: []File{
+			files: []files.File{
 				{Name: "foo"},
 			},
 			expectedError: "sha256 is required",
 		},
 		{
-			files: []File{
+			files: []files.File{
 				{Name: "foo", SHA256: "abcd"},
 			},
 			expectedError: "sha256 was not valid (bad length)",
 		},
 	}
 	for _, test := range tests {
-		err := validateFiles(test.files)
+		err := files.ValidateFiles(test.files)
 		checkErrorMatchesExpected(t, err, test.expectedError)
 	}
 }

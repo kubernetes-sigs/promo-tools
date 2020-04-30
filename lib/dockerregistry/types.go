@@ -196,8 +196,8 @@ type Manifest struct {
 	// Hidden fields; these are data structure optimizations that are populated
 	// from the fields above. As they are redundant, there is no point in
 	// storing this information in YAML.
-	srcRegistry *RegistryContext
-	filepath    string
+	SrcRegistry *RegistryContext
+	Filepath    string
 }
 
 // ThinManifest is a more secure Manifest because it does not define the

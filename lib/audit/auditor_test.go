@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package audit
+package audit_test
 
 import (
 	"bytes"
@@ -26,6 +26,7 @@ import (
 	"regexp"
 	"testing"
 
+	"sigs.k8s.io/k8s-container-image-promoter/lib/audit"
 	reg "sigs.k8s.io/k8s-container-image-promoter/lib/dockerregistry"
 	"sigs.k8s.io/k8s-container-image-promoter/lib/logclient"
 	"sigs.k8s.io/k8s-container-image-promoter/lib/remotemanifest"
@@ -69,9 +70,9 @@ func checkError(t *testing.T, err error, msg string) {
 }
 
 func TestParsePubSubMessageBody(t *testing.T) {
-	toPsm := func(s string) PubSubMessage {
-		return PubSubMessage{
-			Message: PubSubMessageInner{
+	toPsm := func(s string) audit.PubSubMessage {
+		return audit.PubSubMessage{
+			Message: audit.PubSubMessageInner{
 				Data: []byte(s),
 				ID:   "1"},
 			Subscription: "2"}
@@ -106,7 +107,7 @@ func TestParsePubSubMessageBody(t *testing.T) {
 			t.Fail()
 		}
 
-		_, gotErr := ParsePubSubMessageBody(psmBytes)
+		_, gotErr := audit.ParsePubSubMessageBody(psmBytes)
 		errEqual := checkEqual(gotErr, nil)
 		checkError(t, errEqual, fmt.Sprintf("checkError: test: %q: shouldBeValid\n", test.name))
 	}
@@ -136,7 +137,7 @@ func TestParsePubSubMessageBody(t *testing.T) {
 			t.Fail()
 		}
 
-		_, gotErr := ParsePubSubMessageBody(psmBytes)
+		_, gotErr := audit.ParsePubSubMessageBody(psmBytes)
 		errEqual := checkEqual(gotErr, test.expectedErr)
 		checkError(t, errEqual, fmt.Sprintf("checkError: test: %q: shouldBeInvalid\n", test.name))
 	}
@@ -157,7 +158,7 @@ func TestValidatePayload(t *testing.T) {
 
 	for _, input := range shouldBeValid {
 		input := input
-		gotErr := ValidatePayload(&input)
+		gotErr := audit.ValidatePayload(&input)
 		errEqual := checkEqual(gotErr, nil)
 		checkError(t, errEqual, "checkError: test: shouldBeValid\n")
 	}
@@ -191,7 +192,7 @@ func TestValidatePayload(t *testing.T) {
 	}
 
 	for _, test := range shouldBeInValid {
-		gotErr := ValidatePayload(&test.input)
+		gotErr := audit.ValidatePayload(&test.input)
 		errEqual := checkEqual(gotErr, test.expected)
 		checkError(t, errEqual, "checkError: test: shouldBeInValid\n")
 	}
@@ -514,8 +515,8 @@ func TestAudit(t *testing.T) {
 		payload, err := json.Marshal(test.payload)
 		checkError(t, err, "checkError: test: shouldBeValid (payload)\n")
 
-		psm := PubSubMessage{
-			Message: PubSubMessageInner{
+		psm := audit.PubSubMessage{
+			Message: audit.PubSubMessageInner{
 				Data: payload,
 				ID:   "1"},
 			Subscription: "2"}
@@ -643,16 +644,16 @@ func initFakeServerContext(
 	loggingFacility logclient.LoggingFacility,
 	fakeReadRepo func(*reg.SyncContext, reg.RegistryContext) stream.Producer,
 	fakeReadManifestList func(*reg.SyncContext, reg.GCRManifestListContext) stream.Producer,
-) ServerContext {
+) audit.ServerContext {
 
 	remoteManifestFacility := remotemanifest.NewFake(manifests)
 
-	serverContext := ServerContext{
+	serverContext := audit.ServerContext{
 		ID:                     "cafec0ffee",
 		RemoteManifestFacility: remoteManifestFacility,
 		ErrorReportingFacility: reportingFacility,
 		LoggingFacility:        loggingFacility,
-		GcrReadingFacility: GcrReadingFacility{
+		GcrReadingFacility: audit.GcrReadingFacility{
 			ReadRepo:         fakeReadRepo,
 			ReadManifestList: fakeReadManifestList,
 		},
