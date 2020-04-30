@@ -133,7 +133,8 @@ func WriteImages(manifest Manifest, rii RegInvImage) error {
 	klog.Infoln("RENDER", imagesPath)
 
 	// Write the file.
-	err := ioutil.WriteFile(imagesPath, []byte(rii.ToYAML()), 0644)
+	err := ioutil.WriteFile(
+		imagesPath, []byte(rii.ToYAML(YamlMarshalingOpts{})), 0644)
 	return err
 }
 

@@ -383,6 +383,34 @@ type GCRPubSubPayload struct {
 	Tag Tag
 }
 
+// YamlMarshalingOpts holds options for tweaking the YAML output.
+type YamlMarshalingOpts struct {
+	// Render multiple tags on separate lines. I.e.,
+	// prefer
+	//
+	//    sha256:abc...:
+	//    - one
+	//    - two
+	//
+	// over
+	//
+	//    sha256:abc...: ["one", "two"]
+	//
+	// If there is only 1 tag, it will be on one line in brackets (e.g.,
+	// '["one"]').
+	SplitTagsOverMultipleLines bool
+
+	// Do not quote the digest. I.e., prefer
+	//
+	//    sha256:...:
+	//
+	// over
+	//
+	//    "sha256:...":
+	//
+	BareDigest bool
+}
+
 // Various conversion functions.
 
 // ToRegInvImageDigest converts a Manifest to a RegInvImageDigest.
