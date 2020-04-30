@@ -33,7 +33,7 @@ type GenerateManifestOptions struct {
 	BaseDir string
 }
 
-// PopulateDefaults sets the default values for GenerateManifestOptions
+// PopulateDefaults sets the default values for GenerateManifestOptions.
 func (o *GenerateManifestOptions) PopulateDefaults() {
 	// There are no fields with non-empty default values
 	// (but we still want to follow the PopulateDefaults pattern)

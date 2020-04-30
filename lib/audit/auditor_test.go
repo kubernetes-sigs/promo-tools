@@ -20,12 +20,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"regexp"
-	"strings"
 	"testing"
 
 	reg "sigs.k8s.io/k8s-container-image-promoter/lib/dockerregistry"
@@ -70,7 +68,81 @@ func checkError(t *testing.T, err error, msg string) {
 	}
 }
 
-func TestParsePubSubMessage(t *testing.T) {
+func TestParsePubSubMessageBody(t *testing.T) {
+	toPsm := func(s string) PubSubMessage {
+		return PubSubMessage{
+			Message: PubSubMessageInner{
+				Data: []byte(s),
+				ID:   "1"},
+			Subscription: "2"}
+	}
+	var shouldBeValid = []struct {
+		name string
+		body string
+	}{
+		{
+			"nothing (missing keys, but is OK for just parsing from JSON)",
+			`{}`,
+		},
+		{
+			"regular insert, FQIN only",
+			`{"action": "INSERT", "digest": "gcr.io/foo/bar@sha256:000"}`,
+		},
+		{
+			"regular insert with both FQIN and PQIN",
+			`{"action": "INSERT", "digest": "gcr.io/foo/bar@sha256:000", "tag":"gcr.io/foo/bar:1.0"}`,
+		},
+		{
+			"deletion",
+			`{"action": "DELETE", "tag": "gcr.io/foo/bar:1.0"}`,
+		},
+	}
+
+	for _, test := range shouldBeValid {
+		psm := toPsm(test.body)
+		psmBytes, err := json.Marshal(psm)
+		if err != nil {
+			fmt.Println("could not Marshal psm")
+			t.Fail()
+		}
+
+		_, gotErr := ParsePubSubMessageBody(psmBytes)
+		errEqual := checkEqual(gotErr, nil)
+		checkError(t, errEqual, fmt.Sprintf("checkError: test: %q: shouldBeValid\n", test.name))
+	}
+
+	var shouldBeInvalid = []struct {
+		name        string
+		body        string
+		expectedErr error
+	}{
+		{
+			"malformed JSON",
+			`{`,
+			fmt.Errorf("json.Unmarshal (message data): unexpected end of JSON input"),
+		},
+		{
+			"incompatible type (int for string)",
+			`{"action": 1}`,
+			fmt.Errorf("json.Unmarshal (message data): json: cannot unmarshal number into Go struct field GCRPubSubPayload.action of type string"),
+		},
+	}
+
+	for _, test := range shouldBeInvalid {
+		psm := toPsm(test.body)
+		psmBytes, err := json.Marshal(psm)
+		if err != nil {
+			fmt.Println("could not Marshal psm")
+			t.Fail()
+		}
+
+		_, gotErr := ParsePubSubMessageBody(psmBytes)
+		errEqual := checkEqual(gotErr, test.expectedErr)
+		checkError(t, errEqual, fmt.Sprintf("checkError: test: %q: shouldBeInvalid\n", test.name))
+	}
+}
+
+func TestValidatePayload(t *testing.T) {
 	shouldBeValid := []reg.GCRPubSubPayload{
 		{
 			Action: "INSERT",
@@ -83,30 +155,9 @@ func TestParsePubSubMessage(t *testing.T) {
 		},
 	}
 
-	inputToHTTPReq := func(input reg.GCRPubSubPayload) *http.Request {
-		b, err := json.Marshal(&input)
-		if err != nil {
-			fmt.Println("11111111")
-			t.Fail()
-		}
-		psm := PubSubMessage{
-			Message: PubSubMessageInner{
-				Data: b,
-				ID:   "1"},
-			Subscription: "2"}
-
-		psmBytes, err := json.Marshal(psm)
-		if err != nil {
-			fmt.Println("22222222")
-			t.Fail()
-		}
-
-		return &http.Request{
-			Body: ioutil.NopCloser(strings.NewReader((string)(psmBytes)))}
-	}
-
 	for _, input := range shouldBeValid {
-		_, gotErr := ParsePubSubMessage(inputToHTTPReq(input))
+		input := input
+		gotErr := ValidatePayload(&input)
 		errEqual := checkEqual(gotErr, nil)
 		checkError(t, errEqual, "checkError: test: shouldBeValid\n")
 	}
@@ -140,7 +191,7 @@ func TestParsePubSubMessage(t *testing.T) {
 	}
 
 	for _, test := range shouldBeInValid {
-		_, gotErr := ParsePubSubMessage(inputToHTTPReq(test.input))
+		gotErr := ValidatePayload(&test.input)
 		errEqual := checkEqual(gotErr, test.expected)
 		checkError(t, errEqual, "checkError: test: shouldBeInValid\n")
 	}
@@ -394,10 +445,10 @@ func TestAudit(t *testing.T) {
 			readRepo1,
 			readManifestList1,
 			expectedPatterns{
-				report: []string{`TRANSACTION REJECTED: parse failure: {Action: "DELETE", FQIN: "us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent@sha256:c419394f3fa40c32352be5a6ec5865270376d4351a3756bb1893be3f28fcba32", PQIN: "", Path: "us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent", Digest: "sha256:c419394f3fa40c32352be5a6ec5865270376d4351a3756bb1893be3f28fcba32", Tag: ""}: deletions are prohibited`},
+				report: []string{`TRANSACTION REJECTED: validation failure: {Action: "DELETE", FQIN: "us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent@sha256:c419394f3fa40c32352be5a6ec5865270376d4351a3756bb1893be3f28fcba32", PQIN: "", Path: "us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent", Digest: "sha256:c419394f3fa40c32352be5a6ec5865270376d4351a3756bb1893be3f28fcba32", Tag: ""}: deletions are prohibited`},
 				info:   nil,
 				error:  nil,
-				alert:  []string{`TRANSACTION REJECTED: parse failure: {Action: "DELETE", FQIN: "us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent@sha256:c419394f3fa40c32352be5a6ec5865270376d4351a3756bb1893be3f28fcba32", PQIN: "", Path: "us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent", Digest: "sha256:c419394f3fa40c32352be5a6ec5865270376d4351a3756bb1893be3f28fcba32", Tag: ""}: deletions are prohibited`},
+				alert:  []string{`TRANSACTION REJECTED: validation failure: {Action: "DELETE", FQIN: "us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent@sha256:c419394f3fa40c32352be5a6ec5865270376d4351a3756bb1893be3f28fcba32", PQIN: "", Path: "us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent", Digest: "sha256:c419394f3fa40c32352be5a6ec5865270376d4351a3756bb1893be3f28fcba32", Tag: ""}: deletions are prohibited`},
 			},
 		},
 		{
@@ -411,10 +462,10 @@ func TestAudit(t *testing.T) {
 			readRepo1,
 			readManifestList1,
 			expectedPatterns{
-				report: []string{`TRANSACTION REJECTED: parse failure: {Action: "DELETE", FQIN: "", PQIN: "us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent:v0.0.8", Path: "us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent", Digest: "", Tag: "v0.0.8"}: deletions are prohibited`},
+				report: []string{`TRANSACTION REJECTED: validation failure: {Action: "DELETE", FQIN: "", PQIN: "us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent:v0.0.8", Path: "us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent", Digest: "", Tag: "v0.0.8"}: deletions are prohibited`},
 				info:   nil,
 				error:  nil,
-				alert:  []string{`TRANSACTION REJECTED: parse failure: {Action: "DELETE", FQIN: "", PQIN: "us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent:v0.0.8", Path: "us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent", Digest: "", Tag: "v0.0.8"}: deletions are prohibited`},
+				alert:  []string{`TRANSACTION REJECTED: validation failure: {Action: "DELETE", FQIN: "", PQIN: "us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent:v0.0.8", Path: "us.gcr.io/k8s-artifacts-prod/kas-network-proxy/proxy-agent", Digest: "", Tag: "v0.0.8"}: deletions are prohibited`},
 			},
 		},
 		{
@@ -428,10 +479,10 @@ func TestAudit(t *testing.T) {
 			readRepo1,
 			readManifestList1,
 			expectedPatterns{
-				report: []string{`TRANSACTION REJECTED: parse failure: {Action: "DELETE", FQIN: "us.gcr.io/k8s-artifacts-prod/secret@sha256:c419394f3fa40c32352be5a6ec5865270376d4351a3756bb1893be3f28fcba32", PQIN: "", Path: "us.gcr.io/k8s-artifacts-prod/secret", Digest: "sha256:c419394f3fa40c32352be5a6ec5865270376d4351a3756bb1893be3f28fcba32", Tag: ""}: deletions are prohibited`},
+				report: []string{`TRANSACTION REJECTED: validation failure: {Action: "DELETE", FQIN: "us.gcr.io/k8s-artifacts-prod/secret@sha256:c419394f3fa40c32352be5a6ec5865270376d4351a3756bb1893be3f28fcba32", PQIN: "", Path: "us.gcr.io/k8s-artifacts-prod/secret", Digest: "sha256:c419394f3fa40c32352be5a6ec5865270376d4351a3756bb1893be3f28fcba32", Tag: ""}: deletions are prohibited`},
 				info:   nil,
 				error:  nil,
-				alert:  []string{`TRANSACTION REJECTED: parse failure: {Action: "DELETE", FQIN: "us.gcr.io/k8s-artifacts-prod/secret@sha256:c419394f3fa40c32352be5a6ec5865270376d4351a3756bb1893be3f28fcba32", PQIN: "", Path: "us.gcr.io/k8s-artifacts-prod/secret", Digest: "sha256:c419394f3fa40c32352be5a6ec5865270376d4351a3756bb1893be3f28fcba32", Tag: ""}: deletions are prohibited`},
+				alert:  []string{`TRANSACTION REJECTED: validation failure: {Action: "DELETE", FQIN: "us.gcr.io/k8s-artifacts-prod/secret@sha256:c419394f3fa40c32352be5a6ec5865270376d4351a3756bb1893be3f28fcba32", PQIN: "", Path: "us.gcr.io/k8s-artifacts-prod/secret", Digest: "sha256:c419394f3fa40c32352be5a6ec5865270376d4351a3756bb1893be3f28fcba32", Tag: ""}: deletions are prohibited`},
 			},
 		},
 		{
@@ -445,10 +496,10 @@ func TestAudit(t *testing.T) {
 			readRepo1,
 			readManifestList1,
 			expectedPatterns{
-				report: []string{`TRANSACTION REJECTED: parse failure: {Action: "DELETE", FQIN: "", PQIN: "us.gcr.io/k8s-artifacts-prod/secret:v0.0.8", Path: "us.gcr.io/k8s-artifacts-prod/secret", Digest: "", Tag: "v0.0.8"}: deletions are prohibited`},
+				report: []string{`TRANSACTION REJECTED: validation failure: {Action: "DELETE", FQIN: "", PQIN: "us.gcr.io/k8s-artifacts-prod/secret:v0.0.8", Path: "us.gcr.io/k8s-artifacts-prod/secret", Digest: "", Tag: "v0.0.8"}: deletions are prohibited`},
 				info:   nil,
 				error:  nil,
-				alert:  []string{`TRANSACTION REJECTED: parse failure: {Action: "DELETE", FQIN: "", PQIN: "us.gcr.io/k8s-artifacts-prod/secret:v0.0.8", Path: "us.gcr.io/k8s-artifacts-prod/secret", Digest: "", Tag: "v0.0.8"}: deletions are prohibited`},
+				alert:  []string{`TRANSACTION REJECTED: validation failure: {Action: "DELETE", FQIN: "", PQIN: "us.gcr.io/k8s-artifacts-prod/secret:v0.0.8", Path: "us.gcr.io/k8s-artifacts-prod/secret", Digest: "", Tag: "v0.0.8"}: deletions are prohibited`},
 			},
 		},
 	}

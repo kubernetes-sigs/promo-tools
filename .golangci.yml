@@ -59,6 +59,7 @@ linters:
   - godox
   - gosec
   - stylecheck
+  - testpackage
   - whitespace
   - wsl
 

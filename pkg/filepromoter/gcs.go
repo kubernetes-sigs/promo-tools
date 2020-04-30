@@ -38,7 +38,7 @@ type gcsSyncFilestore struct {
 	prefix    string
 }
 
-// OpenReader opens an io.ReadCloser for the specified file
+// OpenReader opens an io.ReadCloser for the specified file.
 func (s *gcsSyncFilestore) OpenReader(
 	ctx context.Context,
 	name string) (io.ReadCloser, error) {
@@ -46,7 +46,7 @@ func (s *gcsSyncFilestore) OpenReader(
 	return s.client.Bucket(s.bucket).Object(absolutePath).NewReader(ctx)
 }
 
-// UploadFile uploads a local file to the specified destination
+// UploadFile uploads a local file to the specified destination.
 func (s *gcsSyncFilestore) UploadFile(
 	ctx context.Context,
 	dest string,

@@ -34,7 +34,7 @@ func (m *Manifest) Validate() error {
 	return nil
 }
 
-// validateFilestores validates the Filestores field of the manifest
+// validateFilestores validates the Filestores field of the manifest.
 func validateFilestores(filestores []Filestore) error {
 	if len(filestores) == 0 {
 		return fmt.Errorf("at least one filestore must be specified")
@@ -77,7 +77,7 @@ func validateFilestores(filestores []Filestore) error {
 	return nil
 }
 
-// validateFiles validates the Files field of the manifest
+// validateFiles validates the Files field of the manifest.
 func validateFiles(files []File) error {
 	if len(files) == 0 {
 		return fmt.Errorf("at least one file must be specified")

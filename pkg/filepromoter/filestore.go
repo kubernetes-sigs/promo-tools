@@ -175,7 +175,7 @@ func joinFilepath(filestore *api.Filestore, relativePath string) string {
 }
 
 // BuildOperations builds the required operations to sync from the
-// Source Filestore to the Dest Filestore
+// Source Filestore to the Dest Filestore.
 func (p *FilestorePromoter) BuildOperations(
 	ctx context.Context) ([]SyncFileOp, error) {
 	sourceFilestore, err := openFilestore(ctx, p.Source, p.UseServiceAccount)

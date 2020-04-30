@@ -1151,7 +1151,7 @@ func (sc *SyncContext) PopulateTokens() error {
 
 // GetTokenKeyDomainRepoPath splits a string by '/'. It's OK to do this because
 // the RegistryName is already parsed against a Regex. (Maybe we should store
-// the repo path separately when we do the initial parse...)
+// the repo path separately when we do the initial parse...).
 func GetTokenKeyDomainRepoPath(
 	registryName RegistryName) (string, string, string) {
 
