@@ -22,6 +22,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"golang.org/x/xerrors"
+
 	reg "sigs.k8s.io/k8s-container-image-promoter/lib/dockerregistry"
 )
 
@@ -120,6 +122,198 @@ func TestFindManifest(t *testing.T) {
 		}
 
 		eqErr = checkEqual(gotErrStr, expectedErrStr)
+		checkError(
+			t,
+			eqErr,
+			fmt.Sprintf("Test: %q (unexpected error)\n", test.name))
+	}
+}
+
+func TestApplyFilters(t *testing.T) {
+	var tests = []struct {
+		// name is folder name
+		name         string
+		inputOptions reg.GrowManifestOptions
+		inputRii     reg.RegInvImage
+		expectedRii  reg.RegInvImage
+		expectedErr  error
+	}{
+		{
+			"empty rii",
+			reg.GrowManifestOptions{},
+			reg.RegInvImage{},
+			reg.RegInvImage{},
+			nil,
+		},
+		{
+			"no filters --- same as input",
+			reg.GrowManifestOptions{},
+			reg.RegInvImage{
+				"foo": {
+					"sha256:000": {"2.0"},
+				},
+			},
+			reg.RegInvImage{
+				"foo": {
+					"sha256:000": {"2.0"},
+				},
+			},
+			nil,
+		},
+		{
+			"remove 'latest' tag by default, even if no filters",
+			reg.GrowManifestOptions{},
+			reg.RegInvImage{
+				"foo": {
+					"sha256:000": {"latest", "2.0"},
+				},
+			},
+			reg.RegInvImage{
+				"foo": {
+					"sha256:000": {"2.0"},
+				},
+			},
+			nil,
+		},
+		{
+			"filter on image name only",
+			reg.GrowManifestOptions{
+				FilterImage: "bar",
+			},
+			reg.RegInvImage{
+				"foo": {
+					"sha256:000": {"latest", "2.0"},
+				},
+				"bar": {
+					"sha256:111": {"latest", "1.0"},
+				},
+			},
+			reg.RegInvImage{
+				"bar": {
+					"sha256:111": {"1.0"},
+				},
+			},
+			nil,
+		},
+		{
+			"filter on tag only",
+			reg.GrowManifestOptions{
+				FilterTag: "1.0",
+			},
+			reg.RegInvImage{
+				"foo": {
+					"sha256:000": {"latest", "2.0"},
+				},
+				"bar": {
+					"sha256:111": {"latest", "1.0"},
+				},
+			},
+			reg.RegInvImage{
+				"bar": {
+					"sha256:111": {"1.0"},
+				},
+			},
+			nil,
+		},
+		{
+			"filter on 'latest' tag",
+			reg.GrowManifestOptions{
+				FilterTag: "latest",
+			},
+			reg.RegInvImage{
+				"foo": {
+					"sha256:000": {"latest", "2.0"},
+				},
+				"bar": {
+					"sha256:111": {"latest", "1.0"},
+				},
+			},
+			reg.RegInvImage{},
+			xerrors.New("no images survived filtering; double-check your --filter_* flag(s) for typos"),
+		},
+		{
+			"filter on digest",
+			reg.GrowManifestOptions{
+				FilterDigest: "sha256:222",
+			},
+			reg.RegInvImage{
+				"foo": {
+					"sha256:000": {"latest", "2.0"},
+					"sha256:222": {"3.0"},
+				},
+				"bar": {
+					"sha256:111": {"latest", "1.0"},
+				},
+			},
+			reg.RegInvImage{
+				"foo": {
+					"sha256:222": {"3.0"},
+				},
+			},
+			nil,
+		},
+		{
+			"filter on shared tag (multiple images share same tag)",
+			reg.GrowManifestOptions{
+				FilterTag: "1.2.3",
+			},
+			reg.RegInvImage{
+				"foo": {
+					"sha256:000": {"latest", "1.2.3"},
+					"sha256:222": {"3.0"},
+				},
+				"bar": {
+					"sha256:111": {"latest", "1.2.3"},
+				},
+			},
+			reg.RegInvImage{
+				"foo": {
+					"sha256:000": {"1.2.3"},
+				},
+				"bar": {
+					"sha256:111": {"1.2.3"},
+				},
+			},
+			nil,
+		},
+		{
+			"filter on shared tag and image name (multiple images share same tag)",
+			reg.GrowManifestOptions{
+				FilterImage: "foo",
+				FilterTag:   "1.2.3",
+			},
+			reg.RegInvImage{
+				"foo": {
+					"sha256:000": {"latest", "1.2.3"},
+					"sha256:222": {"3.0"},
+				},
+				"bar": {
+					"sha256:111": {"latest", "1.2.3"},
+				},
+			},
+			reg.RegInvImage{
+				"foo": {
+					"sha256:000": {"1.2.3"},
+				},
+			},
+			nil,
+		},
+	}
+
+	for _, test := range tests {
+		gotRii, gotErr := reg.ApplyFilters(test.inputOptions, test.inputRii)
+
+		eqErr := checkEqual(gotRii, test.expectedRii)
+		checkError(
+			t,
+			eqErr,
+			fmt.Sprintf("Test: %q (unexpected filtered RegInvImage)\n", test.name))
+
+		if test.expectedErr != nil {
+			eqErr = checkEqual(gotErr.Error(), test.expectedErr.Error())
+		} else {
+			eqErr = checkEqual(gotErr, test.expectedErr)
+		}
 		checkError(
 			t,
 			eqErr,

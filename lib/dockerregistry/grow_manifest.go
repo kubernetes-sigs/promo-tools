@@ -206,6 +206,11 @@ func ReadStagingRepo(
 // rii.
 func ApplyFilters(o GrowManifestOptions, rii RegInvImage) (RegInvImage, error) {
 
+	// If nothing to filter, short-circuit.
+	if len(rii) == 0 {
+		return rii, nil
+	}
+
 	// Now perform some filtering, if any.
 	if len(o.FilterImage) > 0 {
 		rii = FilterByImage(rii, o.FilterImage)
