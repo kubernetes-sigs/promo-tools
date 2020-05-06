@@ -28,7 +28,10 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["inventory_test.go"],
+    srcs = [
+        "grow_manifest_test.go",
+        "inventory_test.go",
+    ],
     # Include test fixtures.
     data = glob(["inventory_test/**/*"]),
     embed = [":go_default_library"],
