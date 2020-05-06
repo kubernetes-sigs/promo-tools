@@ -104,16 +104,22 @@ func GrowManifest(
 
 	// (2) Scan the StagingRepo, and whittle the read results down with some
 	// filters (Filter* fields in GrowManifestOptions).
-	riiFiltered, err := ReadStagingRepo(o)
+	riiUnfiltered, err := ReadStagingRepo(o)
 	if err != nil {
 		return err
 	}
 
-	// (3) Inject (2)'s output into (1)'s manifest's images to create a larger
+	// (3) Apply some filters.
+	riiFiltered, err := ApplyFilters(o, riiUnfiltered)
+	if err != nil {
+		return err
+	}
+
+	// (4) Inject (2)'s output into (1)'s manifest's images to create a larger
 	// RegInvImage.
 	riiCombined = Union(manifest.ToRegInvImage(), riiFiltered)
 
-	// (4) Write back RegInvImage as Manifest ([]Image field}) back onto disk.
+	// (5) Write back RegInvImage as Manifest ([]Image field}) back onto disk.
 	err = WriteImages(manifest, riiCombined)
 
 	return err
@@ -157,16 +163,16 @@ func FindManifest(o GrowManifestOptions) (Manifest, error) {
 		xerrors.Errorf("could not find Manifest for %q", o.StagingRepo)
 }
 
-// ReadStagingRepo reads the StagingRepo, and apply whatever filters are
+// ReadStagingRepo reads the StagingRepo, and applies whatever filters are
 // available to the resulting RegInvImage. This RegInvImage is what we want to
 // inject into the "images.yaml" of a thin manifest.
-func ReadStagingRepo(o GrowManifestOptions) (RegInvImage, error) {
+func ReadStagingRepo(
+	o GrowManifestOptions,
+) (RegInvImage, error) {
 
 	stagingRepoRC := RegistryContext{
 		Name: o.StagingRepo,
 	}
-
-	var rii RegInvImage
 
 	manifests := []Manifest{
 		{
@@ -193,7 +199,12 @@ func ReadStagingRepo(o GrowManifestOptions) (RegInvImage, error) {
 		true,
 		MkReadRepositoryCmdReal)
 
-	rii = sc.Inv[manifests[0].Registries[0].Name]
+	return sc.Inv[manifests[0].Registries[0].Name], nil
+}
+
+// ApplyFilters applies the filters in the options to whittle down the given
+// rii.
+func ApplyFilters(o GrowManifestOptions, rii RegInvImage) (RegInvImage, error) {
 
 	// Now perform some filtering, if any.
 	if len(o.FilterImage) > 0 {
