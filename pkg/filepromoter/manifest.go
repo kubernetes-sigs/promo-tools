@@ -24,7 +24,7 @@ import (
 	api "sigs.k8s.io/k8s-container-image-promoter/pkg/api/files"
 )
 
-// ManifestPromoter promotes files as described in Manifest
+// ManifestPromoter promotes files as described in Manifest.
 type ManifestPromoter struct {
 	Manifest *api.Manifest
 

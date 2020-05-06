@@ -29,7 +29,7 @@ import (
 	api "sigs.k8s.io/k8s-container-image-promoter/pkg/api/files"
 )
 
-// syncFileInfo tracks a file during the synchronization operation
+// syncFileInfo tracks a file during the synchronization operation.
 type syncFileInfo struct {
 	RelativePath string
 	AbsolutePath string
@@ -44,7 +44,7 @@ type syncFileInfo struct {
 	filestore syncFilestore
 }
 
-// copyFileOp manages copying a single file
+// copyFileOp manages copying a single file.
 type copyFileOp struct {
 	Source *syncFileInfo
 	Dest   *syncFileInfo

@@ -18,7 +18,7 @@ package filepromoter
 
 import "context"
 
-// SyncFileOp defines a synchronization operation
+// SyncFileOp defines a synchronization operation.
 type SyncFileOp interface {
 	Run(ctx context.Context) error
 }

@@ -24,7 +24,7 @@ import (
 	"sigs.k8s.io/k8s-container-image-promoter/pkg/gcloud"
 )
 
-// gcloudTokenSource implements oauth2.TokenSource
+// gcloudTokenSource implements oauth2.TokenSource.
 type gcloudTokenSource struct {
 	mutex          sync.Mutex
 	ServiceAccount string

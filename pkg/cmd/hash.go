@@ -27,7 +27,7 @@ import (
 	"sigs.k8s.io/k8s-container-image-promoter/pkg/filepromoter"
 )
 
-// GenerateManifestOptions holds the parameters for a hash-files operation
+// GenerateManifestOptions holds the parameters for a hash-files operation.
 type GenerateManifestOptions struct {
 	// BaseDir is the directory containing the files to hash
 	BaseDir string

@@ -57,7 +57,9 @@ linters:
   disable:
   - gochecknoglobals
   - godox
+  - goerr113
   - gosec
+  - nolintlint
   - stylecheck
   - whitespace
   - wsl
