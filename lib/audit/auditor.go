@@ -292,7 +292,7 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 		s.GcrReadingFacility.ReadRepo)
 	sc.ReadGCRManifestLists(s.GcrReadingFacility.ReadManifestList)
 	if gcrPayload.Digest == "" {
-		msg := fmt.Sprintf("(%s) TRANSACTION REJECTED: could not find digest information: %v", s.ID, gcrPayload.Digest)
+		msg := fmt.Sprintf("(%s) TRANSACTION REJECTED: digest missing from payload --- cannot check parent digest: %v", s.ID, gcrPayload.Digest)
 		_, _ = w.Write([]byte(msg))
 		panic(msg)
 	}
