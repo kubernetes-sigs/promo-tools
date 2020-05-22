@@ -284,6 +284,8 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte(msg))
 		panic(msg)
 	}
+	logInfo.Printf("(%s): using srcRegistry %q for %q", s.ID, srcRegistry.Name, gcrPayload)
+
 	sc.ReadRegistries(
 		[]reg.RegistryContext{srcRegistry},
 		true,
