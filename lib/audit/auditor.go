@@ -239,7 +239,7 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	logInfo.Printf("could not find direct manifest entry for %v; assuming child manifest", gcrPayload)
+	logInfo.Printf("(%s): could not find direct manifest entry for %v; assuming child manifest", s.ID, gcrPayload)
 
 	// (4) It could be that the manifest is a child manifest (part of a fat
 	// manifest). This is the case where the user only specifies the digest of
@@ -294,7 +294,7 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte(msg))
 		panic(msg)
 	}
-	klog.Infof("looking for child digest %v", gcrPayload.Digest)
+	klog.Infof("(%s): looking for child digest %v", s.ID, gcrPayload.Digest)
 	if parentDigest, hasParent := sc.ParentDigest[gcrPayload.Digest]; hasParent {
 		msg := fmt.Sprintf(
 			"(%s) TRANSACTION VERIFIED: %v: agrees with manifest (parent digest %v)\n", s.ID, gcrPayload, parentDigest)
