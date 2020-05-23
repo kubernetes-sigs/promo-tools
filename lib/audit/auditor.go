@@ -304,7 +304,7 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// (5) If all of the above checks fail, then this transaction is unable tobe
+	// (5) If all of the above checks fail, then this transaction is unable to be
 	// verified.
 	msg = fmt.Sprintf(
 		"(%s) TRANSACTION REJECTED: %v: could not validate", s.ID, gcrPayload)
