@@ -276,7 +276,7 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 	// is so that we can query the subproject to figure out all digests that
 	// belong there, so that we can validate the child manifest in the
 	// GCRPubSubPayload.
-	srcRegistry, err := GetMatchingSourceRegistry(manifests, *gcrPayload)
+	srcRegistries, err := GetMatchingSourceRegistries(manifests, *gcrPayload)
 	// If we can't find any source registry for this image, then reject the
 	// transaction.
 	if err != nil {
@@ -284,10 +284,10 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte(msg))
 		panic(msg)
 	}
-	logInfo.Printf("(%s): using srcRegistry %q for %q", s.ID, srcRegistry.Name, gcrPayload)
+	logInfo.Printf("(%s): reading srcRegistries %q for %q", s.ID, srcRegistries, gcrPayload)
 
 	sc.ReadRegistries(
-		[]reg.RegistryContext{srcRegistry},
+		srcRegistries,
 		true,
 		s.GcrReadingFacility.ReadRepo)
 	sc.ReadGCRManifestLists(s.GcrReadingFacility.ReadManifestList)
@@ -317,12 +317,14 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 	panic(msg)
 }
 
-// GetMatchingSourceRegistry gets the first source repository that matches the
+// GetMatchingSourceRegistries gets the first source repository that matches the
 // image information inside a GCRPubSubPayload.
-func GetMatchingSourceRegistry(
+func GetMatchingSourceRegistries(
 	manifests []reg.Manifest,
 	gcrPayload reg.GCRPubSubPayload,
-) (reg.RegistryContext, error) {
+) ([]reg.RegistryContext, error) {
+
+	rcs := []reg.RegistryContext{}
 
 	for _, manifest := range manifests {
 		if !gcrPayload.Match(manifest).PathMatch {
@@ -332,12 +334,16 @@ func GetMatchingSourceRegistry(
 		// the source registry in the manifest.
 		for _, rc := range manifest.Registries {
 			if rc.Src {
-				return rc, nil
+				rcs = append(rcs, rc)
 			}
 		}
 	}
 
-	return reg.RegistryContext{},
+	if len(rcs) > 0 {
+		return rcs, nil
+	}
+
+	return rcs,
 		fmt.Errorf(
 			"could not find matching source registry for %v",
 			gcrPayload.FQIN)

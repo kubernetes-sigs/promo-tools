@@ -823,6 +823,23 @@ func TestAudit(t *testing.T) {
 				alert:  nil,
 			},
 		},
+		{
+			"child image promoted (two manifests both promote to the same destination, but only one source repo actually has the child's parent image referenced in the promoter manifest; payload refers to root insertion)",
+			manifests2,
+			reg.GCRPubSubPayload{
+				Action: "INSERT",
+				FQIN:   "us.gcr.io/k8s-artifacts-prod/etcd@sha256:0873d877318546c6569e1abfafd75e0625c202d24435299c4d2e57eeebea52ee",
+				PQIN:   "",
+			},
+			readRepo2,
+			readManifestList2,
+			expectedPatterns{
+				report: nil,
+				info:   []string{`TRANSACTION VERIFIED: {Action: "INSERT", FQIN: "us.gcr.io/k8s-artifacts-prod/etcd@sha256:0873d877318546c6569e1abfafd75e0625c202d24435299c4d2e57eeebea52ee", PQIN: "", Path: "us.gcr.io/k8s-artifacts-prod/etcd", Digest: "sha256:0873d877318546c6569e1abfafd75e0625c202d24435299c4d2e57eeebea52ee", Tag: ""}: agrees with manifest \(parent digest sha256:bcdd5657b1edc1a2eb27356f33dd66b9400d4a084209c33461c7a7da0a32ebb3\)`},
+				error:  nil,
+				alert:  nil,
+			},
+		},
 	}
 
 	for _, test := range shouldBeValid {
