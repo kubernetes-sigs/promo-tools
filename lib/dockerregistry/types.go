@@ -188,8 +188,8 @@ type PromotionRequest struct {
 // desired state of a Docker Registry).
 type Manifest struct {
 	// Registries contains the source and destination (Src/Dest) registry names.
-	// It is possible that in the future, we support promoting to multiple
-	// registries, in which case we would have more than just Src/Dest.
+	// There must be at least 2 registries: 1 source registry and 1 or more
+	// destination registries.
 	Registries []RegistryContext `yaml:"registries,omitempty"`
 	Images     []Image           `yaml:"images,omitempty"`
 

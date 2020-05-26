@@ -239,7 +239,7 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	logInfo.Printf("could not find direct manifest entry for %v; assuming child manifest", gcrPayload)
+	logInfo.Printf("(%s): could not find direct manifest entry for %v; assuming child manifest", s.ID, gcrPayload)
 
 	// (4) It could be that the manifest is a child manifest (part of a fat
 	// manifest). This is the case where the user only specifies the digest of
@@ -276,7 +276,7 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 	// is so that we can query the subproject to figure out all digests that
 	// belong there, so that we can validate the child manifest in the
 	// GCRPubSubPayload.
-	srcRegistry, err := GetMatchingSourceRegistry(manifests, *gcrPayload)
+	srcRegistries, err := GetMatchingSourceRegistries(manifests, *gcrPayload)
 	// If we can't find any source registry for this image, then reject the
 	// transaction.
 	if err != nil {
@@ -284,17 +284,19 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte(msg))
 		panic(msg)
 	}
+	logInfo.Printf("(%s): reading srcRegistries %q for %q", s.ID, srcRegistries, gcrPayload)
+
 	sc.ReadRegistries(
-		[]reg.RegistryContext{srcRegistry},
+		srcRegistries,
 		true,
 		s.GcrReadingFacility.ReadRepo)
 	sc.ReadGCRManifestLists(s.GcrReadingFacility.ReadManifestList)
 	if gcrPayload.Digest == "" {
-		msg := fmt.Sprintf("(%s) TRANSACTION REJECTED: could not find digest information: %v", s.ID, gcrPayload.Digest)
+		msg := fmt.Sprintf("(%s) TRANSACTION REJECTED: digest missing from payload --- cannot check parent digest: %v", s.ID, gcrPayload.Digest)
 		_, _ = w.Write([]byte(msg))
 		panic(msg)
 	}
-	klog.Infof("looking for child digest %v", gcrPayload.Digest)
+	klog.Infof("(%s): looking for child digest %v", s.ID, gcrPayload.Digest)
 	if parentDigest, hasParent := sc.ParentDigest[gcrPayload.Digest]; hasParent {
 		msg := fmt.Sprintf(
 			"(%s) TRANSACTION VERIFIED: %v: agrees with manifest (parent digest %v)\n", s.ID, gcrPayload, parentDigest)
@@ -304,7 +306,7 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// (5) If all of the above checks fail, then this transaction is unable tobe
+	// (5) If all of the above checks fail, then this transaction is unable to be
 	// verified.
 	msg = fmt.Sprintf(
 		"(%s) TRANSACTION REJECTED: %v: could not validate", s.ID, gcrPayload)
@@ -315,12 +317,14 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 	panic(msg)
 }
 
-// GetMatchingSourceRegistry gets the first source repository that matches the
+// GetMatchingSourceRegistries gets the first source repository that matches the
 // image information inside a GCRPubSubPayload.
-func GetMatchingSourceRegistry(
+func GetMatchingSourceRegistries(
 	manifests []reg.Manifest,
 	gcrPayload reg.GCRPubSubPayload,
-) (reg.RegistryContext, error) {
+) ([]reg.RegistryContext, error) {
+
+	rcs := []reg.RegistryContext{}
 
 	for _, manifest := range manifests {
 		if !gcrPayload.Match(manifest).PathMatch {
@@ -330,12 +334,16 @@ func GetMatchingSourceRegistry(
 		// the source registry in the manifest.
 		for _, rc := range manifest.Registries {
 			if rc.Src {
-				return rc, nil
+				rcs = append(rcs, rc)
 			}
 		}
 	}
 
-	return reg.RegistryContext{},
+	if len(rcs) > 0 {
+		return rcs, nil
+	}
+
+	return rcs,
 		fmt.Errorf(
 			"could not find matching source registry for %v",
 			gcrPayload.FQIN)

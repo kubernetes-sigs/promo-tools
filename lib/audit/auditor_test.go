@@ -352,6 +352,309 @@ func TestAudit(t *testing.T) {
 }`,
 	}
 
+	// Regression test for the case where we are promoting
+	// bcdd5657b1edc1a2eb27356f33dd66b9400d4a084209c33461c7a7da0a32ebb3 (etcd
+	// tag "3.4.7-2"). It is crucial that we read fom *ALL* source registries,
+	// not just the first one that has a match for the destination registry
+	// "us.gcr.io/k8s-artifacts-prod" (because both manifests below promote to
+	// that same destination, but only one of them have the child images of
+	// 3.4.7-2).
+	manifests2 := []reg.Manifest{
+		{
+			Registries: []reg.RegistryContext{
+				{
+					Name: "gcr.io/google-containers",
+					Src:  true,
+				},
+				{
+					// Root promotion
+					Name:           "us.gcr.io/k8s-artifacts-prod",
+					ServiceAccount: "foobar@google-containers.iam.gserviceaccount.com",
+				},
+			},
+
+			Images: []reg.Image{
+				{
+					ImageName: "etcd",
+					Dmap: reg.DigestTags{
+						"sha256:12f377200949c25fde1e54bba639d34d119edd7cfcfb1d117526dba677c03c85": {"3.4.7", "3.4.7-0"},
+					},
+				},
+			},
+		},
+		{
+			Registries: []reg.RegistryContext{
+				{
+					Name: "gcr.io/k8s-staging-etcd",
+					Src:  true,
+				},
+				{
+					// Root promotion
+					Name:           "us.gcr.io/k8s-artifacts-prod",
+					ServiceAccount: "foobar@google-containers.iam.gserviceaccount.com",
+				},
+				{
+					// Non-root promotion
+					Name:           "us.gcr.io/k8s-artifacts-prod/kubernetes",
+					ServiceAccount: "foobar@google-containers.iam.gserviceaccount.com",
+				},
+			},
+
+			Images: []reg.Image{
+				{
+					ImageName: "etcd",
+					Dmap: reg.DigestTags{
+						"sha256:bcdd5657b1edc1a2eb27356f33dd66b9400d4a084209c33461c7a7da0a32ebb3": {"3.4.7-2"},
+					},
+				},
+			},
+		},
+	}
+
+	readRepo2 := map[string]string{
+		"gcr.io/k8s-staging-etcd": `{
+  "child": [
+    "etcd"
+  ],
+  "manifest": {},
+  "name": "k8s-staging-etcd",
+  "tags": []
+}`,
+		"gcr.io/k8s-staging-etcd/etcd": `{
+  "child": [],
+  "manifest": {
+    "sha256:0873d877318546c6569e1abfafd75e0625c202d24435299c4d2e57eeebea52ee": {
+      "imageSizeBytes": "86603886",
+      "layerId": "",
+      "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+      "tag": [],
+      "timeCreatedMs": "1589951279359",
+      "timeUploadedMs": "1589952169591"
+    },
+    "sha256:18f3242ebdefb8c2cbb9da24bb1845001f031c222a06255a06a57b541f7b45ad": {
+      "imageSizeBytes": "134330709",
+      "layerId": "",
+      "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+      "tag": [],
+      "timeCreatedMs": "1589951693859",
+      "timeUploadedMs": "1589952171472"
+    },
+    "sha256:2fb9a8348e5318142ea54c031bfc294c1042009d8f141e0e1d41c332386cc299": {
+      "imageSizeBytes": "133303788",
+      "layerId": "",
+      "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+      "tag": [],
+      "timeCreatedMs": "1589951904418",
+      "timeUploadedMs": "1589952172561"
+    },
+    "sha256:54654da17593ef5e930e57e6ff4e03c0139aeeb0e2f3a6f4f7de248a937369e7": {
+      "imageSizeBytes": "134756383",
+      "layerId": "",
+      "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+      "tag": [],
+      "timeCreatedMs": "1589951485669",
+      "timeUploadedMs": "1589952170488"
+    },
+    "sha256:bcdd5657b1edc1a2eb27356f33dd66b9400d4a084209c33461c7a7da0a32ebb3": {
+      "imageSizeBytes": "0",
+      "layerId": "",
+      "mediaType": "application/vnd.docker.distribution.manifest.list.v2+json",
+      "tag": [
+        "3.4.7-2"
+      ],
+      "timeCreatedMs": "0",
+      "timeUploadedMs": "1589952174599"
+    },
+    "sha256:edc07fe4241d4d745fdd4aaf4bbef4a8568a427693ff7af9e6572335b45c272f": {
+      "imageSizeBytes": "143520849",
+      "layerId": "",
+      "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+      "tag": [],
+      "timeCreatedMs": "1589952118346",
+      "timeUploadedMs": "1589952173579"
+    }
+  },
+  "name": "k8s-staging-etcd/etcd",
+  "tags": [
+    "3.4.7-2"
+  ]
+}`,
+		"gcr.io/google-containers": `{
+  "child": [
+    "etcd"
+  ],
+  "manifest": {},
+  "name": "google-containers",
+  "tags": []
+}`,
+		"gcr.io/google-containers/etcd": `{
+  "child": [],
+  "manifest": {
+    "sha256:12f377200949c25fde1e54bba639d34d119edd7cfcfb1d117526dba677c03c85": {
+      "imageSizeBytes": "0",
+      "layerId": "",
+      "mediaType": "application/vnd.docker.distribution.manifest.list.v2+json",
+      "tag": [
+        "3.4.7",
+        "3.4.7-0"
+      ],
+      "timeCreatedMs": "0",
+      "timeUploadedMs": "1586803705534"
+    },
+    "sha256:a5250021a52e8d2300b6c1c5111a12a3b2f70c463eac9e628e9589578c25cd7a": {
+      "imageSizeBytes": "104216218",
+      "layerId": "",
+      "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+      "tag": [],
+      "timeCreatedMs": "1586542481169",
+      "timeUploadedMs": "1586803661224"
+    },
+    "sha256:50ca5007f4def90e14c5558481a0ed4049ec9f172c92f7d20206c2ccedab6fcf": {
+      "imageSizeBytes": "154231381",
+      "layerId": "",
+      "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+      "tag": [],
+      "timeCreatedMs": "1586542603683",
+      "timeUploadedMs": "1586803673694"
+    },
+    "sha256:969f6212eb70c23c8c2305f7972940129302efc8bafd81dbf610e47c400acaa3": {
+      "imageSizeBytes": "155511148",
+      "layerId": "",
+      "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+      "tag": [],
+      "timeCreatedMs": "1586542725090",
+      "timeUploadedMs": "1586803683899"
+    },
+    "sha256:9da2721aa7dcfd425a2c2d1dc22c59cd80f1f556f677fc78f36d88fbbbbb155f": {
+      "imageSizeBytes": "158254458",
+      "layerId": "",
+      "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+      "tag": [],
+      "timeCreatedMs": "1586451856473",
+      "timeUploadedMs": "1586803695175"
+    },
+    "sha256:7fe05534ed4147675e18179a628743e6be966bba794a6cf8a1b88763b8ae0169": {
+      "imageSizeBytes": "169795464",
+      "layerId": "",
+      "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+      "tag": [],
+      "timeCreatedMs": "1586542977948",
+      "timeUploadedMs": "1586803705133"
+    }
+  },
+  "name": "google-containers/etcd",
+  "tags": [
+    "3.4.7",
+    "3.4.7-0"
+  ]
+}`,
+	}
+
+	readManifestList2 := map[string]string{
+		"gcr.io/k8s-staging-etcd/etcd@sha256:bcdd5657b1edc1a2eb27356f33dd66b9400d4a084209c33461c7a7da0a32ebb3": `{
+  "schemaVersion": 2,
+  "mediaType": "application/vnd.docker.distribution.manifest.list.v2+json",
+  "manifests": [
+    {
+      "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+      "size": 1372,
+      "digest": "sha256:0873d877318546c6569e1abfafd75e0625c202d24435299c4d2e57eeebea52ee",
+      "platform": {
+        "architecture": "amd64",
+        "os": "linux"
+      }
+    },
+    {
+      "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+      "size": 1372,
+      "digest": "sha256:54654da17593ef5e930e57e6ff4e03c0139aeeb0e2f3a6f4f7de248a937369e7",
+      "platform": {
+        "architecture": "arm",
+        "os": "linux"
+      }
+    },
+    {
+      "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+      "size": 1372,
+      "digest": "sha256:18f3242ebdefb8c2cbb9da24bb1845001f031c222a06255a06a57b541f7b45ad",
+      "platform": {
+        "architecture": "arm64",
+        "os": "linux"
+      }
+    },
+    {
+      "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+      "size": 1373,
+      "digest": "sha256:2fb9a8348e5318142ea54c031bfc294c1042009d8f141e0e1d41c332386cc299",
+      "platform": {
+        "architecture": "ppc64le",
+        "os": "linux"
+      }
+    },
+    {
+      "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+      "size": 1372,
+      "digest": "sha256:edc07fe4241d4d745fdd4aaf4bbef4a8568a427693ff7af9e6572335b45c272f",
+      "platform": {
+        "architecture": "s390x",
+        "os": "linux"
+      }
+    }
+  ]
+}`,
+		"gcr.io/google-containers/etcd@sha256:12f377200949c25fde1e54bba639d34d119edd7cfcfb1d117526dba677c03c85": `{
+  "schemaVersion": 2,
+  "mediaType": "application/vnd.docker.distribution.manifest.list.v2+json",
+  "manifests": [
+    {
+      "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+      "size": 952,
+      "digest": "sha256:a5250021a52e8d2300b6c1c5111a12a3b2f70c463eac9e628e9589578c25cd7a",
+      "platform": {
+        "architecture": "amd64",
+        "os": "linux"
+      }
+    },
+    {
+      "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+      "size": 953,
+      "digest": "sha256:50ca5007f4def90e14c5558481a0ed4049ec9f172c92f7d20206c2ccedab6fcf",
+      "platform": {
+        "architecture": "arm",
+        "os": "linux"
+      }
+    },
+    {
+      "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+      "size": 953,
+      "digest": "sha256:969f6212eb70c23c8c2305f7972940129302efc8bafd81dbf610e47c400acaa3",
+      "platform": {
+        "architecture": "arm64",
+        "os": "linux"
+      }
+    },
+    {
+      "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+      "size": 953,
+      "digest": "sha256:9da2721aa7dcfd425a2c2d1dc22c59cd80f1f556f677fc78f36d88fbbbbb155f",
+      "platform": {
+        "architecture": "ppc64le",
+        "os": "linux"
+      }
+    },
+    {
+      "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+      "size": 953,
+      "digest": "sha256:7fe05534ed4147675e18179a628743e6be966bba794a6cf8a1b88763b8ae0169",
+      "platform": {
+        "architecture": "s390x",
+        "os": "linux"
+      }
+    }
+  ]
+}`,
+	}
+
 	type expectedPatterns struct {
 		report []string
 		info   []string
@@ -501,6 +804,40 @@ func TestAudit(t *testing.T) {
 				info:   nil,
 				error:  nil,
 				alert:  []string{`TRANSACTION REJECTED: validation failure: {Action: "DELETE", FQIN: "", PQIN: "us.gcr.io/k8s-artifacts-prod/secret:v0.0.8", Path: "us.gcr.io/k8s-artifacts-prod/secret", Digest: "", Tag: "v0.0.8"}: deletions are prohibited`},
+			},
+		},
+		{
+			"child image promoted (two manifests both promote to the same destination, but only one source repo actually has the child's parent image referenced in the promoter manifest; payload refers to non-root insertion)",
+			manifests2,
+			reg.GCRPubSubPayload{
+				Action: "INSERT",
+				FQIN:   "us.gcr.io/k8s-artifacts-prod/kubernetes/etcd@sha256:0873d877318546c6569e1abfafd75e0625c202d24435299c4d2e57eeebea52ee",
+				PQIN:   "",
+			},
+			readRepo2,
+			readManifestList2,
+			expectedPatterns{
+				report: nil,
+				info:   []string{`TRANSACTION VERIFIED: {Action: "INSERT", FQIN: "us.gcr.io/k8s-artifacts-prod/kubernetes/etcd@sha256:0873d877318546c6569e1abfafd75e0625c202d24435299c4d2e57eeebea52ee", PQIN: "", Path: "us.gcr.io/k8s-artifacts-prod/kubernetes/etcd", Digest: "sha256:0873d877318546c6569e1abfafd75e0625c202d24435299c4d2e57eeebea52ee", Tag: ""}: agrees with manifest \(parent digest sha256:bcdd5657b1edc1a2eb27356f33dd66b9400d4a084209c33461c7a7da0a32ebb3\)`},
+				error:  nil,
+				alert:  nil,
+			},
+		},
+		{
+			"child image promoted (two manifests both promote to the same destination, but only one source repo actually has the child's parent image referenced in the promoter manifest; payload refers to root insertion)",
+			manifests2,
+			reg.GCRPubSubPayload{
+				Action: "INSERT",
+				FQIN:   "us.gcr.io/k8s-artifacts-prod/etcd@sha256:0873d877318546c6569e1abfafd75e0625c202d24435299c4d2e57eeebea52ee",
+				PQIN:   "",
+			},
+			readRepo2,
+			readManifestList2,
+			expectedPatterns{
+				report: nil,
+				info:   []string{`TRANSACTION VERIFIED: {Action: "INSERT", FQIN: "us.gcr.io/k8s-artifacts-prod/etcd@sha256:0873d877318546c6569e1abfafd75e0625c202d24435299c4d2e57eeebea52ee", PQIN: "", Path: "us.gcr.io/k8s-artifacts-prod/etcd", Digest: "sha256:0873d877318546c6569e1abfafd75e0625c202d24435299c4d2e57eeebea52ee", Tag: ""}: agrees with manifest \(parent digest sha256:bcdd5657b1edc1a2eb27356f33dd66b9400d4a084209c33461c7a7da0a32ebb3\)`},
+				error:  nil,
+				alert:  nil,
 			},
 		},
 	}

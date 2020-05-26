@@ -29,7 +29,7 @@ import (
 	api "sigs.k8s.io/k8s-container-image-promoter/pkg/api/files"
 )
 
-// FilestorePromoter manages the promotion of files
+// FilestorePromoter manages the promotion of files.
 type FilestorePromoter struct {
 	Source *api.Filestore
 	Dest   *api.Filestore

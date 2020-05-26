@@ -33,8 +33,8 @@ type Filestore struct {
 	Src            bool   `json:"src,omitempty"`
 }
 
-// File holds information about a file artifact.
-// File artifacts are copied from a source Filestore to N destination Filestores
+// File holds information about a file artifact. File artifacts are copied from
+// a source Filestore to N destination Filestores.
 type File struct {
 	// Name is the relative path of the file, relative to the Filestore base
 	Name string `json:"name"`
