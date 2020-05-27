@@ -87,10 +87,5 @@ func run(ctx context.Context) error {
 		return err
 	}
 
-	err := reg.GrowManifest(ctx, opt)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return reg.GrowManifest(ctx, opt)
 }
