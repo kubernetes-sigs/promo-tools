@@ -23,6 +23,14 @@ lint-ci: download
 	make lint
 test: build
 	bazel test --test_output=all //...
+# test-mac make target is a workaround for the following
+# issue: https://github.com/bazelbuild/rules_go/issues/2013
+test-mac:
+	bazel test --test_output=all \
+		//pkg/api/files:go_default_test \
+		//lib/audit:go_default_test \
+		//lib/dockerregistry:go_default_test \
+		//pkg/cmd:go_default_test
 test-ci: download
 	make build
 	make test
