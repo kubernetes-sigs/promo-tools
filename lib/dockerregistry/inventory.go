@@ -1619,7 +1619,7 @@ func MkReadManifestListCmdReal(
 // determines the number of workers to spawn.
 func (sc *SyncContext) ExecRequests(
 	populateRequests PopulateRequests,
-	processRequest ProcessRequest) {
+	processRequest ProcessRequest) error {
 	// Run requests.
 	MaxConcurrentRequests := 10
 	if sc.Threads > 0 {
@@ -1631,10 +1631,16 @@ func (sc *SyncContext) ExecRequests(
 	// We have to use a WaitGroup, because even though we know beforehand the
 	// number of workers, we don't know the number of jobs.
 	wg := new(sync.WaitGroup)
+
+	var err error
 	// Log any errors encountered.
 	go func() {
 		for reqRes := range requestResults {
 			if len(reqRes.Errors) > 0 {
+				(*mutex).Lock()
+				err = fmt.Errorf("Encountered an error during the" +
+					" promotion step")
+				(*mutex).Unlock()
 				klog.Errorf(
 					"Request %v: error(s) encountered: %v\n",
 					reqRes.Context,
@@ -1670,6 +1676,8 @@ func (sc *SyncContext) ExecRequests(
 	// goroutine (no need to put the error into a channel for consumption from a
 	// single point).
 	close(requestResults)
+
+	return err
 }
 
 func extractRegistryTags(reader io.Reader) (*ggcrV1Google.Tags, error) {
@@ -1855,8 +1863,11 @@ func SplitRegistryImagePath(
 		fmt.Errorf("could not determine registry name for '%v'", registryImagePath)
 }
 
+// MKPopulateRequestsForPromotionEdges takes in a map of PromotionEdges to promote
+// and a PromotionContext and returns a PopulateRequests which can generate
+// requests to be processed
 // nolint[lll]
-func mkPopulateRequestsForPromotionEdges(
+func MKPopulateRequestsForPromotionEdges(
 	toPromote map[PromotionEdge]interface{},
 	mkProducer PromotionContext) PopulateRequests {
 	return func(sc *SyncContext, reqs chan<- stream.ExternalRequest, wg *sync.WaitGroup) {
@@ -2055,7 +2066,7 @@ func (sc *SyncContext) Promote(
 		klog.Infof("  %v\n", edge)
 	}
 
-	var populateRequests = mkPopulateRequestsForPromotionEdges(
+	var populateRequests = MKPopulateRequestsForPromotionEdges(
 		edges,
 		mkProducer)
 
@@ -2158,13 +2169,14 @@ func (sc *SyncContext) Promote(
 	if customProcessRequest != nil {
 		processRequest = *customProcessRequest
 	}
-	sc.ExecRequests(populateRequests, processRequest)
+
+	err := sc.ExecRequests(populateRequests, processRequest)
 
 	if sc.DryRun {
 		sc.PrintCapturedRequests(&captured)
 	}
 
-	return nil
+	return err
 }
 
 // PrintCapturedRequests pretty-prints all given PromotionRequests.
@@ -2329,7 +2341,11 @@ func (sc *SyncContext) GarbageCollect(
 	if customProcessRequest != nil {
 		processRequest = *customProcessRequest
 	}
-	sc.ExecRequests(populateRequests, processRequest)
+
+	err := sc.ExecRequests(populateRequests, processRequest)
+	if err != nil {
+		klog.Info(err)
+	}
 
 	if sc.DryRun {
 		sc.PrintCapturedRequests(&captured)
@@ -2473,9 +2489,15 @@ func (sc *SyncContext) ClearRepository(
 	// referenced by a DockerManifestList, by first deleting all such manifest
 	// lists.
 	deleteManifestLists := deleteRequestsPopulator(isEqualTo(ggcrV1Types.DockerManifestList))
-	sc.ExecRequests(deleteManifestLists, processRequest)
+	err := sc.ExecRequests(deleteManifestLists, processRequest)
+	if err != nil {
+		klog.Info(err)
+	}
 	deleteOthers := deleteRequestsPopulator(isNotEqualTo(ggcrV1Types.DockerManifestList))
-	sc.ExecRequests(deleteOthers, processRequest)
+	err = sc.ExecRequests(deleteOthers, processRequest)
+	if err != nil {
+		klog.Info(err)
+	}
 
 	if sc.DryRun {
 		sc.PrintCapturedRequests(&captured)
