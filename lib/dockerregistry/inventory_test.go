@@ -2458,6 +2458,104 @@ func TestPromotion(t *testing.T) {
 	}
 }
 
+func TestExecRequests(t *testing.T) {
+	sc := reg.SyncContext{}
+
+	destRC := reg.RegistryContext{
+		Name:           reg.RegistryName("gcr.io/bar"),
+		ServiceAccount: "robot",
+	}
+	destRC2 := reg.RegistryContext{
+		Name:           reg.RegistryName("gcr.io/cat"),
+		ServiceAccount: "robot",
+	}
+	srcRC := reg.RegistryContext{
+		Name:           reg.RegistryName("gcr.io/foo"),
+		ServiceAccount: "robot",
+		Src:            true,
+	}
+	registries := []reg.RegistryContext{destRC, srcRC, destRC2}
+
+	nopStream := func(
+		srcRegistry reg.RegistryName,
+		srcImageName reg.ImageName,
+		rc reg.RegistryContext,
+		destImageName reg.ImageName,
+		digest reg.Digest,
+		tag reg.Tag,
+		tp reg.TagOp) stream.Producer {
+
+		return nil
+	}
+
+	edges, _ := reg.ToPromotionEdges([]reg.Manifest{{
+		Registries: registries,
+		Images: []reg.Image{
+			{
+				ImageName: "a",
+				Dmap: reg.DigestTags{
+					"sha256:000": {"0.9"}}}},
+		SrcRegistry: &srcRC}})
+	populateRequests := reg.MKPopulateRequestsForPromotionEdges(
+		edges,
+		nopStream)
+
+	var processRequestSuccess reg.ProcessRequest = func(
+		sc *reg.SyncContext,
+		reqs chan stream.ExternalRequest,
+		requestResults chan<- reg.RequestResult,
+		wg *sync.WaitGroup,
+		mutex *sync.Mutex) {
+		for req := range reqs {
+			reqRes := reg.RequestResult{Context: req}
+			requestResults <- reqRes
+			wg.Add(-1)
+		}
+	}
+
+	var processRequestError reg.ProcessRequest = func(
+		sc *reg.SyncContext,
+		reqs chan stream.ExternalRequest,
+		requestResults chan<- reg.RequestResult,
+		wg *sync.WaitGroup,
+		mutex *sync.Mutex) {
+		for req := range reqs {
+			reqRes := reg.RequestResult{Context: req}
+			errors := make(reg.Errors, 0)
+			errors = append(errors, reg.Error{
+				Context: "Running TestExecRequests",
+				Error:   fmt.Errorf("This request results in an error")})
+			reqRes.Errors = errors
+			requestResults <- reqRes
+			wg.Add(-1)
+		}
+	}
+
+	var tests = []struct {
+		name             string
+		processRequestFn reg.ProcessRequest
+		expected         error
+	}{
+		{
+			"Error tracking for successful promotion",
+			processRequestSuccess,
+			nil,
+		},
+		{
+			"Error tracking for promotion with errors",
+			processRequestError,
+			fmt.Errorf("Encountered an error during the promotion step"),
+		},
+	}
+
+	for _, test := range tests {
+		got := sc.ExecRequests(populateRequests, test.processRequestFn)
+		err := checkEqual(got, test.expected)
+		checkError(t, err,
+			fmt.Sprintf("checkError: test: %v (Error Tracking)\n", test.name))
+	}
+}
+
 func TestGarbageCollection(t *testing.T) {
 	srcRegName := reg.RegistryName("gcr.io/foo")
 	destRegName := reg.RegistryName("gcr.io/bar")
