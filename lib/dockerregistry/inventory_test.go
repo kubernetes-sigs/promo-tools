@@ -2845,6 +2845,7 @@ func TestSnapshot(t *testing.T) {
 			"Basic",
 			reg.RegInvImage{
 				"foo": {
+					"sha256:111": {"one"},
 					"sha256:fff": {"0.9", "0.5"},
 					"sha256:abc": {"0.3", "0.2"},
 				},
@@ -2853,24 +2854,18 @@ func TestSnapshot(t *testing.T) {
 			},
 			`- name: bar
   dmap:
-    sha256:000:
-    - 0.5
-    - 0.8
-    - 0.9
+    "sha256:000": ["0.5", "0.8", "0.9"]
 - name: foo
   dmap:
-    sha256:abc:
-    - 0.2
-    - 0.3
-    sha256:fff:
-    - 0.5
-    - 0.9
+    "sha256:111": ["one"]
+    "sha256:abc": ["0.2", "0.3"]
+    "sha256:fff": ["0.5", "0.9"]
 `,
 		},
 	}
 
 	for _, test := range tests {
-		gotYAML := test.input.ToYAML()
+		gotYAML := test.input.ToYAML(reg.YamlMarshalingOpts{})
 		err := checkEqual(gotYAML, test.expected)
 		checkError(t, err, fmt.Sprintf("checkError: test: %v\n", test.name))
 	}

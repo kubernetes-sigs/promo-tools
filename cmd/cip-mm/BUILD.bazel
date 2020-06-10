@@ -1,0 +1,18 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "go_default_library",
+    srcs = ["main.go"],
+    importpath = "sigs.k8s.io/k8s-container-image-promoter/cmd/cip-mm",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//lib/dockerregistry:go_default_library",
+        "@io_k8s_klog//:go_default_library",
+    ],
+)
+
+go_binary(
+    name = "cip-mm",
+    embed = [":go_default_library"],
+    visibility = ["//visibility:public"],
+)

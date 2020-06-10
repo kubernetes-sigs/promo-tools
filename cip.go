@@ -336,10 +336,10 @@ func main() {
 		case "CSV":
 			snapshot = rii.ToCSV()
 		case "YAML":
-			snapshot = rii.ToYAML()
+			snapshot = rii.ToYAML(reg.YamlMarshalingOpts{})
 		default:
 			klog.Errorf("invalid value %s for -output-format; defaulting to YAML", *outputFormatPtr)
-			snapshot = rii.ToYAML()
+			snapshot = rii.ToYAML(reg.YamlMarshalingOpts{})
 		}
 		fmt.Print(snapshot)
 		os.Exit(0)

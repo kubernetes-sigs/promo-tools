@@ -111,3 +111,16 @@ docker_push(
     name = "push-cip",
     bundle = "cip-docker-loadable",
 )
+
+# Support local installation of "cip" binary.
+load("@com_github_google_rules_install//installer:def.bzl", "installer")
+
+installer(
+    name = "install-cip",
+    data = [":cip"],
+)
+
+installer(
+    name = "install-cip-mm",
+    data = ["//cmd/cip-mm"],
+)

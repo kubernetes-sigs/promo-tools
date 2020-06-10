@@ -1779,7 +1779,9 @@ func (rii *RegInvImage) ToSorted() []ImageWithDigestSlice {
 
 // ToYAML displays a RegInvImage as YAML, but with the map items sorted
 // alphabetically.
-func (rii *RegInvImage) ToYAML() string {
+//
+// nolint[gocognit]
+func (rii *RegInvImage) ToYAML(o YamlMarshalingOpts) string {
 	images := rii.ToSorted()
 
 	var b strings.Builder
@@ -1787,14 +1789,32 @@ func (rii *RegInvImage) ToYAML() string {
 		fmt.Fprintf(&b, "- name: %s\n", image.name)
 		fmt.Fprintf(&b, "  dmap:\n")
 		for _, digestEntry := range image.digests {
-			fmt.Fprintf(&b, "    %s:", digestEntry.hash)
-			if len(digestEntry.tags) > 0 {
-				fmt.Fprintf(&b, "\n")
-				for _, tag := range digestEntry.tags {
-					fmt.Fprintf(&b, "    - %s\n", tag)
-				}
+			if o.BareDigest {
+				fmt.Fprintf(&b, "    %s:", digestEntry.hash)
 			} else {
+				fmt.Fprintf(&b, "    %q:", digestEntry.hash)
+			}
+
+			switch len(digestEntry.tags) {
+			case 0:
 				fmt.Fprintf(&b, " []\n")
+			default:
+				if o.SplitTagsOverMultipleLines {
+					fmt.Fprintf(&b, "\n")
+					for _, tag := range digestEntry.tags {
+						fmt.Fprintf(&b, "    - %s\n", tag)
+					}
+				} else {
+					fmt.Fprintf(&b, " [")
+					for i, tag := range digestEntry.tags {
+						if i == len(digestEntry.tags)-1 {
+							fmt.Fprintf(&b, "%q", tag)
+						} else {
+							fmt.Fprintf(&b, "%q, ", tag)
+						}
+					}
+					fmt.Fprintf(&b, "]\n")
+				}
 			}
 		}
 	}
