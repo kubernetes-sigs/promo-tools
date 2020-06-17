@@ -56,11 +56,10 @@ func GetSrcRegistry(rcs []RegistryContext) (*RegistryContext, error) {
 // MakeSyncContext creates a SyncContext.
 func MakeSyncContext(
 	mfests []Manifest,
-	verbosity, threads int,
+	threads int,
 	dryRun, useSvcAcc bool) (SyncContext, error) {
 
 	sc := SyncContext{
-		Verbosity:         verbosity,
 		Threads:           threads,
 		DryRun:            dryRun,
 		UseServiceAccount: useSvcAcc,

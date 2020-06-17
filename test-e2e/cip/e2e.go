@@ -248,7 +248,7 @@ func runPromotion(repoRoot string, t E2ETest) error {
 		":cip",
 		"--",
 		"-dry-run=false",
-		"-verbosity=3",
+		"-v=3",
 		"-use-service-account",
 		// There is no need to use -key-files=... because we already activated
 		// the 1 service account we need during e2e tests with our own -key-file
@@ -341,7 +341,6 @@ func (t *E2ETest) clearRepositories() error {
 		[]reg.Manifest{
 			{Registries: t.Registries},
 		},
-		2,
 		10,
 		false,
 		true)

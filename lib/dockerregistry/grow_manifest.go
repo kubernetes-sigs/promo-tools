@@ -185,7 +185,6 @@ func ReadStagingRepo(
 
 	sc, err := MakeSyncContext(
 		manifests,
-		2,
 		10,
 		true,
 		false)

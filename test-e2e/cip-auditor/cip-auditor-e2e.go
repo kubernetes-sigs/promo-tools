@@ -418,7 +418,6 @@ func (t *E2ETest) clearRepositories() error {
 		[]reg.Manifest{
 			{Registries: t.Registries},
 		},
-		2,
 		10,
 		false,
 		true)

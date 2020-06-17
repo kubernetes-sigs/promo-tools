@@ -255,8 +255,6 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 	// reg.ReadGCRManifestLists.
 	sc, err := reg.MakeSyncContext(
 		manifests,
-		// verbosity
-		2,
 		// threads
 		10,
 		// dry run (although not necessary as we'll only be doing image reads,
