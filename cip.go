@@ -41,6 +41,7 @@ var TimestampUtcRfc3339 string
 
 // nolint[gocyclo]
 func main() {
+	// klog uses the "v" flag in order to set the verbosity level
 	klog.InitFlags(nil)
 
 	manifestPtr := flag.String(
@@ -52,14 +53,6 @@ func main() {
 	threadsPtr := flag.Int(
 		"threads",
 		10, "number of concurrent goroutines to use when talking to GCR")
-	verbosityPtr := flag.Int(
-		"verbosity",
-		2,
-		"verbosity level for logging;"+
-			" 0 = fatal only,"+
-			" 1 = fatal + errors,"+
-			" 2 = fatal + errors + warnings,"+
-			" 3 = fatal + errors + warnings + informational (everything)")
 	parseOnlyPtr := flag.Bool(
 		"parse-only",
 		false,
@@ -224,7 +217,6 @@ func main() {
 		}
 		sc, err = reg.MakeSyncContext(
 			mfests,
-			*verbosityPtr,
 			*threadsPtr,
 			*dryRunPtr,
 			useServiceAccount)
@@ -240,7 +232,6 @@ func main() {
 
 		sc, err = reg.MakeSyncContext(
 			mfests,
-			*verbosityPtr,
 			*threadsPtr,
 			*dryRunPtr,
 			useServiceAccount)
@@ -306,7 +297,6 @@ func main() {
 		} else {
 			sc, err = reg.MakeSyncContext(
 				mfests,
-				*verbosityPtr,
 				*threadsPtr,
 				*dryRunPtr,
 				useServiceAccount)
