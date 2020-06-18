@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/k8s-container-image-promoter/lib/logclient"
 	"sigs.k8s.io/k8s-container-image-promoter/lib/remotemanifest"
 	"sigs.k8s.io/k8s-container-image-promoter/lib/report"
+	"sigs.k8s.io/k8s-container-image-promoter/lib/stream"
 )
 
 // InitRealServerContext creates a ServerContext with facilities that are meant
@@ -163,6 +164,12 @@ func ValidatePayload(gcrPayload *reg.GCRPubSubPayload) error {
 // parse the request body to understand the GCR state change, (2) update the Git
 // repo of the promoter manifests, and (3) reconcile these two against each
 // other.
+//
+// If this is running in Cloud Run, we have 15 minutes before we exceed Cloud
+// Run "request handling time" quota, which can result in CPU allocation being
+// reduced to 0. So we have to make an effort to try to respond within the 15
+// minute window.
+//
 // nolint[funlen]
 func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 	logInfo := s.LoggingFacility.GetInfoLogger()
@@ -261,7 +268,10 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 		// it doesn't hurt)
 		true,
 		// useServiceAccount
-		false)
+		false,
+		// Make ExponentialBackoff fail faster (<15min) to fall within the Cloud
+		// Run quota.
+		&stream.BackoffCloudRun)
 	if err != nil {
 		// Retry Pub/Sub message if the above fails (it shouldn't because
 		// MakeSyncContext can only error out if the useServiceAccount bool is

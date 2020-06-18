@@ -420,7 +420,8 @@ func (t *E2ETest) clearRepositories() error {
 		},
 		10,
 		false,
-		true)
+		true,
+		nil)
 	if err != nil {
 		return err
 	}

@@ -57,7 +57,8 @@ func GetSrcRegistry(rcs []RegistryContext) (*RegistryContext, error) {
 func MakeSyncContext(
 	mfests []Manifest,
 	threads int,
-	dryRun, useSvcAcc bool) (SyncContext, error) {
+	dryRun, useSvcAcc bool,
+	backoff *wait.Backoff) (SyncContext, error) {
 
 	sc := SyncContext{
 		Threads:           threads,
@@ -68,7 +69,8 @@ func MakeSyncContext(
 		Tokens:            make(map[RootRepo]gcloud.Token),
 		RegistryContexts:  make([]RegistryContext, 0),
 		DigestMediaType:   make(DigestMediaType),
-		ParentDigest:      make(ParentDigest)}
+		ParentDigest:      make(ParentDigest),
+		Backoff:           backoff}
 
 	registriesSeen := make(map[RegistryContext]interface{})
 	for _, mfest := range mfests {
@@ -924,7 +926,9 @@ func (riid *RegInvImageDigest) PrettyValue() string {
 	return b.String()
 }
 
-func getRegistryTagsWrapper(req stream.ExternalRequest,
+func getRegistryTagsWrapper(
+	req stream.ExternalRequest,
+	backoff *wait.Backoff,
 ) (*ggcrV1Google.Tags, error) {
 
 	var googleTags *ggcrV1Google.Tags
@@ -946,8 +950,15 @@ func getRegistryTagsWrapper(req stream.ExternalRequest,
 		return false, nil
 	}
 
+	// Use BackoffDefault by default; use a different (longer or shorter)
+	// backoff if specified.
+	b := &stream.BackoffDefault
+	if backoff != nil {
+		b = backoff
+	}
+
 	err := wait.ExponentialBackoff(
-		stream.BackoffDefault,
+		*b,
 		getRegistryTagsCondition)
 
 	if err != nil {
@@ -982,7 +993,9 @@ func getRegistryTagsFrom(req stream.ExternalRequest,
 }
 
 func getGCRManifestListWrapper(
-	req stream.ExternalRequest) (*ggcrV1.IndexManifest, error) {
+	req stream.ExternalRequest,
+	backoff *wait.Backoff,
+) (*ggcrV1.IndexManifest, error) {
 
 	var gcrManifestList *ggcrV1.IndexManifest
 
@@ -1008,8 +1021,15 @@ func getGCRManifestListWrapper(
 		return false, nil
 	}
 
+	// Use BackoffDefault by default; use a different (longer or shorter)
+	// backoff if specified.
+	b := &stream.BackoffDefault
+	if backoff != nil {
+		b = backoff
+	}
+
 	err := wait.ExponentialBackoff(
-		stream.BackoffDefault,
+		*b,
 		getGCRManifestListCondition)
 
 	if err != nil {
@@ -1237,7 +1257,7 @@ func (sc *SyncContext) ReadRegistries(
 
 			// Now run the request (make network HTTP call with
 			// ExponentialBackoff()).
-			tagsStruct, err := getRegistryTagsWrapper(req)
+			tagsStruct, err := getRegistryTagsWrapper(req, sc.Backoff)
 			if err != nil {
 				// Skip this request if it has unrecoverable errors (even after
 				// ExponentialBackoff).
@@ -1409,7 +1429,7 @@ func (sc *SyncContext) ReadGCRManifestLists(
 
 			// Now run the request (make network HTTP call with
 			// ExponentialBackoff()).
-			gcrManifestList, err := getGCRManifestListWrapper(req)
+			gcrManifestList, err := getGCRManifestListWrapper(req, sc.Backoff)
 			if err != nil {
 				// Skip this request if it has unrecoverable errors (even after
 				// ExponentialBackoff).

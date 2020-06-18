@@ -49,11 +49,43 @@ type ExternalRequest struct {
 
 // BackoffDefault is the default Backoff behavior for network call retries.
 //
+// We wait maximum Steps number of times before each retry attempt. Between each
+// backoff, we wait duration * factor seconds (saving the result to be
+// multiplied by Factor again). If this duration goes over the Cap (before we
+// hit the total number of steps), then steps is set to 0 and we wait for Cap
+// number of seconds before the last retry.
+//
+// In Haskell this would be:
+//
+//  duration = 1
+//  cap = 900
+//  steps = 10
+//  factor = 2
+//  timeout = (/60) $ sum $ (cap:) $ last $ takeWhile (\l -> head l < cap) $
+//    scanl (\acc x -> (factor ^ x) : acc) [duration] [1..steps]
+//
+// where timeout is the number of minutes before we give up. For the values used
+// in BackoffDefault below, timeout is ~32 minutes.
+//
 // nolint[gomnd]
 var BackoffDefault = wait.Backoff{
 	Duration: time.Second,
 	Factor:   2,
 	Jitter:   0.1,
-	Steps:    45,
-	Cap:      time.Second * 60,
+	Steps:    10,
+	Cap:      time.Second * 900,
+}
+
+// BackoffCloudRun is the timeout used when running under Cloud Run, which has a
+// quota of 15 minutes. There is also a 10 minute ACK timeout for Pub/Sub
+// messages; We aim for < 10 minutes to be safe within the Pub/Sub quota; the
+// cap of 240 seconds makes this have a timout of ~8 minutes.
+//
+// nolint[gomnd]
+var BackoffCloudRun = wait.Backoff{
+	Duration: time.Second,
+	Factor:   2,
+	Jitter:   0.1,
+	Steps:    10,
+	Cap:      time.Second * 240,
 }

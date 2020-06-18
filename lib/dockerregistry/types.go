@@ -21,6 +21,7 @@ import (
 
 	cr "github.com/google/go-containerregistry/pkg/v1/types"
 
+	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/k8s-container-image-promoter/lib/stream"
 	"sigs.k8s.io/k8s-container-image-promoter/pkg/gcloud"
 )
@@ -57,6 +58,7 @@ type SyncContext struct {
 	Tokens            map[RootRepo]gcloud.Token
 	DigestMediaType   DigestMediaType
 	ParentDigest      ParentDigest
+	Backoff           *wait.Backoff
 }
 
 // PromotionEdge represents a promotion "link" of an image repository between 2

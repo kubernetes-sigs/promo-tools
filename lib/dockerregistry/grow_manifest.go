@@ -187,7 +187,8 @@ func ReadStagingRepo(
 		manifests,
 		10,
 		true,
-		false)
+		false,
+		nil)
 	if err != nil {
 		return RegInvImage{}, err
 	}

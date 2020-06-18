@@ -219,7 +219,8 @@ func main() {
 			mfests,
 			*threadsPtr,
 			*dryRunPtr,
-			useServiceAccount)
+			useServiceAccount,
+			nil)
 		if err != nil {
 			klog.Fatal(err)
 		}
@@ -234,7 +235,8 @@ func main() {
 			mfests,
 			*threadsPtr,
 			*dryRunPtr,
-			useServiceAccount)
+			useServiceAccount,
+			nil)
 		if err != nil {
 			klog.Fatal(err)
 		}
@@ -299,7 +301,8 @@ func main() {
 				mfests,
 				*threadsPtr,
 				*dryRunPtr,
-				useServiceAccount)
+				useServiceAccount,
+				nil)
 			if err != nil {
 				klog.Fatal(err)
 			}
