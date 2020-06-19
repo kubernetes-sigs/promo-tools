@@ -345,6 +345,14 @@ func main() {
 		os.Exit(0)
 	}
 
+	// Check the pull request
+	if *dryRunPtr {
+		err = sc.RunChecks(promotionEdges, []reg.PreCheck{})
+		if err != nil {
+			klog.Exitln(err)
+		}
+	}
+
 	// Promote.
 	mkProducer := func(
 		srcRegistry reg.RegistryName,
