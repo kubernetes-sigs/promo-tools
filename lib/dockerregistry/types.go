@@ -60,6 +60,15 @@ type SyncContext struct {
 	ParentDigest      ParentDigest
 }
 
+// PreCheck represents a check function to run against a pull request that
+// modifies the promoter manifests before oking promotion of the changes.
+//
+// Run runs the defined check on a set of PromotionEdges and returns an error
+// if the check fails, returns nil otherwise.
+type PreCheck interface {
+	Run(edges map[PromotionEdge]interface{}) error
+}
+
 // PromotionEdge represents a promotion "link" of an image repository between 2
 // registries.
 type PromotionEdge struct {
