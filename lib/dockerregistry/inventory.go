@@ -1951,6 +1951,28 @@ func MKPopulateRequestsForPromotionEdges(
 	}
 }
 
+// RunChecks runs defined PreChecks in order to check the promotion.
+func (sc *SyncContext) RunChecks(
+	edges map[PromotionEdge]interface{},
+	preChecks []PreCheck,
+) error {
+
+	var errors []error
+	for _, preCheck := range preChecks {
+		err := preCheck.Run(edges)
+		if err != nil {
+			klog.Error(err)
+			errors = append(errors, err)
+		}
+	}
+
+	if errors != nil {
+		return fmt.Errorf("%v error(s) encountered during the prechecks",
+			len(errors))
+	}
+	return nil
+}
+
 // FilterPromotionEdges generates all "edges" that we want to promote.
 func (sc *SyncContext) FilterPromotionEdges(
 	edges map[PromotionEdge]interface{},

@@ -1991,6 +1991,64 @@ func TestCheckOverlappingEdges(t *testing.T) {
 	}
 }
 
+type FakeCheckAlwaysSucceed struct{}
+
+func (c *FakeCheckAlwaysSucceed) Run(
+	edges map[reg.PromotionEdge]interface{},
+) error {
+	return nil
+}
+
+type FakeCheckAlwaysFail struct{}
+
+func (c *FakeCheckAlwaysFail) Run(
+	edges map[reg.PromotionEdge]interface{},
+) error {
+	return fmt.Errorf("there was an error in the pull request check")
+}
+
+func TestRunChecks(t *testing.T) {
+	sc := reg.SyncContext{}
+	edges, _ := reg.ToPromotionEdges([]reg.Manifest{})
+
+	var tests = []struct {
+		name     string
+		checks   []reg.PreCheck
+		expected error
+	}{
+		{
+			"Checking pull request with successful checks",
+			[]reg.PreCheck{
+				&FakeCheckAlwaysSucceed{},
+			},
+			nil,
+		},
+		{
+			"Checking pull request with unsuccessful checks",
+			[]reg.PreCheck{
+				&FakeCheckAlwaysFail{},
+			},
+			fmt.Errorf("1 error(s) encountered during the prechecks"),
+		},
+		{
+			"Checking pull request with successful and unsuccessful checks",
+			[]reg.PreCheck{
+				&FakeCheckAlwaysSucceed{},
+				&FakeCheckAlwaysFail{},
+				&FakeCheckAlwaysFail{},
+			},
+			fmt.Errorf("2 error(s) encountered during the prechecks"),
+		},
+	}
+
+	for _, test := range tests {
+		got := sc.RunChecks(edges, test.checks)
+		err := checkEqual(got, test.expected)
+		checkError(t, err,
+			fmt.Sprintf("checkError: test: %v (Error Tracking)\n", test.name))
+	}
+}
+
 // TestPromotion is the most important test as it simulates the main job of the
 // promoter.
 func TestPromotion(t *testing.T) {
