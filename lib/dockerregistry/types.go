@@ -68,6 +68,10 @@ type PreCheck interface {
 	Run(edges map[PromotionEdge]interface{}) error
 }
 
+type ImageSizeCheck struct {
+	MaxFileSize int
+}
+
 // PromotionEdge represents a promotion "link" of an image repository between 2
 // registries.
 type PromotionEdge struct {

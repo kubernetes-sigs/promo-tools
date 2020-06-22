@@ -1973,6 +1973,13 @@ func (sc *SyncContext) RunChecks(
 	return nil
 }
 
+func (check *ImageSizeCheck) Run(
+	edges map[PromotionEdge]interface{},
+) error {
+	var err error
+	return err
+}
+
 // FilterPromotionEdges generates all "edges" that we want to promote.
 func (sc *SyncContext) FilterPromotionEdges(
 	edges map[PromotionEdge]interface{},
