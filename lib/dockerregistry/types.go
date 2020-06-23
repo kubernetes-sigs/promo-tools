@@ -56,6 +56,7 @@ type SyncContext struct {
 	SrcRegistry       *RegistryContext
 	Tokens            map[RootRepo]gcloud.Token
 	DigestMediaType   DigestMediaType
+	DigestImageSize   DigestImageSize
 	ParentDigest      ParentDigest
 }
 
@@ -68,8 +69,11 @@ type PreCheck interface {
 	Run(edges map[PromotionEdge]interface{}) error
 }
 
+// MaxFileSize implements the PreCheck interface and checks against images that
+// are larger than a size threshold (controlled by the max-image-size flag).
 type ImageSizeCheck struct {
-	MaxFileSize int
+	MaxImageSize    float64
+	DigestImageSize DigestImageSize
 }
 
 // PromotionEdge represents a promotion "link" of an image repository between 2
@@ -305,6 +309,9 @@ type ImageName string
 
 // DigestMediaType holds media information about a Digest.
 type DigestMediaType map[Digest]cr.MediaType
+
+// DigestImageSize holds information about the size of an image in bytes.
+type DigestImageSize map[Digest]int
 
 // ParentDigest holds a map of the digests of children to parent digests. It is
 // a reverse mapping of ManifestLists, which point to all the child manifests.

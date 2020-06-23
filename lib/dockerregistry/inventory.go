@@ -1276,6 +1276,9 @@ func (sc *SyncContext) ReadRegistries(
 					fmt.Printf("digest %s: %s\n", digest, err)
 				}
 				sc.DigestMediaType[Digest(digest)] = mediaType
+
+				// Store ImageSize
+				sc.DigestImageSize[Digest(digest)] = int(mfestInfo.Size)
 				mutex.Unlock()
 			}
 
@@ -1976,8 +1979,21 @@ func (sc *SyncContext) RunChecks(
 func (check *ImageSizeCheck) Run(
 	edges map[PromotionEdge]interface{},
 ) error {
-	var err error
-	return err
+	oversizedImages := make([]string, 0)
+	for edge, _ := range edges {
+		imageSize := check.DigestImageSize[edge.Digest]
+		if imageSize > int(check.MaxImageSize*1e9) {
+			oversizedImages = append(oversizedImages,
+				string(edge.DstImageTag.ImageName))
+		}
+	}
+	if len(oversizedImages) > 0 {
+		return fmt.Errorf("The following images were over the max file size"+
+			" of %fGB: %v",
+			check.MaxImageSize,
+			strings.Join(oversizedImages, ", "))
+	}
+	return nil
 }
 
 // FilterPromotionEdges generates all "edges" that we want to promote.

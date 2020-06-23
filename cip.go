@@ -123,6 +123,10 @@ func main() {
 		"audit-gcp-project-id",
 		os.Getenv("CIP_AUDIT_GCP_PROJECT_ID"),
 		"GCP project ID (name); used for labeling error reporting logs to GCP")
+	maxImageSizePtr := flag.Float64(
+		"max-image-size",
+		2,
+		"The maximum image size in GB allowed for promotion (defaults to 2GB)")
 	flag.Parse()
 
 	if len(os.Args) == 1 {
