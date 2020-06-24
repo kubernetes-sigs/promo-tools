@@ -341,7 +341,12 @@ func main() {
 
 	// Check the pull request
 	if *dryRunPtr {
-		err = sc.RunChecks(promotionEdges, []reg.PreCheck{})
+		err = sc.RunChecks(promotionEdges, []reg.PreCheck{
+			reg.MKRealImageSizeCheck(
+				*maxImageSizePtr,
+				sc.DigestImageSize,
+			),
+		})
 		if err != nil {
 			klog.Exitln(err)
 		}

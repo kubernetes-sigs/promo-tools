@@ -68,6 +68,7 @@ func MakeSyncContext(
 		Tokens:            make(map[RootRepo]gcloud.Token),
 		RegistryContexts:  make([]RegistryContext, 0),
 		DigestMediaType:   make(DigestMediaType),
+		DigestImageSize:   make(DigestImageSize),
 		ParentDigest:      make(ParentDigest)}
 
 	registriesSeen := make(map[RegistryContext]interface{})
@@ -1278,7 +1279,9 @@ func (sc *SyncContext) ReadRegistries(
 				sc.DigestMediaType[Digest(digest)] = mediaType
 
 				// Store ImageSize
-				sc.DigestImageSize[Digest(digest)] = int(mfestInfo.Size)
+				if sc.DigestImageSize != nil {
+					sc.DigestImageSize[Digest(digest)] = int(mfestInfo.Size)
+				}
 				mutex.Unlock()
 			}
 
@@ -1976,13 +1979,17 @@ func (sc *SyncContext) RunChecks(
 	return nil
 }
 
+// Run is a function of ImageSizeCheck and checks that all
+// images to be promoted are under the max file size.
 func (check *ImageSizeCheck) Run(
 	edges map[PromotionEdge]interface{},
 ) error {
+	byteConvert := 1024.0
+	gbToByte := byteConvert * byteConvert * byteConvert
 	oversizedImages := make([]string, 0)
-	for edge, _ := range edges {
+	for edge := range edges {
 		imageSize := check.DigestImageSize[edge.Digest]
-		if imageSize > int(check.MaxImageSize*1e9) {
+		if imageSize > int(check.MaxImageSize*gbToByte) {
 			oversizedImages = append(oversizedImages,
 				string(edge.DstImageTag.ImageName))
 		}
@@ -1994,6 +2001,18 @@ func (check *ImageSizeCheck) Run(
 			strings.Join(oversizedImages, ", "))
 	}
 	return nil
+}
+
+// MKRealImageSizeCheck returns an instance of ImageSizeCheck which
+// checks that all images to be promoted are under a max size.
+func MKRealImageSizeCheck(
+	maxImageSize float64,
+	digestImageSize DigestImageSize,
+) *ImageSizeCheck {
+	return &ImageSizeCheck{
+		maxImageSize,
+		digestImageSize,
+	}
 }
 
 // FilterPromotionEdges generates all "edges" that we want to promote.

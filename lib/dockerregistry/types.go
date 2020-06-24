@@ -69,8 +69,9 @@ type PreCheck interface {
 	Run(edges map[PromotionEdge]interface{}) error
 }
 
-// MaxFileSize implements the PreCheck interface and checks against images that
-// are larger than a size threshold (controlled by the max-image-size flag).
+// ImageSizeCheck implements the PreCheck interface and checks against
+// images that are larger than a size threshold (controlled by the
+// max-image-size flag).
 type ImageSizeCheck struct {
 	MaxImageSize    float64
 	DigestImageSize DigestImageSize
