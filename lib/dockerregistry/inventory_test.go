@@ -2065,6 +2065,116 @@ func TestImageSizeCheck(t *testing.T) {
 			fmt.Sprintf("checkError: test: %v (Error Tracking)\n", test.name))
 	}
 }
+func TestImageRemovalCheck(t *testing.T) {
+	srcRegName := reg.RegistryName("gcr.io/foo")
+	destRegName := reg.RegistryName("gcr.io/bar")
+	destRC := reg.RegistryContext{
+		Name:           destRegName,
+		ServiceAccount: "robot",
+	}
+	srcRC := reg.RegistryContext{
+		Name:           srcRegName,
+		ServiceAccount: "robot",
+		Src:            true,
+	}
+	registries := []reg.RegistryContext{destRC, srcRC}
+
+	image1 := reg.Image{
+		ImageName: "foo",
+		Dmap: reg.DigestTags{
+			"sha256:000": {"0.9"}}}
+	image2 := reg.Image{
+		ImageName: "bar",
+		Dmap: reg.DigestTags{
+			"sha256:000": {"0.9"}}}
+
+	var tests = []struct {
+		name       string
+		check      reg.ImageSizeCheck
+		manifests  []reg.Manifest
+		imageSizes []int
+		expected   error
+	}{
+		{
+			"Image size under the max size",
+			reg.ImageSizeCheck{
+				1,
+				make(reg.DigestImageSize),
+			},
+			[]reg.Manifest{
+				{
+					Registries: registries,
+					Images: []reg.Image{
+						image1,
+					},
+					SrcRegistry: &srcRC},
+			},
+			[]int{
+				.5 * 1024 * 1024,
+			},
+			nil,
+		},
+		{
+			"Image size over the max size",
+			reg.ImageSizeCheck{
+				1,
+				make(reg.DigestImageSize),
+			},
+			[]reg.Manifest{
+				{
+					Registries: registries,
+					Images: []reg.Image{
+						image1,
+					},
+					SrcRegistry: &srcRC},
+			},
+			[]int{
+				5 * 1024 * 1024,
+			},
+			fmt.Errorf("The following images were over the max file size" +
+				" of 1MB: foo"),
+		},
+		{
+			"Multiple images over the max size",
+			reg.ImageSizeCheck{
+				1,
+				make(reg.DigestImageSize),
+			},
+			[]reg.Manifest{
+				{
+					Registries: registries,
+					Images: []reg.Image{
+						image1,
+						image2,
+					},
+					SrcRegistry: &srcRC},
+			},
+			[]int{
+				5 * 1024 * 1024,
+				10 * 1024 * 1024,
+			},
+			fmt.Errorf("The following images were over the max file size" +
+				" of 1MB: foo, bar"),
+		},
+	}
+
+	for _, test := range tests {
+		edges, _ := reg.ToPromotionEdges(test.manifests)
+		err := checkEqual(len(edges), len(test.imageSizes))
+		checkError(t, err,
+			fmt.Sprintf("checkError: test: %v Number of image sizes should be "+
+				"equal to the number of edges (ImageSizeCheck)\n", test.name))
+		index := 0
+		for edge := range edges {
+			test.check.DigestImageSize[edge.Digest] = test.imageSizes[index]
+			index++
+		}
+		got := test.check.Run(edges)
+		err = checkEqual(got, test.expected)
+		checkError(t, err,
+			fmt.Sprintf("checkError: test: %v (ImageSizeCheck)\n", test.name))
+	}
+}
 
 // TestPromotion is the most important test as it simulates the main job of the
 // promoter.
