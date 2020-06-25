@@ -2049,6 +2049,23 @@ func TestRunChecks(t *testing.T) {
 	}
 }
 
+func TestImageSizeCheck(t *testing.T) {
+	var tests = []struct {
+		name      string
+		check     reg.ImageSizeCheck
+		manifests []reg.Manifest
+		expected  error
+	}{}
+
+	for _, test := range tests {
+		edges, _ := reg.ToPromotionEdges(test.manifests)
+		got := test.check.Run(edges)
+		err := checkEqual(got, test.expected)
+		checkError(t, err,
+			fmt.Sprintf("checkError: test: %v (Error Tracking)\n", test.name))
+	}
+}
+
 // TestPromotion is the most important test as it simulates the main job of the
 // promoter.
 func TestPromotion(t *testing.T) {
