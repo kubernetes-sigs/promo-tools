@@ -22,7 +22,9 @@ image-load-cip-auditor-e2e:
 image-push-cip-auditor-e2e:
 	bazel run //test-e2e/cip-auditor:push-cip-auditor-test
 lint:
-	GO111MODULE=on golangci-lint --timeout=2s run
+	GO111MODULE=on golangci-lint run \
+		-v \
+		--timeout=5m 
 lint-ci: download
 	make lint
 test: build
