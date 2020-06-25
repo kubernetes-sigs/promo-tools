@@ -1984,19 +1984,19 @@ func (sc *SyncContext) RunChecks(
 func (check *ImageSizeCheck) Run(
 	edges map[PromotionEdge]interface{},
 ) error {
-	byteConvert := 1024.0
-	gbToByte := byteConvert * byteConvert * byteConvert
+	const mbToByteShift = 20
+	maxImageSizeByte := check.MaxImageSize << mbToByteShift
 	oversizedImages := make([]string, 0)
 	for edge := range edges {
 		imageSize := check.DigestImageSize[edge.Digest]
-		if imageSize > int(check.MaxImageSize*gbToByte) {
+		if imageSize > maxImageSizeByte {
 			oversizedImages = append(oversizedImages,
 				string(edge.DstImageTag.ImageName))
 		}
 	}
 	if len(oversizedImages) > 0 {
 		return fmt.Errorf("The following images were over the max file size"+
-			" of %fGB: %v",
+			" of %dMB: %v",
 			check.MaxImageSize,
 			strings.Join(oversizedImages, ", "))
 	}
@@ -2006,7 +2006,7 @@ func (check *ImageSizeCheck) Run(
 // MKRealImageSizeCheck returns an instance of ImageSizeCheck which
 // checks that all images to be promoted are under a max size.
 func MKRealImageSizeCheck(
-	maxImageSize float64,
+	maxImageSize int,
 	digestImageSize DigestImageSize,
 ) *ImageSizeCheck {
 	return &ImageSizeCheck{

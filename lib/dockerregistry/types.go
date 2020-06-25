@@ -73,7 +73,7 @@ type PreCheck interface {
 // images that are larger than a size threshold (controlled by the
 // max-image-size flag).
 type ImageSizeCheck struct {
-	MaxImageSize    float64
+	MaxImageSize    int
 	DigestImageSize DigestImageSize
 }
 
