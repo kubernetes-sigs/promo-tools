@@ -2050,22 +2050,6 @@ func TestRunChecks(t *testing.T) {
 }
 
 func TestImageSizeCheck(t *testing.T) {
-	var tests = []struct {
-		name      string
-		check     reg.ImageSizeCheck
-		manifests []reg.Manifest
-		expected  error
-	}{}
-
-	for _, test := range tests {
-		edges, _ := reg.ToPromotionEdges(test.manifests)
-		got := test.check.Run(edges)
-		err := checkEqual(got, test.expected)
-		checkError(t, err,
-			fmt.Sprintf("checkError: test: %v (Error Tracking)\n", test.name))
-	}
-}
-func TestImageRemovalCheck(t *testing.T) {
 	srcRegName := reg.RegistryName("gcr.io/foo")
 	destRegName := reg.RegistryName("gcr.io/bar")
 	destRC := reg.RegistryContext{
@@ -2086,13 +2070,13 @@ func TestImageRemovalCheck(t *testing.T) {
 	image2 := reg.Image{
 		ImageName: "bar",
 		Dmap: reg.DigestTags{
-			"sha256:000": {"0.9"}}}
+			"sha256:111": {"0.9"}}}
 
 	var tests = []struct {
 		name       string
 		check      reg.ImageSizeCheck
 		manifests  []reg.Manifest
-		imageSizes []int
+		imageSizes map[reg.Digest]int
 		expected   error
 	}{
 		{
@@ -2109,8 +2093,8 @@ func TestImageRemovalCheck(t *testing.T) {
 					},
 					SrcRegistry: &srcRC},
 			},
-			[]int{
-				.5 * 1024 * 1024,
+			map[reg.Digest]int{
+				"sha256:000": .5 * 1024 * 1024,
 			},
 			nil,
 		},
@@ -2128,11 +2112,11 @@ func TestImageRemovalCheck(t *testing.T) {
 					},
 					SrcRegistry: &srcRC},
 			},
-			[]int{
-				5 * 1024 * 1024,
+			map[reg.Digest]int{
+				"sha256:000": 5 * 1024 * 1024,
 			},
 			fmt.Errorf("The following images were over the max file size" +
-				" of 1MB: foo"),
+				" of 1MiB: foo"),
 		},
 		{
 			"Multiple images over the max size",
@@ -2149,12 +2133,12 @@ func TestImageRemovalCheck(t *testing.T) {
 					},
 					SrcRegistry: &srcRC},
 			},
-			[]int{
-				5 * 1024 * 1024,
-				10 * 1024 * 1024,
+			map[reg.Digest]int{
+				"sha256:000": 5 * 1024 * 1024,
+				"sha256:111": 10 * 1024 * 1024,
 			},
 			fmt.Errorf("The following images were over the max file size" +
-				" of 1MB: foo, bar"),
+				" of 1MiB: foo, bar"),
 		},
 	}
 
@@ -2164,10 +2148,9 @@ func TestImageRemovalCheck(t *testing.T) {
 		checkError(t, err,
 			fmt.Sprintf("checkError: test: %v Number of image sizes should be "+
 				"equal to the number of edges (ImageSizeCheck)\n", test.name))
-		index := 0
 		for edge := range edges {
-			test.check.DigestImageSize[edge.Digest] = test.imageSizes[index]
-			index++
+			test.check.DigestImageSize[edge.Digest] =
+				test.imageSizes[edge.Digest]
 		}
 		got := test.check.Run(edges)
 		err = checkEqual(got, test.expected)

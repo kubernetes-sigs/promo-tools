@@ -126,7 +126,7 @@ func main() {
 	maxImageSizePtr := flag.Int(
 		"max-image-size",
 		2048,
-		"The maximum image size (MB) allowed for promotion. Default is 2048MB")
+		"The maximum image size (MiB) allowed for promotion. Default is 2048MiB")
 	flag.Parse()
 
 	if len(os.Args) == 1 {

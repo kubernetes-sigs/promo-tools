@@ -1996,7 +1996,7 @@ func (check *ImageSizeCheck) Run(
 	}
 	if len(oversizedImages) > 0 {
 		return fmt.Errorf("The following images were over the max file size"+
-			" of %dMB: %v",
+			" of %dMiB: %v",
 			check.MaxImageSize,
 			strings.Join(oversizedImages, ", "))
 	}
