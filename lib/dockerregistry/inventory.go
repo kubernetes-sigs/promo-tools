@@ -1279,9 +1279,7 @@ func (sc *SyncContext) ReadRegistries(
 				sc.DigestMediaType[Digest(digest)] = mediaType
 
 				// Store ImageSize
-				if sc.DigestImageSize != nil {
-					sc.DigestImageSize[Digest(digest)] = int(mfestInfo.Size)
-				}
+				sc.DigestImageSize[Digest(digest)] = int(mfestInfo.Size)
 				mutex.Unlock()
 			}
 
@@ -1959,13 +1957,12 @@ func MKPopulateRequestsForPromotionEdges(
 
 // RunChecks runs defined PreChecks in order to check the promotion.
 func (sc *SyncContext) RunChecks(
-	edges map[PromotionEdge]interface{},
 	preChecks []PreCheck,
 ) error {
 
 	var errors []error
 	for _, preCheck := range preChecks {
-		err := preCheck.Run(edges)
+		err := preCheck.Run()
 		if err != nil {
 			klog.Error(err)
 			errors = append(errors, err)
@@ -1979,27 +1976,59 @@ func (sc *SyncContext) RunChecks(
 	return nil
 }
 
-// Run is a function of ImageSizeCheck and checks that all
-// images to be promoted are under the max file size.
-func (check *ImageSizeCheck) Run(
-	edges map[PromotionEdge]interface{},
-) error {
+func (check *ImageSizeCheck) joinImageSizesToString(
+	imageSizes map[string]int,
+) string {
+	imageSizesStr := ""
+	imageNames := make([]string, 0)
+	for k := range imageSizes {
+		imageNames = append(imageNames, k)
+	}
 	const mbToByteShift = 20
-	maxImageSizeByte := check.MaxImageSize << mbToByteShift
-	oversizedImages := make([]string, 0)
-	for edge := range edges {
-		imageSize := check.DigestImageSize[edge.Digest]
-		if imageSize > maxImageSizeByte {
-			oversizedImages = append(oversizedImages,
-				string(edge.DstImageTag.ImageName))
+	sort.Strings(imageNames)
+	for i, imageName := range imageNames {
+		imageSizesStr += imageName + " (" +
+			fmt.Sprint(imageSizes[imageName]>>mbToByteShift) + " MiB)"
+		if i < len(imageNames)-1 {
+			imageSizesStr += ", "
 		}
 	}
-	if len(oversizedImages) > 0 {
-		return fmt.Errorf("The following images were over the max file size"+
-			" of %dMiB: %v",
-			check.MaxImageSize,
-			strings.Join(oversizedImages, ", "))
+	return imageSizesStr
+}
+
+// Run is a function of ImageSizeCheck and checks that all
+// images to be promoted are under the max file size.
+func (check *ImageSizeCheck) Run() error {
+	const mbToByteShift = 20
+	maxImageSizeByte := check.MaxImageSize << mbToByteShift
+	oversizedImages := make(map[string]int)
+	invalidImages := make(map[string]int)
+	for edge := range check.PullEdges {
+		imageSize := check.DigestImageSize[edge.Digest]
+		imageName := string(edge.DstImageTag.ImageName)
+		if imageSize > maxImageSizeByte {
+			oversizedImages[imageName] = imageSize
+		}
+		if imageSize <= 0 {
+			invalidImages[imageName] = imageSize
+		}
 	}
+
+	errStr := ""
+	if len(oversizedImages) > 0 {
+		errStr += fmt.Sprintf("The following images were over the max file "+
+			"size of %dMiB: %v\n", check.MaxImageSize,
+			check.joinImageSizesToString(oversizedImages))
+	}
+	if len(invalidImages) > 0 {
+		errStr += fmt.Sprintf("The following images had an invalid file size "+
+			"of 0 bytes or less: %v\n",
+			check.joinImageSizesToString(invalidImages))
+	}
+	if errStr != "" {
+		return fmt.Errorf(errStr)
+	}
+
 	return nil
 }
 
@@ -2007,11 +2036,13 @@ func (check *ImageSizeCheck) Run(
 // checks that all images to be promoted are under a max size.
 func MKRealImageSizeCheck(
 	maxImageSize int,
+	edges map[PromotionEdge]interface{},
 	digestImageSize DigestImageSize,
 ) *ImageSizeCheck {
 	return &ImageSizeCheck{
 		maxImageSize,
 		digestImageSize,
+		edges,
 	}
 }
 

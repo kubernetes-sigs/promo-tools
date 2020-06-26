@@ -1222,7 +1222,8 @@ func TestReadRegistries(t *testing.T) {
 		sc := reg.SyncContext{
 			RegistryContexts: rcs,
 			Inv:              map[reg.RegistryName]reg.RegInvImage{fakeRegName: nil},
-			DigestMediaType:  make(reg.DigestMediaType)}
+			DigestMediaType:  make(reg.DigestMediaType),
+			DigestImageSize:  make(reg.DigestImageSize)}
 		// test is used to pin the "test" variable from the outer "range"
 		// scope (see scopelint).
 		test := test
@@ -1308,7 +1309,8 @@ func TestReadGManifestLists(t *testing.T) {
 						"sha256:0000000000000000000000000000000000000000000000000000000000000000": {"1.0"}}}},
 			DigestMediaType: reg.DigestMediaType{
 				"sha256:0000000000000000000000000000000000000000000000000000000000000000": cr.DockerManifestList},
-			ParentDigest: make(reg.ParentDigest)}
+			DigestImageSize: make(reg.DigestImageSize),
+			ParentDigest:    make(reg.ParentDigest)}
 		// test is used to pin the "test" variable from the outer "range"
 		// scope (see scopelint).
 		test := test
@@ -1993,23 +1995,18 @@ func TestCheckOverlappingEdges(t *testing.T) {
 
 type FakeCheckAlwaysSucceed struct{}
 
-func (c *FakeCheckAlwaysSucceed) Run(
-	edges map[reg.PromotionEdge]interface{},
-) error {
+func (c *FakeCheckAlwaysSucceed) Run() error {
 	return nil
 }
 
 type FakeCheckAlwaysFail struct{}
 
-func (c *FakeCheckAlwaysFail) Run(
-	edges map[reg.PromotionEdge]interface{},
-) error {
+func (c *FakeCheckAlwaysFail) Run() error {
 	return fmt.Errorf("there was an error in the pull request check")
 }
 
 func TestRunChecks(t *testing.T) {
 	sc := reg.SyncContext{}
-	edges, _ := reg.ToPromotionEdges([]reg.Manifest{})
 
 	var tests = []struct {
 		name     string
@@ -2042,7 +2039,7 @@ func TestRunChecks(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		got := sc.RunChecks(edges, test.checks)
+		got := sc.RunChecks(test.checks)
 		err := checkEqual(got, test.expected)
 		checkError(t, err,
 			fmt.Sprintf("checkError: test: %v (Error Tracking)\n", test.name))
@@ -2072,6 +2069,8 @@ func TestImageSizeCheck(t *testing.T) {
 		Dmap: reg.DigestTags{
 			"sha256:111": {"0.9"}}}
 
+	const mbToByteShift = 20
+
 	var tests = []struct {
 		name       string
 		check      reg.ImageSizeCheck
@@ -2082,8 +2081,8 @@ func TestImageSizeCheck(t *testing.T) {
 		{
 			"Image size under the max size",
 			reg.ImageSizeCheck{
-				1,
-				make(reg.DigestImageSize),
+				MaxImageSize:    1,
+				DigestImageSize: make(reg.DigestImageSize),
 			},
 			[]reg.Manifest{
 				{
@@ -2094,15 +2093,15 @@ func TestImageSizeCheck(t *testing.T) {
 					SrcRegistry: &srcRC},
 			},
 			map[reg.Digest]int{
-				"sha256:000": .5 * 1024 * 1024,
+				"sha256:000": 1 << mbToByteShift,
 			},
 			nil,
 		},
 		{
 			"Image size over the max size",
 			reg.ImageSizeCheck{
-				1,
-				make(reg.DigestImageSize),
+				MaxImageSize:    1,
+				DigestImageSize: make(reg.DigestImageSize),
 			},
 			[]reg.Manifest{
 				{
@@ -2113,16 +2112,16 @@ func TestImageSizeCheck(t *testing.T) {
 					SrcRegistry: &srcRC},
 			},
 			map[reg.Digest]int{
-				"sha256:000": 5 * 1024 * 1024,
+				"sha256:000": 5 << mbToByteShift,
 			},
 			fmt.Errorf("The following images were over the max file size" +
-				" of 1MiB: foo"),
+				" of 1MiB: foo (5 MiB)\n"),
 		},
 		{
 			"Multiple images over the max size",
 			reg.ImageSizeCheck{
-				1,
-				make(reg.DigestImageSize),
+				MaxImageSize:    1,
+				DigestImageSize: make(reg.DigestImageSize),
 			},
 			[]reg.Manifest{
 				{
@@ -2134,25 +2133,47 @@ func TestImageSizeCheck(t *testing.T) {
 					SrcRegistry: &srcRC},
 			},
 			map[reg.Digest]int{
-				"sha256:000": 5 * 1024 * 1024,
-				"sha256:111": 10 * 1024 * 1024,
+				"sha256:000": 5 << mbToByteShift,
+				"sha256:111": 10 << mbToByteShift,
 			},
 			fmt.Errorf("The following images were over the max file size" +
-				" of 1MiB: foo, bar"),
+				" of 1MiB: bar (10 MiB), foo (5 MiB)\n"),
+		},
+		{
+			"Image sizes are <= 0",
+			reg.ImageSizeCheck{
+				MaxImageSize:    1,
+				DigestImageSize: make(reg.DigestImageSize),
+			},
+			[]reg.Manifest{
+				{
+					Registries: registries,
+					Images: []reg.Image{
+						image1,
+						image2,
+					},
+					SrcRegistry: &srcRC},
+			},
+			map[reg.Digest]int{
+				"sha256:000": 0,
+				"sha256:111": -5 << mbToByteShift,
+			},
+			fmt.Errorf("The following images had an invalid file size of 0" +
+				" bytes or less: bar (-5 MiB), foo (0 MiB)\n"),
 		},
 	}
 
 	for _, test := range tests {
-		edges, _ := reg.ToPromotionEdges(test.manifests)
-		err := checkEqual(len(edges), len(test.imageSizes))
+		test.check.PullEdges, _ = reg.ToPromotionEdges(test.manifests)
+		err := checkEqual(len(test.check.PullEdges), len(test.imageSizes))
 		checkError(t, err,
 			fmt.Sprintf("checkError: test: %v Number of image sizes should be "+
 				"equal to the number of edges (ImageSizeCheck)\n", test.name))
-		for edge := range edges {
+		for edge := range test.check.PullEdges {
 			test.check.DigestImageSize[edge.Digest] =
 				test.imageSizes[edge.Digest]
 		}
-		got := test.check.Run(edges)
+		got := test.check.Run()
 		err = checkEqual(got, test.expected)
 		checkError(t, err,
 			fmt.Sprintf("checkError: test: %v (ImageSizeCheck)\n", test.name))

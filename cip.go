@@ -126,7 +126,10 @@ func main() {
 	maxImageSizePtr := flag.Int(
 		"max-image-size",
 		2048,
-		"The maximum image size (MiB) allowed for promotion. Default is 2048MiB")
+		"The maximum image size (MiB) allowed for promotion and must be a positive value (othwerise set to the default value of 2048 MiB)")
+	if *maxImageSizePtr <= 0 {
+		*maxImageSizePtr = 2048
+	}
 	flag.Parse()
 
 	if len(os.Args) == 1 {
@@ -341,9 +344,10 @@ func main() {
 
 	// Check the pull request
 	if *dryRunPtr {
-		err = sc.RunChecks(promotionEdges, []reg.PreCheck{
+		err = sc.RunChecks([]reg.PreCheck{
 			reg.MKRealImageSizeCheck(
 				*maxImageSizePtr,
+				promotionEdges,
 				sc.DigestImageSize,
 			),
 		})
