@@ -106,6 +106,17 @@ func MakeSyncContext(
 	return sc, nil
 }
 
+// LogJSONSummary logs the SyncContext's Logs as a prettified JSON.
+func (sc *SyncContext) LogJSONSummary() {
+	json, err := json.MarshalIndent(sc.Logs, "", "  ")
+	if err != nil {
+		klog.Infof("There was a problem generating the JSON summary: %v",
+			err)
+	} else {
+		klog.Info(string(json))
+	}
+}
+
 // ParseManifestFromFile parses a Manifest from a filepath.
 func ParseManifestFromFile(filePath string) (Manifest, error) {
 
@@ -1616,6 +1627,8 @@ func MkReadManifestListCmdReal(
 
 // ExecRequests uses the Worker Pool pattern, where MaxConcurrentRequests
 // determines the number of workers to spawn.
+//
+// nolint[funlen]
 func (sc *SyncContext) ExecRequests(
 	populateRequests PopulateRequests,
 	processRequest ProcessRequest) error {
@@ -1639,6 +1652,7 @@ func (sc *SyncContext) ExecRequests(
 				(*mutex).Lock()
 				err = fmt.Errorf("Encountered an error during the" +
 					" promotion step")
+				sc.Logs.Errors = append(sc.Logs.Errors, reqRes.Errors...)
 				(*mutex).Unlock()
 				klog.Errorf(
 					"Request %v: error(s) encountered: %v\n",
