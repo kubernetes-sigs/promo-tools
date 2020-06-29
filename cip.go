@@ -337,7 +337,7 @@ func main() {
 
 	// Check the pull request
 	if *dryRunPtr {
-		err = sc.RunChecks(promotionEdges, []reg.PreCheck{})
+		err = sc.RunChecks([]reg.PreCheck{})
 		if err != nil {
 			klog.Exitln(err)
 		}

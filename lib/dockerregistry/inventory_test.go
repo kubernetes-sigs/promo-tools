@@ -1993,23 +1993,18 @@ func TestCheckOverlappingEdges(t *testing.T) {
 
 type FakeCheckAlwaysSucceed struct{}
 
-func (c *FakeCheckAlwaysSucceed) Run(
-	edges map[reg.PromotionEdge]interface{},
-) error {
+func (c *FakeCheckAlwaysSucceed) Run() error {
 	return nil
 }
 
 type FakeCheckAlwaysFail struct{}
 
-func (c *FakeCheckAlwaysFail) Run(
-	edges map[reg.PromotionEdge]interface{},
-) error {
+func (c *FakeCheckAlwaysFail) Run() error {
 	return fmt.Errorf("there was an error in the pull request check")
 }
 
 func TestRunChecks(t *testing.T) {
 	sc := reg.SyncContext{}
-	edges, _ := reg.ToPromotionEdges([]reg.Manifest{})
 
 	var tests = []struct {
 		name     string
@@ -2042,7 +2037,7 @@ func TestRunChecks(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		got := sc.RunChecks(edges, test.checks)
+		got := sc.RunChecks(test.checks)
 		err := checkEqual(got, test.expected)
 		checkError(t, err,
 			fmt.Sprintf("checkError: test: %v (Error Tracking)\n", test.name))
