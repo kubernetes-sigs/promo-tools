@@ -53,6 +53,10 @@ func main() {
 	threadsPtr := flag.Int(
 		"threads",
 		10, "number of concurrent goroutines to use when talking to GCR")
+	jsonLogSummaryPtr := flag.Bool(
+		"json-log-summary",
+		false,
+		"only log a json summary of important errors")
 	parseOnlyPtr := flag.Bool(
 		"parse-only",
 		false,
@@ -334,6 +338,10 @@ func main() {
 		fmt.Print(snapshot)
 		os.Exit(0)
 	}
+
+	if *jsonLogSummaryPtr {
+		defer sc.LogJSONSummary()
+    }
 
 	// Check the pull request
 	if *dryRunPtr {

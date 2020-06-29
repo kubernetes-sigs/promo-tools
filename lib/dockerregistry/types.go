@@ -45,6 +45,11 @@ type Error struct {
 // is used for both -dry-run and testing.
 type CapturedRequests map[PromotionRequest]int
 
+// CollectedLogs holds all the Errors that are generated as the promoter runs.
+type CollectedLogs struct {
+	Errors Errors
+}
+
 // SyncContext is the main data structure for performing the promotion.
 type SyncContext struct {
 	Threads           int
@@ -57,6 +62,7 @@ type SyncContext struct {
 	Tokens            map[RootRepo]gcloud.Token
 	DigestMediaType   DigestMediaType
 	ParentDigest      ParentDigest
+	Logs              CollectedLogs
 }
 
 // PreCheck represents a check function to run against a pull request that
