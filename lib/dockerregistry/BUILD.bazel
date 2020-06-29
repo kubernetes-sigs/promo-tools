@@ -3,6 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = [
+        "checks.go",
         "grow_manifest.go",
         "inventory.go",
         "set.go",
@@ -19,6 +20,8 @@ go_library(
         "@com_github_google_go_containerregistry//pkg/v1:go_default_library",
         "@com_github_google_go_containerregistry//pkg/v1/google:go_default_library",
         "@com_github_google_go_containerregistry//pkg/v1/types:go_default_library",
+        "@in_gopkg_src_d_go_git_v4//:go_default_library",
+        "@in_gopkg_src_d_go_git_v4//plumbing:go_default_library",
         "@in_gopkg_yaml_v2//:go_default_library",
         "@io_k8s_apimachinery//pkg/util/wait:go_default_library",
         "@io_k8s_klog//:go_default_library",
@@ -29,6 +32,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "checks_test.go",
         "grow_manifest_test.go",
         "inventory_test.go",
     ],
@@ -39,5 +43,6 @@ go_test(
         "//lib/json:go_default_library",
         "//lib/stream:go_default_library",
         "@com_github_google_go_containerregistry//pkg/v1/types:go_default_library",
+        "@org_golang_x_xerrors//:go_default_library",
     ],
 )

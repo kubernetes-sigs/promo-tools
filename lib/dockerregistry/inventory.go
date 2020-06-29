@@ -1967,13 +1967,12 @@ func MKPopulateRequestsForPromotionEdges(
 
 // RunChecks runs defined PreChecks in order to check the promotion.
 func (sc *SyncContext) RunChecks(
-	edges map[PromotionEdge]interface{},
 	preChecks []PreCheck,
 ) error {
 
 	var errors []error
 	for _, preCheck := range preChecks {
-		err := preCheck.Run(edges)
+		err := preCheck.Run()
 		if err != nil {
 			klog.Error(err)
 			errors = append(errors, err)
