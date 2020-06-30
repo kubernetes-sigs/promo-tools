@@ -21,6 +21,7 @@ import (
 
 	cr "github.com/google/go-containerregistry/pkg/v1/types"
 
+	"gopkg.in/src-d/go-git.v4/plumbing"
 	"sigs.k8s.io/k8s-container-image-promoter/lib/stream"
 	"sigs.k8s.io/k8s-container-image-promoter/pkg/gcloud"
 )
@@ -72,6 +73,15 @@ type SyncContext struct {
 // nil otherwise.
 type PreCheck interface {
 	Run() error
+}
+
+// ImageRemovalCheck implements the PreCheck interface and checks against
+// pull requests that attempt to remove any images from the promoter manifests.
+type ImageRemovalCheck struct {
+	GitRepoPath    string
+	MasterSHA      plumbing.Hash
+	PullRequestSHA plumbing.Hash
+	PullEdges      map[PromotionEdge]interface{}
 }
 
 // PromotionEdge represents a promotion "link" of an image repository between 2

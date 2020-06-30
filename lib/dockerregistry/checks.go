@@ -20,20 +20,12 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 
 	gogit "gopkg.in/src-d/go-git.v4"
 	"gopkg.in/src-d/go-git.v4/plumbing"
 )
-
-// ImageRemovalCheck implements the PreCheck interface and checks against
-// pull requests that attempt to remove any images from the promoter manifests.
-type ImageRemovalCheck struct {
-	GitRepoPath    string
-	MasterSHA      plumbing.Hash
-	PullRequestSHA plumbing.Hash
-	PullEdges      map[PromotionEdge]interface{}
-}
 
 func getGitShaFromEnv(envVar string) (plumbing.Hash, error) {
 	potenitalSHA := os.Getenv(envVar)
