@@ -1222,7 +1222,8 @@ func TestReadRegistries(t *testing.T) {
 		sc := reg.SyncContext{
 			RegistryContexts: rcs,
 			Inv:              map[reg.RegistryName]reg.RegInvImage{fakeRegName: nil},
-			DigestMediaType:  make(reg.DigestMediaType)}
+			DigestMediaType:  make(reg.DigestMediaType),
+			DigestImageSize:  make(reg.DigestImageSize)}
 		// test is used to pin the "test" variable from the outer "range"
 		// scope (see scopelint).
 		test := test
@@ -1308,7 +1309,8 @@ func TestReadGManifestLists(t *testing.T) {
 						"sha256:0000000000000000000000000000000000000000000000000000000000000000": {"1.0"}}}},
 			DigestMediaType: reg.DigestMediaType{
 				"sha256:0000000000000000000000000000000000000000000000000000000000000000": cr.DockerManifestList},
-			ParentDigest: make(reg.ParentDigest)}
+			DigestImageSize: make(reg.DigestImageSize),
+			ParentDigest:    make(reg.ParentDigest)}
 		// test is used to pin the "test" variable from the outer "range"
 		// scope (see scopelint).
 		test := test

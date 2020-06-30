@@ -20,19 +20,23 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 
 	gogit "gopkg.in/src-d/go-git.v4"
 	"gopkg.in/src-d/go-git.v4/plumbing"
 )
 
-// ImageRemovalCheck implements the PreCheck interface and checks against
-// pull requests that attempt to remove any images from the promoter manifests.
-type ImageRemovalCheck struct {
-	GitRepoPath    string
-	MasterSHA      plumbing.Hash
-	PullRequestSHA plumbing.Hash
-	PullEdges      map[PromotionEdge]interface{}
+// MBToBytes converts a value from MiB to Bytes.
+func MBToBytes(value int) int {
+	const mbToBytesShift = 20
+	return value << mbToBytesShift
+}
+
+// BytesToMB converts a value from Bytes to MiB.
+func BytesToMB(value int) int {
+	const bytesToMBShift = 20
+	return value >> bytesToMBShift
 }
 
 func getGitShaFromEnv(envVar string) (plumbing.Hash, error) {
@@ -162,5 +166,82 @@ func (check *ImageRemovalCheck) Compare(
 		return fmt.Errorf("The following images were removed in this pull "+
 			"request: %v", strings.Join(removedImages, ", "))
 	}
+	return nil
+}
+
+// Error is a function of ImageSizeError and implements the error interface.
+func (err ImageSizeError) Error() string {
+	errStr := ""
+	if len(err.OversizedImages) > 0 {
+		errStr += fmt.Sprintf("The following images were over the max file "+
+			"size of %dMiB:\n%v\n", err.MaxImageSize,
+			err.joinImageSizesToString(err.OversizedImages))
+	}
+	if len(err.InvalidImages) > 0 {
+		errStr += fmt.Sprintf("The following images had an invalid file size "+
+			"of 0 bytes or less:\n%v\n",
+			err.joinImageSizesToString(err.InvalidImages))
+	}
+	return errStr
+}
+
+func (err ImageSizeError) joinImageSizesToString(
+	imageSizes map[string]int,
+) string {
+	imageSizesStr := ""
+	imageNames := make([]string, 0)
+	for k := range imageSizes {
+		imageNames = append(imageNames, k)
+	}
+	sort.Strings(imageNames)
+	for i, imageName := range imageNames {
+		imageSizesStr += imageName + " (" +
+			fmt.Sprint(BytesToMB(imageSizes[imageName])) + " MiB)"
+		if i < len(imageNames)-1 {
+			imageSizesStr += "\n"
+		}
+	}
+	return imageSizesStr
+}
+
+// MKRealImageSizeCheck returns an instance of ImageSizeCheck which
+// checks that all images to be promoted are under a max size.
+func MKRealImageSizeCheck(
+	maxImageSize int,
+	edges map[PromotionEdge]interface{},
+	digestImageSize DigestImageSize,
+) *ImageSizeCheck {
+	return &ImageSizeCheck{
+		maxImageSize,
+		digestImageSize,
+		edges,
+	}
+}
+
+// Run is a function of ImageSizeCheck and checks that all
+// images to be promoted are under the max file size.
+func (check *ImageSizeCheck) Run() error {
+	maxImageSizeByte := MBToBytes(check.MaxImageSize)
+	oversizedImages := make(map[string]int)
+	invalidImages := make(map[string]int)
+	for edge := range check.PullEdges {
+		imageSize := check.DigestImageSize[edge.Digest]
+		imageName := string(edge.DstImageTag.ImageName)
+		if imageSize > maxImageSizeByte {
+			oversizedImages[imageName] = imageSize
+		}
+		if imageSize <= 0 {
+			invalidImages[imageName] = imageSize
+		}
+	}
+
+	if len(oversizedImages) > 0 || len(invalidImages) > 0 {
+		return ImageSizeError{
+			check.MaxImageSize,
+			oversizedImages,
+			invalidImages,
+		}
+	}
+
 	return nil
 }

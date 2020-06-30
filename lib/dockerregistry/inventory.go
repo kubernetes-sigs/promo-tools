@@ -68,6 +68,7 @@ func MakeSyncContext(
 		Tokens:            make(map[RootRepo]gcloud.Token),
 		RegistryContexts:  make([]RegistryContext, 0),
 		DigestMediaType:   make(DigestMediaType),
+		DigestImageSize:   make(DigestImageSize),
 		ParentDigest:      make(ParentDigest)}
 
 	registriesSeen := make(map[RegistryContext]interface{})
@@ -1287,6 +1288,9 @@ func (sc *SyncContext) ReadRegistries(
 					fmt.Printf("digest %s: %s\n", digest, err)
 				}
 				sc.DigestMediaType[Digest(digest)] = mediaType
+
+				// Store ImageSize
+				sc.DigestImageSize[Digest(digest)] = int(mfestInfo.Size)
 				mutex.Unlock()
 			}
 
