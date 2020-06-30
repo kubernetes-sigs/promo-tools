@@ -42,6 +42,14 @@ type Error struct {
 	Error   error
 }
 
+// ImageSizeError contains ImageSizeCheck information on images that are either
+// over the promoter's max image size or have an invalid size of 0 or less.
+type ImageSizeError struct {
+	MaxImageSize    int
+	OversizedImages map[string]int
+	InvalidImages   map[string]int
+}
+
 // CapturedRequests holds a map of all PromotionRequests that were generated. It
 // is used for both -dry-run and testing.
 type CapturedRequests map[PromotionRequest]int
@@ -62,6 +70,7 @@ type SyncContext struct {
 	SrcRegistry       *RegistryContext
 	Tokens            map[RootRepo]gcloud.Token
 	DigestMediaType   DigestMediaType
+	DigestImageSize   DigestImageSize
 	ParentDigest      ParentDigest
 	Logs              CollectedLogs
 }
@@ -73,6 +82,15 @@ type SyncContext struct {
 // nil otherwise.
 type PreCheck interface {
 	Run() error
+}
+
+// ImageSizeCheck implements the PreCheck interface and checks against
+// images that are larger than a size threshold (controlled by the
+// max-image-size flag).
+type ImageSizeCheck struct {
+	MaxImageSize    int
+	DigestImageSize DigestImageSize
+	PullEdges       map[PromotionEdge]interface{}
 }
 
 // ImageRemovalCheck implements the PreCheck interface and checks against
@@ -317,6 +335,9 @@ type ImageName string
 
 // DigestMediaType holds media information about a Digest.
 type DigestMediaType map[Digest]cr.MediaType
+
+// DigestImageSize holds information about the size of an image in bytes.
+type DigestImageSize map[Digest]int
 
 // ParentDigest holds a map of the digests of children to parent digests. It is
 // a reverse mapping of ManifestLists, which point to all the child manifests.

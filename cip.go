@@ -127,6 +127,13 @@ func main() {
 		"audit-gcp-project-id",
 		os.Getenv("CIP_AUDIT_GCP_PROJECT_ID"),
 		"GCP project ID (name); used for labeling error reporting logs to GCP")
+	maxImageSizePtr := flag.Int(
+		"max-image-size",
+		2048,
+		"The maximum image size (MiB) allowed for promotion and must be a positive value (othwerise set to the default value of 2048 MiB)")
+	if *maxImageSizePtr <= 0 {
+		*maxImageSizePtr = 2048
+	}
 	flag.Parse()
 
 	if len(os.Args) == 1 {
@@ -341,7 +348,7 @@ func main() {
 
 	if *jsonLogSummaryPtr {
 		defer sc.LogJSONSummary()
-    }
+	}
 
 	// Check the pull request
 	if *dryRunPtr {

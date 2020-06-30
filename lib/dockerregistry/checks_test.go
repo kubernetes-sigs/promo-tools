@@ -168,3 +168,152 @@ func TestImageRemovalCheck(t *testing.T) {
 			fmt.Sprintf("checkError: test: %v imageRemovalCheck\n", test.name))
 	}
 }
+
+func TestImageSizeCheck(t *testing.T) {
+	srcRegName := reg.RegistryName("gcr.io/foo")
+	destRegName := reg.RegistryName("gcr.io/bar")
+	destRC := reg.RegistryContext{
+		Name:           destRegName,
+		ServiceAccount: "robot",
+	}
+	srcRC := reg.RegistryContext{
+		Name:           srcRegName,
+		ServiceAccount: "robot",
+		Src:            true,
+	}
+	registries := []reg.RegistryContext{destRC, srcRC}
+
+	image1 := reg.Image{
+		ImageName: "foo",
+		Dmap: reg.DigestTags{
+			"sha256:000": {"0.9"}}}
+	image2 := reg.Image{
+		ImageName: "bar",
+		Dmap: reg.DigestTags{
+			"sha256:111": {"0.9"}}}
+
+	var tests = []struct {
+		name       string
+		check      reg.ImageSizeCheck
+		manifests  []reg.Manifest
+		imageSizes map[reg.Digest]int
+		expected   error
+	}{
+		{
+			"Image size under the max size",
+			reg.ImageSizeCheck{
+				MaxImageSize:    1,
+				DigestImageSize: make(reg.DigestImageSize),
+			},
+			[]reg.Manifest{
+				{
+					Registries: registries,
+					Images: []reg.Image{
+						image1,
+					},
+					SrcRegistry: &srcRC},
+			},
+			map[reg.Digest]int{
+				"sha256:000": reg.MBToBytes(1),
+			},
+			nil,
+		},
+		{
+			"Image size over the max size",
+			reg.ImageSizeCheck{
+				MaxImageSize:    1,
+				DigestImageSize: make(reg.DigestImageSize),
+			},
+			[]reg.Manifest{
+				{
+					Registries: registries,
+					Images: []reg.Image{
+						image1,
+					},
+					SrcRegistry: &srcRC},
+			},
+			map[reg.Digest]int{
+				"sha256:000": reg.MBToBytes(5),
+			},
+			reg.ImageSizeError{
+				1,
+				map[string]int{
+					"foo": reg.MBToBytes(5),
+				},
+				map[string]int{},
+			},
+		},
+		{
+			"Multiple images over the max size",
+			reg.ImageSizeCheck{
+				MaxImageSize:    1,
+				DigestImageSize: make(reg.DigestImageSize),
+			},
+			[]reg.Manifest{
+				{
+					Registries: registries,
+					Images: []reg.Image{
+						image1,
+						image2,
+					},
+					SrcRegistry: &srcRC},
+			},
+			map[reg.Digest]int{
+				"sha256:000": reg.MBToBytes(5),
+				"sha256:111": reg.MBToBytes(10),
+			},
+			reg.ImageSizeError{
+				1,
+				map[string]int{
+					"foo": reg.MBToBytes(5),
+					"bar": reg.MBToBytes(10),
+				},
+				map[string]int{},
+			},
+		},
+		{
+			"Image sizes are <= 0",
+			reg.ImageSizeCheck{
+				MaxImageSize:    1,
+				DigestImageSize: make(reg.DigestImageSize),
+			},
+			[]reg.Manifest{
+				{
+					Registries: registries,
+					Images: []reg.Image{
+						image1,
+						image2,
+					},
+					SrcRegistry: &srcRC},
+			},
+			map[reg.Digest]int{
+				"sha256:000": 0,
+				"sha256:111": reg.MBToBytes(-5),
+			},
+			reg.ImageSizeError{
+				1,
+				map[string]int{},
+				map[string]int{
+					"foo": 0,
+					"bar": reg.MBToBytes(-5),
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		test.check.PullEdges, _ = reg.ToPromotionEdges(test.manifests)
+		err := checkEqual(len(test.check.PullEdges), len(test.imageSizes))
+		checkError(t, err,
+			fmt.Sprintf("checkError: test: %v Number of image sizes should be "+
+				"equal to the number of edges (ImageSizeCheck)\n", test.name))
+		for edge := range test.check.PullEdges {
+			test.check.DigestImageSize[edge.Digest] =
+				test.imageSizes[edge.Digest]
+		}
+		got := test.check.Run()
+		err = checkEqual(got, test.expected)
+		checkError(t, err,
+			fmt.Sprintf("checkError: test: %v (ImageSizeCheck)\n", test.name))
+	}
+}
