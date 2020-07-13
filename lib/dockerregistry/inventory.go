@@ -1258,7 +1258,6 @@ func (sc *SyncContext) ReadRegistries(
 						Context: "getRegistryTagsWrapper",
 						Error:   err}}
 				requestResults <- reqRes
-				wg.Add(-1)
 
 				// Invalidate promotion conservatively for the subset of images
 				// that touch this network request. If we have trouble reading
@@ -1318,9 +1317,6 @@ func (sc *SyncContext) ReadRegistries(
 				mutex.Unlock()
 			}
 
-			reqRes.Errors = Errors{}
-			requestResults <- reqRes
-
 			// Process child repos.
 			if recurse {
 				for _, childRepoName := range tagsStruct.Children {
@@ -1353,7 +1349,8 @@ func (sc *SyncContext) ReadRegistries(
 			}
 			// When we're done processing this node (req), decrement the
 			// semaphore.
-			wg.Add(-1)
+			reqRes.Errors = Errors{}
+			requestResults <- reqRes
 		}
 	}
 	sc.ExecRequests(populateRequests, processRequest)
@@ -1433,8 +1430,6 @@ func (sc *SyncContext) ReadGCRManifestLists(
 						Context: "getGCRManifestListWrapper",
 						Error:   err}}
 				requestResults <- reqRes
-				wg.Add(-1)
-
 				continue
 			}
 
@@ -1448,8 +1443,6 @@ func (sc *SyncContext) ReadGCRManifestLists(
 
 			reqRes.Errors = Errors{}
 			requestResults <- reqRes
-
-			wg.Add(-1)
 		}
 	}
 	sc.ExecRequests(populateRequests, processRequest)
@@ -1665,6 +1658,7 @@ func (sc *SyncContext) ExecRequests(
 			} else {
 				klog.Infof("Request %v: OK\n", reqRes.Context.RequestParams)
 			}
+			wg.Add(-1)
 		}
 	}()
 	for w := 0; w < MaxConcurrentRequests; w++ {
@@ -2211,7 +2205,6 @@ func (sc *SyncContext) Promote(
 
 			reqRes.Errors = errors
 			requestResults <- reqRes
-			wg.Add(-1)
 		}
 	}
 
@@ -2383,7 +2376,6 @@ func (sc *SyncContext) GarbageCollect(
 			}
 			reqRes.Errors = errors
 			requestResults <- reqRes
-			wg.Add(-1)
 		}
 	}
 
@@ -2503,18 +2495,11 @@ func (sc *SyncContext) ClearRepository(
 		for req := range reqs {
 			reqRes := RequestResult{Context: req}
 			jsons, errors := getJSONSFromProcess(req)
-			if len(errors) > 0 {
-				reqRes.Errors = errors
-				requestResults <- reqRes
-				// Don't skip over this request, because stderr here is ignorable.
-				// continue
-			}
 			for _, json := range jsons {
 				klog.Info("DELETED image:", json)
 			}
 			reqRes.Errors = errors
 			requestResults <- reqRes
-			wg.Add(-1)
 		}
 	}
 

@@ -2564,7 +2564,6 @@ func TestExecRequests(t *testing.T) {
 		for req := range reqs {
 			reqRes := reg.RequestResult{Context: req}
 			requestResults <- reqRes
-			wg.Add(-1)
 		}
 	}
 
@@ -2582,7 +2581,6 @@ func TestExecRequests(t *testing.T) {
 				Error:   fmt.Errorf("This request results in an error")})
 			reqRes.Errors = errors
 			requestResults <- reqRes
-			wg.Add(-1)
 		}
 	}
 
