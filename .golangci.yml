@@ -55,11 +55,15 @@ linters-settings:
 linters:
   enable-all: true
   disable:
+  - exhaustive
+  - exportloopref
   - gochecknoglobals
   - godox
   - goerr113
+  - gofumpt
   - gosec
   - nolintlint
+  - sqlclosecheck
   - stylecheck
   - whitespace
   - wsl
