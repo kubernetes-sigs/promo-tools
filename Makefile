@@ -10,12 +10,14 @@ build:
 install:
 	bazel run //:install-cip -c opt -- $(shell go env GOPATH)/bin
 	bazel run //:install-cip-mm -c opt -- $(shell go env GOPATH)/bin
+	bazel run //cmd/promobot-files:install -c opt -- $(shell go env GOPATH)/bin
 image:
-	bazel build //:cip-docker-loadable.tar
+	bazel build //:cip-docker-loadable.tar //cmd/promobot-files:image-bundle.tar
 image-load: image
 	docker load -i bazel-bin/cip-docker-loadable.tar
+	docker load -i bazel-bin/cmd/promobot-files/image-bundle.tar
 image-push: image
-	bazel run :push-cip
+	bazel run :push-cip //cmd/promobot-files:push-image-bundle
 image-load-cip-auditor-e2e:
 	bazel build //test-e2e/cip-auditor:cip-docker-loadable-auditor-test.tar
 	docker load -i bazel-bin/test-e2e/cip-auditor/cip-docker-loadable-auditor-test.tar
