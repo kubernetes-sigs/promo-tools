@@ -2137,10 +2137,6 @@ func (sc *SyncContext) Promote(
 			// overwriting), do not bother shelling out to gcloud. Instead just
 			// use the gcrane.doCopy() method directly.
 
-			var err error
-			var stdoutReader io.Reader
-			var stderrReader io.Reader
-
 			rpr := req.RequestParams.(PromotionRequest)
 			switch rpr.TagOp {
 			case Add:
@@ -2172,35 +2168,7 @@ func (sc *SyncContext) Promote(
 			case Move:
 				klog.Infof("tag moves are no longer supported")
 			case Delete:
-				stdoutReader, stderrReader, err = req.StreamProducer.Produce()
-				if err != nil {
-					errors = append(errors, Error{
-						Context: "running process",
-						Error:   err})
-				}
-				b, err := ioutil.ReadAll(stdoutReader)
-				if err != nil {
-					errors = append(errors, Error{
-						Context: "reading process stdout",
-						Error:   err})
-				}
-				be, err := ioutil.ReadAll(stderrReader)
-				if err != nil {
-					errors = append(errors, Error{
-						Context: "reading process stderr",
-						Error:   err})
-				}
-				// The add-tag has stderr; it uses stderr for debug messages, so
-				// don't count it as an error. Instead just print it out as extra
-				// info.
-				klog.Infof("process stdout:\n%v\n", string(b))
-				klog.Infof("process stderr:\n%v\n", string(be))
-				err = req.StreamProducer.Close()
-				if err != nil {
-					errors = append(errors, Error{
-						Context: "closing process",
-						Error:   err})
-				}
+				klog.Infof("deletions are no longer supported")
 			}
 
 			reqRes.Errors = errors
