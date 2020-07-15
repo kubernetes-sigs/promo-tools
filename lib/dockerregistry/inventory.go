@@ -2092,7 +2092,7 @@ func getRegistriesToRead(
 	return rcsFinal
 }
 
-// Promote perferms container image promotion by realizing the intent in the
+// Promote performs container image promotion by realizing the intent in the
 // Manifest.
 //
 // nolint[gocyclo]
