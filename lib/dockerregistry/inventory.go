@@ -2092,7 +2092,7 @@ func getRegistriesToRead(
 	return rcsFinal
 }
 
-// Promote perferms container image promotion by realizing the intent in the
+// Promote performs container image promotion by realizing the intent in the
 // Manifest.
 //
 // nolint[gocyclo]
@@ -2256,12 +2256,12 @@ func (pr *PromotionRequest) PrettyValue() string {
 }
 
 // MkRequestCapturer returns a function that simply records requests as they are
-// captured (slured out from the reqs channel).
+// captured (slurped out from the reqs channel).
 func MkRequestCapturer(captured *CapturedRequests) ProcessRequest {
 	return func(
 		sc *SyncContext,
 		reqs chan stream.ExternalRequest,
-		errs chan<- RequestResult,
+		requestResults chan<- RequestResult,
 		wg *sync.WaitGroup,
 		mutex *sync.Mutex) {
 
@@ -2270,7 +2270,10 @@ func MkRequestCapturer(captured *CapturedRequests) ProcessRequest {
 			mutex.Lock()
 			(*captured)[pr]++
 			mutex.Unlock()
-			wg.Add(-1)
+			// Add a request result to signal the processing of this "request".
+			// This is necessary because ExecRequests() is the sole function in
+			// the codebase that decrements the WaitGroup semaphore.
+			requestResults <- RequestResult{}
 		}
 	}
 }

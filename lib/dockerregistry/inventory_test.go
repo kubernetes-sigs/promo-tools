@@ -2719,7 +2719,7 @@ func TestGarbageCollection(t *testing.T) {
 	var processRequestFake reg.ProcessRequest = func(
 		sc *reg.SyncContext,
 		reqs chan stream.ExternalRequest,
-		errs chan<- reg.RequestResult,
+		requestResults chan<- reg.RequestResult,
 		wg *sync.WaitGroup,
 		mutex *sync.Mutex) {
 
@@ -2728,7 +2728,7 @@ func TestGarbageCollection(t *testing.T) {
 			mutex.Lock()
 			captured[pr]++
 			mutex.Unlock()
-			wg.Add(-1)
+			requestResults <- reg.RequestResult{}
 		}
 	}
 
@@ -2855,7 +2855,7 @@ func TestGarbageCollectionMulti(t *testing.T) {
 	var processRequestFake reg.ProcessRequest = func(
 		sc *reg.SyncContext,
 		reqs chan stream.ExternalRequest,
-		errs chan<- reg.RequestResult,
+		requestResults chan<- reg.RequestResult,
 		wg *sync.WaitGroup,
 		mutex *sync.Mutex) {
 
@@ -2864,7 +2864,7 @@ func TestGarbageCollectionMulti(t *testing.T) {
 			mutex.Lock()
 			captured[pr]++
 			mutex.Unlock()
-			wg.Add(-1)
+			requestResults <- reg.RequestResult{}
 		}
 	}
 
