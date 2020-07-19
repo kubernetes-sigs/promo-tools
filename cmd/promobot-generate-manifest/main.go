@@ -43,6 +43,9 @@ func main() {
 func run(ctx context.Context) error {
 	klog.InitFlags(nil)
 
+	var opt cmd.GenerateManifestOptions
+	opt.PopulateDefaults()
+
 	src := ""
 	flag.StringVar(
 		&src,
@@ -50,14 +53,17 @@ func run(ctx context.Context) error {
 		src,
 		"the base directory to copy from")
 
+	flag.StringVar(
+		&opt.Prefix,
+		"prefix",
+		opt.Prefix,
+		"restrict the exported files; only export those starting with the provided prefix")
+
 	flag.Parse()
 
 	if src == "" {
 		return xerrors.New("must specify --src")
 	}
-
-	var opt cmd.GenerateManifestOptions
-	opt.PopulateDefaults()
 
 	s, err := filepath.Abs(src)
 	if err != nil {
