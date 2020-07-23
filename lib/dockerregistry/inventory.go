@@ -1647,8 +1647,8 @@ func (sc *SyncContext) ExecRequests(
 		for reqRes := range requestResults {
 			if len(reqRes.Errors) > 0 {
 				(*mutex).Lock()
-				err = fmt.Errorf("Encountered an error during the" +
-					" promotion step")
+				err = fmt.Errorf("Encountered an error while" +
+					" executing requests")
 				sc.Logs.Errors = append(sc.Logs.Errors, reqRes.Errors...)
 				(*mutex).Unlock()
 				klog.Errorf(

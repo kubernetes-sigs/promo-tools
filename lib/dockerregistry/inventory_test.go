@@ -2597,7 +2597,7 @@ func TestExecRequests(t *testing.T) {
 		{
 			"Error tracking for promotion with errors",
 			processRequestError,
-			fmt.Errorf("Encountered an error during the promotion step"),
+			fmt.Errorf("Encountered an error while executing requests"),
 		},
 	}
 

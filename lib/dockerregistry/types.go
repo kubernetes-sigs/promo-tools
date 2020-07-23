@@ -21,6 +21,7 @@ import (
 
 	cr "github.com/google/go-containerregistry/pkg/v1/types"
 
+	grafeaspb "google.golang.org/genproto/googleapis/grafeas/v1"
 	"gopkg.in/src-d/go-git.v4/plumbing"
 	"sigs.k8s.io/k8s-container-image-promoter/lib/stream"
 	"sigs.k8s.io/k8s-container-image-promoter/pkg/gcloud"
@@ -49,6 +50,20 @@ type ImageSizeError struct {
 	OversizedImages map[string]int
 	InvalidImages   map[string]int
 }
+
+// ImageVulnError contains ImageVulnCheck information on images that contain a
+// vulnerability with a severity level at or above the defined threshold.
+type ImageVulnError struct {
+	ImageName     ImageName
+	Digest        Digest
+	Vulnerability *grafeaspb.VulnerabilityOccurrence
+}
+
+// ImageVulnProducer is used by ImageVulnCheck to get the vulnerabilities for
+// an image and allows for custom vulnerability producers for testing.
+type ImageVulnProducer func(
+	edge PromotionEdge,
+) ([]*grafeaspb.VulnerabilityOccurrence, error)
 
 // CapturedRequests holds a map of all PromotionRequests that were generated. It
 // is used for both -dry-run and testing.
@@ -82,6 +97,15 @@ type SyncContext struct {
 // nil otherwise.
 type PreCheck interface {
 	Run() error
+}
+
+// ImageVulnCheck implements the PreCheck interface and checks against
+// images that have known vulnerabilities.
+type ImageVulnCheck struct {
+	SyncContext       SyncContext
+	PullEdges         map[PromotionEdge]interface{}
+	SeverityThreshold int
+	FakeVulnProducer  ImageVulnProducer
 }
 
 // ImageSizeCheck implements the PreCheck interface and checks against

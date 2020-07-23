@@ -134,6 +134,10 @@ func main() {
 	if *maxImageSizePtr <= 0 {
 		*maxImageSizePtr = 2048
 	}
+	severityThresholdPtr := flag.Int(
+		"vuln-severity-threshold",
+		-1,
+		"Using this flag will cause the promoter to only run the vulnerability check. Found vulnerabilities at or above this threshold will result in the vulnerability check failing [severity levels beteen 0 and 5; 0 - UNSPECIFIED, 1 - MINIMAL, 2 - LOW, 3 - MEDIUM, 4 - HIGH, 5 - CRITICAL]")
 	flag.Parse()
 
 	if len(os.Args) == 1 {
@@ -280,7 +284,9 @@ func main() {
 		// Print version to make Prow logs more self-explanatory.
 		printVersion()
 
-		if *dryRunPtr {
+		if *severityThresholdPtr >= 0 {
+			klog.Info("********** START (VULN CHECK) **********")
+		} else if *dryRunPtr {
 			klog.Info("********** START (DRY RUN) **********")
 		} else {
 			klog.Info("********** START **********")
@@ -383,12 +389,25 @@ func main() {
 	if !ok {
 		klog.Exitln("encountered errors during edge filtering")
 	}
-	err = sc.Promote(promotionEdges, mkProducer, nil)
-	if err != nil {
-		klog.Exitln(err)
+
+	if *severityThresholdPtr >= 0 {
+		err = sc.RunChecks([]reg.PreCheck{
+			reg.MKImageVulnCheck(sc, promotionEdges,
+				*severityThresholdPtr, nil),
+		})
+		if err != nil {
+			klog.Exitln(err)
+		}
+	} else {
+		err = sc.Promote(promotionEdges, mkProducer, nil)
+		if err != nil {
+			klog.Exitln(err)
+		}
 	}
 
-	if *dryRunPtr {
+	if *severityThresholdPtr >= 0 {
+		klog.Info("********** FINISHED (VULN CHECK) **********")
+	} else if *dryRunPtr {
 		klog.Info("********** FINISHED (DRY RUN) **********")
 	} else {
 		klog.Info("********** FINISHED **********")

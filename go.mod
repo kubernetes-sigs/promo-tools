@@ -11,6 +11,7 @@ require (
 	golang.org/x/oauth2 v0.0.0-20191202225959-858c2ad4c8b6
 	golang.org/x/xerrors v0.0.0-20191011141410-1b5146add898
 	google.golang.org/api v0.15.0
+	google.golang.org/genproto v0.0.0-20191230161307-f3c370f40bfb
 	gopkg.in/src-d/go-git.v4 v4.13.1
 	gopkg.in/yaml.v2 v2.2.8
 	k8s.io/apimachinery v0.17.3

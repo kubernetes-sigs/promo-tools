@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"testing"
 
+	grafeaspb "google.golang.org/genproto/googleapis/grafeas/v1"
 	reg "sigs.k8s.io/k8s-container-image-promoter/lib/dockerregistry"
 )
 
@@ -315,5 +316,160 @@ func TestImageSizeCheck(t *testing.T) {
 		err = checkEqual(got, test.expected)
 		checkError(t, err,
 			fmt.Sprintf("checkError: test: %v (ImageSizeCheck)\n", test.name))
+	}
+}
+
+// TestImageVulnCheck uses a fake populateRequests function and a fake
+// vulnerability producer. The fake vulnerability producer simply returns the
+// vulnerability occurrences that have been mapped to a given PromotionEdge in
+// order to simulate running the real check without having to make an api call
+// to the Container Analysis Service.
+func TestImageVulnCheck(t *testing.T) {
+	edge1 := reg.PromotionEdge{
+		SrcImageTag: reg.ImageTag{
+			ImageName: "foo",
+		},
+		Digest: "sha256:000",
+		DstImageTag: reg.ImageTag{
+			ImageName: "foo",
+		},
+	}
+	edge2 := reg.PromotionEdge{
+		SrcImageTag: reg.ImageTag{
+			ImageName: "bar",
+		},
+		Digest: "sha256:111",
+		DstImageTag: reg.ImageTag{
+			ImageName: "bar/1",
+		},
+	}
+	edge3 := reg.PromotionEdge{
+		SrcImageTag: reg.ImageTag{
+			ImageName: "bar",
+		},
+		Digest: "sha256:111",
+		DstImageTag: reg.ImageTag{
+			ImageName: "bar/2",
+		},
+	}
+
+	mkVulnProducerFake := func(
+		edgeVulnerabilities map[reg.Digest][]*grafeaspb.VulnerabilityOccurrence,
+	) reg.ImageVulnProducer {
+		return func(
+			edge reg.PromotionEdge,
+		) ([]*grafeaspb.VulnerabilityOccurrence, error) {
+			return edgeVulnerabilities[edge.Digest], nil
+		}
+	}
+
+	var tests = []struct {
+		name              string
+		severityThreshold int
+		edges             map[reg.PromotionEdge]interface{}
+		vulnerabilities   map[reg.Digest][]*grafeaspb.VulnerabilityOccurrence
+		expected          error
+	}{
+		{
+			"Severity under threshold",
+			int(grafeaspb.Severity_HIGH),
+			map[reg.PromotionEdge]interface{}{
+				edge1: nil,
+				edge2: nil,
+			},
+			map[reg.Digest][]*grafeaspb.VulnerabilityOccurrence{
+				"sha256:000": {
+					{
+						Severity: grafeaspb.Severity_LOW,
+					},
+				},
+				"sha256:111": {
+					{
+						Severity: grafeaspb.Severity_MEDIUM,
+					},
+				},
+			},
+			nil,
+		},
+		{
+			"Severity at threshold",
+			int(grafeaspb.Severity_HIGH),
+			map[reg.PromotionEdge]interface{}{
+				edge1: nil,
+				edge2: nil,
+			},
+			map[reg.Digest][]*grafeaspb.VulnerabilityOccurrence{
+				"sha256:000": {
+					{
+						Severity: grafeaspb.Severity_HIGH,
+					},
+				},
+				"sha256:111": {
+					{
+						Severity: grafeaspb.Severity_HIGH,
+					},
+				},
+			},
+			fmt.Errorf("VulnerabilityCheck: The following vulnerable images were found:\n" +
+				"    bar@sha256:111 [1 severe vulnerabilities, 1 total]\n" +
+				"    foo@sha256:000 [1 severe vulnerabilities, 1 total]"),
+		},
+		{
+			"Severity above threshold",
+			int(grafeaspb.Severity_MEDIUM),
+			map[reg.PromotionEdge]interface{}{
+				edge1: nil,
+				edge2: nil,
+			},
+			map[reg.Digest][]*grafeaspb.VulnerabilityOccurrence{
+				"sha256:000": {
+					{
+						Severity: grafeaspb.Severity_HIGH,
+					},
+				},
+				"sha256:111": {
+					{
+						Severity: grafeaspb.Severity_HIGH,
+					},
+					{
+						Severity: grafeaspb.Severity_CRITICAL,
+					},
+				},
+			},
+			fmt.Errorf("VulnerabilityCheck: The following vulnerable images were found:\n" +
+				"    bar@sha256:111 [2 severe vulnerabilities, 2 total]\n" +
+				"    foo@sha256:000 [1 severe vulnerabilities, 1 total]"),
+		},
+		{
+			"Multiple edges with same source image",
+			int(grafeaspb.Severity_MEDIUM),
+			map[reg.PromotionEdge]interface{}{
+				edge2: nil,
+				edge3: nil,
+			},
+			map[reg.Digest][]*grafeaspb.VulnerabilityOccurrence{
+				"sha256:111": {
+					{
+						Severity: grafeaspb.Severity_HIGH,
+					},
+				},
+			},
+			fmt.Errorf("VulnerabilityCheck: The following vulnerable images were found:\n" +
+				"    bar@sha256:111 [1 severe vulnerabilities, 1 total]"),
+		},
+	}
+
+	for _, test := range tests {
+		sc := reg.SyncContext{}
+		check := reg.MKImageVulnCheck(
+			sc,
+			test.edges,
+			test.severityThreshold,
+			mkVulnProducerFake(test.vulnerabilities),
+		)
+		got := check.Run()
+		err := checkEqual(got, test.expected)
+		checkError(t, err,
+			fmt.Sprintf("checkError: test: %v (ImageVulnCheck)\n", test.name))
 	}
 }
