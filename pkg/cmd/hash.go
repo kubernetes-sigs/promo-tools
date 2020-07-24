@@ -31,6 +31,13 @@ import (
 type GenerateManifestOptions struct {
 	// BaseDir is the directory containing the files to hash
 	BaseDir string
+
+	// Prefix exports only files matching the specified prefix.
+	//
+	// If we were instead to change BaseDir, we would also
+	// restrict the files, but the relative paths would also
+	// change.
+	Prefix string
 }
 
 // PopulateDefaults sets the default values for GenerateManifestOptions.
@@ -59,6 +66,10 @@ func GenerateManifest(ctx context.Context, options GenerateManifestOptions) (*ap
 		}
 		if !strings.HasPrefix(p, basedir) {
 			return xerrors.Errorf("expected path %q to have prefix %q", p, basedir)
+		}
+
+		if !strings.HasPrefix(p, filepath.Join(basedir, options.Prefix)) {
+			return nil
 		}
 
 		if !info.IsDir() {
