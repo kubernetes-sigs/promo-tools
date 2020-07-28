@@ -34,11 +34,14 @@ func (sc *SyncContext) RunChecks(
 
 #### Integration With PROW
 The Container Image Promoter has several Prow jobs that run whenever a pull 
-request attempts to modify the promoter manifests. Currently, only the 
+request attempts to modify the promoter manifests. The 
 [*pull-k8s-cip*](https://github.com/kubernetes/test-infra/blob/master/config/jobs/kubernetes/sig-release/cip/container-image-promoter.yaml) 
-Prow job calls the `RunChecks` function and actually runs each check. But new 
-Prow jobs can be [added](https://github.com/kubernetes/test-infra/blob/master/config/jobs/README.md#adding-or-updating-jobs) 
-to run an individual check in the future if that check is large enough. 
+and the 
+[*pull-k8s-cip-vuln*](https://github.com/kubernetes/test-infra/blob/master/config/jobs/kubernetes/sig-release/cip/container-image-promoter.yaml) 
+Prow jobs call the `RunChecks` function and actually run their respective checks. 
+New Prow jobs can be [added](https://github.com/kubernetes/test-infra/blob/master/config/jobs/README.md#adding-or-updating-jobs) 
+to run an individual check in the future if that check requires it's own separate 
+job for some reason. 
 
 ### How To Add A Check
 In order to add a check, all you need to do is create a check type that 
@@ -100,11 +103,34 @@ general, it is bad practice to use unnecessarily large images. The
 defined maximum image size. The api calls that get image information from GCR 
 also give information on the image size in bytes. These image sizes are 
 recorded and then checked to make sure they are under the maximum size 
-defined by the *--max-image-size* in MiB. 
-	
-## Checks To Be Implemented
+defined by the *-max-image-size* in MiB. 
+
 ### ImageVulnerabilityCheck
 Since promoted images are pushed to production and production images are 
 effectively treated like the gold standard, it's important that we check 
 all images for any vulnerabilities they might already have before promoting 
-them.
+them. A vulnerability check also serves as a method for surfacing all 
+vulnerabilities regardless if they have a fix to the user. To emphasize this 
+point, the vulnerability check has been implemented in it's own separate Prow 
+job 
+[*pull-k8s-cip-vuln*](https://github.com/kubernetes/test-infra/blob/master/config/jobs/kubernetes/sig-release/cip/container-image-promoter.yaml)
+so that the check's logs (which will detail all the vulnerabilities that exist 
+in the new images to be promoted) won't get mixed in with the logs from the 
+promoter's other checks. 
+
+The vulnerability check makes use of the Container Analysis API in order to 
+1. scan all new staging images for vulnerabilities whenever they are added to 
+an image staging project 
+2. get vulnerability information when we are 
+checking a the images to be promoted from a PR
+
+To make use of this API, key pieces of infrastructure must be put in place, 
+such as enabling the Container Analysis API on all image staging projects 
+and authenticating the Prow job (pull-k8s-cip-vuln) with a Google service 
+account that is authorized to access the vulnerability data for each 
+staging project.
+
+The vulnerability check will reject a pull request if it finds any 
+vulnerabilities that are both beyond the severity threshold (defined by the 
+*-vuln-severity-threshold*) and have a known fix; otherwise the check will 
+accept the PR.
