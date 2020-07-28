@@ -334,7 +334,10 @@ func (check *ImageVulnCheck) Run() error {
 
 			severeOccurrences := 0
 			for _, occ := range occurrences {
-				if IsSevereOccurrence(occ, check.SeverityThreshold) {
+				// The vulnerability check should only reject a PR if it finds
+				// vulnerabilities that are both fixable and severe
+				if occ.GetFixAvailable() &&
+					IsSevereOccurrence(occ, check.SeverityThreshold) {
 					errors = append(errors, Error{
 						Context: "vulnerabilities severity check",
 						Error: ImageVulnError{

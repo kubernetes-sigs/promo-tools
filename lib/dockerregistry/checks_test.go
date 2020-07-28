@@ -380,12 +380,14 @@ func TestImageVulnCheck(t *testing.T) {
 			map[reg.Digest][]*grafeaspb.VulnerabilityOccurrence{
 				"sha256:000": {
 					{
-						Severity: grafeaspb.Severity_LOW,
+						Severity:     grafeaspb.Severity_LOW,
+						FixAvailable: true,
 					},
 				},
 				"sha256:111": {
 					{
-						Severity: grafeaspb.Severity_MEDIUM,
+						Severity:     grafeaspb.Severity_MEDIUM,
+						FixAvailable: true,
 					},
 				},
 			},
@@ -401,12 +403,14 @@ func TestImageVulnCheck(t *testing.T) {
 			map[reg.Digest][]*grafeaspb.VulnerabilityOccurrence{
 				"sha256:000": {
 					{
-						Severity: grafeaspb.Severity_HIGH,
+						Severity:     grafeaspb.Severity_HIGH,
+						FixAvailable: true,
 					},
 				},
 				"sha256:111": {
 					{
-						Severity: grafeaspb.Severity_HIGH,
+						Severity:     grafeaspb.Severity_HIGH,
+						FixAvailable: true,
 					},
 				},
 			},
@@ -424,15 +428,18 @@ func TestImageVulnCheck(t *testing.T) {
 			map[reg.Digest][]*grafeaspb.VulnerabilityOccurrence{
 				"sha256:000": {
 					{
-						Severity: grafeaspb.Severity_HIGH,
+						Severity:     grafeaspb.Severity_HIGH,
+						FixAvailable: true,
 					},
 				},
 				"sha256:111": {
 					{
-						Severity: grafeaspb.Severity_HIGH,
+						Severity:     grafeaspb.Severity_HIGH,
+						FixAvailable: true,
 					},
 					{
-						Severity: grafeaspb.Severity_CRITICAL,
+						Severity:     grafeaspb.Severity_CRITICAL,
+						FixAvailable: true,
 					},
 				},
 			},
@@ -450,12 +457,33 @@ func TestImageVulnCheck(t *testing.T) {
 			map[reg.Digest][]*grafeaspb.VulnerabilityOccurrence{
 				"sha256:111": {
 					{
-						Severity: grafeaspb.Severity_HIGH,
+						Severity:     grafeaspb.Severity_HIGH,
+						FixAvailable: true,
 					},
 				},
 			},
 			fmt.Errorf("VulnerabilityCheck: The following vulnerable images were found:\n" +
 				"    bar@sha256:111 [1 severe vulnerabilities, 1 total]"),
+		},
+		{
+			"Multiple vulnerabilities with no fix",
+			int(grafeaspb.Severity_MEDIUM),
+			map[reg.PromotionEdge]interface{}{
+				edge1: nil,
+			},
+			map[reg.Digest][]*grafeaspb.VulnerabilityOccurrence{
+				"sha256:000": {
+					{
+						Severity:     grafeaspb.Severity_HIGH,
+						FixAvailable: false,
+					},
+					{
+						Severity:     grafeaspb.Severity_CRITICAL,
+						FixAvailable: false,
+					},
+				},
+			},
+			nil,
 		},
 	}
 
