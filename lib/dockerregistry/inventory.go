@@ -1915,7 +1915,6 @@ func MKPopulateRequestsForPromotionEdges(
 
 		for promoteMe := range toPromote {
 			var req stream.ExternalRequest
-			tp := Add
 			oldDigest := Digest("")
 
 			_, dp := promoteMe.VertexProps(sc.Inv)
@@ -1928,24 +1927,16 @@ func MKPopulateRequestsForPromotionEdges(
 				}
 			}
 
-			// Do not invoke mkProducer for Add or Move operations.
-			if tp == Delete {
-				req.StreamProducer = mkProducer(
-					// TODO: Clean up types to avoid having to split up promoteMe
-					// prematurely like this.
-					promoteMe.SrcRegistry.Name,
-					promoteMe.SrcImageTag.ImageName,
-					promoteMe.DstRegistry,
-					promoteMe.DstImageTag.ImageName,
-					promoteMe.Digest,
-					promoteMe.DstImageTag.Tag,
-					tp)
-			}
-
 			// Save some information about this request. It's a bit like
 			// HTTP "headers".
 			req.RequestParams = PromotionRequest{
-				tp,
+				// Only support adding new tags during a promotion run. Tag
+				// moves and deletions are not supported.
+				//
+				// Although disallowing tag moves sounds a bit draconian, it
+				// does make protect production from a malformed set of promoter
+				// manifests with incorrect tag information.
+				Add,
 				// TODO: Clean up types to avoid having to split up promoteMe
 				// prematurely like this.
 				promoteMe.SrcRegistry.Name,
