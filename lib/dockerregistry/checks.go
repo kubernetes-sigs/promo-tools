@@ -27,6 +27,8 @@ import (
 	"strings"
 	"sync"
 
+	"k8s.io/klog"
+
 	containeranalysis "cloud.google.com/go/containeranalysis/apiv1"
 	"google.golang.org/api/iterator"
 	grafeaspb "google.golang.org/genproto/googleapis/grafeas/v1"
@@ -332,29 +334,36 @@ func (check *ImageVulnCheck) Run() error {
 					Error:   err})
 			}
 
-			severeOccurrences := 0
+			fixableSevereOccurrences := 0
 			for _, occ := range occurrences {
+				vuln := occ.GetVulnerability()
+				vulnErr := ImageVulnError{
+					edge.SrcImageTag.ImageName,
+					edge.Digest,
+					occ.GetName(),
+					vuln,
+				}
 				// The vulnerability check should only reject a PR if it finds
 				// vulnerabilities that are both fixable and severe
-				if occ.GetFixAvailable() &&
-					IsSevereOccurrence(occ, check.SeverityThreshold) {
+				if vuln.GetFixAvailable() &&
+					IsSevereOccurrence(vuln, check.SeverityThreshold) {
 					errors = append(errors, Error{
-						Context: "vulnerabilities severity check",
-						Error: ImageVulnError{
-							edge.SrcImageTag.ImageName,
-							edge.Digest,
-							occ,
-						},
+						Context: "Vulnerability Occurrence w/ Fix Available",
+						Error:   vulnErr,
 					})
-					severeOccurrences++
+					fixableSevereOccurrences++
+				} else {
+					klog.Error(vulnErr)
 				}
 			}
-			if severeOccurrences > 0 {
+
+			if fixableSevereOccurrences > 0 {
 				vulnerableImages = append(vulnerableImages,
-					fmt.Sprintf("%v@%v [%v severe vulnerabilities, %v total]",
+					fmt.Sprintf("%v@%v [%v fixable severe vulnerabilities, "+
+						"%v total]",
 						edge.SrcImageTag.ImageName,
 						edge.Digest,
-						severeOccurrences,
+						fixableSevereOccurrences,
 						len(occurrences)))
 			}
 
@@ -378,10 +387,8 @@ func (check *ImageVulnCheck) Run() error {
 
 // Error is a function of ImageSizeError and implements the error interface.
 func (err ImageVulnError) Error() string {
-	vulnJSON, _ := json.MarshalIndent(err.Vulnerability, "", "  ")
-	return fmt.Sprintf("The image %v@%v contains the following "+
-		"vulnerability:\n%v",
-		err.ImageName, err.Digest, string(vulnJSON))
+	vulnJSON, _ := json.MarshalIndent(err, "", "  ")
+	return string(vulnJSON)
 }
 
 // IsSevereOccurrence checks if a vulnerability is a high enough severity to
@@ -413,7 +420,7 @@ func parseImageProjectID(
 func mkRealVulnProducer(client *containeranalysis.Client) ImageVulnProducer {
 	return func(
 		edge PromotionEdge,
-	) ([]*grafeaspb.VulnerabilityOccurrence, error) {
+	) ([]*grafeaspb.Occurrence, error) {
 		// resourceURL is of the form https://gcr.io/[projectID]/my-image
 		resourceURL := "https://" + path.Join(string(edge.SrcRegistry.Name),
 			string(edge.SrcImageTag.ImageName)) + "@" + string(edge.Digest)
@@ -430,7 +437,7 @@ func mkRealVulnProducer(client *containeranalysis.Client) ImageVulnProducer {
 				resourceURL, "VULNERABILITY"),
 		}
 
-		var occurrenceList []*grafeaspb.VulnerabilityOccurrence
+		var occurrenceList []*grafeaspb.Occurrence
 		it := client.GetGrafeasClient().ListOccurrences(ctx, req)
 		for {
 			occ, err := it.Next()
@@ -440,7 +447,7 @@ func mkRealVulnProducer(client *containeranalysis.Client) ImageVulnProducer {
 			if err != nil {
 				return nil, fmt.Errorf("occurrence iteration error: %v", err)
 			}
-			occurrenceList = append(occurrenceList, occ.GetVulnerability())
+			occurrenceList = append(occurrenceList, occ)
 		}
 
 		return occurrenceList, nil
