@@ -302,7 +302,6 @@ func populateGoldenImages(repoRoot, pushRepo string) error {
 		{
 			"bazel",
 			"run",
-			"--host_force_python=PY2",
 			fmt.Sprintf(
 				"--workspace_status_command=%s/workspace_status.sh",
 				repoRoot),
