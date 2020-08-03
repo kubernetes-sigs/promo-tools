@@ -57,12 +57,14 @@ linters:
   disable:
   - exhaustive
   - exportloopref
+  - gci
   - gochecknoglobals
   - godox
   - goerr113
   - gofumpt
   - gosec
   - nolintlint
+  - nlreturn
   - sqlclosecheck
   - stylecheck
   - whitespace
