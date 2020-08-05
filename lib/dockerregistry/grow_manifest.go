@@ -293,6 +293,7 @@ func Union(a, b RegInvImage) RegInvImage {
 		// injection.
 		if a[imageName] == nil {
 			a[imageName] = digestTags
+
 			continue
 		}
 		for digest, tags := range digestTags {
@@ -300,6 +301,7 @@ func Union(a, b RegInvImage) RegInvImage {
 			// and all associated tags.
 			if a[imageName][digest] == nil {
 				a[imageName][digest] = tags
+
 				continue
 			}
 			// If c has the digest already, try to inject those tags in b that
@@ -307,6 +309,7 @@ func Union(a, b RegInvImage) RegInvImage {
 			tagSlice := TagSlice{}
 			for tag := range tags.Union(a[imageName][digest]) {
 				if tag == "latest" {
+
 					continue
 				}
 				tagSlice = append(tagSlice, tag)

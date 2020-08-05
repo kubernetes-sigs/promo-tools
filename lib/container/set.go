@@ -31,6 +31,7 @@ func (a Set) Minus(b Set) Set {
 	for k := range b {
 		delete(c, k)
 	}
+
 	return c
 }
 
@@ -43,6 +44,7 @@ func (a Set) Union(b Set) Set {
 	for k, v := range b {
 		c[k] = v
 	}
+
 	return c
 }
 
@@ -55,5 +57,6 @@ func (a Set) Intersection(b Set) Set {
 			c[k] = v
 		}
 	}
+
 	return c
 }

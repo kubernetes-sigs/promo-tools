@@ -2666,6 +2666,7 @@ func (payload GCRPubSubPayload) matchImage(
 	for _, tag := range tags {
 		if payload.Tag == tag {
 			m.TagMatch = true
+
 			break
 		}
 	}
