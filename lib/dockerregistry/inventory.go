@@ -1771,8 +1771,9 @@ func (rii *RegInvImage) ToSorted() []ImageWithDigestSlice {
 				tags: tags,
 			})
 		}
+		// sort the digest beased on the first tag which was sorted above
 		sort.Slice(digests, func(i, j int) bool {
-			return digests[i].hash < digests[j].hash
+			return digests[i].tags[0] < digests[j].tags[0]
 		})
 
 		images = append(images, ImageWithDigestSlice{
