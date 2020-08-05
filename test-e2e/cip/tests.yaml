@@ -20,13 +20,13 @@
     after: &golden-images
     - name: foo
       dmap:
-        sha256:a42e27f5d18d51c581efef2584ff9aebbfeffcb3145e81e52b1dccf62915e4a3:
+        sha256:c8106c37d689ab8f92bc2dec760ebe5128579110badb826dd9971f8ccd9ce3c7:
         - 1.0
-        sha256:2af5205553239e0eb17c544bc1e90c2d6173012a191f0a44131aa2f9c44bb511:
+        sha256:bfd18f1f0ca4264b5d7a469b9a5f20d5943416c06b95b8ff15191142455da16d:
         - 1.0-linux_amd64
-        sha256:2740382935148a02bf425a893d14848dd6238e405935440ce5c13b771a33f2fd:
+        sha256:1c229946cd2b51215732070f9b1ddc60eee6f77f55fabd8a533f118c8b800c07:
         - 1.0-linux_s390x
-        sha256:03aec0c717de7850ee3e3165ecdf73cf1abf0bdb5b6cce04695eeb80637360f8: []
+        sha256:1abfda90072d40c5c1a7dd010e4546db94d0317b4d970e3c2e7d8d9f4bf94952: []
   - name: eu.gcr.io/k8s-cip-test-prod/some/subdir
     before: []
     after: *golden-images
@@ -51,7 +51,7 @@
     after: &golden-images-recursive-bar
     - name: bar
       dmap:
-        sha256:408d6837313f95f081d5d02cc2691344c5781d43e98653f4af6cf9c1b8d26166:
+        sha256:610b1ef6fec876146dee2b2846c890b566d26f235d7ea8982056a3e84bd35929:
         - 1.0
   - name: eu.gcr.io/k8s-cip-test-prod/golden-bar
     before: []
@@ -64,13 +64,13 @@
     after: &golden-images-recursive-foo
     - name: foo
       dmap:
-        sha256:a42e27f5d18d51c581efef2584ff9aebbfeffcb3145e81e52b1dccf62915e4a3:
+        sha256:c8106c37d689ab8f92bc2dec760ebe5128579110badb826dd9971f8ccd9ce3c7:
         - 1.0
-        sha256:2af5205553239e0eb17c544bc1e90c2d6173012a191f0a44131aa2f9c44bb511:
+        sha256:bfd18f1f0ca4264b5d7a469b9a5f20d5943416c06b95b8ff15191142455da16d:
         - 1.0-linux_amd64
-        sha256:2740382935148a02bf425a893d14848dd6238e405935440ce5c13b771a33f2fd:
+        sha256:1c229946cd2b51215732070f9b1ddc60eee6f77f55fabd8a533f118c8b800c07:
         - 1.0-linux_s390x
-        sha256:03aec0c717de7850ee3e3165ecdf73cf1abf0bdb5b6cce04695eeb80637360f8: []
+        sha256:1abfda90072d40c5c1a7dd010e4546db94d0317b4d970e3c2e7d8d9f4bf94952: []
   - name: eu.gcr.io/k8s-cip-test-prod/golden-foo
     before: []
     after: *golden-images-recursive-foo
