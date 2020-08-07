@@ -286,6 +286,13 @@ func main() {
 
 		if *severityThresholdPtr >= 0 {
 			klog.Info("********** START (VULN CHECK) **********")
+			klog.Info("DISCLAIMER: Vulnerabilities are found as issues with " +
+				"package binaries within image layers, not necessarily " +
+				"with the image layers themselves. So a \"fixable\" " +
+				"vulnerability may not necessarily be immediately" +
+				"actionable. For example, even though a fixed version " +
+				"of the binary is available, it doesn't necessarily mean " +
+				"that a new version of the image layer is available.")
 		} else if *dryRunPtr {
 			klog.Info("********** START (DRY RUN) **********")
 		} else {

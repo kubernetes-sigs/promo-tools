@@ -54,16 +54,17 @@ type ImageSizeError struct {
 // ImageVulnError contains ImageVulnCheck information on images that contain a
 // vulnerability with a severity level at or above the defined threshold.
 type ImageVulnError struct {
-	ImageName     ImageName
-	Digest        Digest
-	Vulnerability *grafeaspb.VulnerabilityOccurrence
+	ImageName      ImageName
+	Digest         Digest
+	OccurrenceName string
+	Vulnerability  *grafeaspb.VulnerabilityOccurrence
 }
 
 // ImageVulnProducer is used by ImageVulnCheck to get the vulnerabilities for
 // an image and allows for custom vulnerability producers for testing.
 type ImageVulnProducer func(
 	edge PromotionEdge,
-) ([]*grafeaspb.VulnerabilityOccurrence, error)
+) ([]*grafeaspb.Occurrence, error)
 
 // CapturedRequests holds a map of all PromotionRequests that were generated. It
 // is used for both -dry-run and testing.
