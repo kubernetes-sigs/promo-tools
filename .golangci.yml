@@ -63,6 +63,7 @@ linters:
   - goerr113
   - gofumpt
   - gosec
+  - nlreturn
   - nolintlint
   - nlreturn
   - sqlclosecheck
