@@ -52,4 +52,3 @@ docker_push(
     name = "push-image-bundle",
     bundle = "image-bundle",
 )
-
