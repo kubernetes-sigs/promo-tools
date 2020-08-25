@@ -38,6 +38,7 @@ test-mac:
 		//pkg/api/files:go_default_test \
 		//lib/audit:go_default_test \
 		//lib/dockerregistry:go_default_test \
+		//dashboard/adapter:go_default_test \
 		//pkg/cmd:go_default_test
 test-ci: download
 	make build

@@ -1,0 +1,27 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "adapter.go",
+        "types.go",
+    ],
+    importpath = "sigs.k8s.io/k8s-container-image-promoter/dashboard/adapter",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@com_google_cloud_go//containeranalysis/apiv1:go_default_library",
+        "@com_google_cloud_go_storage//:go_default_library",
+        "@go_googleapis//grafeas/v1:grafeas_go_proto",
+        "@org_golang_google_api//iterator:go_default_library",
+        "@org_golang_x_net//html:go_default_library",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["adapter_test.go"],
+    embed = [":go_default_library"],
+    deps = [
+        "@go_googleapis//grafeas/v1:grafeas_go_proto",
+    ],
+)
