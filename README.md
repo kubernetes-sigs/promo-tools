@@ -358,3 +358,21 @@ the VERSION file often as the Docker images will always get a unique identifier.
 [bazel]:https://bazel.build/
 [k8sio-manifests-dir]:https://github.com/kubernetes/k8s.io/tree/master/k8s.gcr.io
 [cip-prow-integration]:https://github.com/kubernetes/k8s.io/blob/master/k8s.gcr.io/Vanity-Domain-Flip.md#prow-integration
+
+## Checks Interface
+Read more [here](https://github.com/kubernetes-sigs/k8s-container-image-promoter/blob/master/checks_interface.md).
+
+The addition of the checks interface to the Container Image Promoter is meant
+to make it easy to add checks against pull requests affecting the promoter
+manifests. The interface allows engineers to add checks without worrying about
+any pre-existing checks and test their own checks individually, while also
+giving freedom as to what conditionals or tags might be necessary for the
+check to occur.
+
+## Vulnerability Dashboard
+Read more [here](https://github.com/kubernetes-sigs/k8s-container-image-promoter/blob/master/dashboard/vulnerability_dashboard.md).
+
+The vulnerability dashboard is intended to surface the vulnerabilities of
+images in the Kubernetes production project - k8s-artifacts-prod. The
+dashboard can be accessed by visiting this
+[page](https://storage.googleapis.com/k8s-artifacts-prod-vuln-dashboard/dashboard.html).
