@@ -21,7 +21,8 @@ import (
 	"testing"
 
 	grafeaspb "google.golang.org/genproto/googleapis/grafeas/v1"
-	reg "sigs.k8s.io/k8s-container-image-promoter/lib/dockerregistry"
+
+	reg "sigs.k8s.io/k8s-container-image-promoter/v2/lib/dockerregistry"
 )
 
 func TestImageRemovalCheck(t *testing.T) {

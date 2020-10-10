@@ -23,8 +23,9 @@ import (
 	"strings"
 
 	"golang.org/x/xerrors"
-	api "sigs.k8s.io/k8s-container-image-promoter/pkg/api/files"
-	"sigs.k8s.io/k8s-container-image-promoter/pkg/filepromoter"
+
+	api "sigs.k8s.io/k8s-container-image-promoter/v2/pkg/api/files"
+	"sigs.k8s.io/k8s-container-image-promoter/v2/pkg/filepromoter"
 )
 
 // GenerateManifestOptions holds the parameters for a hash-files operation.

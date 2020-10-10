@@ -26,12 +26,12 @@ import (
 	"regexp"
 	"testing"
 
-	"sigs.k8s.io/k8s-container-image-promoter/lib/audit"
-	reg "sigs.k8s.io/k8s-container-image-promoter/lib/dockerregistry"
-	"sigs.k8s.io/k8s-container-image-promoter/lib/logclient"
-	"sigs.k8s.io/k8s-container-image-promoter/lib/remotemanifest"
-	"sigs.k8s.io/k8s-container-image-promoter/lib/report"
-	"sigs.k8s.io/k8s-container-image-promoter/lib/stream"
+	"sigs.k8s.io/k8s-container-image-promoter/v2/lib/audit"
+	reg "sigs.k8s.io/k8s-container-image-promoter/v2/lib/dockerregistry"
+	"sigs.k8s.io/k8s-container-image-promoter/v2/lib/logclient"
+	"sigs.k8s.io/k8s-container-image-promoter/v2/lib/remotemanifest"
+	"sigs.k8s.io/k8s-container-image-promoter/v2/lib/report"
+	"sigs.k8s.io/k8s-container-image-promoter/v2/lib/stream"
 )
 
 func checkMatch(haystack []byte, re *regexp.Regexp) error {

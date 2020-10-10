@@ -24,8 +24,9 @@ import (
 	"path/filepath"
 
 	"golang.org/x/xerrors"
+
 	"k8s.io/klog"
-	"sigs.k8s.io/k8s-container-image-promoter/pkg/cmd"
+	"sigs.k8s.io/k8s-container-image-promoter/v2/pkg/cmd"
 	"sigs.k8s.io/yaml"
 )
 

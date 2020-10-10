@@ -23,7 +23,7 @@ import (
 	"os"
 
 	"k8s.io/klog"
-	"sigs.k8s.io/k8s-container-image-promoter/pkg/cmd"
+	"sigs.k8s.io/k8s-container-image-promoter/v2/pkg/cmd"
 )
 
 func main() {

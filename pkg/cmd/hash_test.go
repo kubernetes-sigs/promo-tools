@@ -7,9 +7,8 @@ import (
 	"testing"
 
 	"k8s.io/utils/diff"
+	"sigs.k8s.io/k8s-container-image-promoter/v2/pkg/cmd"
 	"sigs.k8s.io/yaml"
-
-	"sigs.k8s.io/k8s-container-image-promoter/pkg/cmd"
 )
 
 func TestHash(t *testing.T) {

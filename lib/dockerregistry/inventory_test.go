@@ -26,9 +26,10 @@ import (
 	"testing"
 
 	cr "github.com/google/go-containerregistry/pkg/v1/types"
-	reg "sigs.k8s.io/k8s-container-image-promoter/lib/dockerregistry"
-	"sigs.k8s.io/k8s-container-image-promoter/lib/json"
-	"sigs.k8s.io/k8s-container-image-promoter/lib/stream"
+
+	reg "sigs.k8s.io/k8s-container-image-promoter/v2/lib/dockerregistry"
+	"sigs.k8s.io/k8s-container-image-promoter/v2/lib/json"
+	"sigs.k8s.io/k8s-container-image-promoter/v2/lib/stream"
 )
 
 func checkEqual(got, expected interface{}) error {

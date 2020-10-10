@@ -21,7 +21,7 @@ import (
 	"fmt"
 
 	"k8s.io/klog"
-	adapter "sigs.k8s.io/k8s-container-image-promoter/dashboard/adapter"
+	adapter "sigs.k8s.io/k8s-container-image-promoter/v2/dashboard/adapter"
 )
 
 // nolint[gocyclo]

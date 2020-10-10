@@ -26,7 +26,7 @@ import (
 	"os"
 
 	"k8s.io/klog"
-	api "sigs.k8s.io/k8s-container-image-promoter/pkg/api/files"
+	api "sigs.k8s.io/k8s-container-image-promoter/v2/pkg/api/files"
 )
 
 // syncFileInfo tracks a file during the synchronization operation.

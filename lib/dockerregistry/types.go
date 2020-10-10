@@ -20,11 +20,11 @@ import (
 	"sync"
 
 	cr "github.com/google/go-containerregistry/pkg/v1/types"
-
 	grafeaspb "google.golang.org/genproto/googleapis/grafeas/v1"
 	"gopkg.in/src-d/go-git.v4/plumbing"
-	"sigs.k8s.io/k8s-container-image-promoter/lib/stream"
-	"sigs.k8s.io/k8s-container-image-promoter/pkg/gcloud"
+
+	"sigs.k8s.io/k8s-container-image-promoter/v2/lib/stream"
+	"sigs.k8s.io/k8s-container-image-promoter/v2/pkg/gcloud"
 )
 
 // RequestResult contains information about the result of running a request
