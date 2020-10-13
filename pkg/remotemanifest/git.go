@@ -26,7 +26,7 @@ import (
 	gogit "gopkg.in/src-d/go-git.v4"
 	"gopkg.in/src-d/go-git.v4/plumbing"
 	"k8s.io/klog"
-	reg "sigs.k8s.io/k8s-container-image-promoter/lib/dockerregistry"
+	reg "sigs.k8s.io/k8s-container-image-promoter/pkg/dockerregistry"
 )
 
 const (

@@ -17,7 +17,7 @@ limitations under the License.
 package inventory
 
 // nolint[lll]
-import "sigs.k8s.io/k8s-container-image-promoter/lib/container"
+import "sigs.k8s.io/k8s-container-image-promoter/pkg/container"
 
 // Various set manipulation operations. Some set operations are missing,
 // because, we don't use them.

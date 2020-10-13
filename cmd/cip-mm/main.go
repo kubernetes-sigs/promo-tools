@@ -23,7 +23,7 @@ import (
 	"os"
 
 	"k8s.io/klog"
-	reg "sigs.k8s.io/k8s-container-image-promoter/lib/dockerregistry"
+	reg "sigs.k8s.io/k8s-container-image-promoter/pkg/dockerregistry"
 )
 
 func main() {

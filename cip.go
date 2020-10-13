@@ -24,10 +24,10 @@ import (
 	// nolint[lll]
 	guuid "github.com/google/uuid"
 	"k8s.io/klog"
-	"sigs.k8s.io/k8s-container-image-promoter/lib/audit"
-	reg "sigs.k8s.io/k8s-container-image-promoter/lib/dockerregistry"
-	"sigs.k8s.io/k8s-container-image-promoter/lib/stream"
+	"sigs.k8s.io/k8s-container-image-promoter/pkg/audit"
+	reg "sigs.k8s.io/k8s-container-image-promoter/pkg/dockerregistry"
 	"sigs.k8s.io/k8s-container-image-promoter/pkg/gcloud"
+	"sigs.k8s.io/k8s-container-image-promoter/pkg/stream"
 )
 
 // GitDescribe is stamped by bazel.
