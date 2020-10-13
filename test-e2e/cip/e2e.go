@@ -13,9 +13,9 @@ import (
 	yaml "gopkg.in/yaml.v2"
 	"k8s.io/klog"
 
-	reg "sigs.k8s.io/k8s-container-image-promoter/lib/dockerregistry"
-	"sigs.k8s.io/k8s-container-image-promoter/lib/stream"
+	reg "sigs.k8s.io/k8s-container-image-promoter/pkg/dockerregistry"
 	"sigs.k8s.io/k8s-container-image-promoter/pkg/gcloud"
+	"sigs.k8s.io/k8s-container-image-promoter/pkg/stream"
 )
 
 // GitDescribe is stamped by bazel.

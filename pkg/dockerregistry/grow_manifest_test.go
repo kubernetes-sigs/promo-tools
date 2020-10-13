@@ -24,7 +24,7 @@ import (
 
 	"golang.org/x/xerrors"
 
-	reg "sigs.k8s.io/k8s-container-image-promoter/lib/dockerregistry"
+	reg "sigs.k8s.io/k8s-container-image-promoter/pkg/dockerregistry"
 )
 
 func TestFindManifest(t *testing.T) {

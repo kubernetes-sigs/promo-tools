@@ -6,7 +6,7 @@ go_library(
     importpath = "sigs.k8s.io/k8s-container-image-promoter/cmd/cip-mm",
     visibility = ["//visibility:private"],
     deps = [
-        "//lib/dockerregistry:go_default_library",
+        "//pkg/dockerregistry:go_default_library",
         "@io_k8s_klog//:go_default_library",
     ],
 )

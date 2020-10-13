@@ -92,9 +92,9 @@ go_library(
         "main.TimestampUtcRfc3339": "{TIMESTAMP_UTC_RFC3339}",
     },
     deps = [
-        "//lib/audit:go_default_library",
-        "//lib/dockerregistry:go_default_library",
-        "//lib/stream:go_default_library",
+        "//pkg/audit:go_default_library",
+        "//pkg/dockerregistry:go_default_library",
+        "//pkg/stream:go_default_library",
         "//pkg/gcloud:go_default_library",
         "@com_github_google_uuid//:go_default_library",
         "@io_k8s_klog//:go_default_library",

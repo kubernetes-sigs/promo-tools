@@ -39,7 +39,8 @@ if [[ -n "${PROW_GIT_TAG:-}" ]]; then
     timestamp_utc_date_no_dashes="${timestamp_utc_date_dashes//-/}"
 else
     git_commit="$(git rev-parse HEAD)"
-    git_desc="$(git describe --always --dirty --long)"
+    git_desc_raw="$(git describe --always --dirty --long)"
+    git_desc="${git_desc_raw//\//-}"
     timestamp_utc_rfc3339=$(date -u +"%Y-%m-%d %H:%M:%S%z")
     timestamp_utc_date_dashes="${timestamp_utc_rfc3339% *}"
     timestamp_utc_date_no_dashes="${timestamp_utc_date_dashes//-/}"

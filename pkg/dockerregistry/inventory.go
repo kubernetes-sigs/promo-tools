@@ -37,9 +37,9 @@ import (
 	ggcrV1 "github.com/google/go-containerregistry/pkg/v1"
 	ggcrV1Google "github.com/google/go-containerregistry/pkg/v1/google"
 	ggcrV1Types "github.com/google/go-containerregistry/pkg/v1/types"
-	cipJson "sigs.k8s.io/k8s-container-image-promoter/lib/json"
-	"sigs.k8s.io/k8s-container-image-promoter/lib/stream"
 	"sigs.k8s.io/k8s-container-image-promoter/pkg/gcloud"
+	cipJson "sigs.k8s.io/k8s-container-image-promoter/pkg/json"
+	"sigs.k8s.io/k8s-container-image-promoter/pkg/stream"
 )
 
 // GetSrcRegistry gets the source registry.

@@ -36,8 +36,8 @@ test: build
 test-mac:
 	bazel test --test_output=all \
 		//pkg/api/files:go_default_test \
-		//lib/audit:go_default_test \
-		//lib/dockerregistry:go_default_test \
+		//pkg/audit:go_default_test \
+		//pkg/dockerregistry:go_default_test \
 		//dashboard/adapter:go_default_test \
 		//pkg/cmd:go_default_test
 test-ci: download
