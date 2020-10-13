@@ -7,7 +7,7 @@ go_library(
         "gcp.go",
         "types.go",
     ],
-    importpath = "sigs.k8s.io/k8s-container-image-promoter/lib/report",
+    importpath = "sigs.k8s.io/k8s-container-image-promoter/pkg/report",
     visibility = ["//visibility:public"],
     deps = [
         "@com_google_cloud_go//errorreporting:go_default_library",
