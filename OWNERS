@@ -1,18 +1,12 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-- dims
-- hh
-- listx
-- tpepper
-- bartsmykla
+- cip-approvers
 reviewers:
-- dims
-- hh
-- listx
-- tpepper
-- ps882
-- bartsmykla
+- cip-approvers
+- cip-reviewers
 
 labels:
 - sig/release
+- area/release-eng
+- wg/k8s-infra

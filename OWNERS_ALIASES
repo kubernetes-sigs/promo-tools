@@ -1,0 +1,16 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+aliases:
+  cip-approvers:
+    - dims
+    - hh
+    - listx
+    - tpepper
+    - bartsmykla
+  cip-reviewers:
+    - dims
+    - hh
+    - listx
+    - tpepper
+    - ps882
+    - bartsmykla
