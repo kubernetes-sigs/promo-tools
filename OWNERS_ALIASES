@@ -4,12 +4,16 @@ aliases:
   cip-approvers:
     - dims
     - hh
+    - justaugustus
+    - justinsb
     - listx
     - tpepper
     - bartsmykla
   cip-reviewers:
     - dims
     - hh
+    - justaugustus
+    - justinsb
     - listx
     - tpepper
     - ps882
