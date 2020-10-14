@@ -107,6 +107,7 @@ git_repository(
     name = "com_github_google_rules_install",
     commit = "84406bab66bbb5061621d3b4b782c453e22c160a",
     remote = "https://github.com/listx/bazel_rules_install",
+    shallow_since = "1588201339 -0700",
 )
 
 load("@com_github_google_rules_install//:deps.bzl", "install_rules_dependencies")
