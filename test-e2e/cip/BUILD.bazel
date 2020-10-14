@@ -10,8 +10,8 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/dockerregistry:go_default_library",
-        "//pkg/stream:go_default_library",
         "//pkg/gcloud:go_default_library",
+        "//pkg/stream:go_default_library",
         "@in_gopkg_yaml_v2//:go_default_library",
         "@io_k8s_klog//:go_default_library",
     ],
@@ -25,9 +25,9 @@ go_binary(
 
 go_image(
     name = "e2e-image",
+    base = "@distroless-base//image",
     embed = [":go_default_library"],
     importpath = "sigs.k8s.io/k8s-container-image-promoter/e2e",
-    base = "@distroless-base//image",
 )
 
 # NOTE: Bazel's docker rules do not support building manifest lists (aka "fat"

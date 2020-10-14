@@ -32,12 +32,12 @@ load("@io_bazel_rules_docker//contrib:push-all.bzl", "docker_push")
 
 go_image(
     name = "container-image",
+    base = "@google-sdk-base//image",
     embed = [":go_default_library"],
-    importpath = "sigs.k8s.io/k8s-container-image-promoter/cmd/promobot-files",
     goarch = "amd64",
     goos = "linux",
+    importpath = "sigs.k8s.io/k8s-container-image-promoter/cmd/promobot-files",
     pure = "on",
-    base = "@google-sdk-base//image",
 )
 
 container_bundle(

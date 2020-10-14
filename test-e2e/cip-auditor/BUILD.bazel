@@ -12,8 +12,8 @@ go_library(
     deps = [
         "//pkg/audit:go_default_library",
         "//pkg/dockerregistry:go_default_library",
-        "//pkg/stream:go_default_library",
         "//pkg/gcloud:go_default_library",
+        "//pkg/stream:go_default_library",
         "@com_github_google_uuid//:go_default_library",
         "@in_gopkg_yaml_v2//:go_default_library",
         "@io_k8s_klog//:go_default_library",
@@ -28,9 +28,9 @@ go_binary(
 
 go_image(
     name = "e2e-image",
+    base = "@distroless-base//image",
     embed = [":go_default_library"],
     importpath = "sigs.k8s.io/k8s-container-image-promoter/e2e",
-    base = "@distroless-base//image",
 )
 
 container_image(
@@ -47,9 +47,9 @@ container_layer(
 
 pkg_tar(
     name = "fixture-tar",
-    strip_prefix = "/test-e2e/cip-auditor/fixture",
     srcs = glob(["fixture/**/*.yaml"]),
     mode = "0755",
+    strip_prefix = "/test-e2e/cip-auditor/fixture",
 )
 
 container_bundle(
