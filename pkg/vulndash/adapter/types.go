@@ -17,7 +17,7 @@ limitations under the License.
 package adapter
 
 // ImageVulnBreakdown is used by the adapter in order to store the information
-// from image vulnerability occurrencess that the dashboard needs.
+// from image vulnerability occurrences that the dashboard needs.
 type ImageVulnBreakdown struct {
 	ResourceURI             string
 	ImageName               string

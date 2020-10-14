@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	grafeaspb "google.golang.org/genproto/googleapis/grafeas/v1"
-	adapter "sigs.k8s.io/k8s-container-image-promoter/dashboard/adapter"
+	adapter "sigs.k8s.io/k8s-container-image-promoter/pkg/vulndash/adapter"
 )
 
 func checkEqual(got, expected interface{}) error {

@@ -6,7 +6,7 @@ go_library(
         "adapter.go",
         "types.go",
     ],
-    importpath = "sigs.k8s.io/k8s-container-image-promoter/dashboard/adapter",
+    importpath = "sigs.k8s.io/k8s-container-image-promoter/pkg/vulndash/adapter",
     visibility = ["//visibility:public"],
     deps = [
         "@com_google_cloud_go//containeranalysis/apiv1:go_default_library",
