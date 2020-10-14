@@ -1,4 +1,4 @@
-package cmd_test
+package promobot_test
 
 import (
 	"context"
@@ -7,20 +7,19 @@ import (
 	"testing"
 
 	"k8s.io/utils/diff"
+	"sigs.k8s.io/k8s-container-image-promoter/pkg/promobot"
 	"sigs.k8s.io/yaml"
-
-	"sigs.k8s.io/k8s-container-image-promoter/pkg/cmd"
 )
 
 func TestHash(t *testing.T) {
 	ctx := context.Background()
 
-	var opt cmd.GenerateManifestOptions
+	var opt promobot.GenerateManifestOptions
 	opt.PopulateDefaults()
 
 	opt.BaseDir = "testdata/files"
 
-	manifest, err := cmd.GenerateManifest(ctx, opt)
+	manifest, err := promobot.GenerateManifest(ctx, opt)
 	if err != nil {
 		t.Fatalf("failed to generate manifest: %v", err)
 	}

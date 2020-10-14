@@ -24,8 +24,9 @@ import (
 	"path/filepath"
 
 	"golang.org/x/xerrors"
+
 	"k8s.io/klog"
-	"sigs.k8s.io/k8s-container-image-promoter/pkg/cmd"
+	"sigs.k8s.io/k8s-container-image-promoter/pkg/promobot"
 	"sigs.k8s.io/yaml"
 )
 
@@ -43,7 +44,7 @@ func main() {
 func run(ctx context.Context) error {
 	klog.InitFlags(nil)
 
-	var opt cmd.GenerateManifestOptions
+	var opt promobot.GenerateManifestOptions
 	opt.PopulateDefaults()
 
 	src := ""
@@ -71,7 +72,7 @@ func run(ctx context.Context) error {
 	}
 	opt.BaseDir = s
 
-	manifest, err := cmd.GenerateManifest(ctx, opt)
+	manifest, err := promobot.GenerateManifest(ctx, opt)
 	if err != nil {
 		return err
 	}

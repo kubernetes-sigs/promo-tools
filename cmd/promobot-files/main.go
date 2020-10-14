@@ -23,13 +23,13 @@ import (
 	"os"
 
 	"k8s.io/klog"
-	"sigs.k8s.io/k8s-container-image-promoter/pkg/cmd"
+	"sigs.k8s.io/k8s-container-image-promoter/pkg/promobot"
 )
 
 func main() {
 	klog.InitFlags(nil)
 
-	var options cmd.PromoteFilesOptions
+	var options promobot.PromoteFilesOptions
 	options.PopulateDefaults()
 
 	flag.StringVar(
@@ -59,7 +59,7 @@ func main() {
 	flag.Parse()
 
 	ctx := context.Background()
-	if err := cmd.RunPromoteFiles(ctx, options); err != nil {
+	if err := promobot.RunPromoteFiles(ctx, options); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		// nolint[gomnd]
 		os.Exit(1)

@@ -6,7 +6,7 @@ go_library(
     importpath = "sigs.k8s.io/k8s-container-image-promoter/cmd/promobot-files",
     visibility = ["//visibility:private"],
     deps = [
-        "//pkg/cmd:go_default_library",
+        "//pkg/promobot:go_default_library",
         "@io_k8s_klog//:go_default_library",
     ],
 )
