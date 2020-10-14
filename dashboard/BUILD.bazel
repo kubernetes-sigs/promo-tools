@@ -6,7 +6,7 @@ go_library(
     importpath = "sigs.k8s.io/k8s-container-image-promoter/dashboard",
     visibility = ["//visibility:private"],
     deps = [
-        "//dashboard/adapter:go_default_library",
+        "//pkg/vulndash/adapter:go_default_library",
         "@io_k8s_klog//:go_default_library",
     ],
 )

@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // nolint[lll]
-package cmd
+package promobot
 
 import (
 	"context"

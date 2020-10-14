@@ -6,7 +6,7 @@ go_library(
         "hash.go",
         "promotefiles.go",
     ],
-    importpath = "sigs.k8s.io/k8s-container-image-promoter/pkg/cmd",
+    importpath = "sigs.k8s.io/k8s-container-image-promoter/pkg/promobot",
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/api/files:go_default_library",

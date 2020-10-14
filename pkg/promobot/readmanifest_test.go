@@ -14,31 +14,30 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cmd_test
+package promobot_test
 
 import (
 	"testing"
 
+	"sigs.k8s.io/k8s-container-image-promoter/pkg/promobot"
 	"sigs.k8s.io/yaml"
-
-	"sigs.k8s.io/k8s-container-image-promoter/pkg/cmd"
 )
 
 func TestReadManifests(t *testing.T) {
 	grid := []struct {
 		Expected string
-		Options  cmd.PromoteFilesOptions
+		Options  promobot.PromoteFilesOptions
 	}{
 		{
 			Expected: "testdata/manifests/onefiles/expected.yaml",
-			Options: cmd.PromoteFilesOptions{
+			Options: promobot.PromoteFilesOptions{
 				FilestoresPath: "testdata/manifests/onefiles/filestores.yaml",
 				FilesPath:      "testdata/manifests/onefiles/files.yaml",
 			},
 		},
 		{
 			Expected: "testdata/manifests/manyfiles/expected.yaml",
-			Options: cmd.PromoteFilesOptions{
+			Options: promobot.PromoteFilesOptions{
 				FilestoresPath: "testdata/manifests/manyfiles/filestores.yaml",
 				FilesPath:      "testdata/manifests/manyfiles/files/",
 			},
@@ -48,7 +47,7 @@ func TestReadManifests(t *testing.T) {
 	for _, g := range grid {
 		g := g // avoid closure go-tcha
 		t.Run(g.Expected, func(t *testing.T) {
-			manifest, err := cmd.ReadManifest(g.Options)
+			manifest, err := promobot.ReadManifest(g.Options)
 			if err != nil {
 				t.Fatalf("failed to read manifest: %v", err)
 			}
