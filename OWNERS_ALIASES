@@ -18,20 +18,15 @@ aliases:
     - hoegaarden # Release Manager
     - idealhack # Release Manager
     - xmudrii # Release Manager
+  wg-k8s-infra-leads:
+    - bartsmykla
+    - dims
+    - spiffxp
   cip-approvers:
-    - dims
-    - hh
     - justaugustus
     - justinsb
     - listx
-    - tpepper
-    - bartsmykla
   cip-reviewers:
-    - dims
-    - hh
     - justaugustus
     - justinsb
     - listx
-    - tpepper
-    - ps882
-    - bartsmykla
