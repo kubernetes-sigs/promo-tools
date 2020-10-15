@@ -1,8 +1,12 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
+- sig-release-leads
+- release-engineering-approvers
 - cip-approvers
 reviewers:
+- release-engineering-approvers
+- release-engineering-reviewers
 - cip-approvers
 - cip-reviewers
 
