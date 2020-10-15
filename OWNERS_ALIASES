@@ -1,0 +1,32 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+aliases:
+  sig-release-leads:
+    - alejandrox1
+    - justaugustus
+    - saschagrunert
+    - tpepper
+  release-engineering-approvers:
+    - justaugustus # subproject owner / Release Manager
+    - saschagrunert # subproject owner / Release Manager
+    - tpepper # subproject owner / Release Manager
+  release-engineering-reviewers:
+    - cpanato # Release Manager
+    - dougm # Release Manager
+    - feiskyer # Release Manager
+    - hasheddan # Release Manager
+    - hoegaarden # Release Manager
+    - idealhack # Release Manager
+    - xmudrii # Release Manager
+  wg-k8s-infra-leads:
+    - bartsmykla
+    - dims
+    - spiffxp
+  cip-approvers:
+    - justaugustus
+    - justinsb
+    - listx
+  cip-reviewers:
+    - justaugustus
+    - justinsb
+    - listx
