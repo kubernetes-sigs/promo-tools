@@ -118,10 +118,13 @@ update: ## Update go modules (source of truth!).
 
 .PHONY: verify verify-boilerplate verify-dependencies verify-go-mod verify-golangci-lint
 
-verify: verify-boilerplate verify-go-mod verify-golangci-lint ## Runs verification scripts to ensure correct execution
+verify: verify-boilerplate verify-dependencies verify-go-mod verify-golangci-lint ## Runs verification scripts to ensure correct execution
 
 verify-boilerplate: ## Runs the file header check
 	./hack/verify-boilerplate.sh
+
+verify-dependencies: ## Runs zeitgeist to verify dependency versions
+	./hack/verify-dependencies.sh
 
 verify-go-mod: ## Runs the go module linter
 	./hack/verify-go-mod.sh
