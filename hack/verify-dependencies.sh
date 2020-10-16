@@ -18,5 +18,21 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-go mod tidy
-git diff --exit-code
+VERSION=0.0.17
+OS="$(uname -s)"
+OS="${OS,,}"
+URL_BASE=https://github.com/kubernetes-sigs/zeitgeist/releases/download
+FILENAME="zeitgeist_${VERSION}_${OS}_amd64.tar.gz"
+URL="${URL_BASE}/v${VERSION}/${FILENAME}"
+
+mkdir -p ./bin ./zeitgeist
+PATH=$PATH:bin
+
+if ! command -v zeitgeist; then
+  curl -sfL "${URL}" -o "${FILENAME}"
+  tar -xzf "${FILENAME}" -C zeitgeist
+  mv ./zeitgeist/zeitgeist ./bin
+  rm -rf ./zeitgeist "${FILENAME}"
+fi
+
+zeitgeist validate
