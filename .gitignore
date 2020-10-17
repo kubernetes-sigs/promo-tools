@@ -1,3 +1,6 @@
 bazel-*
 *.#*
 *.swp
+
+# downloaded and built binaries
+bin
