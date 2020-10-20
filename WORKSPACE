@@ -3,24 +3,25 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
 http_archive(
     name = "rules_pkg",
+    sha256 = "aeca78988341a2ee1ba097641056d168320ecc51372ef7ff8e64b139516a4937",
     urls = [
         "https://github.com/bazelbuild/rules_pkg/releases/download/0.2.6-1/rules_pkg-0.2.6.tar.gz",
         "https://mirror.bazel.build/github.com/bazelbuild/rules_pkg/releases/download/0.2.6/rules_pkg-0.2.6.tar.gz",
     ],
-    sha256 = "aeca78988341a2ee1ba097641056d168320ecc51372ef7ff8e64b139516a4937",
 )
-load("@rules_pkg//:deps.bzl", "rules_pkg_dependencies")
-rules_pkg_dependencies()
 
+load("@rules_pkg//:deps.bzl", "rules_pkg_dependencies")
+
+rules_pkg_dependencies()
 
 # You *must* import the Go rules before setting up the go_image rules.
 http_archive(
     name = "io_bazel_rules_go",
+    sha256 = "c1a5614131bbd4e4764ad782de261a2e9c4173c9528a50dbaefcbea6fce7d66a",
     urls = [
-        "https://storage.googleapis.com/bazel-mirror/github.com/bazelbuild/rules_go/releases/download/v0.20.3/rules_go-v0.20.3.tar.gz",
-        "https://github.com/bazelbuild/rules_go/releases/download/v0.20.3/rules_go-v0.20.3.tar.gz",
+        "https://mirror.bazel.build/github.com/bazelbuild/rules_go/releases/download/v0.21.7/rules_go-v0.21.7.tar.gz",
+        "https://github.com/bazelbuild/rules_go/releases/download/v0.21.7/rules_go-v0.21.7.tar.gz",
     ],
-    sha256 = "e88471aea3a3a4f19ec1310a55ba94772d087e9ce46e41ae38ecebe17935de7b",
 )
 
 # Invoke go_rules_dependencies depending on host platform.
@@ -40,11 +41,11 @@ load_go_sdk()
 
 http_archive(
     name = "bazel_gazelle",
+    sha256 = "b85f48fa105c4403326e9525ad2b2cc437babaa6e15a3fc0b1dbab0ab064bc7c",
     urls = [
-        "https://storage.googleapis.com/bazel-mirror/github.com/bazelbuild/bazel-gazelle/releases/download/v0.19.1/bazel-gazelle-v0.19.1.tar.gz",
-        "https://github.com/bazelbuild/bazel-gazelle/releases/download/v0.19.1/bazel-gazelle-v0.19.1.tar.gz",
+        "https://mirror.bazel.build/github.com/bazelbuild/bazel-gazelle/releases/download/v0.22.2/bazel-gazelle-v0.22.2.tar.gz",
+        "https://github.com/bazelbuild/bazel-gazelle/releases/download/v0.22.2/bazel-gazelle-v0.22.2.tar.gz",
     ],
-    sha256 = "86c6d481b3f7aedc1d60c1c211c6f76da282ae197c3b3160f54bd3a8f847896f",
 )
 
 load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies", "go_repository")
@@ -62,6 +63,7 @@ load(
     "@io_bazel_rules_docker//repositories:repositories.bzl",
     container_repositories = "repositories",
 )
+
 container_repositories()
 
 load("@io_bazel_rules_docker//repositories:deps.bzl", container_deps = "deps")
@@ -83,10 +85,10 @@ load("@io_bazel_rules_docker//container:container.bzl", "container_pull")
 
 container_pull(
     name = "google-sdk-base",
-    registry = "index.docker.io",
-    repository = "google/cloud-sdk",
     # Version 241.0.0
     digest = "sha256:3b77ee8bfa6a2513fb6343cfad0dd6fd6ddd67d0632908c3a5fb9b57dd68ec1b",
+    registry = "index.docker.io",
+    repository = "google/cloud-sdk",
 )
 
 # Maybe use cloud-builders/gcloud, for GCB. But for Prow just use the google-sdk
@@ -107,6 +109,7 @@ git_repository(
     name = "com_github_google_rules_install",
     commit = "84406bab66bbb5061621d3b4b782c453e22c160a",
     remote = "https://github.com/listx/bazel_rules_install",
+    shallow_since = "1588201339 -0700",
 )
 
 load("@com_github_google_rules_install//:deps.bzl", "install_rules_dependencies")
@@ -119,10 +122,10 @@ install_rules_setup()
 
 container_pull(
     name = "distroless-base",
-    registry = "gcr.io",
-    repository = "distroless/base",
     # Version 241.0.0
     digest = "sha256:edc3643ddf96d75032a55e240900b68b335186f1e5fea0a95af3b4cc96020b77",
+    registry = "gcr.io",
+    repository = "distroless/base",
 )
 
 git_repository(
