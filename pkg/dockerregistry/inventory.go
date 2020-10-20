@@ -861,7 +861,7 @@ func (mi *MasterInventory) PrettyValue() string {
 	for _, regName := range regNames {
 		v, ok := (*mi)[regName]
 		if !ok {
-			klog.Error("corrupt MasterInventory")
+			klog.Errorf("corrupt MasterInventory")
 			return ""
 		}
 		fmt.Fprintln(&b, regName)
@@ -963,7 +963,7 @@ func getRegistryTagsWrapper(req stream.ExternalRequest,
 		getRegistryTagsCondition)
 
 	if err != nil {
-		klog.Error(err)
+		klog.ErrorS(err, "Failed to get registry tags condition")
 		return nil, err
 	}
 
@@ -1025,7 +1025,7 @@ func getGCRManifestListWrapper(
 		getGCRManifestListCondition)
 
 	if err != nil {
-		klog.Error(err)
+		klog.ErrorS(err, "Failed to get manifest list condition")
 		return nil, err
 	}
 
@@ -1703,7 +1703,7 @@ func extractRegistryTags(reader io.Reader) (*ggcrV1Google.Tags, error) {
 			if err == io.EOF {
 				break
 			}
-			klog.Error("DECODING ERROR: ", err)
+			klog.ErrorS(err, "Failed to decode registry tags")
 			return nil, err
 		}
 	}
@@ -1722,7 +1722,7 @@ func extractGCRManifestList(reader io.Reader) (*ggcrV1.IndexManifest, error) {
 			if err == io.EOF {
 				break
 			}
-			klog.Error("DECODING ERROR: ", err)
+			klog.ErrorS(err, "Failed to decode manifest list")
 			return nil, err
 		}
 	}
@@ -1963,7 +1963,7 @@ func (sc *SyncContext) RunChecks(
 	for _, preCheck := range preChecks {
 		err := preCheck.Run()
 		if err != nil {
-			klog.Error(err)
+			klog.ErrorS(err, "Failed to run pre-checks")
 			errors = append(errors, err)
 		}
 	}
@@ -2151,7 +2151,7 @@ func (sc *SyncContext) Promote(
 				}
 
 				if err := crane.Copy(srcVertex, dstVertex); err != nil {
-					klog.Error(err)
+					klog.ErrorS(err, "Failed to copy remote image")
 					errors = append(errors, Error{
 						Context: "running writeImage()",
 						Error:   err})

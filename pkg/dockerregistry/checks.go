@@ -353,7 +353,7 @@ func (check *ImageVulnCheck) Run() error {
 					})
 					fixableSevereOccurrences++
 				} else {
-					klog.Error(vulnErr)
+					klog.ErrorS(vulnErr, "Failed to get vulnerability")
 				}
 			}
 
