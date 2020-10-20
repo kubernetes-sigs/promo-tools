@@ -6,6 +6,6 @@ go_library(
     importpath = "sigs.k8s.io/k8s-container-image-promoter/pkg/gcloud",
     visibility = ["//visibility:public"],
     deps = [
-        "@io_k8s_klog//:go_default_library",
+        "@io_k8s_klog_v2//:go_default_library",
     ],
 )

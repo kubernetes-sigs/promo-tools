@@ -15,7 +15,7 @@ go_library(
         "//pkg/report:go_default_library",
         "//pkg/stream:go_default_library",
         "@com_google_cloud_go//errorreporting:go_default_library",
-        "@io_k8s_klog//:go_default_library",
+        "@io_k8s_klog_v2//:go_default_library",
     ],
 )
 

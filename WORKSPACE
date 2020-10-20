@@ -1043,10 +1043,10 @@ go_repository(
 )
 
 go_repository(
-    name = "io_k8s_klog",
-    importpath = "k8s.io/klog",
-    sum = "h1:Pt+yjF5aB1xDSVbau4VsWe+dQNzA0qv1LlXdC2dF6Q8=",
-    version = "v1.0.0",
+    name = "io_k8s_klog_v2",
+    importpath = "k8s.io/klog/v2",
+    sum = "h1:WmkrnW7fdrm0/DMClc+HIxtftvxVIPAhlVwMQo5yLco=",
+    version = "v2.3.0",
 )
 
 go_repository(
