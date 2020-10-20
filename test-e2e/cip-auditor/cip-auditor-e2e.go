@@ -28,7 +28,7 @@ import (
 
 	guuid "github.com/google/uuid"
 	yaml "gopkg.in/yaml.v2"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"sigs.k8s.io/k8s-container-image-promoter/pkg/audit"
 	reg "sigs.k8s.io/k8s-container-image-promoter/pkg/dockerregistry"

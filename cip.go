@@ -23,7 +23,7 @@ import (
 
 	// nolint[lll]
 	guuid "github.com/google/uuid"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/k8s-container-image-promoter/pkg/audit"
 	reg "sigs.k8s.io/k8s-container-image-promoter/pkg/dockerregistry"
 	"sigs.k8s.io/k8s-container-image-promoter/pkg/gcloud"

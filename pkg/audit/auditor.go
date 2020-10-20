@@ -26,7 +26,7 @@ import (
 	"runtime/debug"
 
 	"cloud.google.com/go/errorreporting"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	reg "sigs.k8s.io/k8s-container-image-promoter/pkg/dockerregistry"
 	"sigs.k8s.io/k8s-container-image-promoter/pkg/logclient"
 	"sigs.k8s.io/k8s-container-image-promoter/pkg/remotemanifest"

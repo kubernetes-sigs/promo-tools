@@ -31,7 +31,7 @@ import (
 
 	yaml "gopkg.in/yaml.v2"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"github.com/google/go-containerregistry/pkg/crane"
 	ggcrV1 "github.com/google/go-containerregistry/pkg/v1"

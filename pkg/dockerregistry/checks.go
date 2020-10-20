@@ -27,7 +27,7 @@ import (
 	"strings"
 	"sync"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	containeranalysis "cloud.google.com/go/containeranalysis/apiv1"
 	"google.golang.org/api/iterator"

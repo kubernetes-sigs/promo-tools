@@ -20,7 +20,7 @@ import (
 	"flag"
 	"fmt"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	adapter "sigs.k8s.io/k8s-container-image-promoter/pkg/vulndash/adapter"
 )
 
