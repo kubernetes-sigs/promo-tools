@@ -24,30 +24,25 @@ all: test
 build: ## Bazel build
 	bazel build //:cip \
 		//test-e2e/cip:e2e \
-		//test-e2e/cip-auditor:cip-auditor-e2e \
-		//cmd/cip-mm:cip-mm \
-		//cmd/promobot-files:promobot-files
+		//test-e2e/cip-auditor:cip-auditor-e2e
 
 .PHONY: install
 install: ## Install
 	bazel run //:install-cip -c opt -- $(shell go env GOPATH)/bin
-	bazel run //:install-cip-mm -c opt -- $(shell go env GOPATH)/bin
-	bazel run //cmd/promobot-files:install -c opt -- $(shell go env GOPATH)/bin
 
 ##@ Images
 
 .PHONY: image
 image: ## Build image
-	bazel build //:cip-docker-loadable.tar //cmd/promobot-files:image-bundle.tar
+	bazel build //:cip-docker-loadable.tar
 
 .PHONY: image-load
 image-load: image ## Build image and load it
 	docker load -i bazel-bin/cip-docker-loadable.tar
-	docker load -i bazel-bin/cmd/promobot-files/image-bundle.tar
 
 .PHONY: image-push
 image-push: image ## Build image and push
-	bazel run :push-cip //cmd/promobot-files:push-image-bundle
+	bazel run :push-cip
 
 .PHONY: image-load-cip-auditor-e2e
 image-load-cip-auditor-e2e: ## Build and load image cip-auditor-e2e
@@ -84,7 +79,6 @@ test-mac:
 		//pkg/api/files:go_default_test \
 		//pkg/audit:go_default_test \
 		//pkg/dockerregistry:go_default_test \
-		//pkg/promobot:go_default_test \
 		//pkg/vulndash/adapter:go_default_test
 
 .PHONY: test-ci

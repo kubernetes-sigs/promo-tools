@@ -119,8 +119,3 @@ installer(
     name = "install-cip",
     data = [":cip"],
 )
-
-installer(
-    name = "install-cip-mm",
-    data = ["//cmd/cip-mm"],
-)
