@@ -8,7 +8,6 @@ require (
 	cloud.google.com/go/storage v1.10.0
 	github.com/google/go-containerregistry v0.1.3
 	golang.org/x/net v0.0.0-20200822124328-c89045814202
-	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1
 	google.golang.org/api v0.30.0
 	google.golang.org/genproto v0.0.0-20200827165113-ac2560b5e952
@@ -16,6 +15,4 @@ require (
 	gopkg.in/yaml.v2 v2.3.0
 	k8s.io/apimachinery v0.19.2
 	k8s.io/klog v1.0.0
-	k8s.io/utils v0.0.0-20200324210504-a9aa75ae1b89
-	sigs.k8s.io/yaml v1.2.0
 )
