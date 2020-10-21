@@ -9,7 +9,7 @@ options:
   machineType: N1_HIGHCPU_32
 steps:
 # Start by just pushing the image
-- name: 'gcr.io/k8s-testimages/bazelbuild:v20190916-ec59af8-0.29.1'
+- name: 'gcr.io/k8s-testimages/bazelbuild:latest-2.2.0'
   entrypoint: make
   env:
   - PROW_GIT_TAG=$_GIT_TAG
