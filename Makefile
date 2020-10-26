@@ -78,8 +78,7 @@ test-mac:
 	bazel test --test_output=all \
 		//pkg/api/files:go_default_test \
 		//pkg/audit:go_default_test \
-		//pkg/dockerregistry:go_default_test \
-		//pkg/vulndash/adapter:go_default_test
+		//pkg/dockerregistry:go_default_test
 
 .PHONY: test-ci
 test-ci: download
