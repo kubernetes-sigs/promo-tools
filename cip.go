@@ -21,13 +21,13 @@ import (
 	"fmt"
 	"os"
 
-	// nolint[lll]
 	guuid "github.com/google/uuid"
+
 	"k8s.io/klog"
-	"sigs.k8s.io/k8s-container-image-promoter/pkg/audit"
-	reg "sigs.k8s.io/k8s-container-image-promoter/pkg/dockerregistry"
-	"sigs.k8s.io/k8s-container-image-promoter/pkg/gcloud"
-	"sigs.k8s.io/k8s-container-image-promoter/pkg/stream"
+	"k8s.io/release/pkg/cip/audit"
+	reg "k8s.io/release/pkg/cip/dockerregistry"
+	"k8s.io/release/pkg/cip/gcloud"
+	"k8s.io/release/pkg/cip/stream"
 )
 
 // GitDescribe is stamped by bazel.
