@@ -17,10 +17,10 @@ rules_pkg_dependencies()
 # You *must* import the Go rules before setting up the go_image rules.
 http_archive(
     name = "io_bazel_rules_go",
-    sha256 = "c1a5614131bbd4e4764ad782de261a2e9c4173c9528a50dbaefcbea6fce7d66a",
+    sha256 = "207fad3e6689135c5d8713e5a17ba9d1290238f47b9ba545b63d9303406209c6",
     urls = [
-        "https://mirror.bazel.build/github.com/bazelbuild/rules_go/releases/download/v0.21.7/rules_go-v0.21.7.tar.gz",
-        "https://github.com/bazelbuild/rules_go/releases/download/v0.21.7/rules_go-v0.21.7.tar.gz",
+        "https://mirror.bazel.build/github.com/bazelbuild/rules_go/releases/download/v0.24.7/rules_go-v0.24.7.tar.gz",
+        "https://github.com/bazelbuild/rules_go/releases/download/v0.24.7/rules_go-v0.24.7.tar.gz",
     ],
 )
 
