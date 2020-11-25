@@ -104,7 +104,10 @@ update: ## Update go modules (source of truth!).
 	GO111MODULE=on go mod verify
 	GO111MODULE=on go mod tidy
 	# Update bazel rules to use these new dependencies.
-	bazel run //:gazelle -- fix
+	bazel run //:gazelle -- update-repos \
+		--from_file=go.mod --to_macro=repos.bzl%go_repositories \
+		--build_file_generation=on --build_file_proto_mode=disable_global \
+		--prune
 
 ##@ Verify
 
