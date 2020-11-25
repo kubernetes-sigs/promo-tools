@@ -69,7 +69,7 @@ lint-ci: download
 
 .PHONY: test
 test: build
-	bazel test --test_output=all //...
+	echo "Would've run 'bazel test --test_output=all //...', but there are no unit tests to run in this repo. ref: https://github.com/kubernetes/release/pull/1767"
 
 .PHONY: test-mac
 # test-mac make target is a workaround for the following
@@ -104,7 +104,10 @@ update: ## Update go modules (source of truth!).
 	GO111MODULE=on go mod verify
 	GO111MODULE=on go mod tidy
 	# Update bazel rules to use these new dependencies.
-	bazel run //:gazelle -- fix
+	bazel run //:gazelle -- update-repos \
+		--from_file=go.mod --to_macro=repos.bzl%go_repositories \
+		--build_file_generation=on --build_file_proto_mode=disable_global \
+		--prune
 
 ##@ Verify
 
