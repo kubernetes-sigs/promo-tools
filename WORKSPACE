@@ -48,7 +48,11 @@ http_archive(
     ],
 )
 
-load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies", "go_repository")
+load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies")
+load("//:repos.bzl", "go_repositories")
+
+# gazelle:repository_macro repos.bzl%go_repositories
+go_repositories()
 
 gazelle_dependencies()
 
