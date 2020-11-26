@@ -90,9 +90,9 @@ request.
 This method for detecting removed images should ensure that pull requests are 
 only rejected if an image is completely removed from production, while still 
 allowing edge cases. One example edge case is where a user has already 
-promoted an image foo from registry A to registry B. Then in a later pull 
-request, the user promotes the same image foo from registry C to registry B. 
-Although image foo is removed from registry A, this pull request should be 
+promoted an image foo from repository A to repository B. Then in a later pull 
+request, the user promotes the same image foo from repository C to repository B. 
+Although image foo is removed from repository A, this pull request should be 
 accepted because the same image is still being promoted, albeit from a new 
 location. 
 

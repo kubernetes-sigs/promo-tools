@@ -1,4 +1,4 @@
-registries:
+repositories:
 - name: gcr.io/k8s-gcr-audit-test-prod
   service-account: k8s-infra-gcr-promoter@k8s-gcr-audit-test-prod.iam.gserviceaccount.com
   src: true

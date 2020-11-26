@@ -1,10 +1,10 @@
 # Container Image Promoter
 
 The Container Image Promoter (aka "CIP") promotes Docker images from one
-Registry (src registry) to another (dest registry). The set of images to promote
+Repository (src repository) to another (dest repository). The set of images to promote
 are defined by promoter manifests, in YAML.
 
-Currently only Google Container Registry (GCR) is supported.
+Currently only Google Container Repository (GCR) is supported.
 
 # Install
 
@@ -23,33 +23,33 @@ make install
 Using CIP to promote images requires four pieces:
 
 1. promoter manifest(s)
-2. source registry
-3. destination registry
-4. service account for writing into destination registry
+2. source repository
+3. destination repository
+4. service account for writing into destination repository
 
 ## Promoter manifests
 
 A promoter manifest has two sub-fields:
 
-1. `registries`
+1. `repositories`
 2. `images`
 
 In addition there are 2 types of manifests, *plain* and *thin*. The difference
 is in how they are written, not their content. A plain manifest has both
-`registries` and `images` in one YAML file. On the other hand, a thin manifest
+`repositories` and `images` in one YAML file. On the other hand, a thin manifest
 splits these two fields up into 2 separate YAML files. In practice, thin
 manifests are preferred because they work better when modifying these YAMLs at
 scale; for example, the [k8sio-manifests-dir][k8s.io Github repo] only uses thin
 manifests because it allows `images` to be easily modified in PRs, whereas the
-more sensitive `registries` field remains tightly controlled by a handful of
+more sensitive `repositories` field remains tightly controlled by a handful of
 owners.
 
 ### Plain manifest example
 
 ```
-registries:
+repositories:
 - name: gcr.io/myproject-staging-area # publicly readable, does not need a service account for access
-  src: true # mark it as the source registry (required)
+  src: true # mark it as the source repository (required)
 - name: gcr.io/myproject-production
   service-account: foo@google-containers.iam.gserviceaccount.com
 images:
@@ -66,16 +66,16 @@ images:
 ```
 
 Here, the manifest cares about 3 images --- `apple`, `banana`, and `cherry`. The
-`registries` field lists all destination registries and also the source registry
-where the images should be promoted from. To earmark the source registry, it has
+`repositories` field lists all destination repositories and also the source repository
+where the images should be promoted from. To earmark the source repository, it has
 `src: true` as a property. The promoter will then scan
 `gcr.io/myproject-staging-area` and promote the images found under `images` to
 `gcr.io/myproject-production`.
 
-The source registry will always be read-only for the promoter. Because of this,
-it's OK to not provide a `service-account` field for it in `registries`. But in
-the event that you are trying to promote from one private registry to another,
-you would still provide a `service-account` for the staging registry.
+The source repository will always be read-only for the promoter. Because of this,
+it's OK to not provide a `service-account` field for it in `repositories`. But in
+the event that you are trying to promote from one private repository to another,
+you would still provide a `service-account` for the staging repository.
 
 Given the above manifest, you can run CIP as follows:
 
@@ -127,9 +127,9 @@ pretend we wanted to convert it into a thin manifest. Let's use subdirectory `a`
 as an example. First, `manifests/a/promoter-manifest.yaml` would look like this:
 
 ```
-registries:
+repositories:
 - name: gcr.io/myproject-staging-area # publicly readable, does not need a service account for access
-  src: true # mark it as the source registry (required)
+  src: true # mark it as the source repository (required)
 - name: gcr.io/myproject-production
   service-account: foo@google-containers.iam.gserviceaccount.com
 ```
@@ -155,42 +155,42 @@ contents of the promoter manifest. Indeed, the subdirectory name only acts as an
 organizing namespace to separate it from the other subdirectory names that might
 exist (in the example `b`, `c`, and `d`).
 
-## Registries and service accounts
+## Repositories and service accounts
 
-CIP needs the following access to registries:
+CIP needs the following access to repositories:
 
-- source registry: read access
-- destination registry: read and write access
+- source repository: read access
+- destination repository: read and write access
 
 In a dry run (default), where CIP does not actually perform any image copies,
-only read access in needed for the destination registry.
+only read access in needed for the destination repository.
 
-For *source registries*, most commonly they are world-readable. Hence, no
-`service-account` field is needed for them. However, if your source registry is
+For *source repositories*, most commonly they are world-readable. Hence, no
+`service-account` field is needed for them. However, if your source repository is
 not world-readable, you would need to define a `service-account` field and
 specify the name of the service account that has read access.
 
-For *destination registries*, most commonly they are world-readable, but not
-world-writable. To allow CIP to write to such registries, they require a
+For *destination repositories*, most commonly they are world-readable, but not
+world-writable. To allow CIP to write to such repositories, they require a
 `service-account` field. This is the case of the examples shown thus far, where
 `foo@google-containers.iam.gserviceaccount.com` presumably has write access to
 `gcr.io/myproject-production`.
 
 When CIP starts up, it associates any defined `service-account`s to the
-registries, and also reads in a temporary service account token, and binds it to
-the corresponding registry. The credentials for these service accounts must
+repositories, and also reads in a temporary service account token, and binds it to
+the corresponding repository. The credentials for these service accounts must
 already be set up in the environment prior to running the promoter.
 
 ## How promotion works
 
 The promoter's behaviour can be described in terms of mathematical sets (as in Venn diagrams).
-Suppose `S` is the set of images in the source registry, `D` is the set of all images in the destination registry and
+Suppose `S` is the set of images in the source repository, `D` is the set of all images in the destination repository and
 `M` is the set of images to be promoted (these are defined in the promoter manifest). Then:
 
-- `M ∩ D` = images which do not need promoting since they are already present in the destination registry
+- `M ∩ D` = images which do not need promoting since they are already present in the destination repository
 - `(M ∩ S) \ D` = images that are copied
 
-The above statements are true for each destination registry.
+The above statements are true for each destination repository.
 
 The promoter also prints warnings about images that cannot be promoted:
 
@@ -199,7 +199,7 @@ The promoter also prints warnings about images that cannot be promoted:
 ## Server-side operations
 
 During the promotion process, all data resides on the server (currently, Google
-Container Registry for images). That is, no images get pulled and pushed back
+Container Repository for images). That is, no images get pulled and pushed back
 up. There are two reasons why it does things entirely server-side:
 
 1. Performance. Images can be gigabytes in size and it would take forever to
@@ -213,12 +213,12 @@ up. There are two reasons why it does things entirely server-side:
 ## Grabbing snapshots
 
 The promoter can also be used to quickly generate textual snapshots of all
-images found in a registry. Such snapshots provide a kind of lightweight
-"fingerprint" of a registry, and are useful in comparing registries. The
+images found in a repository. Such snapshots provide a kind of lightweight
+"fingerprint" of a repository, and are useful in comparing repositories. The
 snapshots can also be used to generate the `images` part of a thin manifest, if
-you want to promote *all* images from one registry to another.
+you want to promote *all* images from one repository to another.
 
-To snapshot a GCR registry, you can do:
+To snapshot a GCR repository, you can do:
 
 ```
 cip -snapshot=gcr.io/foo
@@ -244,13 +244,13 @@ resulting output lighter by removing redundant information.
 
 ### Snapshots of promoter manifests
 
-Apart from GCR registries, you can also snapshot a destination registry defined
+Apart from GCR repositories, you can also snapshot a destination repository defined
 in thin manifest directories, with the `-manifest-based-snapshot-of` flag. This
 is useful if for example you want to have a unified look at a particular
-destination registry that is broken up over multiple thin manifests. For
+destination repository that is broken up over multiple thin manifests. For
 example, the thin manifests defined [k8sio-manifests-dir][here] all promoter to
-3 registries, `{asia,eu,us}.gcr.io/k8s-artifacts-prod`. But the various
-subdirectories there all promote images into one of these three registries. From
+3 repositories, `{asia,eu,us}.gcr.io/k8s-artifacts-prod`. But the various
+subdirectories there all promote images into one of these three repositories. From
 examining the thin manifests by hand, it can be difficult to answer questions
 such as, "how many total images (counting by unique digests) are we promoting
 into `gcr.io/k8s-artifacts-prod`?"
@@ -295,8 +295,8 @@ create streams of data (JSON or not) which we can interpret and use.
 
 For tests, the [fake](lib/stream/fake.go) implementation is used instead, which
 predefines how that stream will behave, for the purposes of each unit test. A
-good example of this is the [`TestReadRegistries`
-test](lib/dockerregistry/inventory_test.go).
+good example of this is the [`TestReadRepositories`
+test](lib/dockerrepository/inventory_test.go).
 
 ## Automated builds
 

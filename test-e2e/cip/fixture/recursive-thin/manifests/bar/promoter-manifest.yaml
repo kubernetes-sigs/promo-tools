@@ -1,4 +1,4 @@
-registries:
+repositories:
 - name: gcr.io/k8s-staging-cip-test/golden-bar
   service-account: k8s-infra-gcr-promoter@k8s-cip-test-prod.iam.gserviceaccount.com
   src: true

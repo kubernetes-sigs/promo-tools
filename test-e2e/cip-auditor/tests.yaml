@@ -2,8 +2,8 @@
 # a lot with just 1 test case. This is because we can do N mutations in a single
 # test case.
 - name: "basic"
-  # Registries listed here are WIPED before the test as part of test setup!
-  registries:
+  # Repositories listed here are WIPED before the test as part of test setup!
+  repositories:
   # Staging.
   - name: gcr.io/k8s-gcr-audit-test-prod
     service-account: k8s-infra-gcr-promoter@k8s-gcr-audit-test-prod.iam.gserviceaccount.com
@@ -24,7 +24,7 @@
   #
   # This can be an empty list if we want to start out with an empty GCR state.
   setupCip: []
-  # Commands to invoke for setting up the prod registry *before* the Cloud Run
+  # Commands to invoke for setting up the prod repository *before* the Cloud Run
   # application is started. This is useful because some tests will require that
   # we delete an *already-existing* image.
   setupExtra: []
@@ -49,7 +49,7 @@
   - 'TRANSACTION VERIFIED: {Action: "INSERT", FQIN: "us.gcr.io/k8s-gcr-audit-test-prod/golden-bar/bar@sha256:610b1ef6fec876146dee2b2846c890b566d26f235d7ea8982056a3e84bd35929", PQIN: "us.gcr.io/k8s-gcr-audit-test-prod/golden-bar/bar:1.0", Path: "us.gcr.io/k8s-gcr-audit-test-prod/golden-bar/bar", Digest: "sha256:610b1ef6fec876146dee2b2846c890b566d26f235d7ea8982056a3e84bd35929", Tag: "1.0"}: agrees with manifest'
   - 'TRANSACTION REJECTED: {Action: "INSERT", FQIN: "us.gcr.io/k8s-gcr-audit-test-prod/golden-bar/bar@sha256:610b1ef6fec876146dee2b2846c890b566d26f235d7ea8982056a3e84bd35929", PQIN: "us.gcr.io/k8s-gcr-audit-test-prod/golden-bar/bar:2.0", Path: "us.gcr.io/k8s-gcr-audit-test-prod/golden-bar/bar", Digest: "sha256:610b1ef6fec876146dee2b2846c890b566d26f235d7ea8982056a3e84bd35929", Tag: "2.0"}: could not validate'
 - name: "fatManifest"
-  registries:
+  repositories:
   # Staging.
   - name: gcr.io/k8s-gcr-audit-test-prod
     service-account: k8s-infra-gcr-promoter@k8s-gcr-audit-test-prod.iam.gserviceaccount.com
@@ -65,12 +65,12 @@
   #
   # This can be an empty list if we want to start out with an empty GCR state.
   setupCip: []
-  # Commands to invoke for setting up the prod registry *before* the Cloud Run
+  # Commands to invoke for setting up the prod repository *before* the Cloud Run
   # application is started. This is useful because some tests will require that
   # we delete an *already-existing* image.
   setupExtra: []
   mutations:
-  # Create a fat manifest. Because of the way Docker registries work, the
+  # Create a fat manifest. Because of the way Docker repositories work, the
   # creation of a parent image (the fat manifest) forces the child images to be
   # copied over first.
   - - "gcloud"
@@ -90,7 +90,7 @@
 # The main difference versus the plain "fatManifest" test is that the path
 # prefix "golden-foo" is NOT SHARED between the staging and prod repos here.
 - name: "fatManifest-subproject-different-prefix"
-  registries:
+  repositories:
   # Staging.
   - name: gcr.io/k8s-gcr-audit-test-prod
     service-account: k8s-infra-gcr-promoter@k8s-gcr-audit-test-prod.iam.gserviceaccount.com

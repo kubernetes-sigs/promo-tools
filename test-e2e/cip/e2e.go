@@ -97,7 +97,7 @@ func main() {
 
 		fmt.Println("checking snapshots BEFORE promotion:")
 		for _, snapshot := range t.Snapshots {
-			checkSnapshot(snapshot.Name, snapshot.Before, *repoRootPtr, t.Registries)
+			checkSnapshot(snapshot.Name, snapshot.Before, *repoRootPtr, t.Repositories)
 		}
 
 		err = runPromotion(*repoRootPtr, t)
@@ -107,7 +107,7 @@ func main() {
 
 		fmt.Println("checking snapshots AFTER promotion:")
 		for _, snapshot := range t.Snapshots {
-			checkSnapshot(snapshot.Name, snapshot.After, *repoRootPtr, t.Registries)
+			checkSnapshot(snapshot.Name, snapshot.After, *repoRootPtr, t.Repositories)
 		}
 
 		fmt.Printf("\n===> e2e test '%s': OK\n", t.Name)
@@ -298,11 +298,11 @@ func runPromotion(repoRoot string, t E2ETest) error {
 }
 
 func extractSvcAcc(
-	registry reg.RegistryName,
+	repository reg.RegistryName,
 	rcs []reg.RegistryContext) string {
 
 	for _, r := range rcs {
-		if r.Name == registry {
+		if r.Name == repository {
 			return r.ServiceAccount
 		}
 	}
@@ -310,7 +310,7 @@ func extractSvcAcc(
 }
 
 func getSnapshot(repoRoot string,
-	registry reg.RegistryName,
+	repository reg.RegistryName,
 	rcs []reg.RegistryContext) ([]reg.Image, error) {
 
 	invocation := []string{
@@ -318,9 +318,9 @@ func getSnapshot(repoRoot string,
 		"--workspace_status_command=" + repoRoot + "/workspace_status.sh",
 		":cip",
 		"--",
-		"-snapshot=" + string(registry)}
+		"-snapshot=" + string(repository)}
 
-	svcAcc := extractSvcAcc(registry, rcs)
+	svcAcc := extractSvcAcc(repository, rcs)
 	if len(svcAcc) > 0 {
 		invocation = append(invocation, "-snapshot-service-account="+svcAcc)
 	}
@@ -354,7 +354,7 @@ func (t *E2ETest) clearRepositories() error {
 	// promotions will be done by the cip binary, not this tool.
 	sc, err := reg.MakeSyncContext(
 		[]reg.Manifest{
-			{Registries: t.Registries},
+			{Registries: t.Repositories},
 		},
 		10,
 		false,
@@ -365,14 +365,14 @@ func (t *E2ETest) clearRepositories() error {
 
 	sc.ReadRegistries(
 		sc.RegistryContexts,
-		// Read all registries recursively, because we want to delete every
+		// Read all repositories recursively, because we want to delete every
 		// image found in it (clearRepository works by deleting each image found
 		// in sc.Inv).
 		true,
 		reg.MkReadRepositoryCmdReal)
 
-	// Clear ALL registries in the test manifest. Blank slate!
-	for _, rc := range t.Registries {
+	// Clear ALL repositories in the test manifest. Blank slate!
+	for _, rc := range t.Repositories {
 		fmt.Println("CLEARING REPO", rc.Name)
 		clearRepository(rc.Name, &sc)
 	}
@@ -404,17 +404,17 @@ func clearRepository(regName reg.RegistryName,
 // cares about.
 type E2ETest struct {
 	Name       string                `yaml:"name,omitempty"`
-	Registries []reg.RegistryContext `yaml:"registries,omitempty"`
+	Repositories []reg.RegistryContext `yaml:"repositories,omitempty"`
 	Invocation []string              `yaml:"invocation,omitempty"`
-	Snapshots  []RegistrySnapshot    `yaml:"snapshots,omitempty"`
+	Snapshots  []RepositorySnapshot    `yaml:"snapshots,omitempty"`
 }
 
 // E2ETests is an array of E2ETest.
 type E2ETests []E2ETest
 
-// RegistrySnapshot is the snapshot of a registry. It is basically the key/value
-// pair out of the reg.MasterInventory type (RegistryName + []Image).
-type RegistrySnapshot struct {
+// RepositorySnapshot is the snapshot of a repository. It is basically the key/value
+// pair out of the reg.MasterInventory type (RepositoryName + []Image).
+type RepositorySnapshot struct {
 	Name   reg.RegistryName `yaml:"name,omitempty"`
 	Before []reg.Image      `yaml:"before,omitempty"`
 	After  []reg.Image      `yaml:"after,omitempty"`
@@ -445,7 +445,7 @@ func printUsage() {
 }
 
 // TODO: Use the version of checkEqual found in
-// lib/dockerregistry/inventory_test.go.
+// lib/dockerrepository/inventory_test.go.
 func checkEqual(got, expected interface{}) error {
 	if !reflect.DeepEqual(got, expected) {
 		return fmt.Errorf(

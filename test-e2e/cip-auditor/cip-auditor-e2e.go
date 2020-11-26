@@ -260,9 +260,9 @@ func runE2ETests(testsFile, repoRoot string) {
 }
 
 // testSetup clears all repositories listed in the test, then populates the
-// staging registry with some images we can use to populate the prod registry.
+// staging repository with some images we can use to populate the prod repository.
 // We exploit the fact that GCR has 3 regions (us, asia, eu) and just use one of
-// the regions to behave as the staging registry.
+// the regions to behave as the staging repository.
 //
 // [1]: https://cloud.google.com/pubsub/docs/admin#pubsub-delete-topic-gcloud
 //
@@ -310,7 +310,7 @@ func testSetup(
 // nolint[funlen]
 func populateGoldenImages(repoRoot, pushRepo string) error {
 	// Populate the staging repo with some golden images. This way, we have a
-	// "library" of images we can use when populating the prod registry
+	// "library" of images we can use when populating the prod repository
 	// (STABLE_TEST_AUDIT_PROD_IMG_REPOSITORY).
 	cmds := [][]string{
 		// In order to create a manifest list, images must be pushed to a
@@ -431,7 +431,7 @@ func (t *E2ETest) clearRepositories() error {
 	// promotions will be done by the cip binary, not this tool.
 	sc, err := reg.MakeSyncContext(
 		[]reg.Manifest{
-			{Registries: t.Registries},
+			{Registries: t.Repositories},
 		},
 		10,
 		false,
@@ -442,14 +442,14 @@ func (t *E2ETest) clearRepositories() error {
 
 	sc.ReadRegistries(
 		sc.RegistryContexts,
-		// Read all registries recursively, because we want to delete every
+		// Read all repositories recursively, because we want to delete every
 		// image found in it (clearRepository works by deleting each image found
 		// in sc.Inv).
 		true,
 		reg.MkReadRepositoryCmdReal)
 
-	// Clear ALL registries in the test manifest. Blank slate!
-	for _, rc := range t.Registries {
+	// Clear ALL repositories in the test manifest. Blank slate!
+	for _, rc := range t.Repositories {
 		fmt.Println("CLEARING REPO", rc.Name)
 		clearRepository(rc.Name, &sc)
 	}
@@ -1003,8 +1003,8 @@ func checkLogs(projectID, uuid string, patterns []string) error {
 // is not called (to populate the GCR) --- this is useful for cases when we want
 // to have a blank GCR.
 //
-// Registries is the list of all registries involved for this test case. To
-// ensure hermeticity and reproducibility, these registries are *cleared* before
+// Repositories is the list of all repositories involved for this test case. To
+// ensure hermeticity and reproducibility, these repositories are *cleared* before
 // any of the actual test logic is executed.
 //
 // SetupExtra is how the test environment is set up *before* the Cloud Run
@@ -1020,7 +1020,7 @@ func checkLogs(projectID, uuid string, patterns []string) error {
 // REJECTED).
 type E2ETest struct {
 	Name        string                `yaml:"name,omitempty"`
-	Registries  []reg.RegistryContext `yaml:"registries,omitempty"`
+	Repositories  []reg.RegistryContext `yaml:"repositories,omitempty"`
 	ManifestDir string                `yaml:"manifestDir,omitempty"`
 	SetupCip    []string              `yaml:"setupCip,omitempty"`
 	SetupExtra  [][]string            `yaml:"setupExtra,omitempty"`

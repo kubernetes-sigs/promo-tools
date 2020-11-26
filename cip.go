@@ -66,7 +66,7 @@ func main() {
 		"dry-run",
 		true,
 		"print what would have happened by running this tool;"+
-			" do not actually modify any registry")
+			" do not actually modify any repository")
 	keyFilesPtr := flag.String(
 		"key-files",
 		"",
@@ -103,7 +103,7 @@ func main() {
 	manifestBasedSnapshotOf := flag.String(
 		"manifest-based-snapshot-of",
 		"",
-		"read all images in either -manifest or -thin-manifest-dir and print all images that should be promoted to the given registry (assuming the given registry is empty); this is like -snapshot, but instead of reading over the network from a registry, it reads from the local manifests only")
+		"read all images in either -manifest or -thin-manifest-dir and print all images that should be promoted to the given repository (assuming the given repository is empty); this is like -snapshot, but instead of reading over the network from a repository, it reads from the local manifests only")
 	useServiceAccount := false
 	flag.BoolVar(&useServiceAccount, "use-service-account", false,
 		"pass '--account=...' to all gcloud calls (default: false)")
@@ -185,7 +185,7 @@ func main() {
 	}
 
 	var mfest reg.Manifest
-	var srcRegistry *reg.RegistryContext
+	var srcRepository *reg.RegistryContext
 	var err error
 	var mfests []reg.Manifest
 	promotionEdges := make(map[reg.PromotionEdge]interface{})
@@ -194,13 +194,13 @@ func main() {
 
 	if len(*snapshotPtr) > 0 || len(*manifestBasedSnapshotOf) > 0 {
 		if len(*snapshotPtr) > 0 {
-			srcRegistry = &reg.RegistryContext{
+			srcRepository = &reg.RegistryContext{
 				Name:           reg.RegistryName(*snapshotPtr),
 				ServiceAccount: *snapshotSvcAccPtr,
 				Src:            true,
 			}
 		} else {
-			srcRegistry = &reg.RegistryContext{
+			srcRepository = &reg.RegistryContext{
 				Name:           reg.RegistryName(*manifestBasedSnapshotOf),
 				ServiceAccount: *snapshotSvcAccPtr,
 				Src:            true,
@@ -209,7 +209,7 @@ func main() {
 		mfests = []reg.Manifest{
 			{
 				Registries: []reg.RegistryContext{
-					*srcRegistry,
+					*srcRepository,
 				},
 				Images: []reg.Image{},
 			},
@@ -227,8 +227,8 @@ func main() {
 			klog.Fatal(err)
 		}
 		mfests = append(mfests, mfest)
-		for _, registry := range mfest.Registries {
-			mi[registry.Name] = nil
+		for _, repository := range mfest.Registries {
+			mi[repository.Name] = nil
 		}
 		sc, err = reg.MakeSyncContext(
 			mfests,
@@ -261,7 +261,7 @@ func main() {
 	}
 
 	// If there are no images in the manifest, it may be a stub manifest file
-	// (such as for brand new registries that would be watched by the promoter
+	// (such as for brand new repositories that would be watched by the promoter
 	// for the very first time).
 	if doingPromotion && len(*manifestBasedSnapshotOf) == 0 {
 		promotionEdges, err = reg.ToPromotionEdges(mfests)
@@ -312,7 +312,7 @@ func main() {
 
 			if *minimalSnapshotPtr {
 				sc.ReadRegistries(
-					[]reg.RegistryContext{*srcRegistry},
+					[]reg.RegistryContext{*srcRepository},
 					true,
 					reg.MkReadRepositoryCmdReal)
 				sc.ReadGCRManifestLists(reg.MkReadManifestListCmdReal)
@@ -328,8 +328,8 @@ func main() {
 				klog.Fatal(err)
 			}
 			sc.ReadRegistries(
-				[]reg.RegistryContext{*srcRegistry},
-				// Read all registries recursively, because we want to produce a
+				[]reg.RegistryContext{*srcRepository},
+				// Read all repositories recursively, because we want to produce a
 				// complete snapshot.
 				true,
 				reg.MkReadRepositoryCmdReal)
@@ -373,7 +373,7 @@ func main() {
 
 	// Promote.
 	mkProducer := func(
-		srcRegistry reg.RegistryName,
+		srcRepository reg.RegistryName,
 		srcImageName reg.ImageName,
 		destRC reg.RegistryContext,
 		imageName reg.ImageName,
@@ -382,7 +382,7 @@ func main() {
 		sp.CmdInvocation = reg.GetWriteCmd(
 			destRC,
 			sc.UseServiceAccount,
-			srcRegistry,
+			srcRepository,
 			srcImageName,
 			imageName,
 			digest,
@@ -392,7 +392,7 @@ func main() {
 	}
 	promotionEdges, ok := sc.FilterPromotionEdges(promotionEdges, true)
 	// If any funny business was detected during a comparison of the manifests
-	// with the state of the registries, then exit immediately.
+	// with the state of the repositories, then exit immediately.
 	if !ok {
 		klog.Exitln("encountered errors during edge filtering")
 	}
