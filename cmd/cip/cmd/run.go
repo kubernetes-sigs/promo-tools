@@ -14,198 +14,348 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package cmd
 
 import (
-	"flag"
 	"fmt"
 	"os"
 
 	guuid "github.com/google/uuid"
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
 
-	"k8s.io/klog"
 	"k8s.io/release/pkg/cip/audit"
 	reg "k8s.io/release/pkg/cip/dockerregistry"
 	"k8s.io/release/pkg/cip/gcloud"
 	"k8s.io/release/pkg/cip/stream"
+	"k8s.io/release/pkg/log"
 )
 
-// GitDescribe is stamped by bazel.
-var GitDescribe string
+var (
+	// GitDescribe is stamped by bazel
+	// TODO: These vars were stamped by bazel and need to built by other means now
+	GitDescribe string
 
-// GitCommit is stamped by bazel.
-var GitCommit string
+	// GitCommit is stamped by bazel
+	GitCommit string
 
-// TimestampUtcRfc3339 is stamped by bazel.
-var TimestampUtcRfc3339 string
+	// TimestampUtcRfc3339 is stamped by bazel
+	TimestampUtcRfc3339 string
+)
 
-// nolint[gocyclo]
-func main() {
-	// klog uses the "v" flag in order to set the verbosity level
-	klog.InitFlags(nil)
+// rootCmd represents the base command when called without any subcommands
+// TODO: Update command description
+var rootCmd = &cobra.Command{
+	Use:   "cip",
+	Short: "Promote images from a staging registry to production",
+	Long: `cip - Kubernetes container image promoter
+`,
+	PersistentPreRunE: initLogging,
+	SilenceUsage:      true,
+	SilenceErrors:     true,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return errors.Wrap(
+			runImagePromotion(rootOpts),
+			"run `kpromo run images`",
+		)
+	},
+}
 
-	manifestPtr := flag.String(
-		"manifest", "", "the manifest file to load")
-	thinManifestDirPtr := flag.String(
-		"thin-manifest-dir",
-		"",
-		"recursively read in all manifests within a folder, but all manifests MUST be 'thin' manifests named 'promoter-manifest.yaml', which are like regular manifests but instead of defining the 'images: ...' field directly, the 'imagesPath' field must be defined that points to another YAML file containing the 'images: ...' contents")
-	threadsPtr := flag.Int(
+// TODO: Push these into a package
+type rootOptions struct {
+	logLevel                string
+	manifest                string
+	thinManifestDir         string
+	keyFiles                string
+	snapshot                string
+	snapshotTag             string
+	outputFormat            string
+	snapshotSvcAcct         string
+	manifestBasedSnapshotOf string
+	auditManifestRepoURL    string
+	auditManifestRepoBranch string
+	auditManifestPath       string
+	auditGcpProjectID       string
+	threads                 int
+	maxImageSize            int
+	severityThreshold       int
+	jsonLogSummary          bool
+	parseOnly               bool
+	dryRun                  bool
+	version                 bool
+	minimalSnapshot         bool
+	useServiceAcct          bool
+	audit                   bool
+}
+
+// TODO: Push these into a package
+var rootOpts = &rootOptions{
+	threads: 10,
+
+	outputFormat: "YAML",
+
+	maxImageSize: 2048,
+
+	severityThreshold: -1,
+}
+
+const (
+	// flags.
+	manifestFlag        = "manifest"
+	thinManifestDirFlag = "thin-manifest-dir"
+)
+
+// Execute adds all child commands to the root command and sets flags appropriately.
+// This is called by main.main(). It only needs to happen once to the rootCmd.
+func Execute() {
+	if err := rootCmd.Execute(); err != nil {
+		logrus.Fatal(err)
+	}
+}
+
+func init() {
+	rootCmd.PersistentFlags().StringVar(
+		&rootOpts.logLevel,
+		"log-level",
+		"info",
+		fmt.Sprintf("the logging verbosity, either %s", log.LevelNames()),
+	)
+
+	// TODO: Move this into a default options function in pkg/promobot
+	rootCmd.PersistentFlags().StringVar(
+		&rootOpts.manifest,
+		manifestFlag,
+		rootOpts.manifest,
+		"the manifest file to load",
+	)
+
+	rootCmd.PersistentFlags().StringVar(
+		&rootOpts.thinManifestDir,
+		thinManifestDirFlag,
+		rootOpts.thinManifestDir,
+		"recursively read in all manifests within a folder, but all manifests MUST be 'thin' manifests named 'promoter-manifest.yaml', which are like regular manifests but instead of defining the 'images: ...' field directly, the 'imagesPath' field must be defined that points to another YAML file containing the 'images: ...' contents",
+	)
+
+	rootCmd.PersistentFlags().IntVar(
+		&rootOpts.threads,
 		"threads",
-		10, "number of concurrent goroutines to use when talking to GCR")
-	jsonLogSummaryPtr := flag.Bool(
+		rootOpts.threads,
+		"number of concurrent goroutines to use when talking to GCR",
+	)
+
+	rootCmd.PersistentFlags().BoolVar(
+		&rootOpts.jsonLogSummary,
 		"json-log-summary",
-		false,
-		"only log a json summary of important errors")
-	parseOnlyPtr := flag.Bool(
+		rootOpts.jsonLogSummary,
+		"only log a json summary of important errors",
+	)
+
+	rootCmd.PersistentFlags().BoolVar(
+		&rootOpts.parseOnly,
 		"parse-only",
-		false,
-		"only check that the given manifest file is parseable as a Manifest"+
-			" (default: false)")
-	dryRunPtr := flag.Bool(
+		rootOpts.parseOnly,
+		"only check that the given manifest file is parseable as a Manifest",
+	)
+
+	// TODO: Consider moving this to the root command
+	rootCmd.PersistentFlags().BoolVar(
+		&rootOpts.dryRun,
 		"dry-run",
-		true,
-		"print what would have happened by running this tool;"+
-			" do not actually modify any registry")
-	keyFilesPtr := flag.String(
+		rootOpts.dryRun,
+		"test run promotion without modifying any registry",
+	)
+
+	rootCmd.PersistentFlags().StringVar(
+		&rootOpts.keyFiles,
 		"key-files",
-		"",
-		"CSV of service account key files that must be activated for the promotion (<json-key-file-path>,...)")
-	// Add in help flag information, because Go's "flag" package automatically
-	// adds it, but for whatever reason does not show it as part of available
-	// options.
-	helpPtr := flag.Bool(
-		"help",
-		false,
-		"print help")
-	versionPtr := flag.Bool(
+		rootOpts.keyFiles,
+		"CSV of service account key files that must be activated for the promotion (<json-key-file-path>,...)",
+	)
+
+	rootCmd.PersistentFlags().BoolVar(
+		&rootOpts.version,
 		"version",
-		false,
-		"print version")
-	snapshotPtr := flag.String(
+		rootOpts.version,
+		"print version",
+	)
+
+	rootCmd.PersistentFlags().StringVar(
+		&rootOpts.snapshot,
 		"snapshot",
-		"",
-		"read all images in a repository and print to stdout")
-	snapshotTag := ""
-	flag.StringVar(&snapshotTag, "snapshot-tag", snapshotTag, "only snapshot images with the given tag")
-	minimalSnapshotPtr := flag.Bool(
+		rootOpts.snapshot,
+		"read all images in a repository and print to stdout",
+	)
+
+	rootCmd.PersistentFlags().StringVar(
+		&rootOpts.snapshotTag,
+		"snapshot-tag",
+		rootOpts.snapshotTag,
+		"only snapshot images with the given tag",
+	)
+
+	rootCmd.PersistentFlags().BoolVar(
+		&rootOpts.minimalSnapshot,
 		"minimal-snapshot",
-		false,
-		"(only works with -snapshot/-manifest-based-snapshot-of) discard tagless images from snapshot output if they are referenced by a manifest list")
-	outputFormatPtr := flag.String(
+		rootOpts.minimalSnapshot,
+		"(only works with -snapshot/-manifest-based-snapshot-of) discard tagless images from snapshot output if they are referenced by a manifest list",
+	)
+
+	rootCmd.PersistentFlags().StringVar(
+		&rootOpts.outputFormat,
 		"output-format",
-		"YAML",
-		"(only works with -snapshot/-manifest-based-snapshot-of) choose output format of the snapshot (default: YAML; allowed values: 'YAML' or 'CSV')")
-	snapshotSvcAccPtr := flag.String(
+		rootOpts.outputFormat,
+		"(only works with -snapshot/-manifest-based-snapshot-of) choose output format of the snapshot (default: YAML; allowed values: 'YAML' or 'CSV')",
+	)
+
+	rootCmd.PersistentFlags().StringVar(
+		&rootOpts.snapshotSvcAcct,
 		"snapshot-service-account",
-		"",
-		"service account to use for -snapshot")
-	manifestBasedSnapshotOf := flag.String(
+		rootOpts.snapshotSvcAcct,
+		"service account to use for -snapshot",
+	)
+
+	rootCmd.PersistentFlags().StringVar(
+		&rootOpts.manifestBasedSnapshotOf,
 		"manifest-based-snapshot-of",
-		"",
-		"read all images in either -manifest or -thin-manifest-dir and print all images that should be promoted to the given registry (assuming the given registry is empty); this is like -snapshot, but instead of reading over the network from a registry, it reads from the local manifests only")
-	useServiceAccount := false
-	flag.BoolVar(&useServiceAccount, "use-service-account", false,
-		"pass '--account=...' to all gcloud calls (default: false)")
-	auditorPtr := flag.Bool(
+		rootOpts.manifestBasedSnapshotOf,
+		"read all images in either -manifest or -thin-manifest-dir and print all images that should be promoted to the given registry (assuming the given registry is empty); this is like -snapshot, but instead of reading over the network from a registry, it reads from the local manifests only",
+	)
+
+	rootCmd.PersistentFlags().BoolVar(
+		&rootOpts.useServiceAcct,
+		"use-service-account",
+		rootOpts.useServiceAcct,
+		"pass '--account=...' to all gcloud calls (default: false)",
+	)
+
+	rootCmd.PersistentFlags().BoolVar(
+		&rootOpts.audit,
 		"audit",
-		false,
-		"stand up an HTTP server that responds to Pub/Sub push events for auditing")
-	auditManifestRepoUrlPtr := flag.String(
+		rootOpts.audit,
+		"stand up an HTTP server that responds to Pub/Sub push events for auditing",
+	)
+
+	rootCmd.PersistentFlags().StringVar(
+		&rootOpts.auditManifestRepoURL,
 		"audit-manifest-repo-url",
+		// TODO: Set this in a function instead
 		os.Getenv("CIP_AUDIT_MANIFEST_REPO_URL"),
-		"https://... address of the repository that holds the promoter manifests")
-	auditManifestRepoBranchPtr := flag.String(
+		"https://... address of the repository that holds the promoter manifests",
+	)
+
+	rootCmd.PersistentFlags().StringVar(
+		&rootOpts.auditManifestRepoBranch,
 		"audit-manifest-repo-branch",
+		// TODO: Set this in a function instead
 		os.Getenv("CIP_AUDIT_MANIFEST_REPO_BRANCH"),
-		"Git branch to check out (use) for -audit-manifest-repo")
-	auditManifestPathPtr := flag.String(
+		"Git branch to check out (use) for -audit-manifest-repo",
+	)
+
+	rootCmd.PersistentFlags().StringVar(
+		&rootOpts.auditManifestPath,
 		"audit-manifest-path",
+		// TODO: Set this in a function instead
 		os.Getenv("CIP_AUDIT_MANIFEST_REPO_MANIFEST_DIR"),
-		"path (relative to the root of -audit-manifest-repo) to the manifests directory")
-	auditGcpProjectID := flag.String(
+		"path (relative to the root of -audit-manifest-repo) to the manifests directory",
+	)
+
+	rootCmd.PersistentFlags().StringVar(
+		&rootOpts.auditGcpProjectID,
 		"audit-gcp-project-id",
+		// TODO: Set this in a function instead
 		os.Getenv("CIP_AUDIT_GCP_PROJECT_ID"),
-		"GCP project ID (name); used for labeling error reporting logs to GCP")
-	maxImageSizePtr := flag.Int(
+		"GCP project ID (name); used for labeling error reporting logs to GCP",
+	)
+
+	rootCmd.PersistentFlags().IntVar(
+		&rootOpts.maxImageSize,
 		"max-image-size",
-		2048,
-		"The maximum image size (MiB) allowed for promotion and must be a positive value (othwerise set to the default value of 2048 MiB)")
-	if *maxImageSizePtr <= 0 {
-		*maxImageSizePtr = 2048
+		rootOpts.maxImageSize,
+		"The maximum image size (MiB) allowed for promotion and must be a positive value (otherwise set to the default value of 2048 MiB)",
+	)
+
+	// TODO: Set this in a function instead
+	if rootOpts.maxImageSize <= 0 {
+		rootOpts.maxImageSize = 2048
 	}
-	severityThresholdPtr := flag.Int(
+
+	rootCmd.PersistentFlags().IntVar(
+		&rootOpts.severityThreshold,
 		"vuln-severity-threshold",
-		-1,
-		"Using this flag will cause the promoter to only run the vulnerability check. Found vulnerabilities at or above this threshold will result in the vulnerability check failing [severity levels beteen 0 and 5; 0 - UNSPECIFIED, 1 - MINIMAL, 2 - LOW, 3 - MEDIUM, 4 - HIGH, 5 - CRITICAL]")
-	flag.Parse()
+		rootOpts.severityThreshold,
+		"Using this flag will cause the promoter to only run the vulnerability check. Found vulnerabilities at or above this threshold will result in the vulnerability check failing [severity levels between 0 and 5; 0 - UNSPECIFIED, 1 - MINIMAL, 2 - LOW, 3 - MEDIUM, 4 - HIGH, 5 - CRITICAL]",
+	)
+}
 
-	if len(os.Args) == 1 {
+// nolint: gocyclo
+func runImagePromotion(opts *rootOptions) error {
+	if opts.version {
 		printVersion()
-		printUsage()
-		os.Exit(0)
+		return nil
 	}
 
-	if *helpPtr {
-		printUsage()
-		os.Exit(0)
+	if err := validateImageOptions(opts); err != nil {
+		return errors.Wrap(err, "validating image options")
 	}
 
-	if *versionPtr {
-		printVersion()
-		os.Exit(0)
-	}
-
-	if *auditorPtr {
+	if opts.audit {
 		uuid := os.Getenv("CIP_AUDIT_TESTCASE_UUID")
 		if len(uuid) > 0 {
-			klog.Infof("Starting auditor in Test Mode (%s)", uuid)
+			logrus.Infof("Starting auditor in Test Mode (%s)", uuid)
 		} else {
 			uuid = guuid.New().String()
-			klog.Infof("Starting auditor in Regular Mode (%s)", uuid)
+			logrus.Infof("Starting auditor in Regular Mode (%s)", uuid)
 		}
 
 		auditServerContext, err := audit.InitRealServerContext(
-			*auditGcpProjectID,
-			*auditManifestRepoUrlPtr,
-			*auditManifestRepoBranchPtr,
-			*auditManifestPathPtr,
-			uuid)
+			opts.auditGcpProjectID,
+			opts.auditManifestRepoURL,
+			opts.auditManifestRepoBranch,
+			opts.auditManifestPath,
+			uuid,
+		)
 		if err != nil {
-			klog.Exitln(err)
+			return errors.Wrap(err, "creating auditor context")
 		}
+
 		auditServerContext.RunAuditor()
 	}
 
 	// Activate service accounts.
-	if useServiceAccount && len(*keyFilesPtr) > 0 {
-		if err := gcloud.ActivateServiceAccounts(*keyFilesPtr); err != nil {
-			klog.Exitln(err)
+	if opts.useServiceAcct && opts.keyFiles != "" {
+		if err := gcloud.ActivateServiceAccounts(opts.keyFiles); err != nil {
+			return errors.Wrap(err, "activating service accounts")
 		}
 	}
 
-	var mfest reg.Manifest
-	var srcRegistry *reg.RegistryContext
-	var err error
-	var mfests []reg.Manifest
+	var (
+		mfest       reg.Manifest
+		srcRegistry *reg.RegistryContext
+		err         error
+		mfests      []reg.Manifest
+	)
+
 	promotionEdges := make(map[reg.PromotionEdge]interface{})
 	sc := reg.SyncContext{}
 	mi := make(reg.MasterInventory)
 
-	if len(*snapshotPtr) > 0 || len(*manifestBasedSnapshotOf) > 0 {
-		if len(*snapshotPtr) > 0 {
+	// TODO: Move this into the validation function
+	if opts.snapshot != "" || opts.manifestBasedSnapshotOf != "" {
+		if opts.snapshot != "" {
 			srcRegistry = &reg.RegistryContext{
-				Name:           reg.RegistryName(*snapshotPtr),
-				ServiceAccount: *snapshotSvcAccPtr,
+				Name:           reg.RegistryName(opts.snapshot),
+				ServiceAccount: opts.snapshotSvcAcct,
 				Src:            true,
 			}
 		} else {
 			srcRegistry = &reg.RegistryContext{
-				Name:           reg.RegistryName(*manifestBasedSnapshotOf),
-				ServiceAccount: *snapshotSvcAccPtr,
+				Name:           reg.RegistryName(opts.manifestBasedSnapshotOf),
+				ServiceAccount: opts.snapshotSvcAcct,
 				Src:            true,
 			}
 		}
+
 		mfests = []reg.Manifest{
 			{
 				Registries: []reg.RegistryContext{
@@ -214,59 +364,67 @@ func main() {
 				Images: []reg.Image{},
 			},
 		}
-	} else {
-		if *manifestPtr == "" && *thinManifestDirPtr == "" {
-			klog.Fatal(fmt.Errorf("one of -manifest or -thin-manifest-dir is required"))
-		}
+		// TODO: Move this into the validation function
+	} else if opts.manifest == "" && opts.thinManifestDir == "" {
+		logrus.Fatalf(
+			"either %s or %s flag is required",
+			manifestFlag,
+			thinManifestDirFlag,
+		)
 	}
 
 	doingPromotion := false
-	if *manifestPtr != "" {
-		mfest, err = reg.ParseManifestFromFile(*manifestPtr)
+	if opts.manifest != "" {
+		mfest, err = reg.ParseManifestFromFile(opts.manifest)
 		if err != nil {
-			klog.Fatal(err)
+			logrus.Fatal(err)
 		}
+
 		mfests = append(mfests, mfest)
 		for _, registry := range mfest.Registries {
 			mi[registry.Name] = nil
 		}
+
 		sc, err = reg.MakeSyncContext(
 			mfests,
-			*threadsPtr,
-			*dryRunPtr,
-			useServiceAccount)
+			opts.threads,
+			opts.dryRun,
+			opts.useServiceAcct,
+		)
 		if err != nil {
-			klog.Fatal(err)
+			logrus.Fatal(err)
 		}
+
 		doingPromotion = true
-	} else if *thinManifestDirPtr != "" {
-		mfests, err = reg.ParseThinManifestsFromDir(*thinManifestDirPtr)
+	} else if opts.thinManifestDir != "" {
+		mfests, err = reg.ParseThinManifestsFromDir(opts.thinManifestDir)
 		if err != nil {
-			klog.Exitln(err)
+			return errors.Wrap(err, "parsing thin manifest directory")
 		}
 
 		sc, err = reg.MakeSyncContext(
 			mfests,
-			*threadsPtr,
-			*dryRunPtr,
-			useServiceAccount)
+			opts.threads,
+			opts.dryRun,
+			opts.useServiceAcct)
 		if err != nil {
-			klog.Fatal(err)
+			logrus.Fatal(err)
 		}
+
 		doingPromotion = true
 	}
 
-	if *parseOnlyPtr {
-		os.Exit(0)
+	if opts.parseOnly {
+		return nil
 	}
 
 	// If there are no images in the manifest, it may be a stub manifest file
 	// (such as for brand new registries that would be watched by the promoter
 	// for the very first time).
-	if doingPromotion && len(*manifestBasedSnapshotOf) == 0 {
+	if doingPromotion && opts.manifestBasedSnapshotOf == "" {
 		promotionEdges, err = reg.ToPromotionEdges(mfests)
 		if err != nil {
-			klog.Exitln(err)
+			return errors.Wrap(err, "converting list of manifests to edges for promotion")
 		}
 
 		imagesInManifests := false
@@ -277,97 +435,107 @@ func main() {
 			}
 		}
 		if !imagesInManifests {
-			klog.Info("No images in manifest(s) --- nothing to do.")
-			os.Exit(0)
+			logrus.Info("No images in manifest(s) --- nothing to do.")
+			return nil
 		}
 
 		// Print version to make Prow logs more self-explanatory.
 		printVersion()
 
-		if *severityThresholdPtr >= 0 {
-			klog.Info("********** START (VULN CHECK) **********")
-			klog.Info("DISCLAIMER: Vulnerabilities are found as issues with " +
+		if opts.severityThreshold >= 0 {
+			logrus.Info("********** START (VULN CHECK) **********")
+			logrus.Info("DISCLAIMER: Vulnerabilities are found as issues with " +
 				"package binaries within image layers, not necessarily " +
 				"with the image layers themselves. So a \"fixable\" " +
 				"vulnerability may not necessarily be immediately" +
 				"actionable. For example, even though a fixed version " +
 				"of the binary is available, it doesn't necessarily mean " +
 				"that a new version of the image layer is available.")
-		} else if *dryRunPtr {
-			klog.Info("********** START (DRY RUN) **********")
+		} else if opts.dryRun {
+			logrus.Info("********** START (DRY RUN) **********")
 		} else {
-			klog.Info("********** START **********")
+			logrus.Info("********** START **********")
 		}
 	}
 
-	if len(*snapshotPtr) > 0 || len(*manifestBasedSnapshotOf) > 0 {
+	if len(opts.snapshot) > 0 || len(opts.manifestBasedSnapshotOf) > 0 {
 		rii := make(reg.RegInvImage)
-		if len(*manifestBasedSnapshotOf) > 0 {
+		if len(opts.manifestBasedSnapshotOf) > 0 {
 			promotionEdges, err = reg.ToPromotionEdges(mfests)
 			if err != nil {
-				klog.Exitln(err)
+				return errors.Wrap(err, "converting list of manifests to edges for promotion")
 			}
-			rii = reg.EdgesToRegInvImage(promotionEdges,
-				*manifestBasedSnapshotOf)
 
-			if *minimalSnapshotPtr {
+			rii = reg.EdgesToRegInvImage(
+				promotionEdges,
+				opts.manifestBasedSnapshotOf,
+			)
+
+			if opts.minimalSnapshot {
 				sc.ReadRegistries(
 					[]reg.RegistryContext{*srcRegistry},
 					true,
-					reg.MkReadRepositoryCmdReal)
+					reg.MkReadRepositoryCmdReal,
+				)
+
 				sc.ReadGCRManifestLists(reg.MkReadManifestListCmdReal)
 				rii = sc.RemoveChildDigestEntries(rii)
 			}
 		} else {
 			sc, err = reg.MakeSyncContext(
 				mfests,
-				*threadsPtr,
-				*dryRunPtr,
-				useServiceAccount)
+				opts.threads,
+				opts.dryRun,
+				opts.useServiceAcct,
+			)
 			if err != nil {
-				klog.Fatal(err)
+				logrus.Fatal(err)
 			}
+
 			sc.ReadRegistries(
 				[]reg.RegistryContext{*srcRegistry},
 				// Read all registries recursively, because we want to produce a
 				// complete snapshot.
 				true,
-				reg.MkReadRepositoryCmdReal)
+				reg.MkReadRepositoryCmdReal,
+			)
 
 			rii = sc.Inv[mfests[0].Registries[0].Name]
-			if snapshotTag != "" {
-				rii = reg.FilterByTag(rii, snapshotTag)
+			if opts.snapshotTag != "" {
+				rii = reg.FilterByTag(rii, opts.snapshotTag)
 			}
-			if *minimalSnapshotPtr {
-				klog.Info("-minimal-snapshot specifed; removing tagless child digests of manifest lists")
+
+			if opts.minimalSnapshot {
+				logrus.Info("-minimal-snapshot specified; removing tagless child digests of manifest lists")
 				sc.ReadGCRManifestLists(reg.MkReadManifestListCmdReal)
 				rii = sc.RemoveChildDigestEntries(rii)
 			}
 		}
 
 		var snapshot string
-		switch *outputFormatPtr {
+		switch opts.outputFormat {
 		case "CSV":
 			snapshot = rii.ToCSV()
 		case "YAML":
 			snapshot = rii.ToYAML(reg.YamlMarshalingOpts{})
 		default:
-			klog.Errorf("invalid value %s for -output-format; defaulting to YAML", *outputFormatPtr)
+			logrus.Errorf("invalid value %s for -output-format; defaulting to YAML", opts.outputFormat)
 			snapshot = rii.ToYAML(reg.YamlMarshalingOpts{})
 		}
+
 		fmt.Print(snapshot)
-		os.Exit(0)
+		return nil
 	}
 
-	if *jsonLogSummaryPtr {
+	if opts.jsonLogSummary {
 		defer sc.LogJSONSummary()
 	}
 
 	// Check the pull request
-	if *dryRunPtr {
+	if opts.dryRun {
 		err = sc.RunChecks([]reg.PreCheck{})
 		if err != nil {
-			klog.Exitln(err)
+			return errors.Wrap(err, "running prechecks before promotion")
 		}
 	}
 
@@ -377,7 +545,8 @@ func main() {
 		srcImageName reg.ImageName,
 		destRC reg.RegistryContext,
 		imageName reg.ImageName,
-		digest reg.Digest, tag reg.Tag, tp reg.TagOp) stream.Producer {
+		digest reg.Digest, tag reg.Tag, tp reg.TagOp,
+	) stream.Producer {
 		var sp stream.Subprocess
 		sp.CmdInvocation = reg.GetWriteCmd(
 			destRC,
@@ -387,47 +556,57 @@ func main() {
 			imageName,
 			digest,
 			tag,
-			tp)
+			tp,
+		)
+
 		return &sp
 	}
+
 	promotionEdges, ok := sc.FilterPromotionEdges(promotionEdges, true)
 	// If any funny business was detected during a comparison of the manifests
 	// with the state of the registries, then exit immediately.
 	if !ok {
-		klog.Exitln("encountered errors during edge filtering")
+		return errors.New("encountered errors during edge filtering")
 	}
 
-	if *severityThresholdPtr >= 0 {
-		err = sc.RunChecks([]reg.PreCheck{
-			reg.MKImageVulnCheck(sc, promotionEdges,
-				*severityThresholdPtr, nil),
-		})
+	if opts.severityThreshold >= 0 {
+		err = sc.RunChecks(
+			[]reg.PreCheck{
+				reg.MKImageVulnCheck(sc, promotionEdges, opts.severityThreshold, nil),
+			},
+		)
 		if err != nil {
-			klog.Exitln(err)
+			return errors.Wrap(err, "checking image vulnerabilities")
 		}
 	} else {
 		err = sc.Promote(promotionEdges, mkProducer, nil)
 		if err != nil {
-			klog.Exitln(err)
+			return errors.Wrap(err, "promoting images")
 		}
 	}
 
-	if *severityThresholdPtr >= 0 {
-		klog.Info("********** FINISHED (VULN CHECK) **********")
-	} else if *dryRunPtr {
-		klog.Info("********** FINISHED (DRY RUN) **********")
+	if opts.severityThreshold >= 0 {
+		logrus.Info("********** FINISHED (VULN CHECK) **********")
+	} else if opts.dryRun {
+		logrus.Info("********** FINISHED (DRY RUN) **********")
 	} else {
-		klog.Info("********** FINISHED **********")
+		logrus.Info("********** FINISHED **********")
 	}
+
+	return nil
+}
+
+func initLogging(*cobra.Command, []string) error {
+	return log.SetupGlobalLogger(rootOpts.logLevel)
+}
+
+func validateImageOptions(o *rootOptions) error {
+	// TODO: Validate options
+	return nil
 }
 
 func printVersion() {
 	fmt.Printf("Built:   %s\n", TimestampUtcRfc3339)
 	fmt.Printf("Version: %s\n", GitDescribe)
 	fmt.Printf("Commit:  %s\n", GitCommit)
-}
-
-func printUsage() {
-	fmt.Fprintf(os.Stderr, "Usage of %s:\n", os.Args[0])
-	flag.PrintDefaults()
 }
