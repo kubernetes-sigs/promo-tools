@@ -59,6 +59,7 @@ linters:
   - exportloopref
   - gci
   - gochecknoglobals
+  - gochecknoinits
   - godox
   - goerr113
   - gofumpt

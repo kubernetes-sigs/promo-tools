@@ -33,14 +33,13 @@ import (
 )
 
 var (
-	// GitDescribe is stamped by bazel
-	// TODO: These vars were stamped by bazel and need to built by other means now
+	// GitDescribe is stamped by bazel.
 	GitDescribe string
 
-	// GitCommit is stamped by bazel
+	// GitCommit is stamped by bazel.
 	GitCommit string
 
-	// TimestampUtcRfc3339 is stamped by bazel
+	// TimestampUtcRfc3339 is stamped by bazel.
 	TimestampUtcRfc3339 string
 )
 
@@ -89,24 +88,21 @@ type rootOptions struct {
 	audit                   bool
 }
 
-// TODO: Push these into a package
-var rootOpts = &rootOptions{
-	threads: 10,
-
-	outputFormat: "YAML",
-
-	maxImageSize: 2048,
-
-	severityThreshold: -1,
-}
+var rootOpts = &rootOptions{}
 
 const (
+	// TODO: Push these into a package.
+	defaultThreads           = 10
+	defaultOutputFormat      = "YAML"
+	defaultMaxImageSize      = 2048
+	defaultSeverityThreshold = -1
+
 	// flags.
 	manifestFlag        = "manifest"
 	thinManifestDirFlag = "thin-manifest-dir"
 )
 
-// Execute adds all child commands to the root command and sets flags appropriately.
+// Execute adds all child commands to the root command and sets flags.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
@@ -114,6 +110,8 @@ func Execute() {
 	}
 }
 
+// TODO: Function 'init' is too long (171 > 60) (funlen)
+// nolint: funlen
 func init() {
 	rootCmd.PersistentFlags().StringVar(
 		&rootOpts.logLevel,
@@ -134,13 +132,17 @@ func init() {
 		&rootOpts.thinManifestDir,
 		thinManifestDirFlag,
 		rootOpts.thinManifestDir,
-		"recursively read in all manifests within a folder, but all manifests MUST be 'thin' manifests named 'promoter-manifest.yaml', which are like regular manifests but instead of defining the 'images: ...' field directly, the 'imagesPath' field must be defined that points to another YAML file containing the 'images: ...' contents",
+		`recursively read in all manifests within a folder, but all manifests
+MUST be 'thin' manifests named 'promoter-manifest.yaml', which are like regular
+manifests but instead of defining the 'images: ...' field directly, the
+'imagesPath' field must be defined that points to another YAML file containing
+the 'images: ...' contents`,
 	)
 
 	rootCmd.PersistentFlags().IntVar(
 		&rootOpts.threads,
 		"threads",
-		rootOpts.threads,
+		defaultThreads,
 		"number of concurrent goroutines to use when talking to GCR",
 	)
 
@@ -170,7 +172,8 @@ func init() {
 		&rootOpts.keyFiles,
 		"key-files",
 		rootOpts.keyFiles,
-		"CSV of service account key files that must be activated for the promotion (<json-key-file-path>,...)",
+		`CSV of service account key files that must be activated for the
+promotion (<json-key-file-path>,...)`,
 	)
 
 	rootCmd.PersistentFlags().BoolVar(
@@ -198,14 +201,16 @@ func init() {
 		&rootOpts.minimalSnapshot,
 		"minimal-snapshot",
 		rootOpts.minimalSnapshot,
-		"(only works with -snapshot/-manifest-based-snapshot-of) discard tagless images from snapshot output if they are referenced by a manifest list",
+		`(only works with -snapshot/-manifest-based-snapshot-of) discard tagless
+images from snapshot output if they are referenced by a manifest list`,
 	)
 
 	rootCmd.PersistentFlags().StringVar(
 		&rootOpts.outputFormat,
 		"output-format",
-		rootOpts.outputFormat,
-		"(only works with -snapshot/-manifest-based-snapshot-of) choose output format of the snapshot (default: YAML; allowed values: 'YAML' or 'CSV')",
+		defaultOutputFormat,
+		`(only works with -snapshot/-manifest-based-snapshot-of) choose output
+format of the snapshot (default: YAML; allowed values: 'YAML' or 'CSV')`,
 	)
 
 	rootCmd.PersistentFlags().StringVar(
@@ -219,7 +224,10 @@ func init() {
 		&rootOpts.manifestBasedSnapshotOf,
 		"manifest-based-snapshot-of",
 		rootOpts.manifestBasedSnapshotOf,
-		"read all images in either -manifest or -thin-manifest-dir and print all images that should be promoted to the given registry (assuming the given registry is empty); this is like -snapshot, but instead of reading over the network from a registry, it reads from the local manifests only",
+		`read all images in either -manifest or -thin-manifest-dir and print all
+images that should be promoted to the given registry (assuming the given
+registry is empty); this is like -snapshot, but instead of reading over the
+network from a registry, it reads from the local manifests only`,
 	)
 
 	rootCmd.PersistentFlags().BoolVar(
@@ -233,7 +241,7 @@ func init() {
 		&rootOpts.audit,
 		"audit",
 		rootOpts.audit,
-		"stand up an HTTP server that responds to Pub/Sub push events for auditing",
+		"stand up an audit server that responds to Pub/Sub push events",
 	)
 
 	rootCmd.PersistentFlags().StringVar(
@@ -241,7 +249,7 @@ func init() {
 		"audit-manifest-repo-url",
 		// TODO: Set this in a function instead
 		os.Getenv("CIP_AUDIT_MANIFEST_REPO_URL"),
-		"https://... address of the repository that holds the promoter manifests",
+		"URL of the repository that holds the promoter manifests",
 	)
 
 	rootCmd.PersistentFlags().StringVar(
@@ -249,7 +257,7 @@ func init() {
 		"audit-manifest-repo-branch",
 		// TODO: Set this in a function instead
 		os.Getenv("CIP_AUDIT_MANIFEST_REPO_BRANCH"),
-		"Git branch to check out (use) for -audit-manifest-repo",
+		"git branch to check out (use) for --audit-manifest-repo",
 	)
 
 	rootCmd.PersistentFlags().StringVar(
@@ -257,7 +265,7 @@ func init() {
 		"audit-manifest-path",
 		// TODO: Set this in a function instead
 		os.Getenv("CIP_AUDIT_MANIFEST_REPO_MANIFEST_DIR"),
-		"path (relative to the root of -audit-manifest-repo) to the manifests directory",
+		"relative to the root of `--audit-manifest-repo` to the manifests dir",
 	)
 
 	rootCmd.PersistentFlags().StringVar(
@@ -271,8 +279,8 @@ func init() {
 	rootCmd.PersistentFlags().IntVar(
 		&rootOpts.maxImageSize,
 		"max-image-size",
-		rootOpts.maxImageSize,
-		"The maximum image size (MiB) allowed for promotion and must be a positive value (otherwise set to the default value of 2048 MiB)",
+		defaultMaxImageSize,
+		"the maximum image size (in MiB) allowed for promotion",
 	)
 
 	// TODO: Set this in a function instead
@@ -283,12 +291,16 @@ func init() {
 	rootCmd.PersistentFlags().IntVar(
 		&rootOpts.severityThreshold,
 		"vuln-severity-threshold",
-		rootOpts.severityThreshold,
-		"Using this flag will cause the promoter to only run the vulnerability check. Found vulnerabilities at or above this threshold will result in the vulnerability check failing [severity levels between 0 and 5; 0 - UNSPECIFIED, 1 - MINIMAL, 2 - LOW, 3 - MEDIUM, 4 - HIGH, 5 - CRITICAL]",
+		defaultSeverityThreshold,
+		`Using this flag will cause the promoter to only run the vulnerability
+check. Found vulnerabilities at or above this threshold will result in the
+vulnerability check failing [severity levels between 0 and 5; 0 - UNSPECIFIED,
+1 - MINIMAL, 2 - LOW, 3 - MEDIUM, 4 - HIGH, 5 - CRITICAL]`,
 	)
 }
 
-// nolint: gocyclo
+// TODO: Function 'runImagePromotion' has too many statements (97 > 40) (funlen)
+// nolint: funlen,gocognit,gocyclo
 func runImagePromotion(opts *rootOptions) error {
 	if opts.version {
 		printVersion()
@@ -374,6 +386,9 @@ func runImagePromotion(opts *rootOptions) error {
 	}
 
 	doingPromotion := false
+
+	// TODO: is deeply nested (complexity: 5) (nestif)
+	// nolint: nestif
 	if opts.manifest != "" {
 		mfest, err = reg.ParseManifestFromFile(opts.manifest)
 		if err != nil {
@@ -421,10 +436,15 @@ func runImagePromotion(opts *rootOptions) error {
 	// If there are no images in the manifest, it may be a stub manifest file
 	// (such as for brand new registries that would be watched by the promoter
 	// for the very first time).
+	// TODO: is deeply nested (complexity: 6) (nestif)
+	// nolint: nestif
 	if doingPromotion && opts.manifestBasedSnapshotOf == "" {
 		promotionEdges, err = reg.ToPromotionEdges(mfests)
 		if err != nil {
-			return errors.Wrap(err, "converting list of manifests to edges for promotion")
+			return errors.Wrap(
+				err,
+				"converting list of manifests to edges for promotion",
+			)
 		}
 
 		imagesInManifests := false
@@ -442,15 +462,16 @@ func runImagePromotion(opts *rootOptions) error {
 		// Print version to make Prow logs more self-explanatory.
 		printVersion()
 
+		// nolint: gocritic
 		if opts.severityThreshold >= 0 {
 			logrus.Info("********** START (VULN CHECK) **********")
-			logrus.Info("DISCLAIMER: Vulnerabilities are found as issues with " +
-				"package binaries within image layers, not necessarily " +
-				"with the image layers themselves. So a \"fixable\" " +
-				"vulnerability may not necessarily be immediately" +
-				"actionable. For example, even though a fixed version " +
-				"of the binary is available, it doesn't necessarily mean " +
-				"that a new version of the image layer is available.")
+			logrus.Info(
+				`DISCLAIMER: Vulnerabilities are found as issues with package
+binaries within image layers, not necessarily with the image layers themselves.
+So a 'fixable' vulnerability may not necessarily be immediately actionable. For
+example, even though a fixed version of the binary is available, it doesn't
+necessarily mean that a new version of the image layer is available.`,
+			)
 		} else if opts.dryRun {
 			logrus.Info("********** START (DRY RUN) **********")
 		} else {
@@ -458,12 +479,17 @@ func runImagePromotion(opts *rootOptions) error {
 		}
 	}
 
+	// TODO: is deeply nested (complexity: 12) (nestif)
+	// nolint: nestif
 	if len(opts.snapshot) > 0 || len(opts.manifestBasedSnapshotOf) > 0 {
 		rii := make(reg.RegInvImage)
 		if len(opts.manifestBasedSnapshotOf) > 0 {
 			promotionEdges, err = reg.ToPromotionEdges(mfests)
 			if err != nil {
-				return errors.Wrap(err, "converting list of manifests to edges for promotion")
+				return errors.Wrap(
+					err,
+					"converting list of manifests to edges for promotion",
+				)
 			}
 
 			rii = reg.EdgesToRegInvImage(
@@ -506,7 +532,7 @@ func runImagePromotion(opts *rootOptions) error {
 			}
 
 			if opts.minimalSnapshot {
-				logrus.Info("-minimal-snapshot specified; removing tagless child digests of manifest lists")
+				logrus.Info("removing tagless child digests of manifest lists")
 				sc.ReadGCRManifestLists(reg.MkReadManifestListCmdReal)
 				rii = sc.RemoveChildDigestEntries(rii)
 			}
@@ -519,7 +545,11 @@ func runImagePromotion(opts *rootOptions) error {
 		case "YAML":
 			snapshot = rii.ToYAML(reg.YamlMarshalingOpts{})
 		default:
-			logrus.Errorf("invalid value %s for -output-format; defaulting to YAML", opts.outputFormat)
+			logrus.Errorf(
+				"invalid value %s for -output-format; defaulting to YAML",
+				opts.outputFormat,
+			)
+
 			snapshot = rii.ToYAML(reg.YamlMarshalingOpts{})
 		}
 
@@ -572,7 +602,12 @@ func runImagePromotion(opts *rootOptions) error {
 	if opts.severityThreshold >= 0 {
 		err = sc.RunChecks(
 			[]reg.PreCheck{
-				reg.MKImageVulnCheck(sc, promotionEdges, opts.severityThreshold, nil),
+				reg.MKImageVulnCheck(
+					sc,
+					promotionEdges,
+					opts.severityThreshold,
+					nil,
+				),
 			},
 		)
 		if err != nil {
@@ -585,6 +620,7 @@ func runImagePromotion(opts *rootOptions) error {
 		}
 	}
 
+	// nolint: gocritic
 	if opts.severityThreshold >= 0 {
 		logrus.Info("********** FINISHED (VULN CHECK) **********")
 	} else if opts.dryRun {
