@@ -4,22 +4,22 @@ load("@io_bazel_rules_docker//container:container.bzl", "container_bundle", "con
 load("@io_bazel_rules_docker//contrib:push-all.bzl", "docker_push")
 
 go_library(
-    name = "go_default_library",
+    name = "cip_lib",
     srcs = ["e2e.go"],
     importpath = "sigs.k8s.io/k8s-container-image-promoter/test-e2e/cip",
     visibility = ["//visibility:public"],
     deps = [
-        "@in_gopkg_yaml_v2//:go_default_library",
-        "@io_k8s_klog//:go_default_library",
-        "@io_k8s_release//pkg/cip/dockerregistry:go_default_library",
-        "@io_k8s_release//pkg/cip/gcloud:go_default_library",
-        "@io_k8s_release//pkg/cip/stream:go_default_library",
+        "@in_gopkg_yaml_v2//:yaml_v2",
+        "@io_k8s_klog//:klog",
+        "@io_k8s_release//pkg/cip/dockerregistry",
+        "@io_k8s_release//pkg/cip/gcloud",
+        "@io_k8s_release//pkg/cip/stream",
     ],
 )
 
 go_binary(
     name = "e2e",
-    embed = [":go_default_library"],
+    embed = [":cip_lib"],
     visibility = ["//visibility:public"],
 )
 

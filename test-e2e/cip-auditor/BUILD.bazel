@@ -5,24 +5,24 @@ load("@io_bazel_rules_docker//contrib:push-all.bzl", "docker_push")
 load("@rules_pkg//:pkg.bzl", "pkg_tar")
 
 go_library(
-    name = "go_default_library",
+    name = "cip-auditor_lib",
     srcs = ["cip-auditor-e2e.go"],
     importpath = "sigs.k8s.io/k8s-container-image-promoter/test-e2e/cip-auditor",
     visibility = ["//visibility:public"],
     deps = [
-        "@com_github_google_uuid//:go_default_library",
-        "@in_gopkg_yaml_v2//:go_default_library",
-        "@io_k8s_klog//:go_default_library",
-        "@io_k8s_release//pkg/cip/audit:go_default_library",
-        "@io_k8s_release//pkg/cip/dockerregistry:go_default_library",
-        "@io_k8s_release//pkg/cip/gcloud:go_default_library",
-        "@io_k8s_release//pkg/cip/stream:go_default_library",
+        "@com_github_google_uuid//:uuid",
+        "@in_gopkg_yaml_v2//:yaml_v2",
+        "@io_k8s_klog//:klog",
+        "@io_k8s_release//pkg/cip/audit",
+        "@io_k8s_release//pkg/cip/dockerregistry",
+        "@io_k8s_release//pkg/cip/gcloud",
+        "@io_k8s_release//pkg/cip/stream",
     ],
 )
 
 go_binary(
     name = "cip-auditor-e2e",
-    embed = [":go_default_library"],
+    embed = [":cip-auditor_lib"],
     visibility = ["//visibility:public"],
 )
 
