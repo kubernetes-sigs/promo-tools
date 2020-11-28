@@ -6,19 +6,41 @@ are defined by promoter manifests, in YAML.
 
 Currently only Google Container Registry (GCR) is supported.
 
-# Install
+- [Install](#install)
+- [Promoting images](#promoting-images)
+  - [Promoter manifests](#promoter-manifests)
+    - [Plain manifest example](#plain-manifest-example)
+    - [Thin manifests example](#thin-manifests-example)
+  - [Registries and service accounts](#registries-and-service-accounts)
+- [How promotion works](#how-promotion-works)
+- [Server-side operations](#server-side-operations)
+- [Grabbing snapshots](#grabbing-snapshots)
+  - [Snapshots of promoter manifests](#snapshots-of-promoter-manifests)
+- [Maintenance](#maintenance)
+  - [Linting](#linting)
+  - [Testing](#testing)
+    - [Faking http calls and shell processes](#faking-http-calls-and-shell-processes)
+  - [Automated builds](#automated-builds)
+    - [Connection with Prow](#connection-with-prow)
+- [Versioning](#versioning)
+  - [Default versioning](#default-versioning)
+- [Checks Interface](#checks-interface)
+- [Vulnerability Dashboard](#vulnerability-dashboard)
+
+## Install
 
 1. Install [bazel][bazel].
 2. Run the steps below:
 
-```
+```console
 go get sigs.k8s.io/k8s-container-image-promoter
 cd $GOPATH/src/sigs.k8s.io/k8s-container-image-promoter
+
 # Install the "cip" binary into $GOPATH/bin
 make install
 ```
 
-# Promoting images
+## Promoting images
 
 Using CIP to promote images requires four pieces:
 
@@ -27,7 +49,7 @@ Using CIP to promote images requires four pieces:
 3. destination registry
 4. service account for writing into destination registry
 
-## Promoter manifests
+### Promoter manifests
 
 A promoter manifest has two sub-fields:
 
@@ -44,9 +66,9 @@ manifests because it allows `images` to be easily modified in PRs, whereas the
 more sensitive `registries` field remains tightly controlled by a handful of
 owners.
 
-### Plain manifest example
+#### Plain manifest example
 
-```
+```yaml
 registries:
 - name: gcr.io/myproject-staging-area # publicly readable, does not need a service account for access
   src: true # mark it as the source registry (required)
@@ -79,20 +101,20 @@ you would still provide a `service-account` for the staging registry.
 
 Given the above manifest, you can run CIP as follows:
 
-```
-cip -manifest=path/to/manifest.yaml
+```console
+cip run --manifest=path/to/manifest.yaml
 ```
 
-### Thin manifests example
+#### Thin manifests example
 
-You can use these thin manifests by specifying the `-thin-manifest-dir=<target
+You can use these thin manifests by specifying the `--thin-manifest-dir=<target
 directory>` flag, which forces all promoter manifests to be defined as thin
 manifests within the target directory. This is the only flag that currently
 supports thin manifests.
 
 Assume `foo` is the `<target directory>`. The structure of `foo` must be as follows:
 
-```
+```console
 foo
 ├── images
 │   ├── a
@@ -126,7 +148,7 @@ Continuing with the example plain manifest in the previous section, let's
 pretend we wanted to convert it into a thin manifest. Let's use subdirectory `a`
 as an example. First, `manifests/a/promoter-manifest.yaml` would look like this:
 
-```
+```yaml
 registries:
 - name: gcr.io/myproject-staging-area # publicly readable, does not need a service account for access
   src: true # mark it as the source registry (required)
@@ -136,7 +158,7 @@ registries:
 
 Second, the images would be put in `images/a/images.yaml` like this:
 
-```
+```yaml
 - name: apple
   dmap:
     "sha256:e8ca4f9ff069d6a35f444832097e6650f6594b3ec0de129109d53a1b760884e9": ["1.1", "latest"]
@@ -155,7 +177,7 @@ contents of the promoter manifest. Indeed, the subdirectory name only acts as an
 organizing namespace to separate it from the other subdirectory names that might
 exist (in the example `b`, `c`, and `d`).
 
-## Registries and service accounts
+### Registries and service accounts
 
 CIP needs the following access to registries:
 
@@ -220,32 +242,32 @@ you want to promote *all* images from one registry to another.
 
 To snapshot a GCR registry, you can do:
 
-```
-cip -snapshot=gcr.io/foo
+```console
+cip run --snapshot=gcr.io/foo
 ```
 
 which will output YAML that is compatible with thin manifests' `images.yaml`
-format. You can also force CSV format by specifying the `-output-format=CSV`
+format. You can also force CSV format by specifying the `--output-format=CSV`
 flag:
 
-```
-cip -snapshot=gcr.io/foo `-output-format=CSV`
+```console
+cip run --snapshot=gcr.io/foo --output-format=CSV
 ```
 
 which will output a CSV of image digests and tags found at `gcr.io/foo`.
 
-There is another option, `-minimal-snapshot`, which will discard all tagless
+There is another option, `--minimal-snapshot`, which will discard all tagless
 child images that are referenced by Docker manifest lists (manifest lists are
 Docker images that specify a group of related Docker images, usually one image
 per machine architecture). That is, if there is a Docker manifest list that
 references 10 child images, and these child images are not tagged, then they are
-discarded from the snapshot output with `-minimal-snapshot`. This makes the
+discarded from the snapshot output with `--minimal-snapshot`. This makes the
 resulting output lighter by removing redundant information.
 
 ### Snapshots of promoter manifests
 
 Apart from GCR registries, you can also snapshot a destination registry defined
-in thin manifest directories, with the `-manifest-based-snapshot-of` flag. This
+in thin manifest directories, with the `--manifest-based-snapshot-of` flag. This
 is useful if for example you want to have a unified look at a particular
 destination registry that is broken up over multiple thin manifests. For
 example, the thin manifests defined [k8sio-manifests-dir][here] all promoter to
@@ -257,16 +279,16 @@ into `gcr.io/k8s-artifacts-prod`?"
 
 We can answer the above question with:
 
-```
+```console
 cip \
-	-manifest-based-snapshot-of=us.gcr.io/k8s-artifacts-prod \
-	-thin-manifest-dir=<path_to_k8s.gcr.io_thin_manifest_dir> \
-	-output-format=CSV | wc -l
+  --manifest-based-snapshot-of=us.gcr.io/k8s-artifacts-prod \
+  --thin-manifest-dir=<path_to_k8s.gcr.io_thin_manifest_dir> \
+  --output-format=CSV | wc -l
 ```
 
-# Maintenance
+## Maintenance
 
-## Linting
+### Linting
 
 We use [golangci-lint](https://github.com/golangci/golangci-lint); please
 install it and run `make lint` to check for linting errors. There should be 0
@@ -275,7 +297,7 @@ linting errors; if any should be ignored, add a line ignoring the error with a
 [directitve](https://github.com/golangci/golangci-lint#false-positives). Grep
 for `nolint` in this repo for examples.
 
-## Testing
+### Testing
 
 Run `make test`; this will invoke a bazel rule to run all unit tests. By
 default, running `make` alone also invokes the same tests.
@@ -284,7 +306,7 @@ Every critical piece has a unit test --- unit tests complete nearly instantly,
 so you should *always* add unit tests where possible, and also run them before
 submitting a new PR.
 
-### Faking http calls and shell processes
+#### Faking http calls and shell processes
 
 As the promoter uses a combination of network API calls and shell-instantiated
 processes, we have to fake them for the unit tests. To make this happen, these
@@ -298,7 +320,7 @@ predefines how that stream will behave, for the purposes of each unit test. A
 good example of this is the [`TestReadRegistries`
 test](lib/dockerregistry/inventory_test.go).
 
-## Automated builds
+### Automated builds
 
 The `gcr.io/k8s-staging-artifact-promoter` GCR is a staging repo for Docker
 image build artifacts from this project. Every update to the `master` branch in
@@ -320,7 +342,7 @@ promoter" here means creating a PR in the [k8sio-manifests-dir][k8s.io Github
 repo] to promote versions from staging to production, such as in [this
 PR](https://github.com/kubernetes/k8s.io/pull/704).
 
-### Connection with Prow
+#### Connection with Prow
 
 There are a number of Prow jobs that consume the production Docker images of
 `cip` or `cip-auditor`. These jobs are defined [cip-prow-integration][here].
