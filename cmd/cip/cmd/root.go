@@ -1,0 +1,95 @@
+/*
+Copyright 2020 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package cmd
+
+import (
+	"fmt"
+
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
+
+	"k8s.io/release/pkg/log"
+)
+
+var (
+	// GitDescribe is stamped by bazel.
+	GitDescribe string
+
+	// GitCommit is stamped by bazel.
+	GitCommit string
+
+	// TimestampUtcRfc3339 is stamped by bazel.
+	TimestampUtcRfc3339 string
+)
+
+// rootCmd represents the base command when called without any subcommands.
+var rootCmd = &cobra.Command{
+	Use:   "cip",
+	Short: "Promote images from a staging registry to production",
+	Long: `cip - Kubernetes container image promoter
+`,
+	PersistentPreRunE: initLogging,
+}
+
+type rootOptions struct {
+	logLevel string
+	dryRun   bool
+	version  bool
+}
+
+var rootOpts = &rootOptions{}
+
+// Execute adds all child commands to the root command and sets flags.
+// This is called by main.main(). It only needs to happen once to the rootCmd.
+func Execute() {
+	if err := rootCmd.Execute(); err != nil {
+		logrus.Fatal(err)
+	}
+}
+
+func init() {
+	rootCmd.PersistentFlags().StringVar(
+		&rootOpts.logLevel,
+		"log-level",
+		"info",
+		fmt.Sprintf("the logging verbosity, either %s", log.LevelNames()),
+	)
+
+	rootCmd.PersistentFlags().BoolVar(
+		&rootOpts.dryRun,
+		"dry-run",
+		rootOpts.dryRun,
+		"test run promotion without modifying any registry",
+	)
+
+	rootCmd.PersistentFlags().BoolVar(
+		&rootOpts.version,
+		"version",
+		rootOpts.version,
+		"print version",
+	)
+}
+
+func initLogging(*cobra.Command, []string) error {
+	return log.SetupGlobalLogger(rootOpts.logLevel)
+}
+
+func printVersion() {
+	fmt.Printf("Built:   %s\n", TimestampUtcRfc3339)
+	fmt.Printf("Version: %s\n", GitDescribe)
+	fmt.Printf("Commit:  %s\n", GitCommit)
+}

@@ -26,41 +26,29 @@ import (
 	reg "k8s.io/release/pkg/cip/dockerregistry"
 	"k8s.io/release/pkg/cip/gcloud"
 	"k8s.io/release/pkg/cip/stream"
-	"k8s.io/release/pkg/log"
 )
 
-var (
-	// GitDescribe is stamped by bazel.
-	GitDescribe string
-
-	// GitCommit is stamped by bazel.
-	GitCommit string
-
-	// TimestampUtcRfc3339 is stamped by bazel.
-	TimestampUtcRfc3339 string
-)
-
-// rootCmd represents the base command when called without any subcommands
+// runCmd represents the base command when called without any subcommands
 // TODO: Update command description.
-var rootCmd = &cobra.Command{
-	Use:   "cip",
+var runCmd = &cobra.Command{
+	Use:   "run",
 	Short: "Promote images from a staging registry to production",
 	Long: `cip - Kubernetes container image promoter
+
+Promote images from a staging registry to production
 `,
-	PersistentPreRunE: initLogging,
-	SilenceUsage:      true,
-	SilenceErrors:     true,
+	SilenceUsage:  true,
+	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return errors.Wrap(
-			runImagePromotion(rootOpts),
-			"run `kpromo run images`",
+			runImagePromotion(runOpts),
+			"run `cip run`",
 		)
 	},
 }
 
 // TODO: Push these into a package.
-type rootOptions struct {
-	logLevel                string
+type runOptions struct {
 	manifest                string
 	thinManifestDir         string
 	keyFiles                string
@@ -74,13 +62,11 @@ type rootOptions struct {
 	severityThreshold       int
 	jsonLogSummary          bool
 	parseOnly               bool
-	dryRun                  bool
-	version                 bool
 	minimalSnapshot         bool
 	useServiceAcct          bool
 }
 
-var rootOpts = &rootOptions{}
+var runOpts = &runOptions{}
 
 const (
 	// TODO: Push these into a package.
@@ -94,36 +80,21 @@ const (
 	thinManifestDirFlag = "thin-manifest-dir"
 )
 
-// Execute adds all child commands to the root command and sets flags.
-// This is called by main.main(). It only needs to happen once to the rootCmd.
-func Execute() {
-	if err := rootCmd.Execute(); err != nil {
-		logrus.Fatal(err)
-	}
-}
-
 // TODO: Function 'init' is too long (171 > 60) (funlen)
 // nolint: funlen
 func init() {
-	rootCmd.PersistentFlags().StringVar(
-		&rootOpts.logLevel,
-		"log-level",
-		"info",
-		fmt.Sprintf("the logging verbosity, either %s", log.LevelNames()),
-	)
-
 	// TODO: Move this into a default options function in pkg/promobot
-	rootCmd.PersistentFlags().StringVar(
-		&rootOpts.manifest,
+	runCmd.PersistentFlags().StringVar(
+		&runOpts.manifest,
 		manifestFlag,
-		rootOpts.manifest,
+		runOpts.manifest,
 		"the manifest file to load",
 	)
 
-	rootCmd.PersistentFlags().StringVar(
-		&rootOpts.thinManifestDir,
+	runCmd.PersistentFlags().StringVar(
+		&runOpts.thinManifestDir,
 		thinManifestDirFlag,
-		rootOpts.thinManifestDir,
+		runOpts.thinManifestDir,
 		`recursively read in all manifests within a folder, but all manifests
 MUST be 'thin' manifests named 'promoter-manifest.yaml', which are like regular
 manifests but instead of defining the 'images: ...' field directly, the
@@ -131,118 +102,103 @@ manifests but instead of defining the 'images: ...' field directly, the
 the 'images: ...' contents`,
 	)
 
-	rootCmd.PersistentFlags().IntVar(
-		&rootOpts.threads,
+	runCmd.PersistentFlags().IntVar(
+		&runOpts.threads,
 		"threads",
 		defaultThreads,
 		"number of concurrent goroutines to use when talking to GCR",
 	)
 
-	rootCmd.PersistentFlags().BoolVar(
-		&rootOpts.jsonLogSummary,
+	runCmd.PersistentFlags().BoolVar(
+		&runOpts.jsonLogSummary,
 		"json-log-summary",
-		rootOpts.jsonLogSummary,
+		runOpts.jsonLogSummary,
 		"only log a json summary of important errors",
 	)
 
-	rootCmd.PersistentFlags().BoolVar(
-		&rootOpts.parseOnly,
+	runCmd.PersistentFlags().BoolVar(
+		&runOpts.parseOnly,
 		"parse-only",
-		rootOpts.parseOnly,
+		runOpts.parseOnly,
 		"only check that the given manifest file is parseable as a Manifest",
 	)
 
-	// TODO: Consider moving this to the root command
-	rootCmd.PersistentFlags().BoolVar(
-		&rootOpts.dryRun,
-		"dry-run",
-		rootOpts.dryRun,
-		"test run promotion without modifying any registry",
-	)
-
-	rootCmd.PersistentFlags().StringVar(
-		&rootOpts.keyFiles,
+	runCmd.PersistentFlags().StringVar(
+		&runOpts.keyFiles,
 		"key-files",
-		rootOpts.keyFiles,
+		runOpts.keyFiles,
 		`CSV of service account key files that must be activated for the
 promotion (<json-key-file-path>,...)`,
 	)
 
-	rootCmd.PersistentFlags().BoolVar(
-		&rootOpts.version,
-		"version",
-		rootOpts.version,
-		"print version",
-	)
-
-	rootCmd.PersistentFlags().StringVar(
-		&rootOpts.snapshot,
+	runCmd.PersistentFlags().StringVar(
+		&runOpts.snapshot,
 		"snapshot",
-		rootOpts.snapshot,
+		runOpts.snapshot,
 		"read all images in a repository and print to stdout",
 	)
 
-	rootCmd.PersistentFlags().StringVar(
-		&rootOpts.snapshotTag,
+	runCmd.PersistentFlags().StringVar(
+		&runOpts.snapshotTag,
 		"snapshot-tag",
-		rootOpts.snapshotTag,
+		runOpts.snapshotTag,
 		"only snapshot images with the given tag",
 	)
 
-	rootCmd.PersistentFlags().BoolVar(
-		&rootOpts.minimalSnapshot,
+	runCmd.PersistentFlags().BoolVar(
+		&runOpts.minimalSnapshot,
 		"minimal-snapshot",
-		rootOpts.minimalSnapshot,
+		runOpts.minimalSnapshot,
 		`(only works with -snapshot/-manifest-based-snapshot-of) discard tagless
 images from snapshot output if they are referenced by a manifest list`,
 	)
 
-	rootCmd.PersistentFlags().StringVar(
-		&rootOpts.outputFormat,
+	runCmd.PersistentFlags().StringVar(
+		&runOpts.outputFormat,
 		"output-format",
 		defaultOutputFormat,
 		`(only works with -snapshot/-manifest-based-snapshot-of) choose output
 format of the snapshot (default: YAML; allowed values: 'YAML' or 'CSV')`,
 	)
 
-	rootCmd.PersistentFlags().StringVar(
-		&rootOpts.snapshotSvcAcct,
+	runCmd.PersistentFlags().StringVar(
+		&runOpts.snapshotSvcAcct,
 		"snapshot-service-account",
-		rootOpts.snapshotSvcAcct,
+		runOpts.snapshotSvcAcct,
 		"service account to use for -snapshot",
 	)
 
-	rootCmd.PersistentFlags().StringVar(
-		&rootOpts.manifestBasedSnapshotOf,
+	runCmd.PersistentFlags().StringVar(
+		&runOpts.manifestBasedSnapshotOf,
 		"manifest-based-snapshot-of",
-		rootOpts.manifestBasedSnapshotOf,
+		runOpts.manifestBasedSnapshotOf,
 		`read all images in either -manifest or -thin-manifest-dir and print all
 images that should be promoted to the given registry (assuming the given
 registry is empty); this is like -snapshot, but instead of reading over the
 network from a registry, it reads from the local manifests only`,
 	)
 
-	rootCmd.PersistentFlags().BoolVar(
-		&rootOpts.useServiceAcct,
+	runCmd.PersistentFlags().BoolVar(
+		&runOpts.useServiceAcct,
 		"use-service-account",
-		rootOpts.useServiceAcct,
+		runOpts.useServiceAcct,
 		"pass '--account=...' to all gcloud calls (default: false)",
 	)
 
-	rootCmd.PersistentFlags().IntVar(
-		&rootOpts.maxImageSize,
+	runCmd.PersistentFlags().IntVar(
+		&runOpts.maxImageSize,
 		"max-image-size",
 		defaultMaxImageSize,
 		"the maximum image size (in MiB) allowed for promotion",
 	)
 
 	// TODO: Set this in a function instead
-	if rootOpts.maxImageSize <= 0 {
-		rootOpts.maxImageSize = 2048
+	if runOpts.maxImageSize <= 0 {
+		runOpts.maxImageSize = 2048
 	}
 
-	rootCmd.PersistentFlags().IntVar(
-		&rootOpts.severityThreshold,
+	runCmd.PersistentFlags().IntVar(
+		&runOpts.severityThreshold,
 		"vuln-severity-threshold",
 		defaultSeverityThreshold,
 		`Using this flag will cause the promoter to only run the vulnerability
@@ -250,12 +206,14 @@ check. Found vulnerabilities at or above this threshold will result in the
 vulnerability check failing [severity levels between 0 and 5; 0 - UNSPECIFIED,
 1 - MINIMAL, 2 - LOW, 3 - MEDIUM, 4 - HIGH, 5 - CRITICAL]`,
 	)
+
+	rootCmd.AddCommand(runCmd)
 }
 
 // TODO: Function 'runImagePromotion' has too many statements (97 > 40) (funlen)
 // nolint: funlen,gocognit,gocyclo
-func runImagePromotion(opts *rootOptions) error {
-	if opts.version {
+func runImagePromotion(opts *runOptions) error {
+	if rootOpts.version {
 		printVersion()
 		return nil
 	}
@@ -333,7 +291,7 @@ func runImagePromotion(opts *rootOptions) error {
 		sc, err = reg.MakeSyncContext(
 			mfests,
 			opts.threads,
-			opts.dryRun,
+			rootOpts.dryRun,
 			opts.useServiceAcct,
 		)
 		if err != nil {
@@ -350,7 +308,7 @@ func runImagePromotion(opts *rootOptions) error {
 		sc, err = reg.MakeSyncContext(
 			mfests,
 			opts.threads,
-			opts.dryRun,
+			rootOpts.dryRun,
 			opts.useServiceAcct)
 		if err != nil {
 			logrus.Fatal(err)
@@ -402,7 +360,7 @@ So a 'fixable' vulnerability may not necessarily be immediately actionable. For
 example, even though a fixed version of the binary is available, it doesn't
 necessarily mean that a new version of the image layer is available.`,
 			)
-		} else if opts.dryRun {
+		} else if rootOpts.dryRun {
 			logrus.Info("********** START (DRY RUN) **********")
 		} else {
 			logrus.Info("********** START **********")
@@ -441,7 +399,7 @@ necessarily mean that a new version of the image layer is available.`,
 			sc, err = reg.MakeSyncContext(
 				mfests,
 				opts.threads,
-				opts.dryRun,
+				rootOpts.dryRun,
 				opts.useServiceAcct,
 			)
 			if err != nil {
@@ -492,7 +450,7 @@ necessarily mean that a new version of the image layer is available.`,
 	}
 
 	// Check the pull request
-	if opts.dryRun {
+	if rootOpts.dryRun {
 		err = sc.RunChecks([]reg.PreCheck{})
 		if err != nil {
 			return errors.Wrap(err, "running prechecks before promotion")
@@ -553,7 +511,7 @@ necessarily mean that a new version of the image layer is available.`,
 	// nolint: gocritic
 	if opts.severityThreshold >= 0 {
 		logrus.Info("********** FINISHED (VULN CHECK) **********")
-	} else if opts.dryRun {
+	} else if rootOpts.dryRun {
 		logrus.Info("********** FINISHED (DRY RUN) **********")
 	} else {
 		logrus.Info("********** FINISHED **********")
@@ -562,17 +520,7 @@ necessarily mean that a new version of the image layer is available.`,
 	return nil
 }
 
-func initLogging(*cobra.Command, []string) error {
-	return log.SetupGlobalLogger(rootOpts.logLevel)
-}
-
-func validateImageOptions(o *rootOptions) error {
+func validateImageOptions(o *runOptions) error {
 	// TODO: Validate options
 	return nil
-}
-
-func printVersion() {
-	fmt.Printf("Built:   %s\n", TimestampUtcRfc3339)
-	fmt.Printf("Version: %s\n", GitDescribe)
-	fmt.Printf("Commit:  %s\n", GitCommit)
 }

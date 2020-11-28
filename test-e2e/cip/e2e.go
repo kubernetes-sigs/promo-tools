@@ -262,7 +262,7 @@ func runPromotion(repoRoot string, t E2ETest) error {
 		"--stamp",
 		"//cmd/cip:cip",
 		"--",
-		// TODO: Set `cip run` command here once it exists
+		"run",
 		"--dry-run=false",
 		"--log-level=debug",
 		"--use-service-account",
@@ -320,7 +320,7 @@ func getSnapshot(repoRoot string,
 		"--workspace_status_command=" + repoRoot + "/workspace_status.sh",
 		"//cmd/cip:cip",
 		"--",
-		// TODO: Set `cip run` command here once it exists
+		"run",
 		"--snapshot=" + string(registry)}
 
 	svcAcc := extractSvcAcc(registry, rcs)

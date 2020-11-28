@@ -4,6 +4,7 @@ go_library(
     name = "cmd",
     srcs = [
         "audit.go",
+        "root.go",
         "run.go",
     ],
     importpath = "sigs.k8s.io/k8s-container-image-promoter/cmd/cip/cmd",
