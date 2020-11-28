@@ -9,7 +9,7 @@ load("@io_bazel_rules_docker//contrib:push-all.bzl", "docker_push")
 go_image(
     name = "cip-docker-image",
     base = "@google-sdk-base//image",
-    embed = [":go_default_library"],
+    embed = ["//cmd/cip:cip_lib"],
     goarch = "amd64",
     goos = "linux",
     importpath = "sigs.k8s.io/k8s-container-image-promoter",
@@ -41,7 +41,7 @@ container_layer(
 # the auditor does not require gcloud.
 go_image(
     name = "cip-docker-image-no-gcloud",
-    embed = [":go_default_library"],
+    embed = ["//cmd/cip:cip_lib"],
     goarch = "amd64",
     goos = "linux",
     importpath = "sigs.k8s.io/k8s-container-image-promoter",
@@ -53,7 +53,7 @@ container_image(
     base = ":cip-docker-image-no-gcloud",
     entrypoint = [
         "/app/cip-docker-image-no-gcloud.binary",
-        "-audit",
+        "audit",
     ],
     env = {
         "HOME": "/",
@@ -90,5 +90,5 @@ load("@com_github_google_rules_install//installer:def.bzl", "installer")
 
 installer(
     name = "install-cip",
-    data = [":cip"],
+    data = ["//cmd/cip"],
 )

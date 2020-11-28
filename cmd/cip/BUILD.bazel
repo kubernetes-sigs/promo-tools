@@ -4,7 +4,12 @@ go_library(
     name = "cip_lib",
     srcs = ["main.go"],
     importpath = "sigs.k8s.io/k8s-container-image-promoter/cmd/cip",
-    visibility = ["//visibility:private"],
+    # TODO: Consider further restricting the visibility
+    #       Dependents:
+    #       - //:cip-docker-image
+    #       - //:cip-docker-image-no-gcloud
+    #       - //test-e2e/cip-auditor:push-cip-auditor-test
+    visibility = ["//visibility:public"],
     deps = ["//cmd/cip/cmd"],
 )
 

@@ -71,15 +71,6 @@ lint-ci: download
 test: build
 	echo "Would've run 'bazel test --test_output=all //...', but there are no unit tests to run in this repo. ref: https://github.com/kubernetes/release/pull/1767"
 
-.PHONY: test-mac
-# test-mac make target is a workaround for the following
-# issue: https://github.com/bazelbuild/rules_go/issues/2013
-test-mac:
-	bazel test --test_output=all \
-		//pkg/api/files:go_default_test \
-		//pkg/audit:go_default_test \
-		//pkg/dockerregistry:go_default_test
-
 .PHONY: test-ci
 test-ci: download
 	make build

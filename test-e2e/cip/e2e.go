@@ -260,11 +260,12 @@ func runPromotion(repoRoot string, t E2ETest) error {
 		"run",
 		"--workspace_status_command=" + repoRoot + "/workspace_status.sh",
 		"--stamp",
-		":cip",
+		"//cmd/cip:cip",
 		"--",
-		"-dry-run=false",
-		"-v=3",
-		"-use-service-account",
+		// TODO: Set `cip run` command here once it exists
+		"--dry-run=false",
+		"--log-level=debug",
+		"--use-service-account",
 		// There is no need to use -key-files=... because we already activated
 		// the 1 service account we need during e2e tests with our own -key-file
 		// flag.
@@ -313,16 +314,18 @@ func getSnapshot(repoRoot string,
 	registry reg.RegistryName,
 	rcs []reg.RegistryContext) ([]reg.Image, error) {
 
+	// TODO: Consider setting flag names in `cip` instead
 	invocation := []string{
 		"run",
 		"--workspace_status_command=" + repoRoot + "/workspace_status.sh",
-		":cip",
+		"//cmd/cip:cip",
 		"--",
-		"-snapshot=" + string(registry)}
+		// TODO: Set `cip run` command here once it exists
+		"--snapshot=" + string(registry)}
 
 	svcAcc := extractSvcAcc(registry, rcs)
 	if len(svcAcc) > 0 {
-		invocation = append(invocation, "-snapshot-service-account="+svcAcc)
+		invocation = append(invocation, "--snapshot-service-account="+svcAcc)
 	}
 
 	fmt.Println("execing cmd", "bazel", invocation)
