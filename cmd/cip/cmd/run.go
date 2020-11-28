@@ -18,14 +18,11 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 
-	guuid "github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
-	"k8s.io/release/pkg/cip/audit"
 	reg "k8s.io/release/pkg/cip/dockerregistry"
 	"k8s.io/release/pkg/cip/gcloud"
 	"k8s.io/release/pkg/cip/stream"
@@ -44,7 +41,7 @@ var (
 )
 
 // rootCmd represents the base command when called without any subcommands
-// TODO: Update command description
+// TODO: Update command description.
 var rootCmd = &cobra.Command{
 	Use:   "cip",
 	Short: "Promote images from a staging registry to production",
@@ -61,7 +58,7 @@ var rootCmd = &cobra.Command{
 	},
 }
 
-// TODO: Push these into a package
+// TODO: Push these into a package.
 type rootOptions struct {
 	logLevel                string
 	manifest                string
@@ -72,10 +69,6 @@ type rootOptions struct {
 	outputFormat            string
 	snapshotSvcAcct         string
 	manifestBasedSnapshotOf string
-	auditManifestRepoURL    string
-	auditManifestRepoBranch string
-	auditManifestPath       string
-	auditGcpProjectID       string
 	threads                 int
 	maxImageSize            int
 	severityThreshold       int
@@ -85,7 +78,6 @@ type rootOptions struct {
 	version                 bool
 	minimalSnapshot         bool
 	useServiceAcct          bool
-	audit                   bool
 }
 
 var rootOpts = &rootOptions{}
@@ -237,45 +229,6 @@ network from a registry, it reads from the local manifests only`,
 		"pass '--account=...' to all gcloud calls (default: false)",
 	)
 
-	rootCmd.PersistentFlags().BoolVar(
-		&rootOpts.audit,
-		"audit",
-		rootOpts.audit,
-		"stand up an audit server that responds to Pub/Sub push events",
-	)
-
-	rootCmd.PersistentFlags().StringVar(
-		&rootOpts.auditManifestRepoURL,
-		"audit-manifest-repo-url",
-		// TODO: Set this in a function instead
-		os.Getenv("CIP_AUDIT_MANIFEST_REPO_URL"),
-		"URL of the repository that holds the promoter manifests",
-	)
-
-	rootCmd.PersistentFlags().StringVar(
-		&rootOpts.auditManifestRepoBranch,
-		"audit-manifest-repo-branch",
-		// TODO: Set this in a function instead
-		os.Getenv("CIP_AUDIT_MANIFEST_REPO_BRANCH"),
-		"git branch to check out (use) for --audit-manifest-repo",
-	)
-
-	rootCmd.PersistentFlags().StringVar(
-		&rootOpts.auditManifestPath,
-		"audit-manifest-path",
-		// TODO: Set this in a function instead
-		os.Getenv("CIP_AUDIT_MANIFEST_REPO_MANIFEST_DIR"),
-		"relative to the root of `--audit-manifest-repo` to the manifests dir",
-	)
-
-	rootCmd.PersistentFlags().StringVar(
-		&rootOpts.auditGcpProjectID,
-		"audit-gcp-project-id",
-		// TODO: Set this in a function instead
-		os.Getenv("CIP_AUDIT_GCP_PROJECT_ID"),
-		"GCP project ID (name); used for labeling error reporting logs to GCP",
-	)
-
 	rootCmd.PersistentFlags().IntVar(
 		&rootOpts.maxImageSize,
 		"max-image-size",
@@ -309,29 +262,6 @@ func runImagePromotion(opts *rootOptions) error {
 
 	if err := validateImageOptions(opts); err != nil {
 		return errors.Wrap(err, "validating image options")
-	}
-
-	if opts.audit {
-		uuid := os.Getenv("CIP_AUDIT_TESTCASE_UUID")
-		if len(uuid) > 0 {
-			logrus.Infof("Starting auditor in Test Mode (%s)", uuid)
-		} else {
-			uuid = guuid.New().String()
-			logrus.Infof("Starting auditor in Regular Mode (%s)", uuid)
-		}
-
-		auditServerContext, err := audit.InitRealServerContext(
-			opts.auditGcpProjectID,
-			opts.auditManifestRepoURL,
-			opts.auditManifestRepoBranch,
-			opts.auditManifestPath,
-			uuid,
-		)
-		if err != nil {
-			return errors.Wrap(err, "creating auditor context")
-		}
-
-		auditServerContext.RunAuditor()
 	}
 
 	// Activate service accounts.
