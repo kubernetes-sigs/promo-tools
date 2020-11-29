@@ -76,8 +76,10 @@ const (
 	defaultSeverityThreshold = -1
 
 	// flags.
-	manifestFlag        = "manifest"
-	thinManifestDirFlag = "thin-manifest-dir"
+	manifestFlag                = "manifest"
+	thinManifestDirFlag         = "thin-manifest-dir"
+	snapshotFlag                = "snapshot"
+	manifestBasedSnapshotOfFlag = "manifest-based-snapshot-of"
 )
 
 // TODO: Function 'init' is too long (171 > 60) (funlen)
@@ -113,14 +115,14 @@ the 'images: ...' contents`,
 		&runOpts.jsonLogSummary,
 		"json-log-summary",
 		runOpts.jsonLogSummary,
-		"only log a json summary of important errors",
+		"only log a JSON summary of important errors",
 	)
 
 	runCmd.PersistentFlags().BoolVar(
 		&runOpts.parseOnly,
 		"parse-only",
 		runOpts.parseOnly,
-		"only check that the given manifest file is parseable as a Manifest",
+		"only check that the given manifest file is parsable as a Manifest",
 	)
 
 	runCmd.PersistentFlags().StringVar(
@@ -133,7 +135,7 @@ promotion (<json-key-file-path>,...)`,
 
 	runCmd.PersistentFlags().StringVar(
 		&runOpts.snapshot,
-		"snapshot",
+		snapshotFlag,
 		runOpts.snapshot,
 		"read all images in a repository and print to stdout",
 	)
@@ -149,40 +151,50 @@ promotion (<json-key-file-path>,...)`,
 		&runOpts.minimalSnapshot,
 		"minimal-snapshot",
 		runOpts.minimalSnapshot,
-		`(only works with -snapshot/-manifest-based-snapshot-of) discard tagless
-images from snapshot output if they are referenced by a manifest list`,
+		fmt.Sprintf(`(only works with '--%s' or '--%s') discard tagless images
+from snapshot output if they are referenced by a manifest list`,
+			snapshotFlag,
+			manifestBasedSnapshotOfFlag,
+		),
 	)
 
 	runCmd.PersistentFlags().StringVar(
 		&runOpts.outputFormat,
 		"output-format",
 		defaultOutputFormat,
-		`(only works with -snapshot/-manifest-based-snapshot-of) choose output
-format of the snapshot (default: YAML; allowed values: 'YAML' or 'CSV')`,
+		fmt.Sprintf(`(only works with '--%s' or '--%s') choose output
+format of the snapshot (allowed values: 'YAML' or 'CSV')`,
+			snapshotFlag,
+			manifestBasedSnapshotOfFlag,
+		),
 	)
 
 	runCmd.PersistentFlags().StringVar(
 		&runOpts.snapshotSvcAcct,
 		"snapshot-service-account",
 		runOpts.snapshotSvcAcct,
-		"service account to use for -snapshot",
+		fmt.Sprintf("service account to use for '--%s'", snapshotFlag),
 	)
 
 	runCmd.PersistentFlags().StringVar(
 		&runOpts.manifestBasedSnapshotOf,
-		"manifest-based-snapshot-of",
+		manifestBasedSnapshotOfFlag,
 		runOpts.manifestBasedSnapshotOf,
-		`read all images in either -manifest or -thin-manifest-dir and print all
+		fmt.Sprintf(`read all images in either '--%s' or '--%s' and print all
 images that should be promoted to the given registry (assuming the given
-registry is empty); this is like -snapshot, but instead of reading over the
+registry is empty); this is like '--%s', but instead of reading over the
 network from a registry, it reads from the local manifests only`,
+			manifestFlag,
+			thinManifestDirFlag,
+			snapshotFlag,
+		),
 	)
 
 	runCmd.PersistentFlags().BoolVar(
 		&runOpts.useServiceAcct,
 		"use-service-account",
 		runOpts.useServiceAcct,
-		"pass '--account=...' to all gcloud calls (default: false)",
+		"pass '--account=...' to all gcloud calls",
 	)
 
 	runCmd.PersistentFlags().IntVar(
