@@ -6,6 +6,7 @@ go_library(
         "audit.go",
         "root.go",
         "run.go",
+        "version.go",
     ],
     importpath = "sigs.k8s.io/k8s-container-image-promoter/cmd/cip/cmd",
     visibility = ["//visibility:public"],
@@ -19,5 +20,6 @@ go_library(
         "@io_k8s_release//pkg/cip/gcloud",
         "@io_k8s_release//pkg/cip/stream",
         "@io_k8s_release//pkg/log",
+        "@io_k8s_release//pkg/version",
     ],
 )
