@@ -9,5 +9,5 @@ require (
 	github.com/spf13/cobra v1.1.1
 	gopkg.in/yaml.v2 v2.3.0
 	k8s.io/klog v1.0.0
-	k8s.io/release v0.6.0
+	k8s.io/release v0.6.1-0.20201128190848-6313f6964945
 )
