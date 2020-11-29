@@ -18,6 +18,7 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -71,7 +72,7 @@ var runOpts = &runOptions{}
 const (
 	// TODO: Push these into a package.
 	defaultThreads           = 10
-	defaultOutputFormat      = "YAML"
+	defaultOutputFormat      = "yaml"
 	defaultMaxImageSize      = 2048
 	defaultSeverityThreshold = -1
 
@@ -80,7 +81,13 @@ const (
 	thinManifestDirFlag         = "thin-manifest-dir"
 	snapshotFlag                = "snapshot"
 	manifestBasedSnapshotOfFlag = "manifest-based-snapshot-of"
+	outputFlag                  = "output"
 )
+
+var allowedOutputFormats = []string{
+	"csv",
+	"yaml",
+}
 
 // TODO: Function 'init' is too long (171 > 60) (funlen)
 // nolint: funlen
@@ -160,12 +167,13 @@ from snapshot output if they are referenced by a manifest list`,
 
 	runCmd.PersistentFlags().StringVar(
 		&runOpts.outputFormat,
-		"output-format",
+		outputFlag,
 		defaultOutputFormat,
 		fmt.Sprintf(`(only works with '--%s' or '--%s') choose output
-format of the snapshot (allowed values: 'YAML' or 'CSV')`,
+format of the snapshot (allowed values: %q)`,
 			snapshotFlag,
 			manifestBasedSnapshotOfFlag,
+			allowedOutputFormats,
 		),
 	)
 
@@ -439,15 +447,17 @@ necessarily mean that a new version of the image layer is available.`,
 		}
 
 		var snapshot string
-		switch opts.outputFormat {
-		case "CSV":
+		switch strings.ToLower(opts.outputFormat) {
+		case "csv":
 			snapshot = rii.ToCSV()
-		case "YAML":
+		case "yaml":
 			snapshot = rii.ToYAML(reg.YamlMarshalingOpts{})
 		default:
 			logrus.Errorf(
-				"invalid value %s for -output-format; defaulting to YAML",
+				"invalid value %s for '--%s'; defaulting to %s",
 				opts.outputFormat,
+				outputFlag,
+				defaultOutputFormat,
 			)
 
 			snapshot = rii.ToYAML(reg.YamlMarshalingOpts{})

@@ -247,11 +247,11 @@ cip run --snapshot=gcr.io/foo
 ```
 
 which will output YAML that is compatible with thin manifests' `images.yaml`
-format. You can also force CSV format by specifying the `--output-format=CSV`
+format. You can also force CSV format by specifying the `--output=csv`
 flag:
 
 ```console
-cip run --snapshot=gcr.io/foo --output-format=CSV
+cip run --snapshot=gcr.io/foo --output=csv
 ```
 
 which will output a CSV of image digests and tags found at `gcr.io/foo`.
@@ -283,7 +283,7 @@ We can answer the above question with:
 cip \
   --manifest-based-snapshot-of=us.gcr.io/k8s-artifacts-prod \
   --thin-manifest-dir=<path_to_k8s.gcr.io_thin_manifest_dir> \
-  --output-format=CSV | wc -l
+  --output=csv | wc -l
 ```
 
 ## Maintenance
