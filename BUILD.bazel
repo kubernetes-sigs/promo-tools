@@ -1,4 +1,3 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
 load("@io_bazel_rules_docker//go:image.bzl", "go_image")
 load("@io_bazel_rules_docker//container:container.bzl", "container_bundle", "container_image", "container_layer")
 load("@io_bazel_rules_docker//contrib:push-all.bzl", "docker_push")
@@ -10,7 +9,7 @@ load("@io_bazel_rules_docker//contrib:push-all.bzl", "docker_push")
 go_image(
     name = "cip-docker-image",
     base = "@google-sdk-base//image",
-    embed = [":go_default_library"],
+    embed = ["//cmd/cip:cip_lib"],
     goarch = "amd64",
     goos = "linux",
     importpath = "sigs.k8s.io/k8s-container-image-promoter",
@@ -42,7 +41,7 @@ container_layer(
 # the auditor does not require gcloud.
 go_image(
     name = "cip-docker-image-no-gcloud",
-    embed = [":go_default_library"],
+    embed = ["//cmd/cip:cip_lib"],
     goarch = "amd64",
     goos = "linux",
     importpath = "sigs.k8s.io/k8s-container-image-promoter",
@@ -54,7 +53,7 @@ container_image(
     base = ":cip-docker-image-no-gcloud",
     entrypoint = [
         "/app/cip-docker-image-no-gcloud.binary",
-        "-audit",
+        "audit",
     ],
     env = {
         "HOME": "/",
@@ -81,32 +80,6 @@ load("@bazel_gazelle//:def.bzl", "gazelle")
 # gazelle:prefix sigs.k8s.io/k8s-container-image-promoter
 gazelle(name = "gazelle")
 
-go_library(
-    name = "go_default_library",
-    srcs = ["cip.go"],
-    importpath = "sigs.k8s.io/k8s-container-image-promoter",
-    visibility = ["//visibility:private"],
-    x_defs = {
-        "main.GitCommit": "{STABLE_GIT_COMMIT}",
-        "main.GitDescribe": "{STABLE_GIT_DESC}",
-        "main.TimestampUtcRfc3339": "{TIMESTAMP_UTC_RFC3339}",
-    },
-    deps = [
-        "@com_github_google_uuid//:go_default_library",
-        "@io_k8s_klog//:go_default_library",
-        "@io_k8s_release//pkg/cip/audit:go_default_library",
-        "@io_k8s_release//pkg/cip/dockerregistry:go_default_library",
-        "@io_k8s_release//pkg/cip/gcloud:go_default_library",
-        "@io_k8s_release//pkg/cip/stream:go_default_library",
-    ],
-)
-
-go_binary(
-    name = "cip",
-    embed = [":go_default_library"],
-    visibility = ["//visibility:public"],
-)
-
 docker_push(
     name = "push-cip",
     bundle = "cip-docker-loadable",
@@ -117,5 +90,5 @@ load("@com_github_google_rules_install//installer:def.bzl", "installer")
 
 installer(
     name = "install-cip",
-    data = [":cip"],
+    data = ["//cmd/cip"],
 )

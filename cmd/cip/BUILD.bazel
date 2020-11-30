@@ -1,0 +1,20 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "cip_lib",
+    srcs = ["main.go"],
+    importpath = "sigs.k8s.io/k8s-container-image-promoter/cmd/cip",
+    # TODO: Consider further restricting the visibility
+    #       Dependents:
+    #       - //:cip-docker-image
+    #       - //:cip-docker-image-no-gcloud
+    #       - //test-e2e/cip-auditor:push-cip-auditor-test
+    visibility = ["//visibility:public"],
+    deps = ["//cmd/cip/cmd"],
+)
+
+go_binary(
+    name = "cip",
+    embed = [":cip_lib"],
+    visibility = ["//visibility:public"],
+)

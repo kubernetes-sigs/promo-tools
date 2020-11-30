@@ -22,7 +22,7 @@ all: test
 ##@ Build
 .PHONY: build
 build: ## Bazel build
-	bazel build //:cip \
+	bazel build //cmd/cip:cip \
 		//test-e2e/cip:e2e \
 		//test-e2e/cip-auditor:cip-auditor-e2e
 
@@ -71,15 +71,6 @@ lint-ci: download
 test: build
 	echo "Would've run 'bazel test --test_output=all //...', but there are no unit tests to run in this repo. ref: https://github.com/kubernetes/release/pull/1767"
 
-.PHONY: test-mac
-# test-mac make target is a workaround for the following
-# issue: https://github.com/bazelbuild/rules_go/issues/2013
-test-mac:
-	bazel test --test_output=all \
-		//pkg/api/files:go_default_test \
-		//pkg/audit:go_default_test \
-		//pkg/dockerregistry:go_default_test
-
 .PHONY: test-ci
 test-ci: download
 	make build
@@ -108,12 +99,13 @@ update: ## Update go modules (source of truth!).
 		--from_file=go.mod --to_macro=repos.bzl%go_repositories \
 		--build_file_generation=on --build_file_proto_mode=disable_global \
 		--prune
+	bazel run //:gazelle -- fix
 
 ##@ Verify
 
-.PHONY: verify verify-boilerplate verify-dependencies verify-go-mod verify-golangci-lint
+.PHONY: verify verify-boilerplate verify-dependencies verify-golangci-lint verify-go-mod
 
-verify: verify-boilerplate verify-dependencies verify-go-mod verify-golangci-lint ## Runs verification scripts to ensure correct execution
+verify: verify-boilerplate verify-dependencies verify-golangci-lint verify-go-mod ## Runs verification scripts to ensure correct execution
 
 verify-boilerplate: ## Runs the file header check
 	./hack/verify-boilerplate.sh

@@ -10,19 +10,21 @@ There are 2 flavors of e2e tests, each in its own subfolder:
 
 For both flavors, the testing binary uses test data in a `tests.yaml` to run the necessary tests.
 
-# Running tests
+## Running tests
 
 Here's a way to invoke the tests from your local checkout, against your own GCP test repository:
 
-```
+```console
 export CIP_E2E_KEY_FILE=path/to/secret/creds.json
+
 # For "cip" e2e tests.
 make test-e2e-cip
+
 # For "cip-auditor" e2e tests.
 make test-e2e-cip-auditor
 ```
 
-# cip (e2e.go)
+### cip (e2e.go)
 
 The test cases are defined in `./cip/tests.yaml`. Each test case has 2 parts:
 
@@ -36,7 +38,7 @@ against the actual repositories (as defined in the embedded promoter manifest)
 to make sure that they do indeed match the expected snapshots as defined in the
 test case.
 
-# cip-auditor (cip-auditor-e2e.go)
+### cip-auditor (cip-auditor-e2e.go)
 
 The test cases are defined in `./cip-auditor/tests.yaml`. Each test case has 5
 parts
