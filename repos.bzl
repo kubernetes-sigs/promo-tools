@@ -907,8 +907,8 @@ def go_repositories():
         build_file_generation = "on",
         build_file_proto_mode = "disable_global",
         importpath = "github.com/go-logr/logr",
-        sum = "h1:QvGt2nLcHH0WK9orKa+ppBPAxREcH364nPUedEpK0TY=",
-        version = "v0.2.0",
+        sum = "h1:M1Tv3VzNlEHg6uyACnRdtrploV2P7wZqH8BoQMtz0cg=",
+        version = "v0.1.0",
     )
     go_repository(
         name = "com_github_go_ole_go_ole",
@@ -3436,8 +3436,8 @@ def go_repositories():
         build_file_generation = "on",
         build_file_proto_mode = "disable_global",
         importpath = "k8s.io/klog/v2",
-        sum = "h1:7+X0fUguPyrKEC4WjH8iGDg3laWgMo5tMnRTIGTTxGQ=",
-        version = "v2.4.0",
+        sum = "h1:Foj74zO6RbjjP4hBEKjnYtjjAhGg4jNynUdYF6fJrok=",
+        version = "v2.0.0",
     )
 
     go_repository(
@@ -3462,8 +3462,8 @@ def go_repositories():
         build_file_generation = "on",
         build_file_proto_mode = "disable_global",
         importpath = "k8s.io/release",
-        sum = "h1:vwzt6oiuu11T1iZgnjiY4fX9ZNlRE1WJ3JXay6PbExQ=",
-        version = "v0.6.0",
+        sum = "h1:rLwlBL1B7OQFnQJuTt5vccbtkZlglry9CwEzejRGmUQ=",
+        version = "v0.6.1-0.20201128190848-6313f6964945",
     )
     go_repository(
         name = "io_k8s_sigs_mdtoc",
