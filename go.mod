@@ -8,5 +8,5 @@ require (
 	github.com/sirupsen/logrus v1.7.0
 	github.com/spf13/cobra v1.1.1
 	gopkg.in/yaml.v2 v2.3.0
-	k8s.io/release v0.6.1-0.20201128190848-6313f6964945
+	k8s.io/release v0.6.1-0.20201130132450-1c35c3fb1498
 )
