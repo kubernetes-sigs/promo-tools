@@ -3462,8 +3462,8 @@ def go_repositories():
         build_file_generation = "on",
         build_file_proto_mode = "disable_global",
         importpath = "k8s.io/release",
-        sum = "h1:rLwlBL1B7OQFnQJuTt5vccbtkZlglry9CwEzejRGmUQ=",
-        version = "v0.6.1-0.20201128190848-6313f6964945",
+        sum = "h1:kCfSspBiMFDJO95etxqMWKoOCBV0xSVu7UBrc07MvvE=",
+        version = "v0.6.1-0.20201130132450-1c35c3fb1498",
     )
     go_repository(
         name = "io_k8s_sigs_mdtoc",

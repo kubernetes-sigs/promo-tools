@@ -17,19 +17,12 @@ limitations under the License.
 package cmd
 
 import (
-	"fmt"
-
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
-	"k8s.io/release/pkg/version"
+	"k8s.io/release/pkg/cip/cli"
 )
 
-type versionOptions struct {
-	json bool
-}
-
-var versionOpts = &versionOptions{}
+var versionOpts = &cli.VersionOptions{}
 
 // versionCmd is the command when calling `cip version`.
 var versionCmd = &cobra.Command{
@@ -38,13 +31,13 @@ var versionCmd = &cobra.Command{
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return runVersion(versionOpts)
+		return cli.RunVersionCmd(versionOpts)
 	},
 }
 
 func init() {
 	versionCmd.PersistentFlags().BoolVarP(
-		&versionOpts.json,
+		&versionOpts.JSON,
 		"json",
 		"j",
 		false,
@@ -52,20 +45,4 @@ func init() {
 	)
 
 	rootCmd.AddCommand(versionCmd)
-}
-
-func runVersion(opts *versionOptions) error {
-	v := version.Get()
-	res := v.String()
-
-	if opts.json {
-		j, err := v.JSONString()
-		if err != nil {
-			return errors.Wrap(err, "unable to generate JSON from version info")
-		}
-		res = j
-	}
-
-	fmt.Println(res)
-	return nil
 }
