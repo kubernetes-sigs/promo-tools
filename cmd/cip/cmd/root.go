@@ -22,6 +22,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
+	"k8s.io/release/pkg/cip/cli"
 	"k8s.io/release/pkg/log"
 )
 
@@ -45,13 +46,7 @@ var rootCmd = &cobra.Command{
 	PersistentPreRunE: initLogging,
 }
 
-type rootOptions struct {
-	logLevel string
-	dryRun   bool
-	version  bool
-}
-
-var rootOpts = &rootOptions{}
+var rootOpts = &cli.RootOptions{}
 
 // Execute adds all child commands to the root command and sets flags.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
@@ -63,33 +58,27 @@ func Execute() {
 
 func init() {
 	rootCmd.PersistentFlags().StringVar(
-		&rootOpts.logLevel,
+		&rootOpts.LogLevel,
 		"log-level",
 		"info",
 		fmt.Sprintf("the logging verbosity, either %s", log.LevelNames()),
 	)
 
 	rootCmd.PersistentFlags().BoolVar(
-		&rootOpts.dryRun,
+		&rootOpts.DryRun,
 		"dry-run",
-		rootOpts.dryRun,
+		rootOpts.DryRun,
 		"test run promotion without modifying any registry",
 	)
 
 	rootCmd.PersistentFlags().BoolVar(
-		&rootOpts.version,
+		&rootOpts.Version,
 		"version",
-		rootOpts.version,
+		rootOpts.Version,
 		"print version",
 	)
 }
 
 func initLogging(*cobra.Command, []string) error {
-	return log.SetupGlobalLogger(rootOpts.logLevel)
-}
-
-func printVersion() {
-	fmt.Printf("Built:   %s\n", TimestampUtcRfc3339)
-	fmt.Printf("Version: %s\n", GitDescribe)
-	fmt.Printf("Commit:  %s\n", GitCommit)
+	return log.SetupGlobalLogger(rootOpts.LogLevel)
 }
