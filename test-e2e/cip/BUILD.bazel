@@ -12,8 +12,8 @@ go_library(
         "//legacy/dockerregistry",
         "//legacy/gcloud",
         "//legacy/stream",
-        "@com_github_sirupsen_logrus//:logrus",
         "@in_gopkg_yaml_v2//:yaml_v2",
+        "@io_k8s_klog//:klog",
     ],
 )
 

@@ -26,9 +26,9 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/sirupsen/logrus"
 	yaml "gopkg.in/yaml.v2"
 
+	"k8s.io/klog"
 	reg "sigs.k8s.io/k8s-container-image-promoter/legacy/dockerregistry"
 	"sigs.k8s.io/k8s-container-image-promoter/legacy/gcloud"
 	"sigs.k8s.io/k8s-container-image-promoter/legacy/stream"
@@ -73,17 +73,17 @@ func main() {
 	}
 
 	if *repoRootPtr == "" {
-		logrus.Fatal("-repo-root=... flag is required")
+		klog.Fatal(fmt.Errorf("-repo-root=... flag is required"))
 	}
 
 	ts, err := readE2ETests(*testsPtr)
 	if err != nil {
-		logrus.Fatalf("reading e2e tests: %v", err)
+		klog.Fatal(err)
 	}
 
 	if len(*keyFilePtr) > 0 {
 		if err := gcloud.ActivateServiceAccount(*keyFilePtr); err != nil {
-			logrus.Fatalf("activating service account: %v", err)
+			klog.Fatal("could not activate service account from .json", err)
 		}
 	}
 
@@ -92,7 +92,7 @@ func main() {
 		fmt.Printf("\n===> Running e2e test '%s'...\n", t.Name)
 		err := testSetup(*repoRootPtr, t)
 		if err != nil {
-			logrus.Fatalf("setting up tests: %v", err)
+			klog.Fatal("error with test setup:", err)
 		}
 
 		fmt.Println("checking snapshots BEFORE promotion:")
@@ -102,7 +102,7 @@ func main() {
 
 		err = runPromotion(*repoRootPtr, &t)
 		if err != nil {
-			logrus.Fatalf("running promotion: %v", err)
+			klog.Fatal("error with promotion:", err)
 		}
 
 		fmt.Println("checking snapshots AFTER promotion:")
@@ -126,10 +126,10 @@ func checkSnapshot(
 		rcs,
 	)
 	if err != nil {
-		logrus.Fatalf("could not get snapshot of %s: %s\n", repo, err)
+		klog.Exitf("could not get snapshot of %s: %s\n", repo, err)
 	}
 	if err := checkEqual(got, expected); err != nil {
-		logrus.Fatalln(err)
+		klog.Exitln(err)
 	}
 }
 
@@ -142,9 +142,8 @@ func testSetup(repoRoot string, t E2ETest) error {
 	pushRepo := getBazelOption(repoRoot, "STABLE_TEST_STAGING_IMG_REPOSITORY")
 
 	if pushRepo == "" {
-		logrus.Fatal(
-			"could not dereference STABLE_TEST_AUDIT_STAGING_IMG_REPOSITORY",
-		)
+		return fmt.Errorf(
+			"could not dereference STABLE_TEST_STAGING_IMG_REPOSITORY")
 	}
 
 	cmds := [][]string{
@@ -231,7 +230,7 @@ func execCommand(
 	cmd.Stderr = &stderr
 
 	if err := cmd.Run(); err != nil {
-		logrus.Errorf("for command %s:\nstdout:\n%sstderr:\n%s\n",
+		klog.Errorf("for command %s:\nstdout:\n%sstderr:\n%s\n",
 			cmdString,
 			stdout.String(),
 			stderr.String())
