@@ -9,7 +9,7 @@ check requirements in the future.
 
 ## Interface Explanation
 The `PreCheck` interface is implemented like so in the 
-[types.go](https://github.com/kubernetes-sigs/k8s-container-image-promoter/blob/master/lib/dockerregistry/types.go) 
+[types.go](https://github.com/kubernetes-sigs/k8s-container-image-promoter/blob/v2.4.1/pkg/dockerregistry/types.go) 
 file. The `Run` function is the method used in order to actually execute the 
 check that implements this interface.
 
