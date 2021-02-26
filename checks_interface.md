@@ -54,7 +54,7 @@ func (f *foo) Run() error
 ```
 Then add that check type you've created to the input list of PreChecks for 
 the RunChecks method, which is called in the 
-[cip.go](https://github.com/kubernetes-sigs/k8s-container-image-promoter/blob/master/cip.go) 
+[cip.go](https://github.com/kubernetes-sigs/k8s-container-image-promoter/blob/v2.4.1/cip.go) 
 file.
 
 Note that the `Run` method of the precheck interface does not accept any 
