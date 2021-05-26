@@ -1,85 +1,168 @@
-# all available settings of specific linters
-linters-settings:
-  govet:
-    # report about shadowed variables
-    check-shadowing: true
-  golint:
-    # minimal confidence for issues, default is 0.8
-    min-confidence: 0.8
-  goimports:
-    # put imports beginning with prefix after 3rd-party packages;
-    # it's a comma-separated list of prefixes
-    local-prefixes: k8s.io/container-image-promoter
-  gocyclo:
-    # minimal code complexity to report, 30 by default (but we recommend 10-20)
-    min-complexity: 10
-  dupl:
-    # tokens count to trigger issue, 150 by default
-    threshold: 100
-  goconst:
-    # minimal length of string constant, 3 by default
-    min-len: 2
-    # minimal occurrences count to trigger, 3 by default
-    min-occurrences: 2
-  misspell:
-    # Correct spellings using locale preferences for US or UK.
-    # Default is to use a neutral variety of English.
-    # Setting locale to US will correct the British spelling of 'colour' to 'color'.
-    locale: US
-  lll:
-    # max line length, lines longer will be reported. Default is 120.
-    # '\t' is counted as 1 character by default, and can be changed with the tab-width option
-    line-length: 80
-    # tab width in spaces. Default to 1.
-    tab-width: 4
-  unused:
-    # treat code as a program (not a library) and report unused exported identifiers; default is false.
-    # XXX: if you enable this setting, unused will report a lot of false-positives in text editors:
-    # if it's called for subdir of a project it can't find funcs usages. All text editor integrations
-    # with golangci-lint call it on a directory with the changed file.
-    check-exported: false
-  unparam:
-    # call graph construction algorithm (cha, rta). In general, use cha for libraries,
-    # and rta for programs with main packages. Default is cha.
-    algo: cha
-
-    # Inspect exported functions, default is false. Set to true if no external program/library imports your code.
-    # XXX: if you enable this setting, unparam will report a lot of false-positives in text editors:
-    # if it's called for subdir of a project it can't find external interfaces. All text editor integrations
-    # with golangci-lint call it on a directory with the changed file.
-    check-exported: false
-  nakedret:
-    # make an issue if func has more lines of code than this setting and it has naked returns; default is 30
-    max-func-lines: 30
-
-linters:
-  enable-all: true
-  disable:
-  - exhaustive
-  - exportloopref
-  - gci
-  - gochecknoglobals
-  - gochecknoinits
-  - godox
-  - goerr113
-  - gofumpt
-  - gosec
-  - nlreturn
-  - nolintlint
-  - nlreturn
-  - sqlclosecheck
-  - stylecheck
-  - whitespace
-  - wsl
-
+---
+run:
+  concurrency: 6
+  deadline: 5m
 issues:
-  exclude-use-default: false
   exclude-rules:
-  - path: "_test.go"
-    linters:
+    # counterfeiter fakes are usually named 'fake_<something>.go'
+    - path: fake_.*\.go
+      linters:
+        - gocritic
+        - golint
+        - dupl
+linters:
+  disable-all: true
+  enable:
+    - asciicheck
+    - bodyclose
+    - deadcode
+    - depguard
+    - dogsled
     - dupl
+    - durationcheck
     - errcheck
-    - funlen
-    - gomnd
-    - lll
+    - goconst
+    - gocritic
+    - gocyclo
+    - godox
+    - gofmt
+    - gofumpt
+    - goheader
+    - goimports
+    - golint
+    - gomoddirectives
+    - gomodguard
+    - goprintffuncname
+    - gosimple
+    - govet
+    - importas
+    - ineffassign
+    - makezero
+    - misspell
+    - nakedret
+    - prealloc
+    - predeclared
+    - promlinter
+    - rowserrcheck
+    - sqlclosecheck
     - staticcheck
+    - structcheck
+    - stylecheck
+    - typecheck
+    - unconvert
+    - unparam
+    - unused
+    - varcheck
+    - whitespace
+    # - cyclop
+    # - errorlint
+    # - exhaustive
+    # - exhaustivestruct
+    # - exportloopref
+    # - forbidigo
+    # - forcetypeassert
+    # - funlen
+    # - gci
+    # - gochecknoglobals
+    # - gochecknoinits
+    # - gocognit
+    # - godot
+    # - goerr113
+    # - gomnd
+    # - gosec
+    # - ifshort
+    # - lll
+    # - nestif
+    # - nilerr
+    # - nlreturn
+    # - noctx
+    # - nolintlint
+    # - paralleltest
+    # - revive
+    # - scopelint
+    # - tagliatelle
+    # - testpackage
+    # - thelper
+    # - tparallel
+    # - wastedassign
+    # - wrapcheck
+    # - wsl
+linters-settings:
+  godox:
+    keywords:
+      - BUG
+      - FIXME
+      - HACK
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+  gocritic:
+    enabled-checks:
+      # Diagnostic
+      - appendAssign
+      - argOrder
+      - badCond
+      - caseOrder
+      - codegenComment
+      - commentedOutCode
+      - deprecatedComment
+      - dupArg
+      - dupBranchBody
+      - dupCase
+      - dupSubExpr
+      - exitAfterDefer
+      - flagDeref
+      - flagName
+      - nilValReturn
+      - offBy1
+      - sloppyReassign
+      - weakCond
+      - octalLiteral
+
+      # Performance
+      - appendCombine
+      - equalFold
+      - hugeParam
+      - indexAlloc
+      - rangeExprCopy
+      - rangeValCopy
+
+      # Style
+      - assignOp
+      - boolExprSimplify
+      - captLocal
+      - commentFormatting
+      - commentedOutImport
+      - defaultCaseOrder
+      - docStub
+      - elseif
+      - emptyFallthrough
+      - emptyStringTest
+      - hexLiteral
+      - methodExprCall
+      - regexpMust
+      - singleCaseSwitch
+      - sloppyLen
+      - stringXbytes
+      - switchTrue
+      - typeAssertChain
+      - typeSwitchVar
+      - underef
+      - unlabelStmt
+      - unlambda
+      - unslice
+      - valSwap
+      - wrapperFunc
+      - yodaStyleExpr
+      # - ifElseChain
+
+      # Opinionated
+      - builtinShadow
+      - importShadow
+      - initClause
+      - nestingReduce
+      - paramTypeCombine
+      - ptrToRefParam
+      - typeUnparen
+      - unnamedResult
+      - unnecessaryBlock
