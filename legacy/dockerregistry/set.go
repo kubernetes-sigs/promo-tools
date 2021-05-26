@@ -17,7 +17,7 @@ limitations under the License.
 package inventory
 
 import (
-	"k8s.io/release/pkg/cip/container"
+	"sigs.k8s.io/k8s-container-image-promoter/legacy/container"
 )
 
 // Various set manipulation operations. Some set operations are missing,

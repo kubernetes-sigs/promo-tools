@@ -30,10 +30,10 @@ import (
 	"github.com/sirupsen/logrus"
 	yaml "gopkg.in/yaml.v2"
 
-	"k8s.io/release/pkg/cip/audit"
-	reg "k8s.io/release/pkg/cip/dockerregistry"
-	"k8s.io/release/pkg/cip/gcloud"
-	"k8s.io/release/pkg/cip/stream"
+	"sigs.k8s.io/k8s-container-image-promoter/legacy/audit"
+	reg "sigs.k8s.io/k8s-container-image-promoter/legacy/dockerregistry"
+	"sigs.k8s.io/k8s-container-image-promoter/legacy/gcloud"
+	"sigs.k8s.io/k8s-container-image-promoter/legacy/stream"
 )
 
 // GitDescribe is stamped by bazel.

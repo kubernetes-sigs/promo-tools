@@ -25,7 +25,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/xerrors"
 
-	reg "k8s.io/release/pkg/cip/dockerregistry"
+	reg "sigs.k8s.io/k8s-container-image-promoter/legacy/dockerregistry"
 )
 
 func TestFindManifest(t *testing.T) {

@@ -38,9 +38,9 @@ import (
 	"github.com/sirupsen/logrus"
 	yaml "gopkg.in/yaml.v2"
 
-	"k8s.io/release/pkg/cip/gcloud"
-	cipJson "k8s.io/release/pkg/cip/json"
-	"k8s.io/release/pkg/cip/stream"
+	"sigs.k8s.io/k8s-container-image-promoter/legacy/gcloud"
+	cipJson "sigs.k8s.io/k8s-container-image-promoter/legacy/json"
+	"sigs.k8s.io/k8s-container-image-promoter/legacy/stream"
 )
 
 // GetSrcRegistry gets the source registry.
