@@ -25,6 +25,7 @@ import (
 	"os/exec"
 	"reflect"
 	"strings"
+	"errors"
 
 	"github.com/sirupsen/logrus"
 	yaml "gopkg.in/yaml.v2"
@@ -86,6 +87,9 @@ func main() {
 			logrus.Fatalf("activating service account: %v", err)
 		}
 	}
+
+	// Force error
+	logrus.Fatalf("Testing E2E: %v", errors.New("forcing error"))
 
 	// Loop through each e2e test case.
 	for _, t := range ts {
