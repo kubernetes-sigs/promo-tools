@@ -28,7 +28,7 @@ import (
 
 	yaml "gopkg.in/yaml.v2"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	reg "sigs.k8s.io/k8s-container-image-promoter/legacy/dockerregistry"
 	"sigs.k8s.io/k8s-container-image-promoter/legacy/gcloud"
 	"sigs.k8s.io/k8s-container-image-promoter/legacy/stream"

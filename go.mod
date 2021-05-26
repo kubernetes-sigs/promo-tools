@@ -17,7 +17,7 @@ require (
 	google.golang.org/genproto v0.0.0-20210517163617-5e0236093d7a
 	gopkg.in/src-d/go-git.v4 v4.13.1
 	gopkg.in/yaml.v2 v2.4.0
-	k8s.io/klog v1.0.0
+	k8s.io/klog/v2 v2.9.0
 	k8s.io/release v0.8.1-0.20210526071921-fa4837a72cf9
 	sigs.k8s.io/release-utils v0.2.1
 )
