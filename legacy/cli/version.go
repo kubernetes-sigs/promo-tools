@@ -21,7 +21,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	"k8s.io/release/pkg/version"
+	"sigs.k8s.io/k8s-container-image-promoter/internal/version"
 )
 
 type VersionOptions struct {
