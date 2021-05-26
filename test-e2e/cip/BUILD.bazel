@@ -9,11 +9,11 @@ go_library(
     importpath = "sigs.k8s.io/k8s-container-image-promoter/test-e2e/cip",
     visibility = ["//visibility:public"],
     deps = [
+        "//legacy/dockerregistry",
+        "//legacy/gcloud",
+        "//legacy/stream",
         "@com_github_sirupsen_logrus//:logrus",
         "@in_gopkg_yaml_v2//:yaml_v2",
-        "@io_k8s_release//pkg/cip/dockerregistry",
-        "@io_k8s_release//pkg/cip/gcloud",
-        "@io_k8s_release//pkg/cip/stream",
     ],
 )
 
