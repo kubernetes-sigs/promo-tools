@@ -29,8 +29,8 @@ go_binary(
 go_image(
     name = "e2e-image",
     base = "@distroless-base//image",
-    embed = [":go_default_library"],
-    importpath = "sigs.k8s.io/k8s-container-image-promoter/e2e",
+    embed = [":cip-auditor_lib"],
+    importpath = "sigs.k8s.io/k8s-container-image-promoter/test-e2e/cip-auditor",
 )
 
 container_image(
