@@ -388,7 +388,7 @@ func populateGoldenImages(repoRoot, pushRepo string) error {
 func execCommand(
 	repoRoot string,
 	args ...string,
-) (string, string, error) {
+) (sout, serr string, err error) {
 	logrus.Infof("executing command: %s", args)
 
 	cmd := exec.Command(args[0], args[1:]...)
@@ -408,6 +408,7 @@ func execCommand(
 			stderr.String())
 		return "", "", err
 	}
+
 	return stdout.String(), stderr.String(), nil
 }
 
@@ -774,7 +775,6 @@ func deployCloudRun(
 	uuid,
 	invokerServiceAccount string,
 ) error {
-
 	argss := getCmdsDeployCloudRun(
 		pushRepo,
 		projectID,
@@ -958,20 +958,21 @@ func checkCommand(cmd []string) error {
 		allowedCommands)
 }
 
-func clearRepository(regName reg.RegistryName,
-	sc *reg.SyncContext) {
-
+func clearRepository(regName reg.RegistryName, sc *reg.SyncContext) {
 	mkDeletionCmd := func(
 		dest reg.RegistryContext,
 		imageName reg.ImageName,
-		digest reg.Digest) stream.Producer {
+		digest reg.Digest,
+	) stream.Producer {
 		var sp stream.Subprocess
 		sp.CmdInvocation = reg.GetDeleteCmd(
 			dest,
 			sc.UseServiceAccount,
 			imageName,
 			digest,
-			true)
+			true,
+		)
+
 		return &sp
 	}
 
@@ -992,10 +993,11 @@ func checkLogs(projectID, uuid string, patterns []string) error {
 				stderr)
 		}
 
-		if len(matched) == 0 {
+		if matched == "" {
 			return fmt.Errorf("no matching log found for pattern '%s'", pattern)
 		}
 	}
+
 	return nil
 }
 

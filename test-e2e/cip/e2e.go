@@ -100,7 +100,7 @@ func main() {
 			checkSnapshot(snapshot.Name, snapshot.Before, *repoRootPtr, t.Registries)
 		}
 
-		err = runPromotion(*repoRootPtr, t)
+		err = runPromotion(*repoRootPtr, &t)
 		if err != nil {
 			logrus.Fatalf("running promotion: %v", err)
 		}
@@ -114,15 +114,17 @@ func main() {
 	}
 }
 
-func checkSnapshot(repo reg.RegistryName,
+func checkSnapshot(
+	repo reg.RegistryName,
 	expected []reg.Image,
 	repoRoot string,
-	rcs []reg.RegistryContext) {
-
+	rcs []reg.RegistryContext,
+) {
 	got, err := getSnapshot(
 		repoRoot,
 		repo,
-		rcs)
+		rcs,
+	)
 	if err != nil {
 		logrus.Fatalf("could not get snapshot of %s: %s\n", repo, err)
 	}
@@ -216,8 +218,8 @@ func testSetup(repoRoot string, t E2ETest) error {
 
 func execCommand(
 	repoRoot, cmdString string,
-	args ...string) (string, string, error) {
-
+	args ...string,
+) (sout, serr string, err error) {
 	cmd := exec.Command(cmdString, args...)
 	if repoRoot != "" {
 		cmd.Dir = repoRoot
@@ -235,6 +237,7 @@ func execCommand(
 			stderr.String())
 		return "", "", err
 	}
+
 	return stdout.String(), stderr.String(), nil
 }
 
@@ -256,7 +259,7 @@ func getBazelOption(repoRoot, o string) string {
 	return ""
 }
 
-func runPromotion(repoRoot string, t E2ETest) error {
+func runPromotion(repoRoot string, t *E2ETest) error {
 	args := []string{
 		"run",
 		"--workspace_status_command=" + repoRoot + "/workspace_status.sh",
@@ -299,22 +302,21 @@ func runPromotion(repoRoot string, t E2ETest) error {
 	return nil
 }
 
-func extractSvcAcc(
-	registry reg.RegistryName,
-	rcs []reg.RegistryContext) string {
-
+func extractSvcAcc(registry reg.RegistryName, rcs []reg.RegistryContext) string {
 	for _, r := range rcs {
 		if r.Name == registry {
 			return r.ServiceAccount
 		}
 	}
+
 	return ""
 }
 
-func getSnapshot(repoRoot string,
+func getSnapshot(
+	repoRoot string,
 	registry reg.RegistryName,
-	rcs []reg.RegistryContext) ([]reg.Image, error) {
-
+	rcs []reg.RegistryContext,
+) ([]reg.Image, error) {
 	// TODO: Consider setting flag names in `cip` instead
 	invocation := []string{
 		"run",
@@ -322,7 +324,8 @@ func getSnapshot(repoRoot string,
 		"//cmd/cip:cip",
 		"--",
 		"run",
-		"--snapshot=" + string(registry)}
+		"--snapshot=" + string(registry),
+	}
 
 	svcAcc := extractSvcAcc(registry, rcs)
 	if len(svcAcc) > 0 {
@@ -347,9 +350,10 @@ func getSnapshot(repoRoot string,
 	}
 
 	images := make([]reg.Image, 0)
-	if err = yaml.UnmarshalStrict(stdout.Bytes(), &images); err != nil {
+	if err := yaml.UnmarshalStrict(stdout.Bytes(), &images); err != nil {
 		return nil, err
 	}
+
 	return images, err
 }
 
@@ -383,9 +387,7 @@ func (t *E2ETest) clearRepositories() error {
 	return nil
 }
 
-func clearRepository(regName reg.RegistryName,
-	sc *reg.SyncContext) {
-
+func clearRepository(regName reg.RegistryName, sc *reg.SyncContext) {
 	mkDeletionCmd := func(
 		dest reg.RegistryContext,
 		imageName reg.ImageName,
