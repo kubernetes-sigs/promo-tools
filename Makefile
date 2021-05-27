@@ -69,7 +69,7 @@ lint-ci: download
 
 .PHONY: test
 test: build
-	echo "Would've run 'bazel test --test_output=all //...', but there are no unit tests to run in this repo. ref: https://github.com/kubernetes/release/pull/1767"
+	bazel test --test_output=all //...
 
 .PHONY: test-ci
 test-ci: download
