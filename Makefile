@@ -80,7 +80,8 @@ test-ci: download
 
 .PHONY: test-e2e-cip
 test-e2e-cip:
-	bazel run //test-e2e/cip:e2e -- -tests=$(REPO_ROOT)/test-e2e/cip/tests.yaml -repo-root=$(REPO_ROOT) -key-file=$(CIP_E2E_KEY_FILE)
+	go run $(REPO_ROOT)/test-e2e/cip/e2e.go -tests=$(REPO_ROOT)/test-e2e/cip/tests.yaml -repo-root=$(REPO_ROOT) -key-file=$(CIP_E2E_KEY_FILE)
+#	bazel run //test-e2e/cip:e2e -- -tests=$(REPO_ROOT)/test-e2e/cip/tests.yaml -repo-root=$(REPO_ROOT) -key-file=$(CIP_E2E_KEY_FILE)
 
 .PHONY: test-e2e-cip-auditor
 test-e2e-cip-auditor:
