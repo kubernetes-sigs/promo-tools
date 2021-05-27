@@ -2,24 +2,26 @@
 
 aliases:
   sig-release-leads:
-    - alejandrox1
-    - justaugustus
-    - saschagrunert
-    - tpepper
+    - hasheddan # SIG Technical Lead
+    - jeremyrickard # SIG Technical Lead
+    - justaugustus # SIG Chair
+    - saschagrunert # SIG Chair
   release-engineering-approvers:
+    - cpanato # Release Manager
+    - hasheddan # subproject owner / Release Manager
     - justaugustus # subproject owner / Release Manager
+    - puerco # Release Manager
     - saschagrunert # subproject owner / Release Manager
-    - tpepper # subproject owner / Release Manager
+    - xmudrii # Release Manager
   release-engineering-reviewers:
     - cpanato # Release Manager
-    - dougm # Release Manager
-    - feiskyer # Release Manager
-    - hasheddan # Release Manager
-    - hoegaarden # Release Manager
-    - idealhack # Release Manager
+    - hasheddan # subproject owner / Release Manager
+    - justaugustus # subproject owner / Release Manager
+    - puerco # Release Manager
+    - saschagrunert # subproject owner / Release Manager
     - xmudrii # Release Manager
   wg-k8s-infra-leads:
-    - bartsmykla
+    - ameukam
     - dims
     - spiffxp
   cip-approvers:
