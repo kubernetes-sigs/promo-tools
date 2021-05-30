@@ -14,3 +14,5 @@ require (
 	k8s.io/release v0.8.1-0.20210529062825-c568a0e710da
 	sigs.k8s.io/release-utils v0.2.1
 )
+
+replace k8s.io/release => github.com/justaugustus/release v0.0.0-20210530045139-1c92cda49659

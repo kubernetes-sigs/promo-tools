@@ -30,7 +30,7 @@ linters:
     - goheader
     - goimports
     - golint
-    - gomoddirectives
+    #- gomoddirectives
     - gomodguard
     - goprintffuncname
     - gosimple
