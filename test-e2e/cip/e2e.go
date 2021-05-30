@@ -165,7 +165,7 @@ func runPromotion(repoRoot string, t *E2ETest) error {
 		"run",
 		fmt.Sprintf("%s/cmd/cip/main.go", repoRoot),
 		"run",
-		"--dry-run=false",
+		"--confirm",
 		"--log-level=debug",
 		"--use-service-account",
 		// There is no need to use -key-files=... because we already activated

@@ -78,7 +78,7 @@ type CollectedLogs struct {
 // SyncContext is the main data structure for performing the promotion.
 type SyncContext struct {
 	Threads           int
-	DryRun            bool
+	Confirm           bool
 	UseServiceAccount bool
 	Inv               MasterInventory
 	InvIgnore         []ImageName
