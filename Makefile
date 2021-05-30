@@ -68,12 +68,14 @@ lint-ci: download
 ##@ Tests
 
 .PHONY: test
-test: build
-	bazel test --test_output=all //...
+test: test-go-unit ## Runs unit tests
+
+.PHONY: test-go-unit
+test-go-unit: ## Runs Golang unit tests
+	${REPO_ROOT}/hack/test-go.sh
 
 .PHONY: test-ci
 test-ci: download
-	make build
 	make test
 
 .PHONY: test-e2e-cip
