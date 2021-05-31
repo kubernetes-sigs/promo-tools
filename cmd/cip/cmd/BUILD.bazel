@@ -11,10 +11,10 @@ go_library(
     importpath = "sigs.k8s.io/k8s-container-image-promoter/cmd/cip/cmd",
     visibility = ["//visibility:public"],
     deps = [
+        "//legacy/cli",
         "@com_github_pkg_errors//:errors",
         "@com_github_sirupsen_logrus//:logrus",
         "@com_github_spf13_cobra//:cobra",
-        "@io_k8s_release//pkg/cip/cli",
         "@io_k8s_sigs_release_utils//log",
     ],
 )

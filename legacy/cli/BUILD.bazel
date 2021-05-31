@@ -1,0 +1,23 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "cli",
+    srcs = [
+        "audit.go",
+        "root.go",
+        "run.go",
+        "version.go",
+    ],
+    importpath = "sigs.k8s.io/k8s-container-image-promoter/legacy/cli",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//internal/version",
+        "//legacy/audit",
+        "//legacy/dockerregistry",
+        "//legacy/gcloud",
+        "//legacy/stream",
+        "@com_github_google_uuid//:uuid",
+        "@com_github_pkg_errors//:errors",
+        "@com_github_sirupsen_logrus//:logrus",
+    ],
+)

@@ -1,0 +1,8 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "container",
+    srcs = ["set.go"],
+    importpath = "sigs.k8s.io/k8s-container-image-promoter/legacy/container",
+    visibility = ["//visibility:public"],
+)

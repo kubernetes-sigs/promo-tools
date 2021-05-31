@@ -27,13 +27,13 @@ import (
 	"time"
 
 	guuid "github.com/google/uuid"
-	"github.com/sirupsen/logrus"
 	yaml "gopkg.in/yaml.v2"
 
-	"k8s.io/release/pkg/cip/audit"
-	reg "k8s.io/release/pkg/cip/dockerregistry"
-	"k8s.io/release/pkg/cip/gcloud"
-	"k8s.io/release/pkg/cip/stream"
+	"k8s.io/klog/v2"
+	"sigs.k8s.io/k8s-container-image-promoter/legacy/audit"
+	reg "sigs.k8s.io/k8s-container-image-promoter/legacy/dockerregistry"
+	"sigs.k8s.io/k8s-container-image-promoter/legacy/gcloud"
+	"sigs.k8s.io/k8s-container-image-promoter/legacy/stream"
 )
 
 // GitDescribe is stamped by bazel.
@@ -75,12 +75,12 @@ func main() {
 	}
 
 	if *repoRootPtr == "" {
-		logrus.Fatal("-repo-root=... flag is required")
+		klog.Fatal(fmt.Errorf("-repo-root=... flag is required"))
 	}
 
 	if len(*keyFilePtr) > 0 {
 		if err := gcloud.ActivateServiceAccount(*keyFilePtr); err != nil {
-			logrus.Fatalf("activating service account: %v", err)
+			klog.Fatal("could not activate service account from .json", err)
 		}
 	}
 
@@ -93,7 +93,7 @@ func runE2ETests(testsFile, repoRoot string) {
 	// Start tests
 	ts, err := readE2ETests(testsFile)
 	if err != nil {
-		logrus.Fatalf("reading e2e tests: %v", err)
+		klog.Fatal(err)
 	}
 
 	// Loop through each e2e test case.
@@ -134,32 +134,31 @@ func runE2ETests(testsFile, repoRoot string) {
 	// TODO: All of the Bazel options, not just this one, should be non-empty
 	// values.
 	if pushRepo == "" {
-		logrus.Fatal(
-			"could not dereference STABLE_TEST_AUDIT_STAGING_IMG_REPOSITORY",
-		)
+		klog.Fatal(
+			"could not dereference STABLE_TEST_AUDIT_STAGING_IMG_REPOSITORY")
 	}
 
 	// Enable some APIs. These are required in order to run some of the other
 	// commands below.
 	if err := enableServiceUsageAPI(projectID); err != nil {
-		logrus.Fatalf("enabling Service Usage API: %v", err)
+		klog.Fatal("error enabling Service Usage API", err)
 	}
 	if err := enableCloudResourceManagerAPI(projectID); err != nil {
-		logrus.Fatalf("enabling Cloud Resource Manager API: %v", err)
+		klog.Fatal("error enabling Cloud Resource Manager API", err)
 	}
 	if err := enableStackdriverAPI(projectID); err != nil {
-		logrus.Fatalf("enabling Stackdriver API: %v", err)
+		klog.Fatal("error enabling Stackdriver API", err)
 	}
 	if err := enableStackdriverErrorReportingAPI(projectID); err != nil {
-		logrus.Fatalf("enabling Stackdriver Error Reporting API: %v", err)
+		klog.Fatal("error enabling Stackdriver Error Reporting API", err)
 	}
 	if err := enableCloudRunAPI(projectID); err != nil {
-		logrus.Fatalf("enabling Cloud Run API: %v", err)
+		klog.Fatal("error enabling Cloud Run API", err)
 	}
 
 	// Allow Pub/Sub to create auth tokens for the project.
 	if err := enablePubSubTokenCreation(projectNumber, projectID); err != nil {
-		logrus.Fatalf("giving token creation permissions to Pub/Sub account: %v", err)
+		klog.Fatal("error giving token creation permissions to Pub/Sub account", err)
 	}
 
 	// Clearing the GCR topic is necessary as it will prevent messages regarding
@@ -168,7 +167,7 @@ func runE2ETests(testsFile, repoRoot string) {
 	// messages relating to the pushing of golden images that are not part of
 	// the test case per se.
 	if err := clearPubSubTopic(projectID, "gcr"); err != nil {
-		logrus.Fatalf("resetting Pub/Sub topic 'gcr': %v", err)
+		klog.Fatal("error resetting Pub/Sub topic 'gcr'", err)
 	}
 
 	for _, t := range ts {
@@ -178,7 +177,7 @@ func runE2ETests(testsFile, repoRoot string) {
 		fmt.Printf("\n===> Running e2e test '%s' (%s)...\n", t.Name, uuid)
 		err := testSetup(repoRoot, pushRepo, projectNumber, projectID, t)
 		if err != nil {
-			logrus.Fatalf("setting up tests: %v", err)
+			klog.Fatal("error with test setup stage:", err)
 		}
 
 		// Run all setup commands found in the e2e test. Because we cannot allow
@@ -186,7 +185,7 @@ func runE2ETests(testsFile, repoRoot string) {
 		// command execution to some other command), we only allow certain
 		// whitelisted commands to be executed.
 		if err := runCheckedCommands(t.SetupExtra); err != nil {
-			logrus.Fatalf("setting up custom test setup stage: %v", err)
+			klog.Fatal("error with custom test setup stage:", err)
 		}
 
 		// Deploy cloud run instance.
@@ -196,9 +195,8 @@ func runE2ETests(testsFile, repoRoot string) {
 			t.ManifestDir,
 			projectID,
 			uuid,
-			invokerServiceAccount,
-		); err != nil {
-			logrus.Fatalf("deploying Cloud Run service: %v", err)
+			invokerServiceAccount); err != nil {
+			klog.Fatal("error with deploying Cloud Run service:", err)
 		}
 
 		// NOTE: We do not delete the Pub/Sub topic named "gcr" (the topic where
@@ -214,28 +212,26 @@ func runE2ETests(testsFile, repoRoot string) {
 		// Give the service account permissions to invoke the instance we just
 		// deployed.
 		if err := empowerServiceAccount(
-			projectID, invokerServiceAccount,
-		); err != nil {
-			logrus.Fatalf("empowering the invoker service account: %v", err)
+			projectID, invokerServiceAccount); err != nil {
+			klog.Fatal("error with empowering the invoker service account:", err)
 		}
 
 		// Create a Pub/Sub subscription with the service account.
 		if err := createPubSubSubscription(
 			projectID,
-			invokerServiceAccount,
-		); err != nil {
-			logrus.Fatalf("creating the Pub/Sub subscription: %v", err)
+			invokerServiceAccount); err != nil {
+			klog.Fatal("error with creating the Pub/Sub subscription:", err)
 		}
 
 		// Purge all pending Pub/Sub messages up to this point (just before we
 		// start mutating state in GCR) because it can make the logs noisy.
 		if err := clearPubSubMessages(projectID); err != nil {
-			logrus.Fatalf("purging pre-test Pub/Sub messages: %v", err)
+			klog.Fatal("error with purging pre-test Pub/Sub messages:", err)
 		}
 
 		// Mutate the GCR state (these should all be noticed by the auditor).
 		if err := runCheckedCommands(t.Mutations); err != nil {
-			logrus.Fatalf("checking stage mutations: %v", err)
+			klog.Fatal("error with mutations stage:", err)
 		}
 
 		// Ensure that the auditor behaved as expected by checking the logs.
@@ -250,11 +246,11 @@ func runE2ETests(testsFile, repoRoot string) {
 			if err := checkLogs(projectID, uuid, t.LogMatch); err != nil {
 				msg := "error with checking the logs ((%s), attempt #%d of %d): %s"
 				if i == maxLogMatchAttempts {
-					logrus.Fatalf(msg, uuid, i, maxLogMatchAttempts, err)
+					klog.Fatalf(msg, uuid, i, maxLogMatchAttempts, err)
 				}
-				logrus.Warningf(msg, uuid, i, maxLogMatchAttempts, err)
+				klog.Warningf(msg, uuid, i, maxLogMatchAttempts, err)
 			} else {
-				logrus.Infof("checkLogs succeeded for %s", t.LogMatch)
+				klog.Infof("checkLogs succeeded for %s", t.LogMatch)
 				break
 			}
 		}
@@ -389,7 +385,7 @@ func execCommand(
 	repoRoot string,
 	args ...string,
 ) (sout, serr string, err error) {
-	logrus.Infof("executing command: %s", args)
+	klog.Infof("executing command: %s", args)
 
 	cmd := exec.Command(args[0], args[1:]...)
 	if repoRoot != "" {
@@ -402,7 +398,7 @@ func execCommand(
 	cmd.Stderr = &stderr
 
 	if err := cmd.Run(); err != nil {
-		logrus.Errorf("for command %s:\nstdout:\n%sstderr:\n%s\n",
+		klog.Errorf("for command %s:\nstdout:\n%sstderr:\n%s\n",
 			args[0],
 			stdout.String(),
 			stderr.String())
@@ -415,7 +411,7 @@ func execCommand(
 func getBazelOption(repoRoot, o string) string {
 	stdout, _, err := execCommand(repoRoot, "./workspace_status.sh")
 	if err != nil {
-		logrus.Errorln(err)
+		klog.Errorln(err)
 		return ""
 	}
 
@@ -925,7 +921,7 @@ func runCheckedCommands(commands [][]string) error {
 	}
 
 	for _, command := range commands {
-		logrus.Infof("execing command %s", command)
+		klog.Infof("execing command %s", command)
 		if _, _, err := execCommand("", command...); err != nil {
 			return err
 		}

@@ -20,7 +20,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
-	"k8s.io/release/pkg/cip/cli"
+	"sigs.k8s.io/k8s-container-image-promoter/legacy/cli"
 )
 
 // auditCmd represents the base command when called without any subcommands

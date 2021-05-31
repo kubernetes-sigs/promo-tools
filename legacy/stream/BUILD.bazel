@@ -1,0 +1,17 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "stream",
+    srcs = [
+        "fake.go",
+        "http.go",
+        "subprocess.go",
+        "types.go",
+    ],
+    importpath = "sigs.k8s.io/k8s-container-image-promoter/legacy/stream",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@com_github_cenkalti_backoff_v4//:backoff",
+        "@com_github_sirupsen_logrus//:logrus",
+    ],
+)
