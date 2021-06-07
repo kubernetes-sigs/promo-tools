@@ -46,6 +46,7 @@ mkdir -p "${ARTIFACTS}"
 
 go_test_flags=(
     -v
+    -failfast
     -count=1
     -timeout="${TEST_TIMEOUT}s"
     -cover -coverprofile "${ARTIFACTS}/coverage.out"
@@ -54,6 +55,11 @@ go_test_flags=(
 packages=()
 mapfile -t packages < <(go list ./... | grep -v 'sigs.k8s.io/k8s-container-image-promoter/cmd\|test-e2e')
 
-GO111MODULE=on go test "${go_test_flags[@]}" "${packages[@]}"
+for p in "${packages[@]}"; do
+    if ! GO111MODULE=on go test "${go_test_flags[@]}" "${p}"; then
+        # Exit early.
+        exit 1
+    fi
+done
 
 go tool cover -html "${ARTIFACTS}/coverage.out" -o "${ARTIFACTS}/coverage.html"
