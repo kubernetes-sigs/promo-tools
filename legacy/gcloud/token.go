@@ -17,15 +17,14 @@ limitations under the License.
 package gcloud
 
 import (
-	"bytes"
 	"encoding/csv"
 	"fmt"
 	"io"
-	"os"
-	"os/exec"
 	"strings"
 
 	"github.com/sirupsen/logrus"
+
+	"sigs.k8s.io/release-utils/command"
 )
 
 // Token is the oauth2 access token used for API calls over HTTP.
@@ -42,22 +41,18 @@ func GetServiceAccountToken(
 	}
 	args = MaybeUseServiceAccount(serviceAccount, useServiceAccount, args)
 
-	cmd := exec.Command("gcloud", args...)
-
-	var stdout bytes.Buffer
-	cmd.Stdout = &stdout
-
+	cmd := command.New("gcloud", args...)
+	std, err := cmd.RunSuccessOutput()
 	// Do not log the token (stdout) on error, because it could
 	// be that the token was valid, but that Run() failed for
 	// other reasons. NEVER print the token as part of an error message!
-
-	err := cmd.Run()
 	if err != nil {
 		logrus.Errorf("could not execute cmd %v", cmd)
 		return "", err
 	}
 
-	token := Token(strings.TrimSpace(stdout.String()))
+	stdout := std.Output()
+	token := Token(strings.TrimSpace(stdout))
 	return token, nil
 }
 
@@ -99,18 +94,12 @@ func ActivateServiceAccounts(keyFilePaths string) error {
 
 // ActivateServiceAccount activates the service account with gcloud.
 func ActivateServiceAccount(keyFilePath string) error {
-	cmd := exec.Command("gcloud",
+	cmd := command.New(
+		"gcloud",
 		"auth",
 		"activate-service-account",
-		"--key-file="+keyFilePath)
+		"--key-file="+keyFilePath,
+	)
 
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	err := cmd.Run()
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return cmd.RunSuccess()
 }
