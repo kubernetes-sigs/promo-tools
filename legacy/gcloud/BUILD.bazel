@@ -5,5 +5,8 @@ go_library(
     srcs = ["token.go"],
     importpath = "sigs.k8s.io/k8s-container-image-promoter/legacy/gcloud",
     visibility = ["//visibility:public"],
-    deps = ["@com_github_sirupsen_logrus//:logrus"],
+    deps = [
+        "@com_github_sirupsen_logrus//:logrus",
+        "@io_k8s_sigs_release_utils//command",
+    ],
 )
