@@ -32,6 +32,7 @@ import (
 	reg "sigs.k8s.io/k8s-container-image-promoter/legacy/dockerregistry"
 	"sigs.k8s.io/k8s-container-image-promoter/legacy/gcloud"
 	"sigs.k8s.io/k8s-container-image-promoter/legacy/stream"
+	"sigs.k8s.io/release-utils/command"
 )
 
 // GitDescribe is stamped by bazel.
@@ -202,50 +203,40 @@ func testSetup(repoRoot string, t E2ETest) error {
 		},
 	}
 
-	for _, cmd := range cmds {
-		fmt.Println("execing cmd", cmd)
-		stdout, stderr, err := execCommand(repoRoot, cmd[0], cmd[1:]...)
+	for _, cmdparts := range cmds {
+		c := cmdparts[0]
+		args := cmdparts[1:]
+
+		cmd := command.NewWithWorkDir(
+			repoRoot,
+			c,
+			args...,
+		)
+
+		fmt.Printf("executing %s\n", cmd.String())
+
+		std, err := cmd.RunSuccessOutput()
 		if err != nil {
 			return err
 		}
-		fmt.Println(stdout)
-		fmt.Println(stderr)
+
+		fmt.Println(std.Output())
+		fmt.Println(std.Error())
 	}
 
 	return nil
 }
 
-func execCommand(
-	repoRoot, cmdString string,
-	args ...string,
-) (sout, serr string, err error) {
-	cmd := exec.Command(cmdString, args...)
-	if repoRoot != "" {
-		cmd.Dir = repoRoot
-	}
-
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	if err := cmd.Run(); err != nil {
-		klog.Errorf("for command %s:\nstdout:\n%sstderr:\n%s\n",
-			cmdString,
-			stdout.String(),
-			stderr.String())
-		return "", "", err
-	}
-
-	return stdout.String(), stderr.String(), nil
-}
-
+// TODO: De-dupe with other e2e functions
 func getBazelOption(repoRoot, o string) string {
-	stdout, _, err := execCommand(repoRoot, "./workspace_status.sh")
+	cmd := command.NewWithWorkDir(repoRoot, "./workspace_status.sh")
+	std, err := cmd.RunSuccessOutput()
 	if err != nil {
+		klog.Errorln(err)
 		return ""
 	}
 
+	stdout := std.Output()
 	for _, line := range strings.Split(strings.TrimSuffix(stdout, "\n"), "\n") {
 		if strings.Contains(line, o) {
 			words := strings.Split(line, " ")
@@ -255,6 +246,7 @@ func getBazelOption(repoRoot, o string) string {
 			}
 		}
 	}
+
 	return ""
 }
 
@@ -283,22 +275,8 @@ func runPromotion(repoRoot string, t *E2ETest) error {
 	}
 
 	fmt.Println("execing cmd", "bazel", argsFinal)
-	cmd := exec.Command(
-		"bazel",
-		argsFinal...,
-	)
-
-	cmd.Dir = repoRoot
-
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	err := cmd.Run()
-	if err != nil {
-		return err
-	}
-
-	return nil
+	cmd := command.NewWithWorkDir(repoRoot, "bazel", argsFinal...)
+	return cmd.RunSuccess()
 }
 
 func extractSvcAcc(registry reg.RegistryName, rcs []reg.RegistryContext) string {
@@ -332,6 +310,8 @@ func getSnapshot(
 	}
 
 	fmt.Println("execing cmd", "bazel", invocation)
+	// TODO: Replace with sigs.k8s.io/release-utils/command once the package
+	//       exposes a means to manipulate stdout.Bytes() for unmarshalling.
 	cmd := exec.Command("bazel", invocation...)
 
 	cmd.Dir = repoRoot

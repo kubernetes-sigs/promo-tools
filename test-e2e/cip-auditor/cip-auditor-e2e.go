@@ -17,12 +17,10 @@ limitations under the License.
 package main
 
 import (
-	"bytes"
 	"flag"
 	"fmt"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"strings"
 	"time"
 
@@ -34,6 +32,7 @@ import (
 	reg "sigs.k8s.io/k8s-container-image-promoter/legacy/dockerregistry"
 	"sigs.k8s.io/k8s-container-image-promoter/legacy/gcloud"
 	"sigs.k8s.io/k8s-container-image-promoter/legacy/stream"
+	"sigs.k8s.io/release-utils/command"
 )
 
 // GitDescribe is stamped by bazel.
@@ -368,53 +367,40 @@ func populateGoldenImages(repoRoot, pushRepo string) error {
 		},
 	}
 
-	for _, cmd := range cmds {
-		fmt.Println("execing cmd", cmd)
-		stdout, stderr, err := execCommand(repoRoot, cmd...)
+	for _, cmdparts := range cmds {
+		c := cmdparts[0]
+		args := cmdparts[1:]
+
+		cmd := command.NewWithWorkDir(
+			repoRoot,
+			c,
+			args...,
+		)
+
+		fmt.Printf("executing %s\n", cmd.String())
+
+		std, err := cmd.RunSuccessOutput()
 		if err != nil {
 			return err
 		}
-		fmt.Println(stdout)
-		fmt.Println(stderr)
+
+		fmt.Println(std.Output())
+		fmt.Println(std.Error())
 	}
 
 	return nil
 }
 
-func execCommand(
-	repoRoot string,
-	args ...string,
-) (sout, serr string, err error) {
-	klog.Infof("executing command: %s", args)
-
-	cmd := exec.Command(args[0], args[1:]...)
-	if repoRoot != "" {
-		cmd.Dir = repoRoot
-	}
-
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	if err := cmd.Run(); err != nil {
-		klog.Errorf("for command %s:\nstdout:\n%sstderr:\n%s\n",
-			args[0],
-			stdout.String(),
-			stderr.String())
-		return "", "", err
-	}
-
-	return stdout.String(), stderr.String(), nil
-}
-
+// TODO: De-dupe with other e2e functions
 func getBazelOption(repoRoot, o string) string {
-	stdout, _, err := execCommand(repoRoot, "./workspace_status.sh")
+	cmd := command.NewWithWorkDir(repoRoot, "./workspace_status.sh")
+	std, err := cmd.RunSuccessOutput()
 	if err != nil {
 		klog.Errorln(err)
 		return ""
 	}
 
+	stdout := std.Output()
 	for _, line := range strings.Split(strings.TrimSuffix(stdout, "\n"), "\n") {
 		if strings.Contains(line, o) {
 			words := strings.Split(line, " ")
@@ -728,14 +714,17 @@ func getCmdsDeployCloudRun(
 
 func clearLogs(projectID string) error {
 	args := getCmdListLogs(projectID)
-	stdout, _, err := execCommand("", args...)
+	listCmd := command.New(args[0], args[1:]...)
+	std, err := listCmd.RunSuccessOutput()
 	if err != nil {
 		return err
 	}
 
+	stdout := std.Output()
 	if strings.Contains(stdout, auditLogName) {
 		args = getCmdDeleteLogs(projectID)
-		if _, _, err = execCommand("", args...); err != nil {
+		delCmd := command.New(args[0], args[1:]...)
+		if err := delCmd.RunSuccess(); err != nil {
 			return err
 		}
 	}
@@ -745,17 +734,23 @@ func clearLogs(projectID string) error {
 
 func clearErrorReporting(projectID string) error {
 	args := getCmdDeleteErrorReportingEvents(projectID)
-	_, _, err := execCommand("", args...)
-	return err
+	cmd := command.New(args[0], args[1:]...)
+	return cmd.RunSuccess()
 }
 
 func clearCloudRun(projectID string) error {
 	args := getCmdListCloudRunServices(projectID)
-	stdout, _, err := execCommand("", args...)
+	cmd := command.New(args[0], args[1:]...)
+	std, err := cmd.RunSuccessOutput()
+	if err != nil {
+		return err
+	}
 
+	stdout := std.Output()
 	if strings.Contains(stdout, auditorName) {
 		args = getCmdDeleteCloudRunServices(projectID)
-		if _, _, err = execCommand("", args...); err != nil {
+		cmd := command.New(args[0], args[1:]...)
+		if err := cmd.RunSuccess(); err != nil {
 			return err
 		}
 	}
@@ -776,9 +771,12 @@ func deployCloudRun(
 		projectID,
 		manifestDir,
 		uuid,
-		invokerServiceAccount)
+		invokerServiceAccount,
+	)
+
 	for _, args := range argss {
-		if _, _, err := execCommand(repoRoot, args...); err != nil {
+		cmd := command.NewWithWorkDir(repoRoot, args[0], args[1:]...)
+		if err := cmd.RunSuccess(); err != nil {
 			return err
 		}
 	}
@@ -789,14 +787,17 @@ func deployCloudRun(
 // clearSubscription deletes the existing subscription.
 func clearSubscription(projectID string) error {
 	args := getCmdListSubscriptions(projectID)
-	stdout, _, err := execCommand("", args...)
+	cmd := command.New(args[0], args[1:]...)
+	std, err := cmd.RunSuccessOutput()
 	if err != nil {
 		return err
 	}
 
+	stdout := std.Output()
 	if strings.Contains(stdout, subscriptionName) {
 		args = getCmdDeleteSubscription(projectID)
-		if _, _, err = execCommand("", args...); err != nil {
+		cmd := command.New(args[0], args[1:]...)
+		if err := cmd.RunSuccess(); err != nil {
 			return err
 		}
 	}
@@ -806,19 +807,23 @@ func clearSubscription(projectID string) error {
 
 func clearPubSubTopic(projectID, topic string) error {
 	args := getCmdListTopics(projectID)
-	stdout, _, err := execCommand("", args...)
+	cmd := command.New(args[0], args[1:]...)
+	std, err := cmd.RunSuccessOutput()
 	if err != nil {
 		return err
 	}
 
+	stdout := std.Output()
 	if strings.Contains(stdout, topic) {
 		args = getCmdDeleteTopic(projectID, topic)
-		if _, _, err = execCommand("", args...); err != nil {
+		delCmd := command.New(args[0], args[1:]...)
+		if err := delCmd.RunSuccess(); err != nil {
 			return err
 		}
 
 		args = getCmdCreateTopic(projectID, topic)
-		if _, _, err = execCommand("", args...); err != nil {
+		createCmd := command.New(args[0], args[1:]...)
+		if err := createCmd.RunSuccess(); err != nil {
 			return err
 		}
 	}
@@ -831,8 +836,9 @@ func enablePubSubTokenCreation(
 	projectID string,
 ) error {
 	args := getCmdEnablePubSubTokenCreation(projectNumber, projectID)
-	_, _, err := execCommand("", args...)
-	return err
+	cmd := command.New(args[0], args[1:]...)
+
+	return cmd.RunSuccess()
 }
 
 func enableCloudResourceManagerAPI(
@@ -840,9 +846,11 @@ func enableCloudResourceManagerAPI(
 ) error {
 	args := getCmdEnableService(
 		projectID,
-		"cloudresourcemanager.googleapis.com")
-	_, _, err := execCommand("", args...)
-	return err
+		"cloudresourcemanager.googleapis.com",
+	)
+	cmd := command.New(args[0], args[1:]...)
+
+	return cmd.RunSuccess()
 }
 
 func enableStackdriverAPI(
@@ -850,9 +858,11 @@ func enableStackdriverAPI(
 ) error {
 	args := getCmdEnableService(
 		projectID,
-		"stackdriver.googleapis.com")
-	_, _, err := execCommand("", args...)
-	return err
+		"stackdriver.googleapis.com",
+	)
+	cmd := command.New(args[0], args[1:]...)
+
+	return cmd.RunSuccess()
 }
 
 func enableStackdriverErrorReportingAPI(
@@ -860,9 +870,11 @@ func enableStackdriverErrorReportingAPI(
 ) error {
 	args := getCmdEnableService(
 		projectID,
-		"clouderrorreporting.googleapis.com")
-	_, _, err := execCommand("", args...)
-	return err
+		"clouderrorreporting.googleapis.com",
+	)
+	cmd := command.New(args[0], args[1:]...)
+
+	return cmd.RunSuccess()
 }
 
 func enableCloudRunAPI(
@@ -870,9 +882,11 @@ func enableCloudRunAPI(
 ) error {
 	args := getCmdEnableService(
 		projectID,
-		"run.googleapis.com")
-	_, _, err := execCommand("", args...)
-	return err
+		"run.googleapis.com",
+	)
+	cmd := command.New(args[0], args[1:]...)
+
+	return cmd.RunSuccess()
 }
 
 func enableServiceUsageAPI(
@@ -880,36 +894,44 @@ func enableServiceUsageAPI(
 ) error {
 	args := getCmdEnableService(
 		projectID,
-		"serviceusage.googleapis.com")
-	_, _, err := execCommand("", args...)
-	return err
+		"serviceusage.googleapis.com",
+	)
+	cmd := command.New(args[0], args[1:]...)
+
+	return cmd.RunSuccess()
 }
 
 func empowerServiceAccount(projectID, invokerServiceAccount string) error {
 	args := getCmdEmpowerServiceAccount(projectID, invokerServiceAccount)
-	_, _, err := execCommand("", args...)
-	return err
+	cmd := command.New(args[0], args[1:]...)
+
+	return cmd.RunSuccess()
 }
 
 func clearPubSubMessages(projectID string) error {
 	args := getCmdPurgePubSubMessages(projectID)
-	_, _, err := execCommand("", args...)
-	return err
+	cmd := command.New(args[0], args[1:]...)
+
+	return cmd.RunSuccess()
 }
 
 func createPubSubSubscription(projectID, invokerServiceAccount string) error {
 	args := getCmdCloudRunPushEndpoint(projectID)
-	pushEndpoint, _, err := execCommand("", args...)
+	cloudRunCmd := command.New(args[0], args[1:]...)
+	std, err := cloudRunCmd.RunSuccessOutput()
 	if err != nil {
 		return err
 	}
 
+	pushEndpoint := std.Output()
 	args = getCmdCreatePubSubSubscription(
 		projectID,
 		strings.TrimSpace(pushEndpoint),
-		invokerServiceAccount)
-	_, _, err = execCommand("", args...)
-	return err
+		invokerServiceAccount,
+	)
+	pubSubCmd := command.New(args[0], args[1:]...)
+
+	return pubSubCmd.RunSuccess()
 }
 
 func runCheckedCommands(commands [][]string) error {
@@ -920,9 +942,10 @@ func runCheckedCommands(commands [][]string) error {
 		}
 	}
 
-	for _, command := range commands {
-		klog.Infof("execing command %s", command)
-		if _, _, err := execCommand("", command...); err != nil {
+	for _, c := range commands {
+		klog.Infof("execing command %s", c)
+		cmd := command.New(c[0], c[1:]...)
+		if err := cmd.RunSuccess(); err != nil {
 			return err
 		}
 	}
@@ -978,15 +1001,23 @@ func clearRepository(regName reg.RegistryName, sc *reg.SyncContext) {
 func checkLogs(projectID, uuid string, patterns []string) error {
 	for _, pattern := range patterns {
 		args := getCmdShowLogs(projectID, uuid, pattern)
-		matched, stderr, err := execCommand("", args...)
+		cmd := command.New(args[0], args[1:]...)
+		std, err := cmd.RunSuccessOutput()
 		if err != nil {
 			return err
 		}
 
+		matched, stderr := std.Output(), std.Error()
+		if err != nil {
+			return err
+		}
+
+		// TODO: Is this required?
 		if len(stderr) > 0 {
 			return fmt.Errorf(
 				"encountered stderr while searching logs: '%s'",
-				stderr)
+				stderr,
+			)
 		}
 
 		if matched == "" {
