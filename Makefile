@@ -105,9 +105,9 @@ update: ## Update go modules (source of truth!).
 
 ##@ Verify
 
-.PHONY: verify verify-boilerplate verify-dependencies verify-golangci-lint verify-go-mod
+.PHONY: verify verify-boilerplate verify-dependencies verify-golangci-lint verify-go-mod verify-archives
 
-verify: verify-boilerplate verify-dependencies verify-golangci-lint verify-go-mod ## Runs verification scripts to ensure correct execution
+verify: verify-boilerplate verify-dependencies verify-golangci-lint verify-go-mod verify-archives ## Runs verification scripts to ensure correct execution
 
 verify-boilerplate: ## Runs the file header check
 	./hack/verify-boilerplate.sh
@@ -120,6 +120,9 @@ verify-go-mod: ## Runs the go module linter
 
 verify-golangci-lint: ## Runs all golang linters
 	./hack/verify-golangci-lint.sh
+
+verify-archives: ### Check golden image archives
+	./hack/verify-archives.sh -repo-root=$(REPO_ROOT)
 
 ##@ Helpers
 
