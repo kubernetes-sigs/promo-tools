@@ -4,3 +4,6 @@ bazel-*
 
 # downloaded and built binaries
 bin
+
+# vscode settings
+.vscode
