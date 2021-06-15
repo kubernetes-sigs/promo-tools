@@ -121,6 +121,9 @@ verify-go-mod: ## Runs the go module linter
 verify-golangci-lint: ## Runs all golang linters
 	./hack/verify-golangci-lint.sh
 
+verify-archives: ### Check golden image archives
+	./hack/verify-archives.sh $(REPO_ROOT)
+
 ##@ Helpers
 
 .PHONY: help
