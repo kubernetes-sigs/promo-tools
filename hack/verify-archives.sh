@@ -53,12 +53,13 @@ do
     goldenParent=${path%%/*}
     # Load image from tarball archive.
     output=$(docker load -i "${goldenArchive}${path}.tar")
-    # Reformat docker load output to only grab the image ID.
-    if [[ "$output" =~ sha256:(.*) ]]
+    # Reformat docker load output to only grab the image name.
+    if [[ "$output" =~ "Loaded image: "(.*) ]]
     then
         img="${BASH_REMATCH[1]}"
+        echo $img
     else
-            echo "Error: failed to get image digest from docker load output"
+            echo "Error: failed to get image name from docker load output"
             exit 1
     fi
     # Save container ID after creation.
