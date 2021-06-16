@@ -14,9 +14,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Usage: workspace_status.sh [inject]
+
 set -o errexit
 set -o nounset
 set -o pipefail
+
+INJECTION=false
+
+# By specifying the injection argument, variables will separated by
+# their values with an '=', instead of a ' '. This allows for easier
+# variable injection when consuming this script in shell environments. 
+if (( $# == 1 )) && [ "$1" == "inject" ]; then
+    INJECTION=true
+fi
 
 #`p_` takes two arguments to define a bazel workspace status variable:
 #
@@ -27,7 +38,11 @@ set -o pipefail
 # used. Otherwise, the provided default value is used.
 p_() {
     if (( $# == 2 )); then
-        echo "$1" "${!1:-$2}"
+        if [ "$INJECTION" = true ]; then
+            echo "$1"=\""${!1:-$2}"\"
+        else
+            echo "$1" "${!1:-$2}"
+        fi
     else
         return 1
     fi

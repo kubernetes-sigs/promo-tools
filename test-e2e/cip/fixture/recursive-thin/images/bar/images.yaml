@@ -1,4 +1,4 @@
 - name: bar
   dmap:
-    sha256:610b1ef6fec876146dee2b2846c890b566d26f235d7ea8982056a3e84bd35929:
+    sha256:dd19dc426fa901c12e9a2eeeef8d9ad6c24f50840b8121ccffbba40b5500cb5b:
     - 1.0
