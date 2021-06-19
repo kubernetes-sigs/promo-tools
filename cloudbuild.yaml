@@ -1,23 +1,32 @@
 # See https://cloud.google.com/cloud-build/docs/build-config
 timeout: 1200s
+
 options:
   substitution_option: ALLOW_LOOSE
-  # Need a VM with bigger memory. Machine types are documented in
-  # https://cloud.google.com/compute/docs/machine-types, but the only ones
-  # supported in GCB are found in
-  # https://cloud.google.com/cloud-build/docs/api/reference/rest/Shared.Types/MachineType.
   machineType: N1_HIGHCPU_32
+
 steps:
-# Start by just pushing the image
 - name: 'gcr.io/k8s-testimages/bazelbuild:latest-2.2.0'
   entrypoint: make
   env:
-  - PROW_GIT_TAG=$_GIT_TAG
+  - GIT_TAG=$_GIT_TAG
   - PULL_BASE_REF=$_PULL_BASE_REF
   args:
   - image-push
+
 substitutions:
   # _GIT_TAG will be filled with a git-based tag for the image, of the form vYYYYMMDD-hash, and
   # can be used as a substitution
   _GIT_TAG: '12345'
-  _PULL_BASE_REF: 'master'
+  _PULL_BASE_REF: 'dev'
+
+tags:
+- 'cip'
+- ${_GIT_TAG}
+- ${_PULL_BASE_REF}
+
+images:
+  - 'gcr.io/$PROJECT_ID/cip:$_GIT_TAG'
+  - 'gcr.io/$PROJECT_ID/cip:latest'
+  - 'gcr.io/$PROJECT_ID/cip-auditor:$_GIT_TAG'
+  - 'gcr.io/$PROJECT_ID/cip-auditor:latest'

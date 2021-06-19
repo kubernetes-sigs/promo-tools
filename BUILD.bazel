@@ -71,9 +71,9 @@ container_bundle(
     name = "cip-docker-loadable",
     images = {
         "{STABLE_IMG_REGISTRY}/{STABLE_IMG_REPOSITORY}/{STABLE_IMG_NAME}:latest": "//:cip-with-gcloud",
-        "{STABLE_IMG_REGISTRY}/{STABLE_IMG_REPOSITORY}/{STABLE_IMG_NAME}:{IMG_TAG}": "//:cip-with-gcloud",
+        "{STABLE_IMG_REGISTRY}/{STABLE_IMG_REPOSITORY}/{STABLE_IMG_NAME}:{STABLE_IMG_TAG}": "//:cip-with-gcloud",
         "{STABLE_IMG_REGISTRY}/{STABLE_IMG_REPOSITORY}/{STABLE_IMG_NAME}-auditor:latest": "//:cip-auditor",
-        "{STABLE_IMG_REGISTRY}/{STABLE_IMG_REPOSITORY}/{STABLE_IMG_NAME}-auditor:{IMG_TAG}": "//:cip-auditor",
+        "{STABLE_IMG_REGISTRY}/{STABLE_IMG_REPOSITORY}/{STABLE_IMG_NAME}-auditor:{STABLE_IMG_TAG}": "//:cip-auditor",
     },
 )
 

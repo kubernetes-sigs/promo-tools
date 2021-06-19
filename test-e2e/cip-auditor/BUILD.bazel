@@ -57,7 +57,7 @@ container_bundle(
     name = "cip-docker-loadable-auditor-test",
     images = {
         "{STABLE_TEST_AUDIT_STAGING_IMG_REPOSITORY}/{STABLE_IMG_NAME}-auditor-test:latest": ":cip-auditor-test",
-        "{STABLE_TEST_AUDIT_STAGING_IMG_REPOSITORY}/{STABLE_IMG_NAME}-auditor-test:{IMG_TAG}": ":cip-auditor-test",
+        "{STABLE_TEST_AUDIT_STAGING_IMG_REPOSITORY}/{STABLE_IMG_NAME}-auditor-test:{STABLE_IMG_TAG}": ":cip-auditor-test",
     },
 )
 
