@@ -37,17 +37,30 @@ p_() {
 # mechanism, use it instead of asking `git` directly, because the repo we are in
 # might not actually be a Git repo.
 if [[ -n "${PROW_GIT_TAG:-}" ]]; then
-    # Ensure that the PROW_GIT_TAG fits a known pattern of vYYYYMMDD-tag-n-ghash.
-    regex="v[0-9]{8}-[^-]+-[0-9]+-g[0-9a-f]{7}"
-    if ! [[ "${PROW_GIT_TAG}" =~ $regex ]]; then
-        echo >&2 "could not extract git hash from PROW_GIT_TAG ${PROW_GIT_TAG}"
-        exit 1
+    # Ensure that the PROW_GIT_TAG fits a known pattern of
+    # vYYYYMMDD-tag-n-ghash. According to
+    # https://github.com/kubernetes/test-infra/blob/f7e21a3c18f4f4bbc7ee170675ed53e4544a0632/config/jobs/image-pushing/README.md#custom-substitutions,
+    # the PROW_GIT_TAG will be one of vYYYYMMDD-hash, vYYYYMMDD-tag, or
+    # vYYYYMMDD-tag-n-ghash.
+    if [[ "${PROW_GIT_TAG}" =~ v[0-9]{8}-[^-]+-[0-9]+-g[0-9a-f]{7} ]]; then
+        # In this case we have a "-n-ghash" suffix, which we can use to set the
+        # git_commit and git_desc information.
+
+        # Extract the last 7 characters.
+        git_commit="${PROW_GIT_TAG:(-7)}"
+        # Skip built-in date in PROW_GIT_TAG.
+        git_desc="${PROW_GIT_TAG:(10)}"
+    # If the -n-ghash bit is missing, then it must look like vYYYYMMDD-hash or
+    # vYYYYMMDD-tag. We can't easily tell if something is a hash or a tag, so we
+    # just use it as-is.
+    else
+        # Extract the hash or tag (we can't tell easily).
+        git_commit="${PROW_GIT_TAG:(10)}"
+        # We just reuse git_commit (could be a hash or tag) here because it's
+        # the best we can do.
+        git_desc="${git_commit}"
     fi
 
-    # Extract the last 7 characters.
-    git_commit="${PROW_GIT_TAG:(-7)}"
-    # Skip built-in date in PROW_GIT_TAG.
-    git_desc="${PROW_GIT_TAG:(10)}"
     timestamp_utc_rfc3339=$(date -u +"%Y-%m-%d %H:%M:%S%z")
     timestamp_utc_date_dashes="${timestamp_utc_rfc3339% *}"
     timestamp_utc_date_no_dashes="${timestamp_utc_date_dashes//-/}"
