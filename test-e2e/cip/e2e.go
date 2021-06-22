@@ -29,20 +29,12 @@ import (
 	yaml "gopkg.in/yaml.v2"
 
 	"k8s.io/klog/v2"
+	"sigs.k8s.io/k8s-container-image-promoter/internal/version"
 	reg "sigs.k8s.io/k8s-container-image-promoter/legacy/dockerregistry"
 	"sigs.k8s.io/k8s-container-image-promoter/legacy/gcloud"
 	"sigs.k8s.io/k8s-container-image-promoter/legacy/stream"
 	"sigs.k8s.io/release-utils/command"
 )
-
-// GitDescribe is stamped by bazel.
-var GitDescribe string
-
-// GitCommit is stamped by bazel.
-var GitCommit string
-
-// TimestampUtcRfc3339 is stamped by bazel.
-var TimestampUtcRfc3339 string
 
 // nolint[lll]
 func main() {
@@ -62,8 +54,10 @@ func main() {
 
 	flag.Parse()
 
+	// Log linker flags
+	printVersion()
+
 	if len(os.Args) == 1 {
-		printVersion()
 		printUsage()
 		os.Exit(0)
 	}
@@ -160,10 +154,7 @@ func testSetup(repoRoot string, t E2ETest) error {
 func runPromotion(repoRoot string, t *E2ETest) error {
 	args := []string{
 		"run",
-		"--workspace_status_command=" + repoRoot + "/workspace_status.sh",
-		"--stamp",
-		"//cmd/cip:cip",
-		"--",
+		fmt.Sprintf("%s/cmd/cip/main.go", repoRoot),
 		"run",
 		"--dry-run=false",
 		"--log-level=debug",
@@ -181,8 +172,8 @@ func runPromotion(repoRoot string, t *E2ETest) error {
 		argsFinal = append(argsFinal, strings.ReplaceAll(arg, "$PWD", repoRoot))
 	}
 
-	fmt.Println("execing cmd", "bazel", argsFinal)
-	cmd := command.NewWithWorkDir(repoRoot, "bazel", argsFinal...)
+	fmt.Println("execing cmd", "go", argsFinal)
+	cmd := command.NewWithWorkDir(repoRoot, "go", argsFinal...)
 	return cmd.RunSuccess()
 }
 
@@ -204,9 +195,7 @@ func getSnapshot(
 	// TODO: Consider setting flag names in `cip` instead
 	invocation := []string{
 		"run",
-		"--workspace_status_command=" + repoRoot + "/workspace_status.sh",
-		"//cmd/cip:cip",
-		"--",
+		fmt.Sprintf("%s/cmd/cip/main.go", repoRoot),
 		"run",
 		"--snapshot=" + string(registry),
 	}
@@ -216,10 +205,10 @@ func getSnapshot(
 		invocation = append(invocation, "--snapshot-service-account="+svcAcc)
 	}
 
-	fmt.Println("execing cmd", "bazel", invocation)
+	fmt.Println("execing cmd", "go", invocation)
 	// TODO: Replace with sigs.k8s.io/release-utils/command once the package
 	//       exposes a means to manipulate stdout.Bytes() for unmarshalling.
-	cmd := exec.Command("bazel", invocation...)
+	cmd := exec.Command("go", invocation...)
 
 	cmd.Dir = repoRoot
 
@@ -326,9 +315,7 @@ func readE2ETests(filePath string) (E2ETests, error) {
 }
 
 func printVersion() {
-	fmt.Printf("Built:   %s\n", TimestampUtcRfc3339)
-	fmt.Printf("Version: %s\n", GitDescribe)
-	fmt.Printf("Commit:  %s\n", GitCommit)
+	klog.Infof("\n%s", version.Get().String())
 }
 
 func printUsage() {
