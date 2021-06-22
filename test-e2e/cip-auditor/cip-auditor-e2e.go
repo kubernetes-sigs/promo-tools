@@ -299,7 +299,7 @@ func testSetup(
 		return err
 	}
 
-	if err := populateGoldenImages(repoRoot, pushRepo); err != nil {
+	if err := populateGoldenImages(repoRoot); err != nil {
 		return err
 	}
 
@@ -307,88 +307,20 @@ func testSetup(
 }
 
 // nolint[funlen]
-func populateGoldenImages(repoRoot, pushRepo string) error {
-	// Populate the staging repo with some golden images. This way, we have a
-	// "library" of images we can use when populating the prod registry
-	// (STABLE_TEST_AUDIT_PROD_IMG_REPOSITORY).
-	cmds := [][]string{
-		// In order to create a manifest list, images must be pushed to a
-		// repository first.
-		{
-			"bazel",
-			"run",
-			fmt.Sprintf(
-				"--workspace_status_command=%s/workspace_status.sh",
-				repoRoot),
-			"//test-e2e/cip:push-golden-audit",
-		},
-		{
-			"docker",
-			"manifest",
-			"create",
-			fmt.Sprintf("%s/golden-foo/foo:1.0", pushRepo),
-			fmt.Sprintf("%s/golden-foo/foo:1.0-linux_amd64", pushRepo),
-			fmt.Sprintf("%s/golden-foo/foo:1.0-linux_s390x", pushRepo),
-		},
-		// Fixup the s390x image because it's set to amd64 by default (there is
-		// no way to specify architecture from within bazel yet when creating
-		// images).
-		{
-			"docker",
-			"manifest",
-			"annotate",
-			"--arch=s390x",
-			fmt.Sprintf("%s/golden-foo/foo:1.0", pushRepo),
-			fmt.Sprintf("%s/golden-foo/foo:1.0-linux_s390x", pushRepo),
-		},
-		{
-			"docker",
-			"manifest",
-			"inspect",
-			fmt.Sprintf("%s/golden-foo/foo:1.0", pushRepo),
-		},
-		// Finally, push the manifest list. It is just metadata around existing
-		// images in a repository.
-		{
-			"docker",
-			"manifest",
-			"push",
-			"--purge",
-			fmt.Sprintf("%s/golden-foo/foo:1.0", pushRepo),
-		},
-		// Remove tag for tagless image.
-		{
-			"gcloud",
-			"container",
-			"images",
-			"untag",
-			"--quiet",
-			fmt.Sprintf("%s/golden-foo/foo:NOTAG-0", pushRepo),
-		},
-	}
+func populateGoldenImages(repoRoot string) error {
+	goldenPush := fmt.Sprintf("%s/test-e2e/push-golden.sh", repoRoot)
+	cmd := command.NewWithWorkDir(
+		repoRoot,
+		goldenPush,
+		"--audit",
+	)
 
-	for _, cmdparts := range cmds {
-		c := cmdparts[0]
-		args := cmdparts[1:]
+	klog.Infof("executing %s\n", cmd.String())
 
-		cmd := command.NewWithWorkDir(
-			repoRoot,
-			c,
-			args...,
-		)
-
-		fmt.Printf("executing %s\n", cmd.String())
-
-		std, err := cmd.RunSuccessOutput()
-		if err != nil {
-			return err
-		}
-
-		fmt.Println(std.Output())
-		fmt.Println(std.Error())
-	}
-
-	return nil
+	std, err := cmd.RunSuccessOutput()
+	fmt.Println(std.Output())
+	fmt.Println(std.Error())
+	return err
 }
 
 // TODO: De-dupe with other e2e functions
