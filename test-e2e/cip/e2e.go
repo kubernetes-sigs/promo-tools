@@ -134,7 +134,7 @@ func testSetup(repoRoot string, t E2ETest) error {
 		return err
 	}
 
-	goldenPush := fmt.Sprintf("%s/test-e2e/cip/push-golden.sh", repoRoot)
+	goldenPush := fmt.Sprintf("%s/test-e2e/push-golden.sh", repoRoot)
 
 	cmd := command.NewWithWorkDir(
 		repoRoot,
