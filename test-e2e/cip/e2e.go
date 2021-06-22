@@ -140,114 +140,21 @@ func testSetup(repoRoot string, t E2ETest) error {
 		return err
 	}
 
-	pushRepo := getBazelOption(repoRoot, "STABLE_TEST_STAGING_IMG_REPOSITORY")
+	goldenPush := fmt.Sprintf("%s/test-e2e/cip/push-golden.sh", repoRoot)
 
-	if pushRepo == "" {
-		return fmt.Errorf(
-			"could not dereference STABLE_TEST_STAGING_IMG_REPOSITORY")
-	}
+	cmd := command.NewWithWorkDir(
+		repoRoot,
+		goldenPush,
+	)
 
-	cmds := [][]string{
-		// In order to create a manifest list, images must be pushed to a
-		// repository first.
-		{
-			"bazel",
-			"run",
-			fmt.Sprintf(
-				"--workspace_status_command=%s/workspace_status.sh",
-				repoRoot),
-			"//test-e2e/cip:push-golden",
-		},
-		{
-			"docker",
-			"manifest",
-			"create",
-			fmt.Sprintf("%s/golden-foo/foo:1.0", pushRepo),
-			fmt.Sprintf("%s/golden-foo/foo:1.0-linux_amd64", pushRepo),
-			fmt.Sprintf("%s/golden-foo/foo:1.0-linux_s390x", pushRepo),
-		},
-		// Fixup the s390x image because it's set to amd64 by default (there is
-		// no way to specify architecture from within bazel yet when creating
-		// images).
-		{
-			"docker",
-			"manifest",
-			"annotate",
-			"--arch=s390x",
-			fmt.Sprintf("%s/golden-foo/foo:1.0", pushRepo),
-			fmt.Sprintf("%s/golden-foo/foo:1.0-linux_s390x", pushRepo),
-		},
-		{
-			"docker",
-			"manifest",
-			"inspect",
-			fmt.Sprintf("%s/golden-foo/foo:1.0", pushRepo),
-		},
-		// Finally, push the manifest list. It is just metadata around existing
-		// images in a repository.
-		{
-			"docker",
-			"manifest",
-			"push",
-			"--purge",
-			fmt.Sprintf("%s/golden-foo/foo:1.0", pushRepo),
-		},
-		// Remove tag for tagless image.
-		{
-			"gcloud",
-			"container",
-			"images",
-			"untag",
-			"--quiet",
-			fmt.Sprintf("%s/golden-foo/foo:NOTAG-0", pushRepo),
-		},
-	}
+	klog.Infof("executing %s\n", cmd.String())
 
-	for _, cmdparts := range cmds {
-		c := cmdparts[0]
-		args := cmdparts[1:]
-
-		cmd := command.NewWithWorkDir(
-			repoRoot,
-			c,
-			args...,
-		)
-
-		fmt.Printf("executing %s\n", cmd.String())
-
-		std, err := cmd.RunSuccessOutput()
-		if err != nil {
-			return err
-		}
-
-		fmt.Println(std.Output())
-		fmt.Println(std.Error())
-	}
-
-	return nil
-}
-
-// TODO: De-dupe with other e2e functions
-func getBazelOption(repoRoot, o string) string {
-	cmd := command.NewWithWorkDir(repoRoot, "./workspace_status.sh")
 	std, err := cmd.RunSuccessOutput()
-	if err != nil {
-		klog.Errorln(err)
-		return ""
-	}
+	fmt.Println(std.Output())
+	fmt.Println(std.Error())
 
-	stdout := std.Output()
-	for _, line := range strings.Split(strings.TrimSuffix(stdout, "\n"), "\n") {
-		if strings.Contains(line, o) {
-			words := strings.Split(line, " ")
-			// nolint[gomnd]
-			if len(words) == 2 {
-				return words[1]
-			}
-		}
-	}
+	return err
 
-	return ""
 }
 
 func runPromotion(repoRoot string, t *E2ETest) error {
