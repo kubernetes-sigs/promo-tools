@@ -21,14 +21,14 @@
 # STABLE_TEST_STAGING_IMG_REPOSITORY (both defined in workspace_status.sh).
 #
 # Usage:
-#   ./push-golden.sh [--audit | -a]
+#   ./push-golden.sh [--audit]
 
 set -o errexit
 set -o nounset
 set -o pipefail
 
 printUsage() {
-    echo "Usage: $0 [--audit | -a]"
+    >&2 echo "Usage: $0 [--audit]"
 }
 
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)
@@ -38,14 +38,14 @@ source <(${repo_root}/workspace_status.sh inject)
 staging_repo="$STABLE_TEST_STAGING_IMG_REPOSITORY"
 
 if [[ $# == 1 ]]; then
-    if ([ "$1" == --audit ] || [ "$1" == -a ]); then
+    if [[ "$1" == --audit ]]; then
         staging_repo="$STABLE_TEST_AUDIT_STAGING_IMG_REPOSITORY"
     else
         >&2 echo "ERROR: Malformed flag!"
         printUsage
         exit 1
     fi
-elif [[ $# > 1 ]]; then
+elif (( $# > 1 )); then
     >&2 echo "ERROR: Invalid number of arguments!"
     printUsage
     exit 1
@@ -59,14 +59,11 @@ docker load -i "${archive_path}/foo/NOTAG-0.tar"
 
 # Re-tag images (only for auditor)
 if [[ "$staging_repo" == "$STABLE_TEST_AUDIT_STAGING_IMG_REPOSITORY" ]]; then
-    echo "here"
     docker tag "${STABLE_TEST_STAGING_IMG_REPOSITORY}/golden-bar/bar:1.0" "${staging_repo}/golden-bar/bar:1.0"
     docker tag "${STABLE_TEST_STAGING_IMG_REPOSITORY}/golden-foo/foo:1.0-linux_amd64" "${staging_repo}/golden-foo/foo:1.0-linux_amd64"
     docker tag "${STABLE_TEST_STAGING_IMG_REPOSITORY}/golden-foo/foo:1.0-linux_s390x" "${staging_repo}/golden-foo/foo:1.0-linux_s390x"
     docker tag "${STABLE_TEST_STAGING_IMG_REPOSITORY}/golden-foo/foo:NOTAG-0" "${staging_repo}/golden-foo/foo:NOTAG-0"
 fi
-
-echo ""${staging_repo}/golden-bar/bar:1.0""
 
 # Push to k8s-staging-cip-test.
 docker push "${staging_repo}/golden-bar/bar:1.0"

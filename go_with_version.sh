@@ -25,7 +25,7 @@ set -o nounset
 set -o pipefail
 
 printUsage() {
-    echo "Usage: $0 (build | run) path/to/code.go [args...]"
+    >&2 echo "Usage: $0 (build | run) path/to/code.go [args...]"
 }
 
 if [[ $# < 2 ]]; then

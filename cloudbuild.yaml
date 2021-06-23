@@ -6,11 +6,12 @@ options:
   machineType: N1_HIGHCPU_32
 
 steps:
-- name: 'gcr.io/k8s-testimages/bazelbuild:latest-2.2.0'
+- name: 'gcr.io/cloud-builders/docker'
   entrypoint: make
   env:
   - GIT_TAG=$_GIT_TAG
   - PULL_BASE_REF=$_PULL_BASE_REF
+  - CLOUDBUILD_REPO=$PROJECT_ID
   args:
   - image-push
 
