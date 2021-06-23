@@ -291,7 +291,7 @@ func testSetup(
 
 // nolint[funlen]
 func populateGoldenImages(repoRoot string) error {
-	goldenPush := fmt.Sprintf("%s/test-e2e/push-golden.sh", repoRoot)
+	goldenPush := fmt.Sprintf("%s/test-e2e/golden-images/push-golden.sh", repoRoot)
 	cmd := command.NewWithWorkDir(
 		repoRoot,
 		goldenPush,

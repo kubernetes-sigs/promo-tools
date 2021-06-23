@@ -42,8 +42,8 @@ mockGolden=$(mktemp -d)
 mkdir "${mockGolden}/foo"
 mkdir "${mockGolden}/bar"
 
-goldenArchive="${repoRoot}/test-e2e/cip/golden-archives/"
-goldenContent="${repoRoot}/test-e2e/cip/golden"
+goldenArchive="${repoRoot}/test-e2e/golden-images/archives/"
+goldenContent="${repoRoot}/test-e2e/golden-images/content"
 
 # Extracts data file from each container image.
 for path in "${!paths[@]}"
