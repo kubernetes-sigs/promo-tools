@@ -31,8 +31,8 @@ printUsage() {
     echo "Usage: $0 [--audit | -a]"
 }
 
-repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
-archive_path="${repo_root}/test-e2e/cip/golden-archives"
+repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)
+archive_path="${repo_root}/test-e2e/golden-images/archives"
 # Inject workspace variables
 source <(${repo_root}/workspace_status.sh inject)
 staging_repo="$STABLE_TEST_STAGING_IMG_REPOSITORY"
