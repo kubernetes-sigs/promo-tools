@@ -22,9 +22,9 @@ all: test
 ##@ Build
 .PHONY: build
 build: ## Bazel build
-	bazel build //cmd/cip:cip \
-		//test-e2e/cip-auditor:cip-auditor-e2e
-	${REPO_ROOT}/go_with_version.sh build $(REPO_ROOT)/test-e2e/cip/e2e.go
+	bazel build //cmd/cip:cip
+	${REPO_ROOT}/go_with_version.sh build ${REPO_ROOT}/test-e2e/cip-auditor/cip-auditor-e2e.go
+	${REPO_ROOT}/go_with_version.sh build ${REPO_ROOT}/test-e2e/cip/e2e.go
 
 .PHONY: install
 install: ## Install
@@ -80,14 +80,17 @@ test-ci: download
 
 .PHONY: test-e2e-cip
 test-e2e-cip:
-	${REPO_ROOT}/go_with_version.sh run $(REPO_ROOT)/test-e2e/cip/e2e.go \
-		-tests=$(REPO_ROOT)/test-e2e/cip/tests.yaml \
-		-repo-root=$(REPO_ROOT) \
-		-key-file=$(CIP_E2E_KEY_FILE)
+	${REPO_ROOT}/go_with_version.sh run ${REPO_ROOT}/test-e2e/cip/e2e.go \
+		-tests=${REPO_ROOT}/test-e2e/cip/tests.yaml \
+		-repo-root=${REPO_ROOT} \
+		-key-file=${CIP_E2E_KEY_FILE}
 
 .PHONY: test-e2e-cip-auditor
 test-e2e-cip-auditor:
-	bazel run //test-e2e/cip-auditor:cip-auditor-e2e -- -tests=$(REPO_ROOT)/test-e2e/cip-auditor/tests.yaml -repo-root=$(REPO_ROOT) -key-file=$(CIP_E2E_KEY_FILE)
+	${REPO_ROOT}/go_with_version.sh run ${REPO_ROOT}/test-e2e/cip-auditor/cip-auditor-e2e.go \
+		-tests=${REPO_ROOT}/test-e2e/cip-auditor/tests.yaml \
+		-repo-root=${REPO_ROOT} \
+		-key-file=${CIP_E2E_KEY_FILE}
 
 ##@ Dependencies
 

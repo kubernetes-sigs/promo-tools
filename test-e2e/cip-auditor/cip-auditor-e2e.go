@@ -28,21 +28,13 @@ import (
 	yaml "gopkg.in/yaml.v2"
 
 	"k8s.io/klog/v2"
+	"sigs.k8s.io/k8s-container-image-promoter/internal/version"
 	"sigs.k8s.io/k8s-container-image-promoter/legacy/audit"
 	reg "sigs.k8s.io/k8s-container-image-promoter/legacy/dockerregistry"
 	"sigs.k8s.io/k8s-container-image-promoter/legacy/gcloud"
 	"sigs.k8s.io/k8s-container-image-promoter/legacy/stream"
 	"sigs.k8s.io/release-utils/command"
 )
-
-// GitDescribe is stamped by bazel.
-var GitDescribe string
-
-// GitCommit is stamped by bazel.
-var GitCommit string
-
-// TimestampUtcRfc3339 is stamped by bazel.
-var TimestampUtcRfc3339 string
 
 // nolint[lll]
 func main() {
@@ -62,8 +54,10 @@ func main() {
 
 	flag.Parse()
 
+	// Log linker flags
+	printVersion()
+
 	if len(os.Args) == 1 {
-		printVersion()
 		printUsage()
 		os.Exit(0)
 	}
@@ -115,20 +109,13 @@ func runE2ETests(testsFile, repoRoot string) {
 	// (4) Modify GCR as the test defines.
 	//
 	// (5) Check Cloud Run logs.
-	projectID := getBazelOption(
-		repoRoot,
-		"STABLE_TEST_AUDIT_PROJECT_ID")
-	projectNumber := getBazelOption(
-		repoRoot,
-		"STABLE_TEST_AUDIT_PROJECT_NUMBER")
 
-	invokerServiceAccount := getBazelOption(
-		repoRoot,
-		"STABLE_TEST_AUDIT_INVOKER_SERVICE_ACCOUNT")
-
-	pushRepo := getBazelOption(
-		repoRoot,
-		"STABLE_TEST_AUDIT_STAGING_IMG_REPOSITORY")
+	// Obtain project information defined in workspace_status.sh
+	status := getWorkspaceStatus(repoRoot)
+	projectID := status["STABLE_TEST_AUDIT_PROJECT_ID"]
+	projectNumber := status["STABLE_TEST_AUDIT_PROJECT_NUMBER"]
+	invokerServiceAccount := status["STABLE_TEST_AUDIT_INVOKER_SERVICE_ACCOUNT"]
+	pushRepo := status["STABLE_TEST_AUDIT_STAGING_IMG_REPOSITORY"]
 
 	// TODO: All of the Bazel options, not just this one, should be non-empty
 	// values.
@@ -299,11 +286,7 @@ func testSetup(
 		return err
 	}
 
-	if err := populateGoldenImages(repoRoot); err != nil {
-		return err
-	}
-
-	return nil
+	return populateGoldenImages(repoRoot)
 }
 
 // nolint[funlen]
@@ -324,25 +307,26 @@ func populateGoldenImages(repoRoot string) error {
 }
 
 // TODO: De-dupe with other e2e functions
-func getBazelOption(repoRoot, o string) string {
+func getWorkspaceStatus(repoRoot string) map[string]string {
+	fmt.Println("Reading workspace variables")
+
+	status := make(map[string]string)
 	cmd := command.NewWithWorkDir(repoRoot, "./workspace_status.sh")
 	std, err := cmd.RunSuccessOutput()
 	if err != nil {
 		klog.Errorln(err)
-		return ""
+		return status
 	}
 
 	stdout := std.Output()
-	for _, line := range strings.Split(strings.TrimSuffix(stdout, "\n"), "\n") {
-		if strings.Contains(line, o) {
-			words := strings.Split(line, " ")
-			// nolint[gomnd]
-			if len(words) == 2 {
-				return words[1]
-			}
+	for idx, line := range strings.Split(strings.TrimSuffix(stdout, "\n"), "\n") {
+		words := strings.Split(line, " ")
+		if len(words) != 2 {
+			klog.Fatalf("Unexpected key value pair in line: %d!\n", idx)
 		}
+		status[words[0]] = words[1]
 	}
-	return ""
+	return status
 }
 
 func (t *E2ETest) clearRepositories() error {
@@ -1010,9 +994,7 @@ func readE2ETests(filePath string) (E2ETests, error) {
 }
 
 func printVersion() {
-	fmt.Printf("Built:   %s\n", TimestampUtcRfc3339)
-	fmt.Printf("Version: %s\n", GitDescribe)
-	fmt.Printf("Commit:  %s\n", GitCommit)
+	klog.Infof("\n%s", version.Get().String())
 }
 
 func printUsage() {
