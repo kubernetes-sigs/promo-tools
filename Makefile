@@ -44,11 +44,6 @@ image-load: image ## Build image and load it
 image-push: image ## Build image and push
 	bazel run :push-cip
 
-.PHONY: image-load-cip-auditor-e2e
-image-load-cip-auditor-e2e: ## Build and load image cip-auditor-e2e
-	bazel build //test-e2e/cip-auditor:cip-docker-loadable-auditor-test.tar
-	docker load -i bazel-bin/test-e2e/cip-auditor/cip-docker-loadable-auditor-test.tar
-
 .PHONY: image-push-cip-auditor-e2e
 image-push-cip-auditor-e2e: ## Push image cip-auditor-e2e
 	./test-e2e/cip-auditor/push-cip-auditor-test.sh
