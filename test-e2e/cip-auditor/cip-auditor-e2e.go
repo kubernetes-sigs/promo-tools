@@ -322,7 +322,7 @@ func getWorkspaceStatus(repoRoot string) map[string]string {
 	for idx, line := range strings.Split(strings.TrimSuffix(stdout, "\n"), "\n") {
 		words := strings.Split(line, " ")
 		if len(words) != 2 {
-			klog.Fatalf("Unexpected key value pair in line: %d!\n", idx)
+			klog.Fatalf("ERROR: Unexpected key value pair when parsing workspace_status.sh. Line %d: %q", idx, line)
 		}
 		status[words[0]] = words[1]
 	}
