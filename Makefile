@@ -51,7 +51,7 @@ image-load-cip-auditor-e2e: ## Build and load image cip-auditor-e2e
 
 .PHONY: image-push-cip-auditor-e2e
 image-push-cip-auditor-e2e: ## Push image cip-auditor-e2e
-	bazel run //test-e2e/cip-auditor:push-cip-auditor-test
+	./test-e2e/cip-auditor/push-cip-auditor-test.sh
 
 ##@ Lints
 
