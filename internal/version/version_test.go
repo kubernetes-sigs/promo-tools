@@ -32,3 +32,7 @@ func TestVersionJSON(t *testing.T) {
 	require.Nil(t, err)
 	require.NotEmpty(t, sut)
 }
+
+func TestBad(t *testing.T) {
+	t.Fail()
+}
