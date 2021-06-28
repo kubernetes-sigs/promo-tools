@@ -100,9 +100,9 @@ update: ## Update go modules (source of truth!).
 
 ##@ Verify
 
-.PHONY: verify verify-boilerplate verify-dependencies verify-golangci-lint verify-go-mod
+.PHONY: verify verify-boilerplate verify-dependencies verify-golangci-lint verify-go-mod verify-archives
 
-verify: verify-boilerplate verify-dependencies verify-golangci-lint verify-go-mod ## Runs verification scripts to ensure correct execution
+verify: verify-boilerplate verify-dependencies verify-golangci-lint verify-go-mod verify-archives ## Runs verification scripts to ensure correct execution
 
 verify-boilerplate: ## Runs the file header check
 	./hack/verify-boilerplate.sh
