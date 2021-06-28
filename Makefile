@@ -21,14 +21,14 @@ all: test
 
 ##@ Build
 .PHONY: build
-build: ## Bazel build
-	bazel build //cmd/cip:cip
+build: ## Go build
+	go build -o cip ${REPO_ROOT}/cmd/cip/...
 	${REPO_ROOT}/go_with_version.sh build ${REPO_ROOT}/test-e2e/cip-auditor/cip-auditor-e2e.go
 	${REPO_ROOT}/go_with_version.sh build ${REPO_ROOT}/test-e2e/cip/e2e.go
 
 .PHONY: install
-install: ## Install
-	bazel run //:install-cip -c opt -- $(shell go env GOPATH)/bin
+install: build ## Install
+	cp cip $(shell go env GOPATH)/bin
 
 ##@ Images
 
@@ -97,12 +97,6 @@ download: ## Download go modules
 update: ## Update go modules (source of truth!).
 	GO111MODULE=on go mod verify
 	GO111MODULE=on go mod tidy
-	# Update bazel rules to use these new dependencies.
-	bazel run //:gazelle -- update-repos \
-		--from_file=go.mod --to_macro=repos.bzl%go_repositories \
-		--build_file_generation=on --build_file_proto_mode=disable_global \
-		--prune
-	bazel run //:gazelle -- fix
 
 ##@ Verify
 
