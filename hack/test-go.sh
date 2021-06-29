@@ -37,6 +37,10 @@ do
         TEST_TIMEOUT="$2"
         shift
         shift
+        ;;
+        --failfast)
+        TEST_FAILFAST="-failfast"
+        shift
     esac
 done
 
@@ -49,11 +53,26 @@ go_test_flags=(
     -count=1
     -timeout="${TEST_TIMEOUT}s"
     -cover -coverprofile "${ARTIFACTS}/coverage.out"
+    ${TEST_FAILFAST:-}
 )
 
 packages=()
 mapfile -t packages < <(go list ./... | grep -v 'sigs.k8s.io/k8s-container-image-promoter/cmd\|test-e2e')
 
-GO111MODULE=on go test "${go_test_flags[@]}" "${packages[@]}"
+export GO111MODULE=on
+
+# If the user rquests failing fast (so that they can iterate on the failing test
+# quickly without having to swim across the verbose log outputs from parallel
+# tests), then iterate through each module serially.
+if [[ -n "${TEST_FAILFAST:-}" ]]; then
+    echo >&2 "Testing serially with -failfast"
+    echo >&2 "${go_test_flags[@]}"
+    for package in "${packages[@]}"; do
+        go test "${go_test_flags[@]}" "${package}"
+    done
+else
+    # By default, we run tests in parallel. This is used in CI.
+    go test "${go_test_flags[@]}" "${packages[@]}"
+fi
 
 go tool cover -html "${ARTIFACTS}/coverage.out" -o "${ARTIFACTS}/coverage.html"
