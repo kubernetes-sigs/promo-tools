@@ -358,7 +358,7 @@ these Prow jobs, the sequence of events required to fix those Prow jobs are:
 4. update Prow jobs to use the new images from Step 3
 
 Step 1 is done in this Github repo. Step 3 is done in [the k8s.io Github
-repo](https://github.com/kubernetes/k8s.io/tree/master/k8s.gcr.io). Step 4 is
+repo](https://github.com/kubernetes/k8s.io/tree/main/k8s.gcr.io). Step 4 is
 done in the [test-infra Github repo](https://github.com/kubernetes/test-infra).
 
 ## Versioning
@@ -378,8 +378,8 @@ following format: `YYYYMMDD-<git-describe>`. As such, there is no need to bump
 the VERSION file often as the Docker images will always get a unique identifier.
 
 [bazel]:https://bazel.build/
-[k8sio-manifests-dir]:https://github.com/kubernetes/k8s.io/tree/master/k8s.gcr.io
-[cip-prow-integration]:https://github.com/kubernetes/k8s.io/blob/master/k8s.gcr.io/Vanity-Domain-Flip.md#prow-integration
+[k8sio-manifests-dir]:https://github.com/kubernetes/k8s.io/tree/main/k8s.gcr.io
+[cip-prow-integration]:https://github.com/kubernetes/k8s.io/blob/main/k8s.gcr.io/Vanity-Domain-Flip.md#prow-integration
 
 ## Checks Interface
 
