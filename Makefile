@@ -32,26 +32,18 @@ install: build ## Install
 
 ##@ Images
 
-.PHONY: image
-image: ## Build image
-	bazel build //:cip-docker-loadable.tar
-
-.PHONY: image-load
-image-load: image ## Build image and load it
-	docker load -i bazel-bin/cip-docker-loadable.tar
-
 .PHONY: image-push
-image-push: image ## Build image and push
-	bazel run :push-cip
+image-push: ## Build and push auditor and cip images
+	./hack/push-cip.sh
 
 .PHONY: image-push-cip-auditor-e2e
-image-push-cip-auditor-e2e: ## Push image cip-auditor-e2e
-	./test-e2e/cip-auditor/push-cip-auditor-test.sh
+image-push-cip-auditor-e2e: ## Build and push auditor e2e images
+	./hack/push-cip.sh --audit
 
 ##@ Lints
 
 .PHONY: lint
-lint: ## Build image-load-cip-auditor-e2e
+lint:
 	GO111MODULE=on golangci-lint run \
 		-v \
 		--timeout=5m

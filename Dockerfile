@@ -12,21 +12,42 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# About: This dockerfile builds the cip binary for use in auditor e2e tests.
+# About: This dockerfile builds the cip binary for auditor tests and production use.
+#
+# Usage: Since there are two variants to build, you must include the variant name during build-time.
+# cip production binary: 
+#   docker build --build-arg variant=prod /path/to/Dockerfile
+# test auditor:
+#   docker build --build-arg variant=test /path/to/Dockerfile
 
-FROM golang:latest
+# Determine final build variant [prod | test].
+ARG variant
+
+FROM golang:latest AS base
 # Transfer all project files to container.
 WORKDIR /go/src/app
 COPY . .
 # Build and export cip command.
 RUN ./go_with_version.sh build ./cmd/cip
 RUN cp ./cip /bin/cip
-# Include cip-auditor testing fixtures.
-RUN mkdir /e2e-fixtures
-RUN cp -r ./test-e2e/cip-auditor/fixture/* /e2e-fixtures
 # Provide docker config for repo information.
 RUN mkdir /.docker
 RUN cp ./docker/config.json /.docker/config.json
+
+FROM gcr.io/google.com/cloudsdktool/cloud-sdk:latest AS gcloud-base
+COPY --from=base / /
+
+FROM base AS test-variant
+# Include cip-auditor testing fixtures.
+RUN mkdir /e2e-fixtures
+RUN cp -r ./test-e2e/cip-auditor/fixture/* /e2e-fixtures
 # Trigger the auditor on startup.
 ENV HOME=/
 ENTRYPOINT ["cip", "audit"]
+
+FROM gcloud-base as prod-variant
+ENV HOME=/
+ENTRYPOINT ["/bin/bash", "-c"]
+
+# Allow the runtime argument to choose the final variant.
+FROM ${variant}-variant AS final
