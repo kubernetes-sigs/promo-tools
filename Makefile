@@ -75,7 +75,7 @@ test-ci: download
 	make test
 
 .PHONY: test-e2e-cip
-test-e2e-cip:
+test-e2e-cip: test-cip-image-build
 	${REPO_ROOT}/go_with_version.sh run ${REPO_ROOT}/test-e2e/cip/e2e.go \
 		-tests=${REPO_ROOT}/test-e2e/cip/tests.yaml \
 		-repo-root=${REPO_ROOT} \
@@ -87,6 +87,10 @@ test-e2e-cip-auditor:
 		-tests=${REPO_ROOT}/test-e2e/cip-auditor/tests.yaml \
 		-repo-root=${REPO_ROOT} \
 		-key-file=${CIP_E2E_KEY_FILE}
+
+.PHONY: test-cip-image-build
+test-cip-image-build:
+	./hack/test-cip-image.sh
 
 ##@ Dependencies
 
