@@ -14,27 +14,61 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# About: This script builds and pushes the cip and auditor images to a public repository,
-# defined in workspace_status.sh.
+# About: This script can either build or push the cip and auditor container images. Providing the '--audit' flag
+# handles test images used in the e2e auditor.
+
+# Usage: cip-image.sh <command> [--audit]
+# Commands:
+#   build     docker build images from the project's Dockerfile
+#   push      docker push images to their tagged location
+#
+# Optional Flag:
+#   --audit   handle images for e2e test auditor
 
 set -o errexit
 set -o nounset
 set -o pipefail
 
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
-# Detect which container variant to build.
-build_variant="cip"
+# Specify what group of images should be handled.
+variant="cip"
+# Determine what to do with the images (build or push).
+operation=""
 
 printUsage() {
-    >&2 echo "Usage: $0 [--audit]"
+    >&2 cat << EOF
+Usage: $0 <command> [--audit]
+Commands:
+  build     docker build images from the project's Dockerfile
+  push      docker push images to their tagged location
+
+Optional Flag:
+  --audit   handle images for e2e test auditor
+EOF
 }
 
-if (( $# > 1 )) || { (( $# > 0 )) && [[ "$1" != --audit ]];}; then
-    >&2 echo "ERROR: Invalid arguments."
+# Parse runtime arguments.
+for arg in "$@"; do
+    case $arg in
+        build|push)
+            operation=$arg
+            ;;
+        --audit)
+            variant=auditor
+            ;;
+        *)
+            >&2 echo "ERROR: Unknown runtime argument \"$arg\""
+            printUsage
+            exit 1
+            ;;
+    esac
+done
+
+# Ensure an operation was found. 
+if [[ -z "${operation:-}" ]]; then
+    >&2 echo "ERROR: Command not found."
     printUsage
     exit 1
-elif (( $# == 1 )) && [[ "$1" == --audit ]]; then
-    build_variant="auditor"
 fi
 
 # Takes array of images and pushes to their tagged registry location.
@@ -69,12 +103,15 @@ buildImage() {
     $cmd
 }
 
-# Builds and pushes the image variant with specified tags.
-shipImage() {
+# Either builds or pushes the image variant with provided tags.
+handleVariant() {
     local variant=$1
     shift
-    buildImage "$variant" "${*}"
-    pushImages "${*}"
+    if [[ "$operation" == "build" ]]; then
+        buildImage "$variant" "${*}"
+    else
+        pushImages "${*}"
+    fi
 }
 
 # Entrypoint of this script.
@@ -94,18 +131,18 @@ main() {
     # NOTE: Both cip and auditor variants build an auditor image. Although they are named differently,
     # the image contents are the exact same.
 
-    if [[ "$build_variant" == "auditor" ]]; then
+    if [[ "$variant" == "auditor" ]]; then
         # Only build and push the auditor image.
-        shipImage "auditor" \
+        handleVariant "auditor" \
             "${test_tag_prefix}-auditor-test:latest" \
             "${test_tag_prefix}-auditor-test:${STABLE_IMG_TAG}"
     else
         # Build and push auditor and cip images.
-        shipImage "auditor" \
+        handleVariant "auditor" \
             "${stable_tag_prefix}-auditor:latest" \
             "${stable_tag_prefix}-auditor:${STABLE_IMG_TAG}"
 
-        shipImage "cip" \
+        handleVariant "cip" \
             "${stable_tag_prefix}:latest" \
             "${stable_tag_prefix}:${STABLE_IMG_TAG}"
     fi

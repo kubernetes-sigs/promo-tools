@@ -32,13 +32,22 @@ install: build ## Install
 
 ##@ Images
 
+.PHONY: image-build ## Build auditor and cip images
+image-build:
+	./hack/cip-image.sh build
+
+.PHONY: image-build-cip-auditor-e2e
+image-build-cip-auditor-e2e: ## Build auditor e2e images
+	./hack/cip-image.sh build --audit
+
 .PHONY: image-push
-image-push: ## Build and push auditor and cip images
-	./hack/push-cip.sh
+image-push: image-build ## Build and push auditor and cip images
+	./hack/cip-image.sh push
 
 .PHONY: image-push-cip-auditor-e2e
-image-push-cip-auditor-e2e: ## Build and push auditor e2e images
-	./hack/push-cip.sh --audit
+image-push-cip-auditor-e2e: image-build-cip-auditor-e2e ## Build and push auditor e2e images
+	./hack/cip-image.sh push --audit
+
 
 ##@ Lints
 
