@@ -16,8 +16,7 @@
 
 # About:
 # This script extracts the golden image tarballs and compares their contents against the
-# already-tracked golden folder (which is used by Bazel to generate deterministic images
-# on every e2e test invocation). The purpose of this script is to verify that the tarballs
+# already-tracked golden folder. The purpose of this script is to verify that the tarballs
 # residing in golden-archives matches the original source of truth (golden).
 #
 # Usage:
