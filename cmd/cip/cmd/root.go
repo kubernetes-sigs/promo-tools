@@ -26,17 +26,6 @@ import (
 	"sigs.k8s.io/release-utils/log"
 )
 
-var (
-	// GitDescribe is stamped by bazel.
-	GitDescribe string
-
-	// GitCommit is stamped by bazel.
-	GitCommit string
-
-	// TimestampUtcRfc3339 is stamped by bazel.
-	TimestampUtcRfc3339 string
-)
-
 // rootCmd represents the base command when called without any subcommands.
 var rootCmd = &cobra.Command{
 	Use:   "cip",
