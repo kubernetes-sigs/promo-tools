@@ -233,7 +233,7 @@ images:
 }
 
 func TestParseThinManifestsFromDir(t *testing.T) {
-	pwd := bazelTestPath("TestParseThinManifestsFromDir")
+	pwd := getTestPath("TestParseThinManifestsFromDir")
 
 	tests := []struct {
 		name string
@@ -486,7 +486,7 @@ func TestParseThinManifestsFromDir(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		fixtureDir := bazelTestPath("TestParseThinManifestsFromDir", test.input)
+		fixtureDir := getTestPath("TestParseThinManifestsFromDir", test.input)
 
 		// Fixup expected filepaths to match bazel's testing directory.
 		expectedModified := test.expectedOutput[:0]
@@ -528,7 +528,7 @@ func TestValidateThinManifestsFromDir(t *testing.T) {
 		"malformed-directory-tree-structure-bad-prefix-is-ignored",
 	}
 
-	pwd := bazelTestPath("TestValidateThinManifestsFromDir")
+	pwd := getTestPath("TestValidateThinManifestsFromDir")
 
 	for _, testInput := range shouldBeValid {
 		fixtureDir := filepath.Join(pwd, "valid", testInput)
@@ -578,7 +578,7 @@ func TestValidateThinManifestsFromDir(t *testing.T) {
 	}
 
 	for _, test := range shouldBeInvalid {
-		fixtureDir := bazelTestPath("TestValidateThinManifestsFromDir", "invalid", test.dirName)
+		fixtureDir := getTestPath("TestValidateThinManifestsFromDir", "invalid", test.dirName)
 
 		// It could be that a manifest, taken individually, failed on its own,
 		// before we even get to ValidateThinManifestsFromDir(). So handle these
@@ -3518,7 +3518,7 @@ func TestPopulateExtraFields(t *testing.T) {
 
 // Helper functions.
 
-func bazelTestPath(testName string, paths ...string) string {
+func getTestPath(testName string, paths ...string) string {
 	prefix := []string{
 		os.Getenv("PWD"),
 		"inventory_test",
