@@ -1,0 +1,67 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+load("@io_bazel_rules_docker//go:image.bzl", "go_image")
+load("@io_bazel_rules_docker//container:container.bzl", "container_bundle", "container_image", "container_layer")
+load("@io_bazel_rules_docker//contrib:push-all.bzl", "docker_push")
+load("@rules_pkg//:pkg.bzl", "pkg_tar")
+
+go_library(
+    name = "cip-auditor_lib",
+    srcs = ["cip-auditor-e2e.go"],
+    importpath = "sigs.k8s.io/k8s-container-image-promoter/test-e2e/cip-auditor",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//legacy/audit",
+        "//legacy/dockerregistry",
+        "//legacy/gcloud",
+        "//legacy/stream",
+        "@com_github_google_uuid//:uuid",
+        "@in_gopkg_yaml_v2//:yaml_v2",
+        "@io_k8s_klog_v2//:klog",
+        "@io_k8s_sigs_release_utils//command",
+    ],
+)
+
+go_binary(
+    name = "cip-auditor-e2e",
+    embed = [":cip-auditor_lib"],
+    visibility = ["//visibility:public"],
+)
+
+go_image(
+    name = "e2e-image",
+    base = "@distroless-base//image",
+    embed = [":cip-auditor_lib"],
+    importpath = "sigs.k8s.io/k8s-container-image-promoter/test-e2e/cip-auditor",
+)
+
+container_image(
+    name = "cip-auditor-test",
+    base = "//:cip-auditor",
+    layers = [":e2e-fixtures"],
+)
+
+container_layer(
+    name = "e2e-fixtures",
+    directory = "/e2e-fixtures",
+    tars = [":fixture-tar"],
+)
+
+pkg_tar(
+    name = "fixture-tar",
+    srcs = glob(["fixture/**/*.yaml"]),
+    mode = "0755",
+    strip_prefix = "/test-e2e/cip-auditor/fixture",
+)
+
+container_bundle(
+    name = "cip-docker-loadable-auditor-test",
+    images = {
+        "{STABLE_TEST_AUDIT_STAGING_IMG_REPOSITORY}/{STABLE_IMG_NAME}-auditor-test:latest": ":cip-auditor-test",
+        "{STABLE_TEST_AUDIT_STAGING_IMG_REPOSITORY}/{STABLE_IMG_NAME}-auditor-test:{STABLE_IMG_TAG}": ":cip-auditor-test",
+    },
+)
+
+docker_push(
+    name = "push-cip-auditor-test",
+    bundle = "cip-docker-loadable-auditor-test",
+)

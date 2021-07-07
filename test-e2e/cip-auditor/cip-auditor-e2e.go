@@ -117,7 +117,7 @@ func runE2ETests(testsFile, repoRoot string) {
 	invokerServiceAccount := status["STABLE_TEST_AUDIT_INVOKER_SERVICE_ACCOUNT"]
 	pushRepo := status["STABLE_TEST_AUDIT_STAGING_IMG_REPOSITORY"]
 
-	// TODO: All of the workspace options, not just this one, should be non-empty
+	// TODO: All of the Bazel options, not just this one, should be non-empty
 	// values.
 	if pushRepo == "" {
 		klog.Fatal(

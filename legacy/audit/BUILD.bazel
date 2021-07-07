@@ -1,0 +1,34 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "audit",
+    srcs = [
+        "auditor.go",
+        "types.go",
+    ],
+    importpath = "sigs.k8s.io/k8s-container-image-promoter/legacy/audit",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//legacy/dockerregistry",
+        "//legacy/logclient",
+        "//legacy/remotemanifest",
+        "//legacy/report",
+        "//legacy/stream",
+        "@com_github_sirupsen_logrus//:logrus",
+        "@com_google_cloud_go//errorreporting",
+    ],
+)
+
+go_test(
+    name = "audit_test",
+    srcs = ["auditor_test.go"],
+    embed = [":audit"],
+    deps = [
+        "//legacy/dockerregistry",
+        "//legacy/logclient",
+        "//legacy/remotemanifest",
+        "//legacy/report",
+        "//legacy/stream",
+        "@com_github_stretchr_testify//require",
+    ],
+)

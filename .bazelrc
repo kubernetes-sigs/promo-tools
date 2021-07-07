@@ -1,0 +1,3 @@
+common --workspace_status_command=$PWD/workspace_status.sh
+common --host_force_python=PY2
+common --stamp

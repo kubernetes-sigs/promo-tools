@@ -77,7 +77,9 @@ docker manifest create \
     "${staging_repo}/golden-foo/foo:1.0-linux_amd64" \
     "${staging_repo}/golden-foo/foo:1.0-linux_s390x"
 
-# Fixup the s390x image because it's set to amd64 by default.
+# Fixup the s390x image because it's set to amd64 by default (there is
+# no way to specify architecture from within bazel yet when creating
+# images).
 docker manifest annotate --arch=s390x \
     "${staging_repo}/golden-foo/foo:1.0" \
     "${staging_repo}/golden-foo/foo:1.0-linux_s390x"

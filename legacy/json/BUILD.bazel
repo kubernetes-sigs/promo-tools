@@ -1,0 +1,9 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "json",
+    srcs = ["json.go"],
+    importpath = "sigs.k8s.io/k8s-container-image-promoter/legacy/json",
+    visibility = ["//visibility:public"],
+    deps = ["@in_gopkg_yaml_v2//:yaml_v2"],
+)

@@ -1,0 +1,18 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "remotemanifest",
+    srcs = [
+        "fake.go",
+        "git.go",
+        "types.go",
+    ],
+    importpath = "sigs.k8s.io/k8s-container-image-promoter/legacy/remotemanifest",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//legacy/dockerregistry",
+        "@com_github_sirupsen_logrus//:logrus",
+        "@in_gopkg_src_d_go_git_v4//:go-git_v4",
+        "@in_gopkg_src_d_go_git_v4//plumbing",
+    ],
+)

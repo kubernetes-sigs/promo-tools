@@ -1,7 +1,7 @@
 # E2E Testing Overview
 
 This directory has logic that allows the creation of deterministic Docker images
-using by loading golden archives for e2e testing.
+using Bazel for e2e testing.
 
 There are 2 flavors of e2e tests, each in its own subfolder:
 
