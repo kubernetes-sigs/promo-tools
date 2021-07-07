@@ -16,17 +16,10 @@ limitations under the License.
 
 package cli
 
-import "fmt"
+import (
+	"fmt"
 
-var (
-	// GitDescribe is stamped by bazel.
-	GitDescribe string
-
-	// GitCommit is stamped by bazel.
-	GitCommit string
-
-	// TimestampUtcRfc3339 is stamped by bazel.
-	TimestampUtcRfc3339 string
+	"sigs.k8s.io/k8s-container-image-promoter/internal/version"
 )
 
 type RootOptions struct {
@@ -37,7 +30,5 @@ type RootOptions struct {
 
 // nolint: deadcode,unused
 func printVersion() {
-	fmt.Printf("Built:   %s\n", TimestampUtcRfc3339)
-	fmt.Printf("Version: %s\n", GitDescribe)
-	fmt.Printf("Commit:  %s\n", GitCommit)
+	fmt.Println(version.Get())
 }

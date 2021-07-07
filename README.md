@@ -29,7 +29,7 @@ Currently only Google Container Registry (GCR) is supported.
 
 ## Install
 
-1. Install [Docker][docker] & [Go][golang].
+1. Install [bazel][bazel].
 2. Run the steps below:
 
 ```console
@@ -299,7 +299,7 @@ for `nolint` in this repo for examples.
 
 ### Testing
 
-Run `make test`; this will invoke a script to run all unit tests. By
+Run `make test`; this will invoke a bazel rule to run all unit tests. By
 default, running `make` alone also invokes the same tests.
 
 Every critical piece has a unit test --- unit tests complete nearly instantly,
@@ -377,8 +377,7 @@ The Docker images that are produced by this repo are automatically tagged in the
 following format: `YYYYMMDD-<git-describe>`. As such, there is no need to bump
 the VERSION file often as the Docker images will always get a unique identifier.
 
-[docker]:https://docs.docker.com/get-docker
-[golang]:https://golang.org/doc/install
+[bazel]:https://bazel.build/
 [k8sio-manifests-dir]:https://github.com/kubernetes/k8s.io/tree/main/k8s.gcr.io
 [cip-prow-integration]:https://github.com/kubernetes/k8s.io/blob/main/k8s.gcr.io/Vanity-Domain-Flip.md#prow-integration
 

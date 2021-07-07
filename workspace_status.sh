@@ -29,7 +29,7 @@ if (( $# == 1 )) && [ "$1" == "inject" ]; then
     INJECTION=true
 fi
 
-#`p_` takes two arguments to define a workspace status variable:
+#`p_` takes two arguments to define a bazel workspace status variable:
 #
 #  * the name of the variable
 #  * a default value

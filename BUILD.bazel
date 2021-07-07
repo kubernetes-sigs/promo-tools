@@ -1,0 +1,96 @@
+# gazelle:proto disable_global
+
+load("@io_bazel_rules_docker//go:image.bzl", "go_image")
+load("@io_bazel_rules_docker//container:container.bzl", "container_bundle", "container_image", "container_layer")
+load("@io_bazel_rules_docker//contrib:push-all.bzl", "docker_push")
+
+# Go image. "bazel build //:cip-docker-image.tar" results in a tarfile that is
+# "docker load -i"-able, but the image is automatially named
+# "bazel:cip-docker-image". To get around this, we use the container_bundle rule
+# to set the image name directly.
+go_image(
+    name = "cip-docker-image",
+    base = "@google-sdk-base//image",
+    embed = ["//cmd/cip:cip_lib"],
+    goarch = "amd64",
+    goos = "linux",
+    importpath = "sigs.k8s.io/k8s-container-image-promoter",
+    pure = "on",
+)
+
+container_image(
+    name = "cip-with-gcloud",
+    base = ":cip-docker-image",
+    entrypoint = [
+        "/bin/bash",
+        "-c",
+    ],
+    env = {
+        "PATH": "/cip:$${PATH}",
+        "HOME": "/",
+    },
+    layers = [":cip-docker-creds"],
+    symlinks = {"/cip/cip": "/app/cip-docker-image.binary"},
+)
+
+container_layer(
+    name = "cip-docker-creds",
+    directory = "/.docker",
+    files = ["docker/config.json"],
+)
+
+# Like cip-docker-image, but does not use gcloud as the base. This is because
+# the auditor does not require gcloud.
+go_image(
+    name = "cip-docker-image-no-gcloud",
+    embed = ["//cmd/cip:cip_lib"],
+    goarch = "amd64",
+    goos = "linux",
+    importpath = "sigs.k8s.io/k8s-container-image-promoter",
+    pure = "on",
+)
+
+container_image(
+    name = "cip-auditor",
+    base = ":cip-docker-image-no-gcloud",
+    entrypoint = [
+        "/app/cip-docker-image-no-gcloud.binary",
+        "audit",
+    ],
+    env = {
+        "HOME": "/",
+    },
+    layers = [":cip-docker-creds"],
+    visibility = ["//visibility:public"],
+)
+
+# Invoke with "bazel build //:cip-docker-loadable.tar". Then you can run "docker
+# load -i bazel-bin/cip-docker-loadable.tar" to load it into the local Docker
+# daemon.
+container_bundle(
+    name = "cip-docker-loadable",
+    images = {
+        "{STABLE_IMG_REGISTRY}/{STABLE_IMG_REPOSITORY}/{STABLE_IMG_NAME}:latest": "//:cip-with-gcloud",
+        "{STABLE_IMG_REGISTRY}/{STABLE_IMG_REPOSITORY}/{STABLE_IMG_NAME}:{STABLE_IMG_TAG}": "//:cip-with-gcloud",
+        "{STABLE_IMG_REGISTRY}/{STABLE_IMG_REPOSITORY}/{STABLE_IMG_NAME}-auditor:latest": "//:cip-auditor",
+        "{STABLE_IMG_REGISTRY}/{STABLE_IMG_REPOSITORY}/{STABLE_IMG_NAME}-auditor:{STABLE_IMG_TAG}": "//:cip-auditor",
+    },
+)
+
+load("@bazel_gazelle//:def.bzl", "gazelle")
+
+# gazelle:prefix sigs.k8s.io/k8s-container-image-promoter
+gazelle(name = "gazelle")
+
+docker_push(
+    name = "push-cip",
+    bundle = "cip-docker-loadable",
+)
+
+# Support local installation of "cip" binary.
+load("@com_github_google_rules_install//installer:def.bzl", "installer")
+
+installer(
+    name = "install-cip",
+    data = ["//cmd/cip"],
+)
