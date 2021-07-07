@@ -22,7 +22,7 @@ all: test
 ##@ Build
 .PHONY: build
 build: ## Go build
-	${REPO_ROOT}/go_with_version.sh build ${REPO_ROOT}/cmd/cip
+	go build -o cip ${REPO_ROOT}/cmd/cip/...
 	${REPO_ROOT}/go_with_version.sh build ${REPO_ROOT}/test-e2e/cip-auditor/cip-auditor-e2e.go
 	${REPO_ROOT}/go_with_version.sh build ${REPO_ROOT}/test-e2e/cip/e2e.go
 

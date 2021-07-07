@@ -29,7 +29,7 @@ import (
 )
 
 func TestFindManifest(t *testing.T) {
-	pwd := bazelTestPath("TestFindManifest")
+	pwd := getTestPath("TestFindManifest")
 	srcRC := reg.RegistryContext{
 		Name:           "gcr.io/foo-staging",
 		ServiceAccount: "sa@robot.com",
