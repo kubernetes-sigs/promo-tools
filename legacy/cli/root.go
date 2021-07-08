@@ -28,7 +28,6 @@ type RootOptions struct {
 	Version  bool
 }
 
-// nolint: deadcode,unused
 func printVersion() {
 	fmt.Println(version.Get())
 }
