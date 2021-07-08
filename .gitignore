@@ -1,6 +1,13 @@
 *.#*
 *.swp
 
+# Bazel (to ensure bazel configs are not recommitted to repo)
+*.bazel
+*.bzl
+.bazel*
+bazel-*
+WORKSPACE
+
 # downloaded and built binaries
 bin
 
