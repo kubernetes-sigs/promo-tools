@@ -917,12 +917,21 @@ func clearRepository(regName reg.RegistryName, sc *reg.SyncContext) {
 func checkLogs(projectID, uuid string, patterns []string) error {
 	for _, pattern := range patterns {
 		args := getCmdShowLogs(projectID, uuid, pattern)
+
+		fmt.Println("Running command: ", args)
+
 		cmd := command.New(args[0], args[1:]...)
 		std, err := cmd.RunSuccessOutput()
 		if err != nil {
 			return err
 		}
-
+		fmt.Println("**********************************************")
+		fmt.Println("**********************************************")
+		fmt.Println("************** CHECKING LOGS *****************")
+		fmt.Println("**********************************************")
+		fmt.Println(std.Output())
+		fmt.Println("==============================================")
+		fmt.Println(std.Error())
 		matched, stderr := std.Output(), std.Error()
 		if err != nil {
 			return err
