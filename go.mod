@@ -1,6 +1,6 @@
 module sigs.k8s.io/k8s-container-image-promoter
 
-go 1.15
+go 1.16
 
 require (
 	cloud.google.com/go v0.82.0
