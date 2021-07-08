@@ -5,7 +5,6 @@ go 1.16
 require (
 	cloud.google.com/go v0.82.0
 	cloud.google.com/go/logging v1.1.2
-	cloud.google.com/go/storage v1.12.0 // indirect
 	github.com/Microsoft/go-winio v0.4.16 // indirect
 	github.com/cenkalti/backoff/v4 v4.1.0
 	github.com/google/go-containerregistry v0.5.1
