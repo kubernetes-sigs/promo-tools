@@ -34,7 +34,7 @@ RUN cp ./cip /bin/cip
 RUN mkdir /.docker
 RUN cp ./docker/config.json /.docker/config.json
 
-FROM gcr.io/google.com/cloudsdktool/cloud-sdk:latest AS gcloud-base
+FROM gcr.io/google.com/cloudsdktool/cloud-sdk:346.0.0-alpine AS gcloud-base
 COPY --from=base / /
 
 FROM base AS test-variant
