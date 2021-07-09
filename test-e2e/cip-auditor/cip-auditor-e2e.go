@@ -576,7 +576,7 @@ func getCmdShowLogs(projectID, uuid, pattern string) []string {
 		"logging",
 		"read",
 		"--format=value(textPayload)",
-		fmt.Sprintf("logName=%s resource.labels.project_id=%s %q", fullLogName, projectID, uuidAndPattern),
+		fmt.Sprintf("resource.type=project logName=%s resource.labels.project_id=%s %q", fullLogName, projectID, uuidAndPattern),
 		fmt.Sprintf("--project=%s", projectID),
 	}
 }
