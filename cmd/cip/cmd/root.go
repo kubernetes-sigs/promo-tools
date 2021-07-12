@@ -59,13 +59,6 @@ func init() {
 		rootOpts.DryRun,
 		"test run promotion without modifying any registry",
 	)
-
-	rootCmd.PersistentFlags().BoolVar(
-		&rootOpts.Version,
-		"version",
-		rootOpts.Version,
-		"print version",
-	)
 }
 
 func initLogging(*cobra.Command, []string) error {

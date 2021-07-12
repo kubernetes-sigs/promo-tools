@@ -25,7 +25,6 @@ import (
 type RootOptions struct {
 	LogLevel string
 	DryRun   bool
-	Version  bool
 }
 
 func printVersion() {
