@@ -8,7 +8,7 @@ require (
 	github.com/Microsoft/go-winio v0.5.0 // indirect
 	github.com/cenkalti/backoff/v4 v4.1.1
 	github.com/google/go-containerregistry v0.5.1
-	github.com/google/uuid v1.2.0
+	github.com/google/uuid v1.3.0
 	github.com/kevinburke/ssh_config v1.1.0 // indirect
 	github.com/opencontainers/image-spec v1.0.2-0.20200206005212-79b036d80240 // indirect
 	github.com/pkg/errors v0.9.1
