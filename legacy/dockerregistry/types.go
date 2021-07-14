@@ -432,6 +432,18 @@ type digest struct {
 	tags []string
 }
 
+// TODO: Review/optimize/de-dupe (https://github.com/kubernetes-sigs/promo-tools/pull/351)
+type ImageWithParentDigestSlice struct {
+	Name          string
+	parentDigests []parentDigest
+}
+
+// TODO: Review/optimize/de-dupe (https://github.com/kubernetes-sigs/promo-tools/pull/351)
+type parentDigest struct {
+	hash     string
+	children []string
+}
+
 // GCRPubSubPayload is the message payload sent to a Pub/Sub topic by a GCR.
 type GCRPubSubPayload struct {
 	Action string `json:"action"`
