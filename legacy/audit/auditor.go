@@ -38,7 +38,7 @@ import (
 // for production use (going over the network to fetch actual official promoter
 // manifests from GitHub, for example).
 func InitRealServerContext(
-	gcpProjectID, repoURLStr, branch, path, uuid string,
+	gcpProjectID, repoURLStr, branch, path, uuid string, verbose bool,
 ) (*ServerContext, error) {
 	remoteManifestFacility, err := remotemanifest.NewGit(
 		repoURLStr,
@@ -64,6 +64,7 @@ func InitRealServerContext(
 			ReadRepo:         reg.MkReadRepositoryCmdReal,
 			ReadManifestList: reg.MkReadManifestListCmdReal,
 		},
+		VerboseLogging: verbose,
 	}
 
 	return &serverContext, nil
@@ -71,6 +72,7 @@ func InitRealServerContext(
 
 // RunAuditor runs an HTTP server.
 func (s *ServerContext) RunAuditor() {
+	s.Debug("Running on Process ID (PID):", os.Getgid())
 	logrus.Info("Starting Auditor")
 	logrus.Infoln(s)
 
@@ -215,6 +217,7 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 	logInfo.Println(msg)
 
 	// (2) Clone fresh repo (or use one already on disk).
+	s.Debug("Cloning GCR repo...")
 	manifests, err := s.RemoteManifestFacility.Fetch()
 	if err != nil {
 		logError.Println(err)
@@ -296,6 +299,7 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 	}
 
 	logInfo.Printf("(%s): reading srcRegistries %v for %q", s.ID, srcRegistries, gcrPayload)
+	s.Debug("Querying GCR repository...")
 
 	sc.ReadRegistries(
 		srcRegistries,

@@ -73,5 +73,12 @@ func init() {
 		"manifest path (relative to the root of promoter manifest repo)",
 	)
 
+	auditCmd.PersistentFlags().BoolVar(
+		&auditOpts.Verbose,
+		"verbose",
+		auditOpts.Verbose,
+		"include extra logging information",
+	)
+
 	rootCmd.AddCommand(auditCmd)
 }
