@@ -32,6 +32,7 @@ type AuditOptions struct {
 	RepoBranch   string
 	ManifestPath string
 	UUID         string
+	Verbose      bool
 }
 
 func RunAuditCmd(opts *AuditOptions) error {
@@ -47,6 +48,7 @@ func RunAuditCmd(opts *AuditOptions) error {
 		opts.RepoBranch,
 		opts.ManifestPath,
 		opts.UUID,
+		opts.Verbose,
 	)
 	if err != nil {
 		return errors.Wrap(err, "creating auditor context")
