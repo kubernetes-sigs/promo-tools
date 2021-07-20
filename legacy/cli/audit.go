@@ -24,6 +24,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"sigs.k8s.io/k8s-container-image-promoter/legacy/audit"
+	"sigs.k8s.io/k8s-container-image-promoter/legacy/logclient"
 )
 
 type AuditOptions struct {
@@ -42,8 +43,10 @@ func RunAuditCmd(opts *AuditOptions) error {
 		return errors.Wrap(err, "validating audit options")
 	}
 
-	// Set logging level.
-	audit.PersistantAuditInfo.VerboseLogging = opts.Verbose
+	// Allow persistent logging when --verbose flag is present.
+	if opts.Verbose {
+		logclient.EnablePersistentLogging()
+	}
 
 	auditorContext, err := audit.InitRealServerContext(
 		opts.ProjectID,

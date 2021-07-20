@@ -28,7 +28,6 @@ import (
 	"cloud.google.com/go/errorreporting"
 	"github.com/sirupsen/logrus"
 
-	"sigs.k8s.io/k8s-container-image-promoter/bazel-k8s-container-image-promoter/legacy/audit"
 	reg "sigs.k8s.io/k8s-container-image-promoter/legacy/dockerregistry"
 	"sigs.k8s.io/k8s-container-image-promoter/legacy/logclient"
 	"sigs.k8s.io/k8s-container-image-promoter/legacy/remotemanifest"
@@ -72,7 +71,7 @@ func InitRealServerContext(
 
 // RunAuditor runs an HTTP server.
 func (s *ServerContext) RunAuditor() {
-	audit.PersistantAuditInfo.Debug("Running on Process ID (PID):", os.Getgid())
+	logclient.Debug("Running on Process ID (PID):", os.Getgid())
 	logrus.Info("Starting Auditor")
 	logrus.Infoln(s)
 
@@ -191,6 +190,7 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 	// (1) Parse request payload.
+	logclient.Debug("Parsing Pub/Sub message...")
 	gcrPayload, err := ParsePubSubMessage(r.Body)
 	if err != nil {
 		// It's important to fail any message we cannot parse, because this
@@ -217,7 +217,7 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 	logInfo.Println(msg)
 
 	// (2) Clone fresh repo (or use one already on disk).
-	audit.PersistantAuditInfo.Debug("Cloning GCR repo...")
+	logclient.Debug("Cloning GCR repo...")
 	manifests, err := s.RemoteManifestFacility.Fetch()
 	if err != nil {
 		logError.Println(err)
@@ -265,6 +265,7 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 	// Because the subproject is gcr.io/k8s-artifacts-prod/<subproject>/foo...,
 	// we can search for the matching subproject and run
 	// reg.ReadGCRManifestLists.
+	logclient.Debug("Investigating incoming manifest as a child image...")
 	sc, err := reg.MakeSyncContext(
 		manifests,
 		// threads
@@ -299,7 +300,6 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 	}
 
 	logInfo.Printf("(%s): reading srcRegistries %v for %q", s.ID, srcRegistries, gcrPayload)
-	audit.PersistantAuditInfo.Debug("Querying GCR repository...")
 
 	sc.ReadRegistries(
 		srcRegistries,

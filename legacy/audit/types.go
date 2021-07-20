@@ -17,7 +17,6 @@ limitations under the License.
 package audit
 
 import (
-	"github.com/sirupsen/logrus"
 	reg "sigs.k8s.io/k8s-container-image-promoter/legacy/dockerregistry"
 	"sigs.k8s.io/k8s-container-image-promoter/legacy/logclient"
 	"sigs.k8s.io/k8s-container-image-promoter/legacy/remotemanifest"
@@ -57,34 +56,8 @@ type PubSubMessage struct {
 	Subscription string             `json:"subscription"`
 }
 
-// PersistantLoggingInfo holds peristand stats about the behavior of the auditor.
-// Since the auditor is a continuously running program, this data will begin
-// collection upon startup and lost on shutdown. Such data is only collected when
-// invoked with the --verbose flag.
-type PersistantLoggingInfo struct {
-	VerboseLogging bool
-	NumGCRQueries  uint64
-}
-
-// Debug only logs the given message if the VerboseLogging option is true.
-func (l PersistantLoggingInfo) Debug(args ...interface{}) {
-	if l.VerboseLogging {
-		logrus.Debug(args...)
-	}
-}
-
 const (
 	// LogName is the auditing log name to use. This is the name that comes up
 	// for "gcloud logging logs list".
 	LogName = "cip-audit-log"
-)
-
-var (
-	// PersistantAuditInfo is used to hold persistant logs for the auditor.
-	// This is set as a global variable to allow all parts of the auditor
-	// access to access logging info.
-	PersistantAuditInfo = PersistantLoggingInfo{
-		VerboseLogging: false,
-		NumGCRQueries:  0,
-	}
 )

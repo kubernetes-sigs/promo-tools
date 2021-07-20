@@ -40,6 +40,7 @@ import (
 
 	"sigs.k8s.io/k8s-container-image-promoter/legacy/gcloud"
 	cipJson "sigs.k8s.io/k8s-container-image-promoter/legacy/json"
+	"sigs.k8s.io/k8s-container-image-promoter/legacy/logclient"
 	"sigs.k8s.io/k8s-container-image-promoter/legacy/stream"
 )
 
@@ -1289,7 +1290,6 @@ func (sc *SyncContext) ReadRegistries(
 
 			// Now run the request (make network HTTP call with
 			// ExponentialBackoff()).
-			// tylerferrara -> count the number of requests made
 			tagsStruct, err := getRegistryTagsWrapper(req)
 			if err != nil {
 				// Skip this request if it has unrecoverable errors (even after
@@ -1594,6 +1594,9 @@ func MkReadRepositoryCmdReal(
 ) stream.Producer {
 	var sh stream.HTTP
 
+	// Log GCR query (only if --verbose flag is present)
+	logclient.CountGCRQuery(1)
+
 	tokenKey, domain, repoPath := GetTokenKeyDomainRepoPath(rc.Name)
 
 	httpReq, err := http.NewRequest(
@@ -1631,6 +1634,9 @@ func MkReadRepositoryCmdReal(
 // error) tuple instead.
 func MkReadManifestListCmdReal(sc *SyncContext, gmlc *GCRManifestListContext) stream.Producer {
 	var sh stream.HTTP
+
+	// Log GCR query (only if --verbose flag is present)
+	logclient.CountGCRQuery(1)
 
 	tokenKey, domain, repoPath := GetTokenKeyDomainRepoPath(gmlc.RegistryContext.Name)
 
