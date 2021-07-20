@@ -1289,6 +1289,7 @@ func (sc *SyncContext) ReadRegistries(
 
 			// Now run the request (make network HTTP call with
 			// ExponentialBackoff()).
+			// tylerferrara -> count the number of requests made
 			tagsStruct, err := getRegistryTagsWrapper(req)
 			if err != nil {
 				// Skip this request if it has unrecoverable errors (even after

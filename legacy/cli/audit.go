@@ -42,13 +42,15 @@ func RunAuditCmd(opts *AuditOptions) error {
 		return errors.Wrap(err, "validating audit options")
 	}
 
+	// Set logging level.
+	audit.PersistantAuditInfo.VerboseLogging = opts.Verbose
+
 	auditorContext, err := audit.InitRealServerContext(
 		opts.ProjectID,
 		opts.RepoURL,
 		opts.RepoBranch,
 		opts.ManifestPath,
 		opts.UUID,
-		opts.Verbose,
 	)
 	if err != nil {
 		return errors.Wrap(err, "creating auditor context")
