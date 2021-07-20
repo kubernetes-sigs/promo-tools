@@ -1595,7 +1595,7 @@ func MkReadRepositoryCmdReal(
 	var sh stream.HTTP
 
 	// Log GCR query (only if --verbose flag is present)
-	logclient.CountGCRQuery(1)
+	logclient.IncrementGCRQuery(1)
 
 	tokenKey, domain, repoPath := GetTokenKeyDomainRepoPath(rc.Name)
 
@@ -1636,7 +1636,7 @@ func MkReadManifestListCmdReal(sc *SyncContext, gmlc *GCRManifestListContext) st
 	var sh stream.HTTP
 
 	// Log GCR query (only if --verbose flag is present)
-	logclient.CountGCRQuery(1)
+	logclient.IncrementGCRQuery(1)
 
 	tokenKey, domain, repoPath := GetTokenKeyDomainRepoPath(gmlc.RegistryContext.Name)
 

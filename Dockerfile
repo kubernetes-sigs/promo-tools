@@ -43,7 +43,7 @@ RUN mkdir /e2e-fixtures
 RUN cp -r ./test-e2e/cip-auditor/fixture/* /e2e-fixtures
 # Trigger the auditor on startup.
 ENV HOME=/
-ENTRYPOINT ["cip", "audit"]
+ENTRYPOINT ["cip", "audit", "--verbose"]
 
 FROM gcloud-base as prod-variant
 ENV HOME=/
