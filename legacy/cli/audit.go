@@ -90,10 +90,10 @@ func (o *AuditOptions) set() {
 	logrus.Infof(
 		// nolint: lll
 		"Image auditor options: [GCP project: %s, repo URL: %s, repo branch: %s, path: %s, UUID: %s]",
+		o.ProjectID,
 		o.RepoURL,
 		o.RepoBranch,
 		o.ManifestPath,
-		o.ProjectID,
 		o.UUID,
 	)
 }
