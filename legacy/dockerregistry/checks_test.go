@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	grafeaspb "google.golang.org/genproto/googleapis/grafeas/v1"
 
 	reg "sigs.k8s.io/k8s-container-image-promoter/legacy/dockerregistry"
@@ -187,9 +188,7 @@ func TestImageRemovalCheck(t *testing.T) {
 		// nolint: errcheck
 		pullEdges, _ := reg.ToPromotionEdges(test.pullManifests)
 		got := test.check.Compare(masterEdges, pullEdges)
-		err := checkEqual(got, test.expected)
-		checkError(t, err,
-			fmt.Sprintf("checkError: test: %v imageRemovalCheck\n", test.name))
+		require.Equal(t, test.expected, got)
 	}
 }
 
@@ -340,16 +339,7 @@ func TestImageSizeCheck(t *testing.T) {
 		// TODO: Why are we not checking errors here?
 		// nolint: errcheck
 		test.check.PullEdges, _ = reg.ToPromotionEdges(test.manifests)
-		err := checkEqual(len(test.check.PullEdges), len(test.imageSizes))
-
-		checkError(
-			t,
-			err,
-			fmt.Sprintf(
-				"checkError: test: %v Number of image sizes should be equal to the number of edges (ImageSizeCheck)\n",
-				test.name,
-			),
-		)
+		require.Equal(t, len(test.imageSizes), len(test.check.PullEdges))
 
 		for edge := range test.check.PullEdges {
 			test.check.DigestImageSize[edge.Digest] =
@@ -357,13 +347,7 @@ func TestImageSizeCheck(t *testing.T) {
 		}
 
 		got := test.check.Run()
-		err = checkEqual(got, test.expected)
-
-		checkError(
-			t,
-			err,
-			fmt.Sprintf("checkError: test: %v (ImageSizeCheck)\n", test.name),
-		)
+		require.Equal(t, test.expected, got)
 	}
 }
 
@@ -584,8 +568,6 @@ func TestImageVulnCheck(t *testing.T) {
 			mkVulnProducerFake(test.vulnerabilities),
 		)
 		got := check.Run()
-		err := checkEqual(got, test.expected)
-		checkError(t, err,
-			fmt.Sprintf("checkError: test: %v (ImageVulnCheck)\n", test.name))
+		require.Equal(t, test.expected, got)
 	}
 }
