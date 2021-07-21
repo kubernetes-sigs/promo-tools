@@ -22,14 +22,13 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/stretchr/testify/require"
 	"golang.org/x/xerrors"
 
 	reg "sigs.k8s.io/k8s-container-image-promoter/legacy/dockerregistry"
 )
 
 func TestFindManifest(t *testing.T) {
-	pwd := getTestPath("TestFindManifest")
+	pwd := bazelTestPath("TestFindManifest")
 	srcRC := reg.RegistryContext{
 		Name:           "gcr.io/foo-staging",
 		ServiceAccount: "sa@robot.com",
@@ -103,19 +102,30 @@ func TestFindManifest(t *testing.T) {
 
 	for _, test := range tests {
 		gotManifest, gotErr := reg.FindManifest(&test.input)
-		if test.expectedErr != nil {
-			require.NotNil(t, gotErr)
-			require.Error(t, gotErr, test.expectedErr.Error())
-		} else {
-			require.Nil(t, gotErr)
-		}
 
 		// Clean up gotManifest for purposes of comparing against expected
 		// results. Namely, clear out the SrcRegistry pointer because this will
 		// always be different.
 		gotManifest.SrcRegistry = nil
 
-		require.Equal(t, gotManifest, test.expectedManifest)
+		eqErr := checkEqual(gotManifest, test.expectedManifest)
+		checkError(t, eqErr,
+			fmt.Sprintf("Test: %q (unexpected manifest)\n", test.name),
+		)
+
+		var gotErrStr string
+		var expectedErrStr string
+		if gotErr != nil {
+			gotErrStr = gotErr.Error()
+		}
+		if test.expectedErr != nil {
+			expectedErrStr = test.expectedErr.Error()
+		}
+
+		eqErr = checkEqual(gotErrStr, expectedErrStr)
+		checkError(t, eqErr,
+			fmt.Sprintf("Test: %q (unexpected error)\n", test.name),
+		)
 	}
 }
 
@@ -292,13 +302,21 @@ func TestApplyFilters(t *testing.T) {
 
 	for _, test := range tests {
 		gotRii, gotErr := reg.ApplyFilters(&test.inputOptions, test.inputRii)
-		if test.expectedErr != nil {
-			require.NotNil(t, gotErr)
-			require.Error(t, gotErr, test.expectedErr.Error())
-		} else {
-			require.Nil(t, gotErr)
-		}
 
-		require.Equal(t, gotRii, test.expectedRii)
+		eqErr := checkEqual(gotRii, test.expectedRii)
+		checkError(
+			t,
+			eqErr,
+			fmt.Sprintf("Test: %q (unexpected filtered RegInvImage)\n", test.name))
+
+		if test.expectedErr != nil {
+			eqErr = checkEqual(gotErr.Error(), test.expectedErr.Error())
+		} else {
+			eqErr = checkEqual(gotErr, test.expectedErr)
+		}
+		checkError(
+			t,
+			eqErr,
+			fmt.Sprintf("Test: %q (unexpected error)\n", test.name))
 	}
 }
