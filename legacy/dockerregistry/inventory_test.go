@@ -21,16 +21,41 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sync"
 	"testing"
 
 	cr "github.com/google/go-containerregistry/pkg/v1/types"
-	"github.com/stretchr/testify/require"
 
 	reg "sigs.k8s.io/k8s-container-image-promoter/legacy/dockerregistry"
 	"sigs.k8s.io/k8s-container-image-promoter/legacy/json"
 	"sigs.k8s.io/k8s-container-image-promoter/legacy/stream"
 )
+
+func checkEqual(got, expected interface{}) error {
+	if !reflect.DeepEqual(got, expected) {
+		return fmt.Errorf(
+			`<<<<<<< got (type %T)
+%v
+=======
+%v
+>>>>>>> expected (type %T)`,
+			got,
+			got,
+			expected,
+			expected)
+	}
+	return nil
+}
+
+func checkError(t *testing.T, err error, msg string) {
+	if err != nil {
+		fmt.Printf("\n%v", msg)
+		fmt.Println(err)
+		fmt.Println()
+		t.Fail()
+	}
+}
 
 type ParseJSONStreamResult struct {
 	jsons json.Objects
@@ -90,19 +115,26 @@ func TestReadJSONStream(t *testing.T) {
 		var sr stream.Fake
 		sr.Bytes = []byte(test.input)
 		stdout, _, err := sr.Produce()
-		require.Nil(t, err)
+
+		// The fake should never error out when producing a stdout stream for
+		// us.
+		eqErr := checkEqual(err, nil)
+		checkError(t, eqErr, fmt.Sprintf("Test: %v (Produce() err)\n",
+			test.name))
 
 		jsons, err := json.Consume(stdout)
-		defer sr.Close()
+		_ = sr.Close()
 
-		if test.expectedOutput.err != nil {
-			require.NotNil(t, err)
-			require.Error(t, err, test.expectedOutput.err)
-		} else {
-			require.Nil(t, err)
-		}
+		// Check the error as well (at the very least, we can check that the
+		// error was nil).
+		eqErr = checkEqual(err, test.expectedOutput.err)
+		checkError(t, eqErr, fmt.Sprintf("Test: %v (json.Consume() err)\n",
+			test.name))
 
-		require.Equal(t, jsons, test.expectedOutput.jsons)
+		got := jsons
+		expected := test.expectedOutput.jsons
+		eqErr = checkEqual(got, expected)
+		checkError(t, eqErr, fmt.Sprintf("Test: %v (json)\n", test.name))
 	}
 }
 
@@ -220,20 +252,30 @@ images:
 	// Test only the JSON unmarshalling logic.
 	for _, test := range tests {
 		b := []byte(test.input)
-
 		imageManifest, err := reg.ParseManifestYAML(b)
+
+		// Check the error as well (at the very least, we can check that the
+		// error was nil).
+		eqErr := checkEqual(err, test.expectedError)
+		checkError(t, eqErr, fmt.Sprintf("Test: %v (error)\n", test.name))
+
+		// There is nothing more to check if we expected a parse failure.
 		if test.expectedError != nil {
-			require.NotNil(t, err)
-			require.Error(t, err, test.expectedError)
-		} else {
-			require.Nil(t, err)
-			require.Equal(t, imageManifest, test.expectedOutput)
+			continue
 		}
+
+		got := imageManifest
+		expected := test.expectedOutput
+		eqErr = checkEqual(got, expected)
+		checkError(
+			t,
+			eqErr,
+			fmt.Sprintf("Test: %v (Manifest)\n", test.name))
 	}
 }
 
 func TestParseThinManifestsFromDir(t *testing.T) {
-	pwd := getTestPath("TestParseThinManifestsFromDir")
+	pwd := bazelTestPath("TestParseThinManifestsFromDir")
 
 	tests := []struct {
 		name string
@@ -486,7 +528,7 @@ func TestParseThinManifestsFromDir(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		fixtureDir := getTestPath("TestParseThinManifestsFromDir", test.input)
+		fixtureDir := bazelTestPath("TestParseThinManifestsFromDir", test.input)
 
 		// Fixup expected filepaths to match bazel's testing directory.
 		expectedModified := test.expectedOutput[:0]
@@ -499,11 +541,6 @@ func TestParseThinManifestsFromDir(t *testing.T) {
 		}
 
 		got, errParse := reg.ParseThinManifestsFromDir(fixtureDir)
-		if test.expectedParseError != nil {
-			require.NotNil(t, errParse)
-			require.Error(t, errParse, test.expectedParseError)
-			continue
-		}
 
 		// Clear private fields (redundant data) that are calculated on-the-fly
 		// (it's too verbose to include them here; besides, it's not what we're
@@ -514,8 +551,28 @@ func TestParseThinManifestsFromDir(t *testing.T) {
 			gotModified = append(gotModified, mfest)
 		}
 
-		require.Nil(t, errParse)
-		require.Equal(t, gotModified, test.expectedOutput)
+		// Check the error as well (at the very least, we can check that the
+		// error was nil).
+		var errParseStr string
+		var expectedParseErrorStr string
+		if errParse != nil {
+			errParseStr = errParse.Error()
+		}
+		if test.expectedParseError != nil {
+			expectedParseErrorStr = test.expectedParseError.Error()
+		}
+		eqErr := checkEqual(errParseStr, expectedParseErrorStr)
+		checkError(t, eqErr, fmt.Sprintf("Test: %v (error)\n", test.name))
+
+		// There is nothing more to check if we expected a parse failure.
+		if test.expectedParseError != nil {
+			continue
+		}
+
+		eqErr = checkEqual(gotModified, test.expectedOutput)
+		checkError(t, eqErr,
+			fmt.Sprintf("Test: %v (Manifest)\n", test.name),
+		)
 	}
 }
 
@@ -528,16 +585,24 @@ func TestValidateThinManifestsFromDir(t *testing.T) {
 		"malformed-directory-tree-structure-bad-prefix-is-ignored",
 	}
 
-	pwd := getTestPath("TestValidateThinManifestsFromDir")
+	pwd := bazelTestPath("TestValidateThinManifestsFromDir")
 
 	for _, testInput := range shouldBeValid {
 		fixtureDir := filepath.Join(pwd, "valid", testInput)
 
 		mfests, errParse := reg.ParseThinManifestsFromDir(fixtureDir)
-		require.Nil(t, errParse)
+		eqErr := checkEqual(errParse, nil)
+		checkError(
+			t,
+			eqErr,
+			fmt.Sprintf("Test: `%v' should be valid (ParseThinManifestsFromDir)\n", testInput))
 
 		_, edgeErr := reg.ToPromotionEdges(mfests)
-		require.Nil(t, edgeErr)
+		eqErr = checkEqual(edgeErr, nil)
+		checkError(
+			t,
+			eqErr,
+			fmt.Sprintf("Test: `%v' should be valid\n", testInput))
 	}
 
 	shouldBeInvalid := []struct {
@@ -578,26 +643,34 @@ func TestValidateThinManifestsFromDir(t *testing.T) {
 	}
 
 	for _, test := range shouldBeInvalid {
-		fixtureDir := getTestPath("TestValidateThinManifestsFromDir", "invalid", test.dirName)
+		fixtureDir := bazelTestPath("TestValidateThinManifestsFromDir", "invalid", test.dirName)
+		var eqErr error
 
 		// It could be that a manifest, taken individually, failed on its own,
 		// before we even get to ValidateThinManifestsFromDir(). So handle these
 		// cases as well.
 		mfests, errParse := reg.ParseThinManifestsFromDir(fixtureDir)
-		if test.expectedParseError != nil {
-			require.NotNil(t, errParse)
-			require.Error(t, errParse, test.expectedParseError)
-		} else {
-			require.Nil(t, errParse)
+
+		var errParseStr string
+		var expectedParseErrorStr string
+		if errParse != nil {
+			errParseStr = errParse.Error()
 		}
 
-		_, edgeErr := reg.ToPromotionEdges(mfests)
-		if test.expectedEdgeError != nil {
-			require.NotNil(t, edgeErr)
-			require.Error(t, edgeErr, test.expectedEdgeError)
-		} else {
-			require.Nil(t, edgeErr)
+		if test.expectedParseError != nil {
+			expectedParseErrorStr = test.expectedParseError.Error()
 		}
+
+		eqErr = checkEqual(errParseStr, expectedParseErrorStr)
+		checkError(t, eqErr,
+			fmt.Sprintf("Test: `%v' should be invalid (ParseThinManifestsFromDir)\n", test.dirName),
+		)
+
+		_, edgeErr := reg.ToPromotionEdges(mfests)
+		eqErr = checkEqual(edgeErr, test.expectedEdgeError)
+		checkError(t, eqErr,
+			fmt.Sprintf("Test: `%v' should be invalid (ToPromotionEdges)\n", test.dirName),
+		)
 	}
 }
 
@@ -611,10 +684,12 @@ func TestParseImageDigest(t *testing.T) {
 
 	for _, testInput := range shouldBeValid {
 		d := reg.Digest(testInput)
-		require.NotEmpty(t, d)
-
-		err := reg.ValidateDigest(d)
-		require.Nil(t, err)
+		got := reg.ValidateDigest(d)
+		eqErr := checkEqual(got, nil)
+		checkError(
+			t,
+			eqErr,
+			fmt.Sprintf("Test: `%v' should be valid\n", testInput))
 	}
 
 	shouldBeInvalid := []string{
@@ -632,8 +707,12 @@ func TestParseImageDigest(t *testing.T) {
 
 	for _, testInput := range shouldBeInvalid {
 		d := reg.Digest(testInput)
-		err := reg.ValidateDigest(d)
-		require.NotNil(t, err)
+		got := reg.ValidateDigest(d)
+		eqErr := checkEqual(got, fmt.Errorf("invalid digest: %v", d))
+		checkError(
+			t,
+			eqErr,
+			fmt.Sprintf("Test: `%v' should be invalid\n", testInput))
 	}
 }
 
@@ -651,8 +730,12 @@ func TestParseImageTag(t *testing.T) {
 
 	for _, testInput := range shouldBeValid {
 		tag := reg.Tag(testInput)
-		err := reg.ValidateTag(tag)
-		require.Nil(t, err)
+		got := reg.ValidateTag(tag)
+		eqErr := checkEqual(got, nil)
+		checkError(
+			t,
+			eqErr,
+			fmt.Sprintf("Test: `%v' should be valid\n", testInput))
 	}
 
 	shouldBeInvalid := []string{
@@ -672,8 +755,12 @@ func TestParseImageTag(t *testing.T) {
 
 	for _, testInput := range shouldBeInvalid {
 		tag := reg.Tag(testInput)
-		err := reg.ValidateTag(tag)
-		require.NotNil(t, err)
+		got := reg.ValidateTag(tag)
+		eqErr := checkEqual(got, fmt.Errorf("invalid tag: %v", tag))
+		checkError(
+			t,
+			eqErr,
+			fmt.Sprintf("Test: `%v' should be invalid\n", testInput))
 	}
 }
 
@@ -687,10 +774,12 @@ func TestValidateRegistryImagePath(t *testing.T) {
 
 	for _, testInput := range shouldBeValid {
 		rip := reg.RegistryImagePath(testInput)
-		require.NotEmpty(t, rip)
-
-		err := reg.ValidateRegistryImagePath(rip)
-		require.Nil(t, err)
+		got := reg.ValidateRegistryImagePath(rip)
+		eqErr := checkEqual(got, nil)
+		checkError(
+			t,
+			eqErr,
+			fmt.Sprintf("Test: `%v' should be valid\n", testInput))
 	}
 
 	shouldBeInvalid := []string{
@@ -716,8 +805,14 @@ func TestValidateRegistryImagePath(t *testing.T) {
 
 	for _, testInput := range shouldBeInvalid {
 		rip := reg.RegistryImagePath(testInput)
-		err := reg.ValidateRegistryImagePath(rip)
-		require.NotNil(t, err)
+		got := reg.ValidateRegistryImagePath(rip)
+		eqErr := checkEqual(
+			got, fmt.Errorf("invalid registry image path: %v", rip),
+		)
+
+		checkError(t, eqErr,
+			fmt.Sprintf("Test: `%v' should be invalid\n", testInput),
+		)
 	}
 }
 
@@ -767,15 +862,21 @@ func TestSplitRegistryImagePath(t *testing.T) {
 	}
 	for _, test := range tests {
 		rName, iName, err := reg.SplitRegistryImagePath(test.input, knownRegistryNames)
-		if test.expectedErr != nil {
-			require.NotNil(t, err)
-			require.Error(t, err, test.expectedErr)
-		} else {
-			require.Nil(t, err)
-		}
-
-		require.Equal(t, rName, test.expectedRegistryName)
-		require.Equal(t, iName, test.expectedImageName)
+		eqErr := checkEqual(rName, test.expectedRegistryName)
+		checkError(
+			t,
+			eqErr,
+			fmt.Sprintf("Test: `%v' failure (registry name mismatch)\n", test.input))
+		eqErr = checkEqual(iName, test.expectedImageName)
+		checkError(
+			t,
+			eqErr,
+			fmt.Sprintf("Test: `%v' failure (image name mismatch)\n", test.input))
+		eqErr = checkEqual(err, test.expectedErr)
+		checkError(
+			t,
+			eqErr,
+			fmt.Sprintf("Test: `%v' failure (error mismatch)\n", test.input))
 	}
 }
 
@@ -818,15 +919,21 @@ func TestSplitByKnownRegistries(t *testing.T) {
 	}
 	for _, test := range tests {
 		rootReg, imageName, err := reg.SplitByKnownRegistries(test.input, knownRegistryContexts)
-		if test.expectedErr != nil {
-			require.NotNil(t, err)
-			require.Error(t, err, test.expectedErr)
-		} else {
-			require.Nil(t, err)
-		}
-
-		require.Equal(t, rootReg, test.expectedRegistryName)
-		require.Equal(t, imageName, test.expectedImageName)
+		eqErr := checkEqual(rootReg, test.expectedRegistryName)
+		checkError(
+			t,
+			eqErr,
+			fmt.Sprintf("Test: `%v' failure (registry name mismatch)\n", test.input))
+		eqErr = checkEqual(imageName, test.expectedImageName)
+		checkError(
+			t,
+			eqErr,
+			fmt.Sprintf("Test: `%v' failure (image name mismatch)\n", test.input))
+		eqErr = checkEqual(err, test.expectedErr)
+		checkError(
+			t,
+			eqErr,
+			fmt.Sprintf("Test: `%v' failure (error mismatch)\n", test.input))
 	}
 }
 
@@ -845,99 +952,103 @@ func TestCommandGeneration(t *testing.T) {
 		tp            reg.TagOp
 	)
 
-	t.Run(
-		"GetDeleteCmd",
-		func(t *testing.T) {
-			got := reg.GetDeleteCmd(
-				destRC,
-				true,
-				destImageName,
-				digest,
-				false)
+	testName := "GetDeleteCmd"
+	got := reg.GetDeleteCmd(
+		destRC,
+		true,
+		destImageName,
+		digest,
+		false)
 
-			expected := []string{
-				"gcloud",
-				"--account=robot",
-				"container",
-				"images",
-				"delete",
-				reg.ToFQIN(destRC.Name, destImageName, digest),
-				"--format=json",
-			}
+	expected := []string{
+		"gcloud",
+		"--account=robot",
+		"container",
+		"images",
+		"delete",
+		reg.ToFQIN(destRC.Name, destImageName, digest),
+		"--format=json",
+	}
 
-			require.Equal(t, got, expected)
-
-			got = reg.GetDeleteCmd(
-				destRC,
-				false,
-				destImageName,
-				digest,
-				false,
-			)
-
-			expected = []string{
-				"gcloud",
-				"container",
-				"images",
-				"delete",
-				reg.ToFQIN(destRC.Name, destImageName, digest),
-				"--format=json",
-			}
-
-			require.Equal(t, got, expected)
-		},
+	eqErr := checkEqual(got, expected)
+	checkError(t, eqErr,
+		fmt.Sprintf("Test: %v (cmd string)\n", testName),
 	)
 
-	t.Run(
-		"GetWriteCmd (Delete)",
-		func(t *testing.T) {
-			tp = reg.Delete
+	got = reg.GetDeleteCmd(
+		destRC,
+		false,
+		destImageName,
+		digest,
+		false,
+	)
 
-			got := reg.GetWriteCmd(
-				destRC,
-				true,
-				srcRegName,
-				srcImageName,
-				destImageName,
-				digest,
-				tag,
-				tp,
-			)
+	expected = []string{
+		"gcloud",
+		"container",
+		"images",
+		"delete",
+		reg.ToFQIN(destRC.Name, destImageName, digest),
+		"--format=json",
+	}
 
-			expected := []string{
-				"gcloud",
-				"--account=robot",
-				"--quiet",
-				"container",
-				"images",
-				"untag",
-				reg.ToPQIN(destRC.Name, destImageName, tag),
-			}
+	eqErr = checkEqual(got, expected)
+	checkError(t, eqErr,
+		fmt.Sprintf("Test: %v (cmd string)\n", testName),
+	)
 
-			require.Equal(t, got, expected)
+	testName = "GetWriteCmd (Delete)"
+	tp = reg.Delete
 
-			got = reg.GetWriteCmd(
-				destRC,
-				false,
-				srcRegName,
-				srcImageName,
-				destImageName,
-				digest,
-				tag,
-				tp,
-			)
+	got = reg.GetWriteCmd(
+		destRC,
+		true,
+		srcRegName,
+		srcImageName,
+		destImageName,
+		digest,
+		tag,
+		tp,
+	)
 
-			expected = []string{
-				"gcloud",
-				"--quiet",
-				"container",
-				"images",
-				"untag",
-				reg.ToPQIN(destRC.Name, destImageName, tag),
-			}
+	expected = []string{
+		"gcloud",
+		"--account=robot",
+		"--quiet",
+		"container",
+		"images",
+		"untag",
+		reg.ToPQIN(destRC.Name, destImageName, tag),
+	}
 
-			require.Equal(t, got, expected)
-		},
+	eqErr = checkEqual(got, expected)
+	checkError(t, eqErr,
+		fmt.Sprintf("Test: %v (cmd string)\n", testName),
+	)
+
+	got = reg.GetWriteCmd(
+		destRC,
+		false,
+		srcRegName,
+		srcImageName,
+		destImageName,
+		digest,
+		tag,
+		tp,
+	)
+
+	expected = []string{
+		"gcloud",
+		"--quiet",
+		"container",
+		"images",
+		"untag",
+		reg.ToPQIN(destRC.Name, destImageName, tag),
+	}
+
+	eqErr = checkEqual(got, expected)
+	checkError(t, eqErr,
+		fmt.Sprintf("Test: %v (cmd string)\n", testName),
 	)
 }
 
@@ -1143,7 +1254,6 @@ func TestReadRegistries(t *testing.T) {
 			},
 		},
 	}
-
 	for _, test := range tests {
 		// Destination registry is a placeholder, because ReadImageNames acts on
 		// 2 registries (src and dest) at once.
@@ -1170,16 +1280,20 @@ func TestReadRegistries(t *testing.T) {
 			_, domain, repoPath := reg.GetTokenKeyDomainRepoPath(rc.Name)
 			fakeHTTPBody, ok := test.input[domain+"/"+repoPath]
 			if !ok {
-				require.False(t, ok)
+				checkError(
+					t,
+					fmt.Errorf("could not read fakeHTTPBody"),
+					fmt.Sprintf("Test: %v\n", test.name))
 			}
-
 			sr.Bytes = []byte(fakeHTTPBody)
 			return &sr
 		}
 
 		sc.ReadRegistries(rcs, true, mkFakeStream1)
 		got := sc.Inv[fakeRegName]
-		require.Equal(t, got, test.expectedOutput)
+		expected := test.expectedOutput
+		err := checkEqual(got, expected)
+		checkError(t, err, fmt.Sprintf("Test: %v\n", test.name))
 	}
 }
 
@@ -1261,7 +1375,10 @@ func TestReadGManifestLists(t *testing.T) {
 			_, domain, repoPath := reg.GetTokenKeyDomainRepoPath(gmlc.RegistryContext.Name)
 			fakeHTTPBody, ok := test.input[domain+"/"+repoPath+"/"+string(gmlc.ImageName)]
 			if !ok {
-				require.False(t, ok)
+				checkError(
+					t,
+					fmt.Errorf("could not read fakeHTTPBody"),
+					fmt.Sprintf("Test: %v\n", test.name))
 			}
 
 			sr.Bytes = []byte(fakeHTTPBody)
@@ -1270,7 +1387,9 @@ func TestReadGManifestLists(t *testing.T) {
 
 		sc.ReadGCRManifestLists(mkFakeStream1)
 		got := sc.ParentDigest
-		require.Equal(t, got, test.expectedOutput)
+		expected := test.expectedOutput
+		err := checkEqual(got, expected)
+		checkError(t, err, fmt.Sprintf("Test: %v\n", test.name))
 	}
 }
 
@@ -1296,9 +1415,14 @@ func TestGetTokenKeyDomainRepoPath(t *testing.T) {
 			func(t *testing.T) {
 				tokenKey, domain, repoPath := reg.GetTokenKeyDomainRepoPath(test.input)
 
-				require.Equal(t, tokenKey, test.expected[0])
-				require.Equal(t, domain, test.expected[1])
-				require.Equal(t, repoPath, test.expected[2])
+				err := checkEqual(tokenKey, test.expected[0])
+				checkError(t, err, "(tokenKey)\n")
+
+				err = checkEqual(domain, test.expected[1])
+				checkError(t, err, "(domain)\n")
+
+				err = checkEqual(repoPath, test.expected[2])
+				checkError(t, err, "(repoPath)\n")
 			},
 		)
 	}
@@ -1371,7 +1495,9 @@ func TestSetManipulationsRegistryInventories(t *testing.T) {
 
 	for _, test := range tests {
 		got := test.op(test.input1, test.input2)
-		require.Equal(t, got, test.expectedOutput)
+		expected := test.expectedOutput
+		err := checkEqual(got, expected)
+		checkError(t, err, fmt.Sprintf("Test: %v\n", test.name))
 	}
 }
 
@@ -1457,7 +1583,9 @@ func TestSetManipulationsTags(t *testing.T) {
 
 	for _, test := range tests {
 		got := test.op(test.input1, test.input2)
-		require.Equal(t, got, test.expectedOutput)
+		expected := test.expectedOutput
+		err := checkEqual(got, expected)
+		checkError(t, err, fmt.Sprintf("Test: %v\n", test.name))
 	}
 }
 
@@ -1560,7 +1688,9 @@ func TestSetManipulationsRegInvImageTag(t *testing.T) {
 
 	for _, test := range tests {
 		got := test.op(test.input1, test.input2)
-		require.Equal(t, got, test.expectedOutput)
+		expected := test.expectedOutput
+		err := checkEqual(got, expected)
+		checkError(t, err, fmt.Sprintf("Test: %v\n", test.name))
 	}
 }
 
@@ -1790,19 +1920,25 @@ func TestToPromotionEdges(t *testing.T) {
 	for _, test := range tests {
 		// Finalize Manifests.
 		for i := range test.input {
-			require.Nil(t, test.input[i].Finalize())
+			// Skip errors.
+			// TODO: Why are we not checking errors here?
+			// nolint: errcheck
+			_ = test.input[i].Finalize()
 		}
 
 		got, gotErr := reg.ToPromotionEdges(test.input)
-		if test.expectedInitialErr != nil {
-			require.NotNil(t, gotErr)
-			require.Error(t, gotErr, test.expectedInitialErr)
-		}
-		require.Equal(t, got, test.expectedInitial)
+		err := checkEqual(got, test.expectedInitial)
+		checkError(t, err, fmt.Sprintf("checkError: test: %v (ToPromotionEdges)\n", test.name))
+
+		err = checkEqual(gotErr, test.expectedInitialErr)
+		checkError(t, err, fmt.Sprintf("checkError: test: %v (ToPromotionEdges (error mismatch)\n", test.name))
 
 		got, gotClean := sc.GetPromotionCandidates(got)
-		require.Equal(t, got, test.expectedFiltered)
-		require.Equal(t, gotClean, test.expectedFilteredClean)
+		err = checkEqual(got, test.expectedFiltered)
+		checkError(t, err, fmt.Sprintf("checkError: test: %v (getPromotionCandidates)\n", test.name))
+
+		err = checkEqual(gotClean, test.expectedFilteredClean)
+		checkError(t, err, fmt.Sprintf("checkError: test: %v (getPromotionCandidates (cleanliness mismatch)\n", test.name))
 	}
 }
 
@@ -2022,11 +2158,11 @@ func TestCheckOverlappingEdges(t *testing.T) {
 
 	for _, test := range tests {
 		got, gotErr := reg.CheckOverlappingEdges(test.input)
-		if test.expectedErr != nil {
-			require.NotNil(t, gotErr)
-			require.Error(t, gotErr, test.expectedErr)
-		}
-		require.Equal(t, got, test.expected)
+		err := checkEqual(got, test.expected)
+		checkError(t, err, fmt.Sprintf("checkError: test: %v\n", test.name))
+
+		err = checkEqual(gotErr, test.expectedErr)
+		checkError(t, err, fmt.Sprintf("checkError: test: %v (error mismatch)\n", test.name))
 	}
 }
 
@@ -2077,7 +2213,9 @@ func TestRunChecks(t *testing.T) {
 
 	for _, test := range tests {
 		got := sc.RunChecks(test.checks)
-		require.Equal(t, got, test.expected)
+		err := checkEqual(got, test.expected)
+		checkError(t, err,
+			fmt.Sprintf("checkError: test: %v (Error Tracking)\n", test.name))
 	}
 }
 
@@ -2658,7 +2796,11 @@ func TestPromotion(t *testing.T) {
 		// Reset captured for each test.
 		captured = make(reg.CapturedRequests)
 		srcReg, err := reg.GetSrcRegistry(registries)
-		require.Nil(t, err)
+
+		checkError(t, err,
+			fmt.Sprintf("checkError (srcReg): test: %v\n", test.name))
+		checkError(t, err,
+			fmt.Sprintf("checkError (rd): test: %v\n", test.name))
 
 		test.inputSc.SrcRegistry = srcReg
 
@@ -2670,21 +2812,29 @@ func TestPromotion(t *testing.T) {
 		}
 
 		edges, err := reg.ToPromotionEdges([]reg.Manifest{test.inputM})
-		require.Nil(t, err)
+		eqErr := checkEqual(err, nil)
+		checkError(t, eqErr,
+			fmt.Sprintf("Test: %v: (unexpected error getting promotion edges)\n", test.name),
+		)
 
 		filteredEdges, gotClean := test.inputSc.FilterPromotionEdges(
 			edges,
 			false)
-		require.Equal(t, gotClean, test.expectedFilteredClean)
+		err = checkEqual(gotClean, test.expectedFilteredClean)
+		checkError(t, err,
+			fmt.Sprintf("checkError: test: %v (edge filtering cleanliness mismatch)\n", test.name),
+		)
 
-		require.Nil(t, test.inputSc.Promote(
+		// TODO: Why are we not checking errors here?
+		// nolint: errcheck
+		test.inputSc.Promote(
 			filteredEdges,
 			nopStream,
 			&processRequestFake,
-		),
 		)
 
-		require.Equal(t, captured, test.expectedReqs)
+		err = checkEqual(captured, test.expectedReqs)
+		checkError(t, err, fmt.Sprintf("checkError: test: %v\n", test.name))
 	}
 }
 
@@ -2721,7 +2871,9 @@ func TestExecRequests(t *testing.T) {
 		return nil
 	}
 
-	edges, err := reg.ToPromotionEdges(
+	// TODO: Why are we not checking errors here?
+	// nolint: errcheck
+	edges, _ := reg.ToPromotionEdges(
 		[]reg.Manifest{
 			{
 				Registries: registries,
@@ -2737,7 +2889,6 @@ func TestExecRequests(t *testing.T) {
 			},
 		},
 	)
-	require.Nil(t, err)
 
 	populateRequests := reg.MKPopulateRequestsForPromotionEdges(
 		edges,
@@ -2793,7 +2944,9 @@ func TestExecRequests(t *testing.T) {
 
 	for _, test := range tests {
 		got := sc.ExecRequests(populateRequests, test.processRequestFn)
-		require.Equal(t, got, test.expected)
+		err := checkEqual(got, test.expected)
+		checkError(t, err,
+			fmt.Sprintf("checkError: test: %v (Error Tracking)\n", test.name))
 	}
 }
 
@@ -2942,7 +3095,6 @@ func TestGarbageCollection(t *testing.T) {
 			// TODO: Why are we not checking errors here?
 			// nolint: errcheck
 			pr := req.RequestParams.(reg.PromotionRequest)
-
 			mutex.Lock()
 			captured[pr]++
 			mutex.Unlock()
@@ -2960,12 +3112,13 @@ func TestGarbageCollection(t *testing.T) {
 			return nil
 		}
 		srcReg, err := reg.GetSrcRegistry(registries)
-		require.Nil(t, err)
-
+		checkError(t, err,
+			fmt.Sprintf("checkError (srcReg): test: %v\n", test.name))
 		test.inputSc.SrcRegistry = srcReg
 		test.inputSc.GarbageCollect(test.inputM, nopStream, &processRequestFake)
 
-		require.Equal(t, captured, test.expectedReqs)
+		err = checkEqual(captured, test.expectedReqs)
+		checkError(t, err, fmt.Sprintf("checkError: test: %v\n", test.name))
 	}
 }
 
@@ -3122,12 +3275,15 @@ func TestGarbageCollectionMulti(t *testing.T) {
 		}
 
 		srcReg, err := reg.GetSrcRegistry(registries)
-		require.Nil(t, err)
+		checkError(t, err,
+			fmt.Sprintf("checkError (srcReg): test: %v\n", test.name),
+		)
 
 		test.inputSc.SrcRegistry = srcReg
 		test.inputSc.GarbageCollect(test.inputM, nopStream, &processRequestFake)
 
-		require.Equal(t, captured, test.expectedReqs)
+		err = checkEqual(captured, test.expectedReqs)
+		checkError(t, err, fmt.Sprintf("checkError: test: %v\n", test.name))
 	}
 }
 
@@ -3163,7 +3319,8 @@ func TestSnapshot(t *testing.T) {
 
 	for _, test := range tests {
 		gotYAML := test.input.ToYAML(reg.YamlMarshalingOpts{})
-		require.YAMLEq(t, gotYAML, test.expected)
+		err := checkEqual(gotYAML, test.expected)
+		checkError(t, err, fmt.Sprintf("checkError: test: %v\n", test.name))
 	}
 }
 
@@ -3220,7 +3377,8 @@ func TestParseContainerParts(t *testing.T) {
 			err,
 		}
 
-		require.Equal(t, got, test.expected)
+		errEqual := checkEqual(got, test.expected)
+		checkError(t, errEqual, "checkError: test: shouldBeValid\n")
 	}
 
 	shouldBeInvalid := []struct {
@@ -3291,7 +3449,8 @@ func TestParseContainerParts(t *testing.T) {
 			err,
 		}
 
-		require.Equal(t, got, test.expected)
+		errEqual := checkEqual(got, test.expected)
+		checkError(t, errEqual, "checkError: test: shouldBeInvalid\n")
 	}
 }
 
@@ -3399,10 +3558,15 @@ func TestMatch(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		require.Nil(t, test.gcrPayload.PopulateExtraFields())
+		// TODO: Why are we not checking errors here?
+		// nolint: errcheck
+		test.gcrPayload.PopulateExtraFields()
 		got := test.gcrPayload.Match(&test.mfest)
 
-		require.Equal(t, got, test.expectedMatch)
+		errEqual := checkEqual(got, test.expectedMatch)
+		checkError(t, errEqual,
+			fmt.Sprintf("checkError: test %q: shouldBeValid\n", test.name),
+		)
 	}
 }
 
@@ -3472,10 +3636,18 @@ func TestPopulateExtraFields(t *testing.T) {
 	}
 
 	for _, test := range shouldBeValid {
-		require.Nil(t, test.input.PopulateExtraFields())
+		err := test.input.PopulateExtraFields()
+
+		eqErr := checkEqual(err, nil)
+		checkError(t, eqErr,
+			fmt.Sprintf("checkError: %v: shouldBeValid\n", test.name),
+		)
 
 		got := test.input
-		require.Equal(t, got, test.expected)
+		errEqual := checkEqual(got, test.expected)
+		checkError(t, errEqual,
+			fmt.Sprintf("checkError: %v: shouldBeValid\n", test.name),
+		)
 	}
 
 	shouldBeInvalid := []struct {
@@ -3510,15 +3682,17 @@ func TestPopulateExtraFields(t *testing.T) {
 	}
 
 	for _, test := range shouldBeInvalid {
-		err := test.input.PopulateExtraFields()
-		require.NotNil(t, err)
-		require.Error(t, err, test.expected)
+		got := test.input.PopulateExtraFields()
+		eqErr := checkEqual(got, test.expected)
+		checkError(t, eqErr,
+			fmt.Sprintf("checkError: %v: shouldInvalid\n", test.name),
+		)
 	}
 }
 
 // Helper functions.
 
-func getTestPath(testName string, paths ...string) string {
+func bazelTestPath(testName string, paths ...string) string {
 	prefix := []string{
 		os.Getenv("PWD"),
 		"inventory_test",
