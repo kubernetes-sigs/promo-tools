@@ -40,8 +40,18 @@ func (rc *RequestCounter) log() {
 	// Log the number of requests found.
 	msg := fmt.Sprintf("Since %s there have been %d requests to GCR.", counter.since.Format("01-02-2006 15:04:05"), counter.requests)
 	logrus.Debug(msg)
+	// Warn of GCR scaling when requests exceed quota.
+	rc.warn()
 	// Reset the counter.
 	rc.reset()
+}
+
+// warn only logs a warning if the number of requests has exceeded the quota.
+func (rc *RequestCounter) warn() {
+	if rc.requests > rc.quota {
+		msg := fmt.Sprintf("The GCR quota of \"%d requests per %d min\" has been exceeded.", quotaLimit, measurementWindow/10)
+		logrus.Warn(msg)
+	}
 }
 
 // reset clears the number of requests and stamps the object with the current time of reset.
