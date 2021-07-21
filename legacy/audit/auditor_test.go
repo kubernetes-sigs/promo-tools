@@ -22,9 +22,10 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"reflect"
 	"regexp"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 
 	"sigs.k8s.io/k8s-container-image-promoter/legacy/audit"
 	reg "sigs.k8s.io/k8s-container-image-promoter/legacy/dockerregistry"
@@ -33,41 +34,6 @@ import (
 	"sigs.k8s.io/k8s-container-image-promoter/legacy/report"
 	"sigs.k8s.io/k8s-container-image-promoter/legacy/stream"
 )
-
-func checkMatch(haystack []byte, re *regexp.Regexp) error {
-	if !re.Match(haystack) {
-		return fmt.Errorf(
-			"===BEGIN-MESSAGE===\nCOULD NOT FIND MATCH FOR %q IN\n%s\n===END-MESSAGE===",
-			re.String(),
-			haystack)
-	}
-	return nil
-}
-
-func checkEqual(got, expected interface{}) error {
-	if !reflect.DeepEqual(got, expected) {
-		return fmt.Errorf(
-			`<<<<<<< got (type %T)
-%v
-=======
-%v
->>>>>>> expected (type %T)`,
-			got,
-			got,
-			expected,
-			expected)
-	}
-	return nil
-}
-
-func checkError(t *testing.T, err error, msg string) {
-	if err != nil {
-		fmt.Printf("\n%v", msg)
-		fmt.Println(err)
-		fmt.Println()
-		t.Fail()
-	}
-}
 
 func TestParsePubSubMessageBody(t *testing.T) {
 	toPsm := func(s string) audit.PubSubMessage {
@@ -111,8 +77,7 @@ func TestParsePubSubMessageBody(t *testing.T) {
 		}
 
 		_, gotErr := audit.ParsePubSubMessageBody(psmBytes)
-		errEqual := checkEqual(gotErr, nil)
-		checkError(t, errEqual, fmt.Sprintf("checkError: test: %q: shouldBeValid\n", test.name))
+		require.Nil(t, gotErr)
 	}
 
 	shouldBeInvalid := []struct {
@@ -141,8 +106,7 @@ func TestParsePubSubMessageBody(t *testing.T) {
 		}
 
 		_, gotErr := audit.ParsePubSubMessageBody(psmBytes)
-		errEqual := checkEqual(gotErr, test.expectedErr)
-		checkError(t, errEqual, fmt.Sprintf("checkError: test: %q: shouldBeInvalid\n", test.name))
+		require.Equal(t, test.expectedErr, gotErr)
 	}
 }
 
@@ -161,9 +125,8 @@ func TestValidatePayload(t *testing.T) {
 
 	for _, input := range shouldBeValid {
 		input := input
-		gotErr := audit.ValidatePayload(&input)
-		errEqual := checkEqual(gotErr, nil)
-		checkError(t, errEqual, "checkError: test: shouldBeValid\n")
+		err := audit.ValidatePayload(&input)
+		require.Nil(t, err)
 	}
 
 	shouldBeInValid := []struct {
@@ -207,9 +170,8 @@ func TestValidatePayload(t *testing.T) {
 	}
 
 	for _, test := range shouldBeInValid {
-		gotErr := audit.ValidatePayload(&test.input)
-		errEqual := checkEqual(gotErr, test.expected)
-		checkError(t, errEqual, "checkError: test: shouldBeInValid\n")
+		err := audit.ValidatePayload(&test.input)
+		require.Equal(t, test.expected, err)
 	}
 }
 
@@ -865,7 +827,7 @@ func TestAudit(t *testing.T) {
 		// Create a new Request to pass to the handler, which incorporates the
 		// GCRPubSubPayload.
 		payload, err := json.Marshal(test.payload)
-		checkError(t, err, "checkError: test: shouldBeValid (payload)\n")
+		require.Nil(t, err)
 
 		psm := audit.PubSubMessage{
 			Message: audit.PubSubMessageInner{
@@ -873,10 +835,10 @@ func TestAudit(t *testing.T) {
 				ID:   "1"},
 			Subscription: "2"}
 		b, err := json.Marshal(psm)
-		checkError(t, err, "checkError: test: shouldBeValid (psm)\n")
+		require.Nil(t, err)
 
 		r, err := http.NewRequest("POST", "/", bytes.NewBuffer(b))
-		checkError(t, err, "checkError: test: shouldBeValid (NewRequest)\n")
+		require.Nil(t, err)
 
 		// test is used to pin the "test" variable from the outer "range" scope
 		// (see scopelint) into the fakeReadRepo (in a sense it ensures that
@@ -890,13 +852,7 @@ func TestAudit(t *testing.T) {
 			key := fmt.Sprintf("%s/%s", domain, repoPath)
 
 			fakeHTTPBody, ok := test.readRepo[key]
-			if !ok {
-				checkError(
-					t,
-					fmt.Errorf("could not read fakeHTTPBody"),
-					fmt.Sprintf("Test: %v\n", test.name))
-			}
-
+			require.True(t, ok)
 			sr.Bytes = []byte(fakeHTTPBody)
 			return &sr
 		}
@@ -911,12 +867,7 @@ func TestAudit(t *testing.T) {
 				gmlc.ImageName,
 				gmlc.Digest)
 			fakeHTTPBody, ok := test.readManifestList[key]
-			if !ok {
-				checkError(
-					t,
-					fmt.Errorf("could not read fakeHTTPBody"),
-					fmt.Sprintf("Test: %v\n", test.name))
-			}
+			require.True(t, ok)
 			sr.Bytes = []byte(fakeHTTPBody)
 			return &sr
 		}
@@ -950,45 +901,37 @@ func TestAudit(t *testing.T) {
 		if len(test.expectedPatterns.report) > 0 {
 			for _, pattern := range test.expectedPatterns.report {
 				re := regexp.MustCompile(pattern)
-				err := checkMatch(reportBuffer.Bytes(), re)
-				checkError(t, err, fmt.Sprintf("test: %s (reportBuffer)\n", test.name))
+				require.Regexp(t, re, reportBuffer.String())
 			}
 		} else {
-			errEqual := checkEqual(reportBuffer.String(), "")
-			checkError(t, errEqual, fmt.Sprintf("test: %s (reportBuffer)\n", test.name))
+			require.Equal(t, "", reportBuffer.String())
 		}
 
 		if len(test.expectedPatterns.info) > 0 {
 			for _, pattern := range test.expectedPatterns.info {
 				re := regexp.MustCompile(pattern)
-				err := checkMatch(infoLogBuffer.Bytes(), re)
-				checkError(t, err, fmt.Sprintf("test: %s (infoLogBuffer)\n", test.name))
+				require.Regexp(t, re, infoLogBuffer.String())
 			}
 		} else {
-			errEqual := checkEqual(infoLogBuffer.String(), "")
-			checkError(t, errEqual, fmt.Sprintf("test: %s (infoLogBuffer)\n", test.name))
+			require.Equal(t, "", infoLogBuffer.String())
 		}
 
 		if len(test.expectedPatterns.error) > 0 {
 			for _, pattern := range test.expectedPatterns.error {
 				re := regexp.MustCompile(pattern)
-				err := checkMatch(errorLogBuffer.Bytes(), re)
-				checkError(t, err, fmt.Sprintf("test: %s (errorLogBuffer)\n", test.name))
+				require.Regexp(t, re, errorLogBuffer.String())
 			}
 		} else {
-			errEqual := checkEqual(errorLogBuffer.String(), "")
-			checkError(t, errEqual, fmt.Sprintf("test: %s (errorLogBuffer)\n", test.name))
+			require.Equal(t, "", errorLogBuffer.String())
 		}
 
 		if len(test.expectedPatterns.alert) > 0 {
 			for _, pattern := range test.expectedPatterns.alert {
 				re := regexp.MustCompile(pattern)
-				err := checkMatch(alertLogBuffer.Bytes(), re)
-				checkError(t, err, fmt.Sprintf("test: %s (alertLogBuffer)\n", test.name))
+				require.Regexp(t, re, alertLogBuffer.String())
 			}
 		} else {
-			errEqual := checkEqual(alertLogBuffer.String(), "")
-			checkError(t, errEqual, fmt.Sprintf("test: %s (alertLogBuffer)\n", test.name))
+			require.Equal(t, "", alertLogBuffer.String())
 		}
 	}
 }
