@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"reflect"
 	"sync"
 	"testing"
 
@@ -32,31 +31,6 @@ import (
 	"sigs.k8s.io/k8s-container-image-promoter/legacy/json"
 	"sigs.k8s.io/k8s-container-image-promoter/legacy/stream"
 )
-
-func checkEqual(got, expected interface{}) error {
-	if !reflect.DeepEqual(got, expected) {
-		return fmt.Errorf(
-			`<<<<<<< got (type %T)
-%v
-=======
-%v
->>>>>>> expected (type %T)`,
-			got,
-			got,
-			expected,
-			expected)
-	}
-	return nil
-}
-
-func checkError(t *testing.T, err error, msg string) {
-	if err != nil {
-		fmt.Printf("\n%v", msg)
-		fmt.Println(err)
-		fmt.Println()
-		t.Fail()
-	}
-}
 
 type ParseJSONStreamResult struct {
 	jsons json.Objects
