@@ -29,7 +29,7 @@ import (
 )
 
 func TestFindManifest(t *testing.T) {
-	pwd := getTestPath("TestFindManifest")
+	pwd := bazelTestPath("TestFindManifest")
 	srcRC := reg.RegistryContext{
 		Name:           "gcr.io/foo-staging",
 		ServiceAccount: "sa@robot.com",
@@ -103,19 +103,24 @@ func TestFindManifest(t *testing.T) {
 
 	for _, test := range tests {
 		gotManifest, gotErr := reg.FindManifest(&test.input)
-		if test.expectedErr != nil {
-			require.NotNil(t, gotErr)
-			require.Error(t, gotErr, test.expectedErr.Error())
-		} else {
-			require.Nil(t, gotErr)
-		}
 
 		// Clean up gotManifest for purposes of comparing against expected
 		// results. Namely, clear out the SrcRegistry pointer because this will
 		// always be different.
 		gotManifest.SrcRegistry = nil
 
-		require.Equal(t, gotManifest, test.expectedManifest)
+		require.Equal(t, test.expectedManifest, gotManifest)
+
+		var gotErrStr string
+		var expectedErrStr string
+		if gotErr != nil {
+			gotErrStr = gotErr.Error()
+		}
+		if test.expectedErr != nil {
+			expectedErrStr = test.expectedErr.Error()
+		}
+
+		require.Equal(t, expectedErrStr, gotErrStr)
 	}
 }
 
@@ -292,13 +297,13 @@ func TestApplyFilters(t *testing.T) {
 
 	for _, test := range tests {
 		gotRii, gotErr := reg.ApplyFilters(&test.inputOptions, test.inputRii)
-		if test.expectedErr != nil {
-			require.NotNil(t, gotErr)
-			require.Error(t, gotErr, test.expectedErr.Error())
-		} else {
-			require.Nil(t, gotErr)
-		}
 
-		require.Equal(t, gotRii, test.expectedRii)
+		require.Equal(t, test.expectedRii, gotRii)
+
+		if test.expectedErr != nil {
+			require.Equal(t, test.expectedErr.Error(), gotErr.Error())
+		} else {
+			require.Equal(t, test.expectedErr, gotErr)
+		}
 	}
 }

@@ -181,14 +181,14 @@ func TestImageRemovalCheck(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		masterEdges, err := reg.ToPromotionEdges(test.masterManifests)
-		require.Nil(t, err)
-
-		pullEdges, err := reg.ToPromotionEdges(test.pullManifests)
-		require.Nil(t, err)
-
+		// TODO: Why are we not checking errors here?
+		// nolint: errcheck
+		masterEdges, _ := reg.ToPromotionEdges(test.masterManifests)
+		// TODO: Why are we not checking errors here?
+		// nolint: errcheck
+		pullEdges, _ := reg.ToPromotionEdges(test.pullManifests)
 		got := test.check.Compare(masterEdges, pullEdges)
-		require.Equal(t, got, test.expected)
+		require.Equal(t, test.expected, got)
 	}
 }
 
@@ -336,10 +336,10 @@ func TestImageSizeCheck(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		var err error
-		test.check.PullEdges, err = reg.ToPromotionEdges(test.manifests)
-		require.Nil(t, err)
-		require.Len(t, test.check.PullEdges, len(test.imageSizes))
+		// TODO: Why are we not checking errors here?
+		// nolint: errcheck
+		test.check.PullEdges, _ = reg.ToPromotionEdges(test.manifests)
+		require.Equal(t, len(test.imageSizes), len(test.check.PullEdges))
 
 		for edge := range test.check.PullEdges {
 			test.check.DigestImageSize[edge.Digest] =
@@ -347,7 +347,7 @@ func TestImageSizeCheck(t *testing.T) {
 		}
 
 		got := test.check.Run()
-		require.Equal(t, got, test.expected)
+		require.Equal(t, test.expected, got)
 	}
 }
 
@@ -567,8 +567,7 @@ func TestImageVulnCheck(t *testing.T) {
 			test.severityThreshold,
 			mkVulnProducerFake(test.vulnerabilities),
 		)
-
 		got := check.Run()
-		require.Equal(t, got, test.expected)
+		require.Equal(t, test.expected, got)
 	}
 }
