@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"golang.org/x/xerrors"
 
 	reg "sigs.k8s.io/k8s-container-image-promoter/legacy/dockerregistry"
@@ -108,10 +109,7 @@ func TestFindManifest(t *testing.T) {
 		// always be different.
 		gotManifest.SrcRegistry = nil
 
-		eqErr := checkEqual(gotManifest, test.expectedManifest)
-		checkError(t, eqErr,
-			fmt.Sprintf("Test: %q (unexpected manifest)\n", test.name),
-		)
+		require.Equal(t, test.expectedManifest, gotManifest)
 
 		var gotErrStr string
 		var expectedErrStr string
@@ -122,10 +120,7 @@ func TestFindManifest(t *testing.T) {
 			expectedErrStr = test.expectedErr.Error()
 		}
 
-		eqErr = checkEqual(gotErrStr, expectedErrStr)
-		checkError(t, eqErr,
-			fmt.Sprintf("Test: %q (unexpected error)\n", test.name),
-		)
+		require.Equal(t, expectedErrStr, gotErrStr)
 	}
 }
 
@@ -303,20 +298,12 @@ func TestApplyFilters(t *testing.T) {
 	for _, test := range tests {
 		gotRii, gotErr := reg.ApplyFilters(&test.inputOptions, test.inputRii)
 
-		eqErr := checkEqual(gotRii, test.expectedRii)
-		checkError(
-			t,
-			eqErr,
-			fmt.Sprintf("Test: %q (unexpected filtered RegInvImage)\n", test.name))
+		require.Equal(t, test.expectedRii, gotRii)
 
 		if test.expectedErr != nil {
-			eqErr = checkEqual(gotErr.Error(), test.expectedErr.Error())
+			require.Equal(t, test.expectedErr.Error(), gotErr.Error())
 		} else {
-			eqErr = checkEqual(gotErr, test.expectedErr)
+			require.Equal(t, test.expectedErr, gotErr)
 		}
-		checkError(
-			t,
-			eqErr,
-			fmt.Sprintf("Test: %q (unexpected error)\n", test.name))
 	}
 }
