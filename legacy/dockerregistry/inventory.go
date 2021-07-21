@@ -40,6 +40,7 @@ import (
 
 	"sigs.k8s.io/k8s-container-image-promoter/legacy/gcloud"
 	cipJson "sigs.k8s.io/k8s-container-image-promoter/legacy/json"
+	"sigs.k8s.io/k8s-container-image-promoter/legacy/reqcounter"
 	"sigs.k8s.io/k8s-container-image-promoter/legacy/stream"
 )
 
@@ -1593,6 +1594,9 @@ func MkReadRepositoryCmdReal(
 ) stream.Producer {
 	var sh stream.HTTP
 
+	// Log the HTTP request to GCR.
+	reqcounter.Increment()
+
 	tokenKey, domain, repoPath := GetTokenKeyDomainRepoPath(rc.Name)
 
 	httpReq, err := http.NewRequest(
@@ -1630,6 +1634,9 @@ func MkReadRepositoryCmdReal(
 // error) tuple instead.
 func MkReadManifestListCmdReal(sc *SyncContext, gmlc *GCRManifestListContext) stream.Producer {
 	var sh stream.HTTP
+
+	// Log the HTTP request to GCR.
+	reqcounter.Increment()
 
 	tokenKey, domain, repoPath := GetTokenKeyDomainRepoPath(gmlc.RegistryContext.Name)
 
