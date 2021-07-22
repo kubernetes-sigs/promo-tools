@@ -10,6 +10,8 @@ WORKSPACE
 
 # downloaded and built binaries
 bin
+# tmp files
+tmp/
 
 # vscode settings
 .vscode
