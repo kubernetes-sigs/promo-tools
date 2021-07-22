@@ -28,7 +28,7 @@ printUsage() {
     >&2 echo "Usage: $0 (build | run) path/to/code.go [args...]"
 }
 
-if [[ $# < 2 ]]; then
+if [[ $# -lt 2 ]]; then
     >&2 echo "ERROR: Invalid number of arguments!"
     printUsage
     exit 1
@@ -46,12 +46,11 @@ if git_status=$(git status --porcelain --untracked=no 2>/dev/null) && [[ -z "${g
 git_tree_state=clean
 fi
 
-go $1 -v -ldflags "-s -w \
+go "$1" -v -ldflags "-s -w \
     -X $pkg.buildDate=$(date -u +'%Y-%m-%dT%H:%M:%SZ') \
     -X $pkg.gitCommit=$(git rev-parse HEAD 2>/dev/null || echo unknown) \
     -X $pkg.gitTreeState=$git_tree_state \
     -X $pkg.gitVersion=$(git describe --tags --abbrev=0 || echo unknown)" \
-    "${@:2}" \
-    || return 1
+    "${@:2}"
 
 echo "Finished running $tool"
