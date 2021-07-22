@@ -40,6 +40,7 @@ import (
 
 	"sigs.k8s.io/k8s-container-image-promoter/legacy/gcloud"
 	cipJson "sigs.k8s.io/k8s-container-image-promoter/legacy/json"
+	"sigs.k8s.io/k8s-container-image-promoter/legacy/reqcounter"
 	"sigs.k8s.io/k8s-container-image-promoter/legacy/stream"
 )
 
@@ -1715,6 +1716,9 @@ func (sc *SyncContext) ExecRequests(
 			} else {
 				logrus.Infof("Request %v: OK\n", reqRes.Context.RequestParams)
 			}
+
+			// Log the HTTP request to GCR.
+			reqcounter.Increment()
 
 			wg.Add(-1)
 		}
