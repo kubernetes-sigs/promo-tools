@@ -17,11 +17,13 @@ limitations under the License.
 package reqcounter_test
 
 import (
+	"fmt"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
+	ft "sigs.k8s.io/k8s-container-image-promoter/legacy/faketime"
 	rc "sigs.k8s.io/k8s-container-image-promoter/legacy/reqcounter"
 )
 
@@ -123,4 +125,49 @@ func TestRequestCounterIncrement(t *testing.T) {
 	requestCounter.Increment()
 	// Ensure the request counter was incremented.
 	require.EqualValues(t, &expected, &requestCounter, "The request counter failed to increment its request field.")
+}
+
+func TestLog(t *testing.T) {
+	// Create multiple request counters with unique intervals.
+	requestCounters := []rc.RequestCounter{
+		NewRequestCounter(0),
+		NewRequestCounter(9),
+		NewRequestCounter(2839),
+	}
+	requestCounters[0].Interval = time.Second * 2
+	requestCounters[1].Interval = time.Second
+	requestCounters[2].Interval = time.Hour
+	// Load request counters into network monitor.
+	netMonitor := &rc.NetworkMonitor{
+		RequestCounters: rc.RequestCounters{
+			&requestCounters[0],
+			&requestCounters[1],
+			&requestCounters[2],
+		},
+	}
+	// Mock the Debug function, capturing each statement.
+	logged := []string{}
+	rc.Debug = func(args ...interface{}) {
+		logged = append(logged, fmt.Sprint(args[0]))
+	}
+	// Mock the global clock with fake time.
+	fakeTime := &ft.FakeTime{}
+	timeStep := time.Second * 2
+	rc.Clock = fakeTime
+	// Create expected logging messages.
+	start, end := time.Unix(0, 0), time.Unix(0, timeStep.Nanoseconds())
+	expected := []string{
+		fmt.Sprintf("From %s to %s [%d min] there have been %d requests to GCR.", start.Format(rc.TimestampFormat), end.Format(rc.TimestampFormat), requestCounters[1].Interval/time.Minute, requestCounters[1].Requests),
+		fmt.Sprintf("From %s to %s [%d min] there have been %d requests to GCR.", start.Format(rc.TimestampFormat), end.Format(rc.TimestampFormat), requestCounters[1].Interval/time.Minute, requestCounters[1].Requests),
+		fmt.Sprintf("From %s to %s [%d min] there have been %d requests to GCR.", start.Format(rc.TimestampFormat), end.Format(rc.TimestampFormat), requestCounters[0].Interval/time.Minute, requestCounters[0].Requests),
+	}
+	// Log all request counters.
+	netMonitor.Log()
+	// Move fake time forward.
+	fakeTime.Advance(timeStep)
+
+	time.Sleep(time.Second) // *********** COMMENT ME OUT
+
+	// Ensure the correct counters have been logged.
+	require.EqualValues(t, expected, logged, "The correct request counters did not log correctly.")
 }
