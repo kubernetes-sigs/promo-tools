@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+	tw "sigs.k8s.io/k8s-container-image-promoter/legacy/timewrapper"
 )
 
 // RequestCounter records the number of HTTP requests to GCR.
@@ -48,7 +49,7 @@ func (rc *RequestCounter) Flush() {
 	defer rc.Mutex.Unlock()
 
 	// Log the number of requests within this measurement window.
-	msg := fmt.Sprintf("From %s to %s [%d min] there have been %d requests to GCR.", rc.Since.Format(timestampFormat), time.Now().Format(timestampFormat), rc.Interval/time.Minute, rc.Requests)
+	msg := fmt.Sprintf("From %s to %s [%d min] there have been %d requests to GCR.", rc.Since.Format(TimestampFormat), Clock.Now().Format(TimestampFormat), rc.Interval/time.Minute, rc.Requests)
 	Debug(msg)
 
 	// Reset the request counter.
@@ -60,14 +61,14 @@ func (rc *RequestCounter) Flush() {
 // if it must be reset.
 func (rc *RequestCounter) reset() {
 	rc.Requests = 0
-	rc.Since = time.Now()
+	rc.Since = Clock.Now()
 }
 
 // watch continuously logs the request counter at the specified intervals.
 func (rc *RequestCounter) watch() {
 	go func() {
 		for {
-			Sleep(rc.Interval)
+			Clock.Sleep(rc.Interval)
 			rc.Flush()
 		}
 	}()
@@ -104,8 +105,8 @@ const (
 	// requests counters to perfectly line up with the actual GCR quota.
 	// Source: https://cloud.google.com/container-registry/quotas
 	MeasurementWindow time.Duration = time.Minute * 10
-	// timestampFormat specifies the syntax for logging time stamps of request counters.
-	timestampFormat string = "2006-01-02 15:04:05"
+	// TimestampFormat specifies the syntax for logging time stamps of request counters.
+	TimestampFormat string = "2006-01-02 15:04:05"
 )
 
 var (
@@ -116,8 +117,8 @@ var (
 	NetMonitor *NetworkMonitor
 	// Debug is defined to simplify testing of logrus.Debug calls.
 	Debug func(args ...interface{}) = logrus.Debug
-	// Sleep is defined to allow mocking of the time.Sleep function in tests.
-	Sleep func(d time.Duration) = time.Sleep
+	// Clock is defined to allow mocking of time functions.
+	Clock tw.Time = tw.RealTime{}
 )
 
 // Init allows request counting to begin.
@@ -129,7 +130,7 @@ func Init() {
 	requestCounter := &RequestCounter{
 		Mutex:    sync.Mutex{},
 		Requests: 0,
-		Since:    time.Now(),
+		Since:    Clock.Now(),
 		Interval: MeasurementWindow,
 	}
 
