@@ -17,12 +17,14 @@ limitations under the License.
 package reqcounter_test
 
 import (
+	"fmt"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 	rc "sigs.k8s.io/k8s-container-image-promoter/legacy/reqcounter"
+	tw "sigs.k8s.io/k8s-container-image-promoter/legacy/timewrapper"
 )
 
 // defaultTime should be used as a timestamp for all request counters.
@@ -123,4 +125,58 @@ func TestRequestCounterIncrement(t *testing.T) {
 	requestCounter.Increment()
 	// Ensure the request counter was incremented.
 	require.EqualValues(t, &expected, &requestCounter, "The request counter failed to increment its request field.")
+}
+
+func TestLog(t *testing.T) {
+	// Create multiple request counters with unique number of starting requests. These unique requests will
+	// be the way to differentiate between request counter log statements.
+	requestCounters := []rc.RequestCounter{
+		NewRequestCounter(21),
+		NewRequestCounter(9),
+		NewRequestCounter(2839),
+	}
+	netMonitor := &rc.NetworkMonitor{
+		RequestCounters: rc.RequestCounters{
+			&requestCounters[0],
+			&requestCounters[1],
+			&requestCounters[2],
+		},
+	}
+	// Mock time with a fake global time that remains constant. This avoids testing the order in which
+	// request counters are logged. For simplicity, additional tests may check whether a single request
+	// counter calls Debug() the expected number of times as fake time advances forward. This circumvents
+	// the task of concurrently communicating time-steps with multiple goroutines, demanding a
+	// complicated sleep and time-step synchronization.
+	rc.Clock = tw.FakeTime{Time: defaultTime}
+	// Record the unique logging statements from each request counter.
+	// Block goroutines after reset(), where all logging messages will be identical.
+	logged := map[string]bool{}
+	stableTime := defaultTime.Format(rc.TimestampFormat)
+	// Craft the expected log which will block.
+	resetLog := fmt.Sprintf("From %s to %s [0 min] there have been 0 requests to GCR.", stableTime, stableTime)
+	// Use a wait group to sure each request counter has finished recording their debug statements.
+	wg := sync.WaitGroup{}
+	wg.Add(len(requestCounters))
+	// Mock the logrus.Debug function.
+	rc.Debug = func(args ...interface{}) {
+		msg := fmt.Sprint(args[0])
+		if resetLog == msg {
+			// Block the current goroutine.
+			select {}
+		}
+		logged[msg] = true
+		wg.Done()
+	}
+	// Define the expected logs.
+	expected := map[string]bool{
+		fmt.Sprintf("From %s to %s [%d min] there have been %d requests to GCR.", stableTime, stableTime, requestCounters[0].Interval/time.Minute, requestCounters[0].Requests): true,
+		fmt.Sprintf("From %s to %s [%d min] there have been %d requests to GCR.", stableTime, stableTime, requestCounters[1].Interval/time.Minute, requestCounters[1].Requests): true,
+		fmt.Sprintf("From %s to %s [%d min] there have been %d requests to GCR.", stableTime, stableTime, requestCounters[2].Interval/time.Minute, requestCounters[2].Requests): true,
+	}
+	// Log all request counters.
+	netMonitor.Log()
+	// Wait for all goroutines to finish their Debug calls.
+	wg.Wait()
+	// Ensure all request counters were logged and formed correctly.
+	require.EqualValues(t, expected, logged, "Request counter(s) did not log correctly.")
 }
