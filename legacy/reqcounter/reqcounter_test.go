@@ -17,12 +17,14 @@ limitations under the License.
 package reqcounter_test
 
 import (
+	"fmt"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 	rc "sigs.k8s.io/k8s-container-image-promoter/legacy/reqcounter"
+	tw "sigs.k8s.io/k8s-container-image-promoter/legacy/timewrapper"
 )
 
 // defaultTime should be used as a timestamp for all request counters.
@@ -123,4 +125,50 @@ func TestRequestCounterIncrement(t *testing.T) {
 	requestCounter.Increment()
 	// Ensure the request counter was incremented.
 	require.EqualValues(t, &expected, &requestCounter, "The request counter failed to increment its request field.")
+}
+
+func TestWatch(t *testing.T) {
+	// Create a simple request counter which logs in 1sec intervals.
+	requestCounter := NewRequestCounter(0)
+	// Collect all logging statements.
+	logs := []string{}
+	// Mock logrus.Debug
+	rc.Debug = func(args ...interface{}) {
+		msg := fmt.Sprint(args[0])
+		logs = append(logs, msg)
+	}
+	// Mock time.
+	fakeTime := tw.NewFakeTime(defaultTime)
+	rc.Clock = &fakeTime
+	// Begin logging.
+	requestCounter.Watch()
+	// Make sure the logger is actually blocked at the Sleep function.
+	fakeTime.WaitForSleeper()
+	// Increment the request counter.
+	requestCounter.Increment()
+	// Advance time forward.
+	fakeTime.Advance(time.Second)
+	// Define expected logs.
+	expected := []string{
+		"From 2006-01-02 15:04:05 to 2006-01-02 15:04:06 [0 min] there have been 1 requests to GCR.",
+	}
+	// Ensure the expected logs were found.
+	require.EqualValues(t, expected, logs, "The request counter failed to produce the correct logs.")
+
+	// Wipe the logs.
+	logs = []string{}
+	// Record two fake GCR requests.
+	requestCounter.Increment()
+	requestCounter.Increment()
+	// Advance time forward.
+	fakeTime.Advance(time.Second*4 + time.Microsecond)
+	// Define expected logs.
+	expected = []string{
+		"From 2006-01-02 15:04:06 to 2006-01-02 15:04:07 [0 min] there have been 2 requests to GCR.",
+		"From 2006-01-02 15:04:07 to 2006-01-02 15:04:08 [0 min] there have been 0 requests to GCR.",
+		"From 2006-01-02 15:04:08 to 2006-01-02 15:04:09 [0 min] there have been 0 requests to GCR.",
+		"From 2006-01-02 15:04:09 to 2006-01-02 15:04:10 [0 min] there have been 0 requests to GCR.",
+	}
+	// Ensure the expected logs were found.
+	require.EqualValues(t, expected, logs, "The request counter failed to produce the correct logs.")
 }

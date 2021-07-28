@@ -64,8 +64,8 @@ func (rc *RequestCounter) reset() {
 	rc.Since = Clock.Now()
 }
 
-// watch continuously logs the request counter at the specified intervals.
-func (rc *RequestCounter) watch() {
+// Watch continuously logs the request counter at the specified intervals.
+func (rc *RequestCounter) Watch() {
 	go func() {
 		for {
 			Clock.Sleep(rc.Interval)
@@ -92,7 +92,7 @@ func (nm *NetworkMonitor) increment() {
 // Log begins logging each request counter at their specified intervals.
 func (nm *NetworkMonitor) Log() {
 	for _, rc := range nm.RequestCounters {
-		rc.watch()
+		rc.Watch()
 	}
 }
 
