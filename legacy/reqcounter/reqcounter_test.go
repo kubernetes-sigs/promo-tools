@@ -17,12 +17,14 @@ limitations under the License.
 package reqcounter_test
 
 import (
+	"fmt"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 	rc "sigs.k8s.io/k8s-container-image-promoter/legacy/reqcounter"
+	tw "sigs.k8s.io/k8s-container-image-promoter/legacy/timewrapper"
 )
 
 // defaultTime should be used as a timestamp for all request counters.
@@ -123,4 +125,36 @@ func TestRequestCounterIncrement(t *testing.T) {
 	requestCounter.Increment()
 	// Ensure the request counter was incremented.
 	require.EqualValues(t, &expected, &requestCounter, "The request counter failed to increment its request field.")
+}
+
+func TestCycle(t *testing.T) {
+	// Create a simple request counter expected to log every 10 minutes.
+	requestCounter := NewRequestCounter(82)
+	requestCounter.Interval = time.Minute * 10
+	// Collect logging statements.
+	logs := []string{}
+	// Mock logrus.Debug calls.
+	rc.Debug = func(args ...interface{}) {
+		logs = append(logs, fmt.Sprint(args[0]))
+	}
+	// Mock time.
+	fakeTime := tw.FakeTime{
+		Time: defaultTime,
+	}
+	rc.Clock = &fakeTime
+	// Determine the expected logs.
+	expected := []string{
+		"From 2006-01-02 15:04:05 to 2006-01-02 15:14:05 [10 min] there have been 82 requests to GCR.",
+		"From 2006-01-02 15:14:05 to 2006-01-02 15:24:05 [10 min] there have been 0 requests to GCR.",
+		"From 2006-01-02 15:24:05 to 2006-01-02 15:34:05 [10 min] there have been 0 requests to GCR.",
+		"From 2006-01-02 15:34:05 to 2006-01-02 15:44:05 [10 min] there have been 0 requests to GCR.",
+		"From 2006-01-02 15:44:05 to 2006-01-02 15:54:05 [10 min] there have been 0 requests to GCR.",
+	}
+	// Repeatedly run sleep/log cycles.
+	numCycles := len(expected)
+	for i := 0; i < numCycles; i++ {
+		requestCounter.Cycle()
+	}
+	// Ensure the correct logs were produced.
+	require.EqualValues(t, expected, logs, "The request counter produced malformed logs.")
 }

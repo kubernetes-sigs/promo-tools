@@ -41,7 +41,9 @@ type FakeTime struct {
 }
 
 // Now returns the global fake time.
-func (ft FakeTime) Now() time.Time { return ft.Time }
+func (ft *FakeTime) Now() time.Time { return ft.Time }
 
-// Sleep does not block the current goroutine.
-func (ft FakeTime) Sleep(d time.Duration) {}
+// Sleep adds the given duration to the global fake time.
+func (ft *FakeTime) Sleep(d time.Duration) {
+	ft.Time = ft.Time.Add(d)
+}
