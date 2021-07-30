@@ -26,13 +26,12 @@ import (
 )
 
 // RequestCounter records the number of HTTP requests to GCR.
-// TODO: @tylerferrara in the future, add a field 'persistent bool' to determine if
-// the request counter should ever reset.
 type RequestCounter struct {
-	Mutex    sync.Mutex    // Lock to prevent race-conditions with concurrent processes.
-	Requests uint64        // Number of HTTP requests since recording started.
-	Since    time.Time     // When the current request counter began recording requests.
-	Interval time.Duration // The duration of time between each log.
+	Mutex      sync.Mutex    // Lock to prevent race-conditions with concurrent processes.
+	Requests   uint64        // Number of HTTP requests since recording started.
+	Since      time.Time     // When the current request counter began recording requests.
+	Interval   time.Duration // The duration of time between each log.
+	Resettable bool          // Reset after logging.
 }
 
 // increment adds 1 to the request counter, signifying another call to GCR.
@@ -52,13 +51,13 @@ func (rc *RequestCounter) Flush() {
 	msg := fmt.Sprintf("From %s to %s [%d min] there have been %d requests to GCR.", rc.Since.Format(TimestampFormat), Clock.Now().Format(TimestampFormat), rc.Interval/time.Minute, rc.Requests)
 	Debug(msg)
 
-	// Reset the request counter.
-	rc.reset()
+	if rc.Resettable {
+		// Reset the request counter.
+		rc.reset()
+	}
 }
 
 // reset clears the request counter and stamps the current time of reset.
-// TODO: @tylerferrara in the future, use the request counter field 'persistent' to check
-// if it must be reset.
 func (rc *RequestCounter) reset() {
 	rc.Requests = 0
 	rc.Since = Clock.Now()
@@ -134,10 +133,11 @@ func Init() {
 	// Create a request counter for logging traffic every 10mins. This aims to mimic the actual
 	// GCR quota, but acts as a rough estimation of this quota, indicating when throttling may occur.
 	requestCounter := &RequestCounter{
-		Mutex:    sync.Mutex{},
-		Requests: 0,
-		Since:    Clock.Now(),
-		Interval: MeasurementWindow,
+		Mutex:      sync.Mutex{},
+		Requests:   0,
+		Since:      Clock.Now(),
+		Interval:   MeasurementWindow,
+		Resettable: true,
 	}
 
 	// Create a new network monitor.
