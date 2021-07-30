@@ -2713,9 +2713,7 @@ func TestExecRequests(t *testing.T) {
 		return nil
 	}
 
-	// TODO: Why are we not checking errors here?
-	// nolint: errcheck
-	edges, _ := reg.ToPromotionEdges(
+	edges, err := reg.ToPromotionEdges(
 		[]reg.Manifest{
 			{
 				Registries: registries,
@@ -2731,6 +2729,7 @@ func TestExecRequests(t *testing.T) {
 			},
 		},
 	)
+	require.Nil(t, err)
 
 	populateRequests := reg.MKPopulateRequestsForPromotionEdges(
 		edges,
@@ -2932,9 +2931,8 @@ func TestGarbageCollection(t *testing.T) {
 		mutex *sync.Mutex,
 	) {
 		for req := range reqs {
-			// TODO: Why are we not checking errors here?
-			// nolint: errcheck
-			pr := req.RequestParams.(reg.PromotionRequest)
+			pr, ok := req.RequestParams.(reg.PromotionRequest)
+			require.True(t, ok)
 			mutex.Lock()
 			captured[pr]++
 			mutex.Unlock()
@@ -3092,9 +3090,8 @@ func TestGarbageCollectionMulti(t *testing.T) {
 		mutex *sync.Mutex,
 	) {
 		for req := range reqs {
-			// TODO: Why are we not checking errors here?
-			// nolint: errcheck
-			pr := req.RequestParams.(reg.PromotionRequest)
+			pr, ok := req.RequestParams.(reg.PromotionRequest)
+			require.True(t, ok)
 			mutex.Lock()
 			captured[pr]++
 			mutex.Unlock()
