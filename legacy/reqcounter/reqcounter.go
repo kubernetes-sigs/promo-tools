@@ -64,14 +64,20 @@ func (rc *RequestCounter) reset() {
 	rc.Since = Clock.Now()
 }
 
-// watch continuously logs the request counter at the specified intervals.
+// watch indefinitely performs repeated sleep/log cycles.
 func (rc *RequestCounter) watch() {
+	// TODO: @tylerferrara create a way to cleanly terminate this goroutine.
 	go func() {
 		for {
-			Clock.Sleep(rc.Interval)
-			rc.Flush()
+			rc.Cycle()
 		}
 	}()
+}
+
+// Cycle sleeps for the request counter's interval and flushes itself.
+func (rc *RequestCounter) Cycle() {
+	Clock.Sleep(rc.Interval)
+	rc.Flush()
 }
 
 // RequestCounters holds multiple request counters.
