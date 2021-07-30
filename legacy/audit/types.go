@@ -17,8 +17,6 @@ limitations under the License.
 package audit
 
 import (
-	"github.com/sirupsen/logrus"
-
 	reg "sigs.k8s.io/k8s-container-image-promoter/legacy/dockerregistry"
 	"sigs.k8s.io/k8s-container-image-promoter/legacy/logclient"
 	"sigs.k8s.io/k8s-container-image-promoter/legacy/remotemanifest"
@@ -43,14 +41,6 @@ type ServerContext struct {
 	ErrorReportingFacility report.ReportingFacility
 	LoggingFacility        logclient.LoggingFacility
 	GcrReadingFacility     GcrReadingFacility
-	VerboseLogging         bool
-}
-
-// Debug only logs the given message if the VerboseLogging option is set.
-func (s *ServerContext) Debug(args ...interface{}) {
-	if s.VerboseLogging {
-		logrus.Debug(args...)
-	}
 }
 
 // PubSubMessageInner is the inner struct that holds the actual Pub/Sub

@@ -49,13 +49,14 @@ func RunAuditCmd(opts *AuditOptions) error {
 		opts.RepoBranch,
 		opts.ManifestPath,
 		opts.UUID,
-		opts.Verbose,
 	)
 	if err != nil {
 		return errors.Wrap(err, "creating auditor context")
 	}
 
 	if opts.Verbose {
+		// Enable verbose logging.
+		logrus.SetLevel(logrus.DebugLevel)
 		// Initialize global counter to track the number of HTTP requests made to GCR.
 		reqcounter.Init()
 	}
