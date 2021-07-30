@@ -128,33 +128,70 @@ func TestRequestCounterIncrement(t *testing.T) {
 }
 
 func TestCycle(t *testing.T) {
-	// Create a simple request counter expected to log every 10 minutes.
-	requestCounter := NewRequestCounter(82)
-	requestCounter.Interval = time.Minute * 10
-	// Collect logging statements.
-	logs := []string{}
-	// Mock logrus.Debug calls.
-	rc.Debug = func(args ...interface{}) {
-		logs = append(logs, fmt.Sprint(args[0]))
+	// Define the variables of each test.
+	type cycleTest struct {
+		interval time.Duration // Specify logging interval.
+		requests []int         // The number of HTTP request to simulate for each cycle.
 	}
-	// Mock time.
-	fakeTime := tw.FakeTime{
-		Time: defaultTime,
+	// Define all tests.
+	cycleTests := []cycleTest{
+		{
+			interval: rc.MeasurementWindow,
+			requests: []int{3, 7, 50, 1},
+		},
+		{
+			interval: time.Second,
+			requests: []int{9, 0, 13, 700},
+		},
+		{
+			interval: time.Minute * 30,
+			requests: []int{9, 0, 13, 700},
+		},
+		{
+			interval: time.Hour * 10,
+			requests: []int{9, 0, 13, 700},
+		},
 	}
-	rc.Clock = &fakeTime
-	// Determine the expected logs.
-	expected := []string{
-		"From 2006-01-02 15:04:05 to 2006-01-02 15:14:05 [10 min] there have been 82 requests to GCR.",
-		"From 2006-01-02 15:14:05 to 2006-01-02 15:24:05 [10 min] there have been 0 requests to GCR.",
-		"From 2006-01-02 15:24:05 to 2006-01-02 15:34:05 [10 min] there have been 0 requests to GCR.",
-		"From 2006-01-02 15:34:05 to 2006-01-02 15:44:05 [10 min] there have been 0 requests to GCR.",
-		"From 2006-01-02 15:44:05 to 2006-01-02 15:54:05 [10 min] there have been 0 requests to GCR.",
+	// Simulate HTTP requests by repeatedly incrementing the request counter.
+	mockNetworkTraffic := func(requestCounter *rc.RequestCounter, requests int) {
+		for requests > 0 {
+			requestCounter.Increment()
+			requests--
+		}
 	}
-	// Repeatedly run sleep/log cycles.
-	numCycles := len(expected)
-	for i := 0; i < numCycles; i++ {
-		requestCounter.Cycle()
+
+	// Run all tests.
+	for _, ct := range cycleTests {
+		// Create a simple request counter.
+		requestCounter := NewRequestCounter(0)
+		requestCounter.Interval = ct.interval
+		// Collect logging statements.
+		logs := []string{}
+		// Mock logrus.Debug calls.
+		rc.Debug = func(args ...interface{}) {
+			logs = append(logs, fmt.Sprint(args[0]))
+		}
+		// Mock time.
+		fakeTime := tw.FakeTime{
+			Time: defaultTime,
+		}
+		rc.Clock = &fakeTime
+		// Collect expected logs.
+		expected := []string{}
+		// Repeatedly run sleep/log cycles.
+		testClock := defaultTime
+		for _, requests := range ct.requests {
+			// Generate the expected log for this cycle.
+			nextClock := testClock.Add(ct.interval)
+			expect := fmt.Sprintf("From %s to %s [%d min] there have been %d requests to GCR.", testClock.Format(rc.TimestampFormat), nextClock.Format(rc.TimestampFormat), ct.interval/time.Minute, requests)
+			expected = append(expected, expect)
+			testClock = nextClock
+			// Simulate HTTP requests.
+			mockNetworkTraffic(&requestCounter, requests)
+			// Initiate a sleep/log cycle.
+			requestCounter.Cycle()
+		}
+		// Ensure the correct logs were produced.
+		require.EqualValues(t, expected, logs, "The request counter produced malformed logs.")
 	}
-	// Ensure the correct logs were produced.
-	require.EqualValues(t, expected, logs, "The request counter produced malformed logs.")
 }
