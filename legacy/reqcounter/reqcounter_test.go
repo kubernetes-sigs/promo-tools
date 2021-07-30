@@ -49,15 +49,17 @@ func TestInit(t *testing.T) {
 	require.True(t, rc.EnableCounting, "Init did not enable counting.")
 	// Ensure request counters are created.
 	require.Greater(t, len(rc.NetMonitor.RequestCounters), 0, "Init did not create any request counters within the global Monitor.")
-	// Ensure at least one request counter uses the MeasurementWindow.
-	found := false
+	// Ensure at least one request counter uses the QuotaWindowShort.
+	foundQuotaWindowShort, foundQuotaWindowLong := false, false
 	for _, requestCounter := range rc.NetMonitor.RequestCounters {
-		if requestCounter.Interval == rc.MeasurementWindow {
-			found = true
-			break
+		if requestCounter.Interval == rc.QuotaWindowShort {
+			foundQuotaWindowShort = true
+		} else if requestCounter.Interval == rc.QuotaWindowLong {
+			foundQuotaWindowLong = true
 		}
 	}
-	require.True(t, found, "No request counters are using the Interval: MeasurementWindow.")
+	require.True(t, foundQuotaWindowShort, "No request counters are using the Interval: QuotaWindowShort.")
+	require.True(t, foundQuotaWindowLong, "No request counters are using the Interval: QuotaWindowLong.")
 }
 
 func TestIncrement(t *testing.T) {
@@ -146,8 +148,13 @@ func TestCycle(t *testing.T) {
 	// Define all tests.
 	cycleTests := []cycleTest{
 		{
-			interval:   rc.MeasurementWindow,
+			interval:   rc.QuotaWindowShort,
 			requests:   []int{3, 7, 50, 1},
+			resettable: true,
+		},
+		{
+			interval:   rc.QuotaWindowLong,
+			requests:   []int{2, 622, 5, 8},
 			resettable: true,
 		},
 		{
