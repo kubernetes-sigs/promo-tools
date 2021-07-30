@@ -102,14 +102,16 @@ func (nm *NetworkMonitor) Log() {
 }
 
 const (
-	// MeasurementWindow specifies the length of time to wait before logging the request counters. Since Google's
-	// Container Registry specifies a quota of 50,000 HTTP requests per 10 min, the window
-	// for recording requests is set to 10 min.
-	// NOTE: This metric is only a rough approximation of the actual GCR quota. The specific 10min measurement
+	// QuotaWindowShort specifies the length of time to wait before logging in order to estimate the first
+	// GCR Quota of 50,000 HTTP requests per 10 min.
+	// NOTE: These metrics are only a rough approximation of the actual GCR quotas. The specific 10min measurement
 	// is ambiguous, as the start and end time are not specified in the docs. Therefore, it's impossible for our
 	// requests counters to perfectly line up with the actual GCR quota.
 	// Source: https://cloud.google.com/container-registry/quotas
-	MeasurementWindow time.Duration = time.Minute * 10
+	QuotaWindowShort time.Duration = time.Minute * 10
+	// QuotaWindowLong specifies the length of time to wait before logging in order to estimate the second
+	// GCR Quota of 1,000,000 HTTP requests per day.
+	QuotaWindowLong time.Duration = time.Hour * 24
 	// TimestampFormat specifies the syntax for logging time stamps of request counters.
 	TimestampFormat string = "2006-01-02 15:04:05"
 )
@@ -132,17 +134,33 @@ func Init() {
 
 	// Create a request counter for logging traffic every 10mins. This aims to mimic the actual
 	// GCR quota, but acts as a rough estimation of this quota, indicating when throttling may occur.
-	requestCounter := &RequestCounter{
-		Mutex:      sync.Mutex{},
-		Requests:   0,
-		Since:      Clock.Now(),
-		Interval:   MeasurementWindow,
-		Resettable: true,
+	requestCounters := RequestCounters{
+		{
+			Mutex:      sync.Mutex{},
+			Requests:   0,
+			Since:      Clock.Now(),
+			Interval:   QuotaWindowShort,
+			Resettable: true,
+		},
+		{
+			Mutex:      sync.Mutex{},
+			Requests:   0,
+			Since:      Clock.Now(),
+			Interval:   QuotaWindowLong,
+			Resettable: true,
+		},
+		{
+			Mutex:      sync.Mutex{},
+			Requests:   0,
+			Since:      Clock.Now(),
+			Interval:   QuotaWindowShort,
+			Resettable: false,
+		},
 	}
 
 	// Create a new network monitor.
 	NetMonitor = &NetworkMonitor{
-		RequestCounters: RequestCounters{requestCounter},
+		RequestCounters: requestCounters,
 	}
 
 	// Begin logging network traffic.
