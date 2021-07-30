@@ -103,14 +103,14 @@ func TestIncrement(t *testing.T) {
 func TestFlush(t *testing.T) {
 	// Create a local invocation of time.
 	requestCounter := NewRequestCounter(33)
-	// Mock the logrus.Debug function.
-	debugCalls := 0
-	rc.Debug = func(args ...interface{}) {
-		debugCalls++
+	// Mock the logrus.Info function.
+	infoCalls := 0
+	rc.Log = func(args ...interface{}) {
+		infoCalls++
 	}
 	requestCounter.Flush()
-	// Ensure logrus.Debug was called.
-	require.Equal(t, 1, debugCalls, "Flush() failed to trigger a debug statement.")
+	// Ensure logrus.Info was called.
+	require.Equal(t, 1, infoCalls, "Flush() failed to trigger a debug statement.")
 	// Ensure the request counter is reset, where time advances and the requests are zeroed.
 	require.Equal(t, uint64(0), requestCounter.Requests, "Calling Flush() did not reset the request counter to 0.")
 	require.True(t, defaultTime.Before(requestCounter.Since), "Calling Flush() did not reset the request counter timestamp.")
@@ -133,8 +133,8 @@ func TestCycle(t *testing.T) {
 	requestCounter.Interval = time.Minute * 10
 	// Collect logging statements.
 	logs := []string{}
-	// Mock logrus.Debug calls.
-	rc.Debug = func(args ...interface{}) {
+	// Mock logrus.Info calls.
+	rc.Log = func(args ...interface{}) {
 		logs = append(logs, fmt.Sprint(args[0]))
 	}
 	// Mock time.

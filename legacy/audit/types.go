@@ -49,7 +49,7 @@ type ServerContext struct {
 // Debug only logs the given message if the VerboseLogging option is set.
 func (s *ServerContext) Debug(args ...interface{}) {
 	if s.VerboseLogging {
-		logrus.Debug(args...)
+		logrus.Info(args...)
 	}
 }
 

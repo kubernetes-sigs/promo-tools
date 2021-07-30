@@ -50,7 +50,7 @@ func (rc *RequestCounter) Flush() {
 
 	// Log the number of requests within this measurement window.
 	msg := fmt.Sprintf("From %s to %s [%d min] there have been %d requests to GCR.", rc.Since.Format(TimestampFormat), Clock.Now().Format(TimestampFormat), rc.Interval/time.Minute, rc.Requests)
-	Debug(msg)
+	Log(msg)
 
 	// Reset the request counter.
 	rc.reset()
@@ -121,8 +121,8 @@ var (
 	EnableCounting bool
 	// NetMonitor holds all request counters for recording HTTP requests to GCR.
 	NetMonitor *NetworkMonitor
-	// Debug is defined to simplify testing of logrus.Debug calls.
-	Debug func(args ...interface{}) = logrus.Debug
+	// Log is defined to simplify testing of logrus.Info calls.
+	Log func(args ...interface{}) = logrus.Info
 	// Clock is defined to allow mocking of time functions.
 	Clock tw.Time = tw.RealTime{}
 )
