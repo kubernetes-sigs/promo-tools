@@ -35,10 +35,11 @@ var defaultTime, _ = time.Parse("020106 150405", "020106 150405")
 // All other object fields are set to default values.
 func NewRequestCounter(requests uint64) rc.RequestCounter {
 	return rc.RequestCounter{
-		Mutex:    sync.Mutex{},
-		Requests: requests,
-		Since:    defaultTime,
-		Interval: time.Second,
+		Mutex:      sync.Mutex{},
+		Requests:   requests,
+		Since:      defaultTime,
+		Interval:   time.Second,
+		Resettable: true,
 	}
 }
 
@@ -114,6 +115,14 @@ func TestFlush(t *testing.T) {
 	// Ensure the request counter is reset, where time advances and the requests are zeroed.
 	require.Equal(t, uint64(0), requestCounter.Requests, "Calling Flush() did not reset the request counter to 0.")
 	require.True(t, defaultTime.Before(requestCounter.Since), "Calling Flush() did not reset the request counter timestamp.")
+
+	// Create a non-resettable request counter.
+	requestCounter = NewRequestCounter(66)
+	requestCounter.Resettable = false
+	requestCounter.Flush()
+	// Ensure the request counter did not reset.
+	require.Equal(t, uint64(66), requestCounter.Requests, "Calling Flush() reset the requests of a non-resettable request counter.")
+	require.True(t, defaultTime.Equal(requestCounter.Since), "Calling Flush() reset the timestamp of a non-resettable request counter.")
 }
 
 func TestRequestCounterIncrement(t *testing.T) {
@@ -130,26 +139,36 @@ func TestRequestCounterIncrement(t *testing.T) {
 func TestCycle(t *testing.T) {
 	// Define the variables of each test.
 	type cycleTest struct {
-		interval time.Duration // Specify logging interval.
-		requests []int         // The number of HTTP request to simulate for each cycle.
+		interval   time.Duration // Specify logging interval.
+		requests   []int         // The number of HTTP request to simulate for each cycle.
+		resettable bool          // Reset after logging.
 	}
 	// Define all tests.
 	cycleTests := []cycleTest{
 		{
-			interval: rc.MeasurementWindow,
-			requests: []int{3, 7, 50, 1},
+			interval:   rc.MeasurementWindow,
+			requests:   []int{3, 7, 50, 1},
+			resettable: true,
 		},
 		{
-			interval: time.Second,
-			requests: []int{9, 0, 13, 700},
+			interval:   time.Second,
+			requests:   []int{9, 0, 13, 700},
+			resettable: true,
 		},
 		{
-			interval: time.Minute * 30,
-			requests: []int{9, 0, 13, 700},
+			interval:   time.Minute * 30,
+			requests:   []int{9, 0, 13, 700},
+			resettable: true,
 		},
 		{
-			interval: time.Hour * 10,
-			requests: []int{9, 0, 13, 700},
+			interval:   time.Hour * 10,
+			requests:   []int{9, 0, 13, 700},
+			resettable: true,
+		},
+		{
+			interval:   time.Hour * 10,
+			requests:   []int{9, 0, 13, 700},
+			resettable: false,
 		},
 	}
 	// Simulate HTTP requests by repeatedly incrementing the request counter.
@@ -165,6 +184,7 @@ func TestCycle(t *testing.T) {
 		// Create a simple request counter.
 		requestCounter := NewRequestCounter(0)
 		requestCounter.Interval = ct.interval
+		requestCounter.Resettable = ct.resettable
 		// Collect logging statements.
 		logs := []string{}
 		// Mock logrus.Debug calls.
@@ -180,10 +200,20 @@ func TestCycle(t *testing.T) {
 		expected := []string{}
 		// Repeatedly run sleep/log cycles.
 		testClock := defaultTime
+		totalRequests := 0
 		for _, requests := range ct.requests {
 			// Generate the expected log for this cycle.
 			nextClock := testClock.Add(ct.interval)
-			expect := fmt.Sprintf("From %s to %s [%d min] there have been %d requests to GCR.", testClock.Format(rc.TimestampFormat), nextClock.Format(rc.TimestampFormat), ct.interval/time.Minute, requests)
+			expectedRequests := requests
+			expectedStartingClock := testClock
+			if !ct.resettable {
+				// Record a running tally.
+				totalRequests += requests
+				expectedRequests = totalRequests
+				// The starting timestamp must not change.
+				expectedStartingClock = defaultTime
+			}
+			expect := fmt.Sprintf("From %s to %s [%d min] there have been %d requests to GCR.", expectedStartingClock.Format(rc.TimestampFormat), nextClock.Format(rc.TimestampFormat), ct.interval/time.Minute, expectedRequests)
 			expected = append(expected, expect)
 			testClock = nextClock
 			// Simulate HTTP requests.
