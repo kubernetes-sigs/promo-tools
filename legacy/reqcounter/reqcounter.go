@@ -32,7 +32,7 @@ type RequestCounter struct {
 	Since     time.Time     // When the current request counter began recording requests.
 	Interval  time.Duration // The duration of time between each log.
 	Threshold uint64        // When to warn of a high request count during a logging cycle. Setting a
-	// non-zero threshold allows the request counter to reset each interval. Therefore, if left uninitialized,
+	// non-zero threshold allows the request counter to reset each interval. If left uninitialized,
 	// the request counter will be persistent and never warn or reset.
 }
 
