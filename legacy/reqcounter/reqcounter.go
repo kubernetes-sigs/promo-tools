@@ -27,11 +27,13 @@ import (
 
 // RequestCounter records the number of HTTP requests to GCR.
 type RequestCounter struct {
-	Mutex      sync.Mutex    // Lock to prevent race-conditions with concurrent processes.
-	Requests   uint64        // Number of HTTP requests since recording started.
-	Since      time.Time     // When the current request counter began recording requests.
-	Interval   time.Duration // The duration of time between each log.
-	Resettable bool          // Reset after logging.
+	Mutex     sync.Mutex    // Lock to prevent race-conditions with concurrent processes.
+	Requests  uint64        // Number of HTTP requests since recording started.
+	Since     time.Time     // When the current request counter began recording requests.
+	Interval  time.Duration // The duration of time between each log.
+	Threshold uint64        // When to warn of a high request count during a logging cycle. Setting a
+	// non-zero threshold allows the request counter to reset each interval. Therefore, if left uninitialized,
+	// the request counter will be persistent and never warn or reset.
 }
 
 // increment adds 1 to the request counter, signifying another call to GCR.
@@ -47,13 +49,23 @@ func (rc *RequestCounter) Flush() {
 	rc.Mutex.Lock()
 	defer rc.Mutex.Unlock()
 
-	// Log the number of requests within this measurement window.
-	msg := fmt.Sprintf("From %s to %s [%d min] there have been %d requests to GCR.", rc.Since.Format(TimestampFormat), Clock.Now().Format(TimestampFormat), rc.Interval/time.Minute, rc.Requests)
-	Debug(msg)
+	rc.log()
 
-	if rc.Resettable {
+	// Only allow request counters wi
+	if rc.Threshold > 0 {
 		// Reset the request counter.
 		rc.reset()
+	}
+}
+
+// log the number of HTTP requests found. If the number of requests exceeds the
+// threshold, log an additional warning message.
+func (rc *RequestCounter) log() {
+	msg := fmt.Sprintf("From %s to %s [%d min] there have been %d requests to GCR.", rc.Since.Format(TimestampFormat), Clock.Now().Format(TimestampFormat), rc.Interval/time.Minute, rc.Requests)
+	Debug(msg)
+	if rc.Threshold > 0 && rc.Requests > rc.Threshold {
+		msg = fmt.Sprintf("The threshold of %d requests has been surpassed.", rc.Threshold)
+		Warn(msg)
 	}
 }
 
@@ -124,6 +136,8 @@ var (
 	NetMonitor *NetworkMonitor
 	// Debug is defined to simplify testing of logrus.Debug calls.
 	Debug func(args ...interface{}) = logrus.Debug
+	// Warn is defined to simplify testing of logrus.Warn calls.
+	Warn func(args ...interface{}) = logrus.Warn
 	// Clock is defined to allow mocking of time functions.
 	Clock tw.Time = tw.RealTime{}
 )
@@ -136,25 +150,24 @@ func Init() {
 	// GCR quota, but acts as a rough estimation of this quota, indicating when throttling may occur.
 	requestCounters := RequestCounters{
 		{
-			Mutex:      sync.Mutex{},
-			Requests:   0,
-			Since:      Clock.Now(),
-			Interval:   QuotaWindowShort,
-			Resettable: true,
+			Mutex:     sync.Mutex{},
+			Requests:  0,
+			Since:     Clock.Now(),
+			Interval:  QuotaWindowShort,
+			Threshold: 50000,
 		},
 		{
-			Mutex:      sync.Mutex{},
-			Requests:   0,
-			Since:      Clock.Now(),
-			Interval:   QuotaWindowLong,
-			Resettable: true,
+			Mutex:     sync.Mutex{},
+			Requests:  0,
+			Since:     Clock.Now(),
+			Interval:  QuotaWindowLong,
+			Threshold: 1000000,
 		},
 		{
-			Mutex:      sync.Mutex{},
-			Requests:   0,
-			Since:      Clock.Now(),
-			Interval:   QuotaWindowShort,
-			Resettable: false,
+			Mutex:    sync.Mutex{},
+			Requests: 0,
+			Since:    Clock.Now(),
+			Interval: QuotaWindowShort,
 		},
 	}
 

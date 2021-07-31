@@ -27,6 +27,9 @@ import (
 	tw "sigs.k8s.io/k8s-container-image-promoter/legacy/timewrapper"
 )
 
+// defaultThreshold should be used as a default request counter threshold.
+const defaultThreshold = 10000
+
 // defaultTime should be used as a timestamp for all request counters.
 // The actual time represents: September 22, 2002 at 05:03:16.
 var defaultTime, _ = time.Parse("020106 150405", "020106 150405")
@@ -35,11 +38,11 @@ var defaultTime, _ = time.Parse("020106 150405", "020106 150405")
 // All other object fields are set to default values.
 func NewRequestCounter(requests uint64) rc.RequestCounter {
 	return rc.RequestCounter{
-		Mutex:      sync.Mutex{},
-		Requests:   requests,
-		Since:      defaultTime,
-		Interval:   time.Second,
-		Resettable: true,
+		Mutex:     sync.Mutex{},
+		Requests:  requests,
+		Since:     defaultTime,
+		Interval:  time.Second,
+		Threshold: defaultThreshold,
 	}
 }
 
@@ -118,13 +121,28 @@ func TestFlush(t *testing.T) {
 	require.Equal(t, uint64(0), requestCounter.Requests, "Calling Flush() did not reset the request counter to 0.")
 	require.True(t, defaultTime.Before(requestCounter.Since), "Calling Flush() did not reset the request counter timestamp.")
 
-	// Create a non-resettable request counter.
+	// Create a persistent request counter.
 	requestCounter = NewRequestCounter(66)
-	requestCounter.Resettable = false
+	requestCounter.Threshold = 0
 	requestCounter.Flush()
 	// Ensure the request counter did not reset.
 	require.Equal(t, uint64(66), requestCounter.Requests, "Calling Flush() reset the requests of a non-resettable request counter.")
 	require.True(t, defaultTime.Equal(requestCounter.Since), "Calling Flush() reset the timestamp of a non-resettable request counter.")
+
+	// Create a request counter that exceeded a threshold.
+	requestCounter = NewRequestCounter(600)
+	requestCounter.Threshold = 599
+	// Reset debug counter.
+	debugCalls = 0
+	// Mock logrus.Warn.
+	warnCalls := 0
+	rc.Warn = func(args ...interface{}) {
+		warnCalls++
+	}
+	requestCounter.Flush()
+	// Ensure both logrus.Debug and logrus.Warn was called.
+	require.Equal(t, 1, debugCalls, "Flush() failed to trigger a debug statement after exceeding the threshold.")
+	require.Equal(t, 1, warnCalls, "Flush() failed to trigger a warning statement after exceeding the threshold.")
 }
 
 func TestRequestCounterIncrement(t *testing.T) {
@@ -141,41 +159,41 @@ func TestRequestCounterIncrement(t *testing.T) {
 func TestCycle(t *testing.T) {
 	// Define the variables of each test.
 	type cycleTest struct {
-		interval   time.Duration // Specify logging interval.
-		requests   []int         // The number of HTTP request to simulate for each cycle.
-		resettable bool          // Reset after logging.
+		interval  time.Duration // Specify logging interval.
+		requests  []int         // The number of HTTP request to simulate for each cycle.
+		threshold uint64        // When to fire a warning log.
 	}
 	// Define all tests.
 	cycleTests := []cycleTest{
 		{
-			interval:   rc.QuotaWindowShort,
-			requests:   []int{3, 7, 50, 1},
-			resettable: true,
+			interval:  rc.QuotaWindowShort,
+			requests:  []int{3, 7, 50, 1},
+			threshold: defaultThreshold,
 		},
 		{
-			interval:   rc.QuotaWindowLong,
-			requests:   []int{2, 622, 5, 8},
-			resettable: true,
+			interval:  rc.QuotaWindowLong,
+			requests:  []int{2, 622, 5, 8},
+			threshold: defaultThreshold,
 		},
 		{
-			interval:   time.Second,
-			requests:   []int{9, 0, 13, 700},
-			resettable: true,
+			interval:  time.Second,
+			requests:  []int{9, 0, 13, 700},
+			threshold: defaultThreshold,
 		},
 		{
-			interval:   time.Minute * 30,
-			requests:   []int{9, 0, 13, 700},
-			resettable: true,
+			interval:  time.Minute * 30,
+			requests:  []int{9, 0, 13, 700},
+			threshold: defaultThreshold,
 		},
 		{
-			interval:   time.Hour * 10,
-			requests:   []int{9, 0, 13, 700},
-			resettable: true,
+			interval:  time.Hour * 10,
+			requests:  []int{9, 0, 13, 700},
+			threshold: defaultThreshold,
 		},
 		{
-			interval:   time.Hour * 10,
-			requests:   []int{9, 0, 13, 700},
-			resettable: false,
+			interval:  time.Hour * 10,
+			requests:  []int{9, 0, 13, 700},
+			threshold: 0,
 		},
 	}
 	// Simulate HTTP requests by repeatedly incrementing the request counter.
@@ -191,7 +209,7 @@ func TestCycle(t *testing.T) {
 		// Create a simple request counter.
 		requestCounter := NewRequestCounter(0)
 		requestCounter.Interval = ct.interval
-		requestCounter.Resettable = ct.resettable
+		requestCounter.Threshold = ct.threshold
 		// Collect logging statements.
 		logs := []string{}
 		// Mock logrus.Debug calls.
@@ -213,7 +231,7 @@ func TestCycle(t *testing.T) {
 			nextClock := testClock.Add(ct.interval)
 			expectedRequests := requests
 			expectedStartingClock := testClock
-			if !ct.resettable {
+			if ct.threshold == 0 {
 				// Record a running tally.
 				totalRequests += requests
 				expectedRequests = totalRequests
