@@ -25,6 +25,7 @@ import (
 
 	"sigs.k8s.io/k8s-container-image-promoter/legacy/audit"
 	"sigs.k8s.io/k8s-container-image-promoter/legacy/reqcounter"
+	"sigs.k8s.io/k8s-container-image-promoter/legacy/signals"
 )
 
 type AuditOptions struct {
@@ -59,6 +60,8 @@ func RunAuditCmd(opts *AuditOptions) error {
 		logrus.SetLevel(logrus.DebugLevel)
 		// Initialize global counter to track the number of HTTP requests made to GCR.
 		reqcounter.Init()
+		// Watch for OS signals.
+		signals.Watch()
 	}
 
 	auditorContext.RunAuditor()
