@@ -3,7 +3,7 @@ module sigs.k8s.io/k8s-container-image-promoter
 go 1.16
 
 require (
-	cloud.google.com/go v0.89.0
+	cloud.google.com/go v0.90.0
 	cloud.google.com/go/logging v1.4.2
 	github.com/cenkalti/backoff/v4 v4.1.1
 	github.com/google/go-containerregistry v0.6.0
