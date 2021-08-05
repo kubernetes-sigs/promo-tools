@@ -2713,9 +2713,7 @@ func TestExecRequests(t *testing.T) {
 		return nil
 	}
 
-	// TODO: Why are we not checking errors here?
-	// nolint: errcheck
-	edges, _ := reg.ToPromotionEdges(
+	edges, err := reg.ToPromotionEdges(
 		[]reg.Manifest{
 			{
 				Registries: registries,
@@ -2731,6 +2729,7 @@ func TestExecRequests(t *testing.T) {
 			},
 		},
 	)
+	require.Nil(t, err)
 
 	populateRequests := reg.MKPopulateRequestsForPromotionEdges(
 		edges,
@@ -2786,6 +2785,140 @@ func TestExecRequests(t *testing.T) {
 
 	for _, test := range tests {
 		got := sc.ExecRequests(populateRequests, test.processRequestFn)
+		require.Equal(t, test.expected, got)
+	}
+}
+
+func TestValidateEdges(t *testing.T) {
+	srcRegName := reg.RegistryName("gcr.io/src")
+	dstRegName := reg.RegistryName("gcr.io/dst")
+	srcRegistry := reg.RegistryContext{
+		Name:           srcRegName,
+		ServiceAccount: "robot",
+		Src:            true,
+	}
+	dstRegistry := reg.RegistryContext{
+		Name:           dstRegName,
+		ServiceAccount: "robot",
+	}
+
+	registries := []reg.RegistryContext{
+		srcRegistry,
+		dstRegistry,
+	}
+
+	tests := []struct {
+		name     string
+		inputM   reg.Manifest
+		inputSc  reg.SyncContext
+		expected error
+	}{
+		{
+			"No problems (nothing to promote)",
+			reg.Manifest{
+				SrcRegistry: &srcRegistry,
+				Registries:  registries,
+				Images: []reg.Image{
+					{
+						ImageName: "a",
+						Dmap: reg.DigestTags{
+							"sha256:000": {"0.0"},
+						},
+					},
+				},
+			},
+			reg.SyncContext{
+				Inv: reg.MasterInventory{
+					"gcr.io/src": {
+						"a": {
+							"sha256:000": {"0.0"},
+						},
+					},
+					"gcr.io/dst": {
+						"a": {
+							"sha256:000": {"0.0"},
+						},
+					},
+				},
+			},
+			nil,
+		},
+		{
+			"Promotion edges OK",
+			reg.Manifest{
+				SrcRegistry: &srcRegistry,
+				Registries:  registries,
+				Images: []reg.Image{
+					{
+						ImageName: "a",
+						Dmap: reg.DigestTags{
+							"sha256:000": {"0.0"},
+							// This is an image we want to promote. There are no
+							// tag moves involved here, so it's OK.
+							"sha256:111": {"1.0"},
+						},
+					},
+				},
+			},
+			reg.SyncContext{
+				Inv: reg.MasterInventory{
+					"gcr.io/src": {
+						"a": {
+							"sha256:000": {},
+							"sha256:111": {},
+						},
+					},
+					"gcr.io/dst": {
+						"a": {
+							"sha256:000": {"0.0"},
+						},
+					},
+				},
+			},
+			nil,
+		},
+		{
+			"Tag move detected in promotion edge",
+			reg.Manifest{
+				SrcRegistry: &srcRegistry,
+				Registries:  registries,
+				Images: []reg.Image{
+					{
+						ImageName: "a",
+						Dmap: reg.DigestTags{
+							// The idea here is that we've already promoted
+							// sha256:111 as tag 1.0, but we want to try to
+							// retag 1.0 to the sha256:222 image instead. This
+							// intent should result in an error.
+							"sha256:222": {"1.0"},
+						},
+					},
+				},
+			},
+			reg.SyncContext{
+				Inv: reg.MasterInventory{
+					"gcr.io/src": {
+						"a": {
+							"sha256:000": {},
+							"sha256:111": {},
+						},
+					},
+					"gcr.io/dst": {
+						"a": {
+							"sha256:000": {"0.0"},
+							"sha256:111": {"1.0"},
+						},
+					},
+				},
+			},
+			fmt.Errorf("[edge &{{gcr.io/src robot  true} {a 1.0} sha256:222 {gcr.io/dst robot  false} {a 1.0}}: tag '1.0' in dest points to sha256:111, not sha256:222 (as per the manifest), but tag moves are not supported; skipping]"),
+		},
+	}
+
+	for _, test := range tests {
+		edges, err := reg.ToPromotionEdges([]reg.Manifest{test.inputM})
+		require.Nil(t, err)
+		got := test.inputSc.ValidateEdges(edges)
 		require.Equal(t, test.expected, got)
 	}
 }
@@ -2932,9 +3065,8 @@ func TestGarbageCollection(t *testing.T) {
 		mutex *sync.Mutex,
 	) {
 		for req := range reqs {
-			// TODO: Why are we not checking errors here?
-			// nolint: errcheck
-			pr := req.RequestParams.(reg.PromotionRequest)
+			pr, ok := req.RequestParams.(reg.PromotionRequest)
+			require.True(t, ok)
 			mutex.Lock()
 			captured[pr]++
 			mutex.Unlock()
@@ -3092,9 +3224,8 @@ func TestGarbageCollectionMulti(t *testing.T) {
 		mutex *sync.Mutex,
 	) {
 		for req := range reqs {
-			// TODO: Why are we not checking errors here?
-			// nolint: errcheck
-			pr := req.RequestParams.(reg.PromotionRequest)
+			pr, ok := req.RequestParams.(reg.PromotionRequest)
+			require.True(t, ok)
 			mutex.Lock()
 			captured[pr]++
 			mutex.Unlock()

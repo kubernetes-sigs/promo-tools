@@ -1950,6 +1950,45 @@ func SplitRegistryImagePath(
 		fmt.Errorf("could not determine registry name for '%v'", registryImagePath)
 }
 
+// ValidatesEdges runs ValidateEdge for each given edge, collecting all errors
+// found.
+func (sc *SyncContext) ValidateEdges(edges map[PromotionEdge]interface{}) error {
+	errors := []error{}
+	for edge := range edges {
+		if err := sc.ValidateEdge(&edge); err != nil {
+			errors = append(errors, err)
+		}
+	}
+
+	if len(errors) > 0 {
+		return fmt.Errorf("%v", errors)
+	}
+
+	return nil
+}
+
+// ValidateEdge checks to see if there are any malformed edges. Currently this
+// check is limited to detecting attempted tag moves in the destination
+// registry.
+func (sc *SyncContext) ValidateEdge(edge *PromotionEdge) error {
+	_, dp := edge.VertexProps(&sc.Inv)
+
+	if dp.PqinExists {
+		if !dp.DigestExists {
+			// Detect attempted tag move in the destination registry.
+			return fmt.Errorf(
+				"edge %v: tag '%s' in dest points to %s, not %s (as per the manifest), but tag moves are not supported; skipping",
+				edge,
+				edge.DstImageTag.Tag,
+				dp.BadDigest,
+				edge.Digest,
+			)
+		}
+	}
+
+	return nil
+}
+
 // MKPopulateRequestsForPromotionEdges takes in a map of PromotionEdges to promote
 // and a PromotionContext and returns a PopulateRequests which can generate
 // requests to be processed
@@ -1973,21 +2012,14 @@ func MKPopulateRequestsForPromotionEdges(
 			var req stream.ExternalRequest
 			oldDigest := Digest("")
 
-			_, dp := promoteMe.VertexProps(&sc.Inv)
-
-			if dp.PqinExists {
-				if !dp.DigestExists {
-					// Pqin points to the wrong digest.
-					logrus.Errorf(
-						"edge %v: tag '%s' in dest points to %s, not %s (as per the manifest), but tag moves are not supported; skipping\n",
-						promoteMe,
-						promoteMe.DstImageTag.Tag,
-						dp.BadDigest,
-						promoteMe.Digest,
-					)
-
-					continue
-				}
+			// Technically speaking none of the edges at this point should be
+			// invalid (such as trying to do tag moves), because we run
+			// ValidateEdges() in Promote() in the early stages, before passing
+			// on this closure to ExecRequests(). However the check here is so
+			// cheap that we do it anyway, just in case.
+			if err := sc.ValidateEdge(&promoteMe); err != nil {
+				logrus.Error(err)
+				continue
 			}
 
 			// Save some information about this request. It's a bit like
@@ -2162,6 +2194,12 @@ func (sc *SyncContext) Promote(
 	logrus.Info("Pending promotions:")
 	for edge := range edges {
 		logrus.Infof("  %v\n", edge)
+	}
+
+	// If we detect that we have malformed edges, such as a tag move attempt, we
+	// exit early.
+	if err := sc.ValidateEdges(edges); err != nil {
+		return err
 	}
 
 	var populateRequests = MKPopulateRequestsForPromotionEdges(
