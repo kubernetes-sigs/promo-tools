@@ -19,17 +19,24 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"net/http"
 	"runtime"
+	"time"
 )
 
 const (
-	// query is a fast query to GCR asking for all tags for the image addon-builder
-	// within the k8s-artifacts-prod top-level registry.
-	query string = "https://us.gcr.io/v2/k8s-artifacts-prod/addon-builder/tags/list"
 	// targetStatusCode is the GCR status code for too many request.
 	// Source: https://cloud.google.com/docs/quota#quota_errors
 	targetStatusCode int = 429
+)
+
+var (
+	queries []string = []string{
+		"https://us.gcr.io/v2/k8s-artifacts-prod/addon-builder/tags/list",
+		"https://gcr.io/v2/k8s-staging-autoscaling/addon-resizer-amd64/tags/list",
+		"https://gcr.io/v2/k8s-staging-cloud-provider-gcp/gcp-filestore-csi-driver/tags/list",
+	}
 )
 
 // message holds information about the HTTP response.
@@ -45,6 +52,7 @@ func main() {
 	numWorkers := runtime.NumCPU() * 2
 	c := make(chan message, numWorkers)
 	// Create all the workers.
+	start := time.Now()
 	spawnWorkers(numWorkers, c)
 	requests := numWorkers
 	// Continuously make HTTP requests.
@@ -54,15 +62,27 @@ func main() {
 		// Wait for response.
 		msg := <-c
 		if msg.statusCode == targetStatusCode {
+			t := time.Now()
+			elapsed := t.Sub(start)
 			fmt.Println("We were throttled by GCR!")
+			fmt.Println("Unique Endpoints: ", len(queries))
+			fmt.Println("Took: ", elapsed.Minutes(), "minutes")
 			fmt.Println("Status Code: ", targetStatusCode)
 			fmt.Println("Body: ", msg.body)
+			fmt.Println("Time to ")
 			break
 		}
 		// Spawn a new worker.
 		go worker(c)
 		requests++
 	}
+
+}
+
+// getRandQuery randomly selects a query from the list of queries.
+func getRandQuery() string {
+	i := rand.Intn(len(queries))
+	return queries[i]
 }
 
 // spawnWorkers invokes n concurrent workers.
@@ -76,6 +96,7 @@ func spawnWorkers(n int, c chan message) {
 // worker sends an HTTP request to GCR and forwards the
 // response to the given channel.
 func worker(c chan message) {
+	query := getRandQuery()
 	resp, err := http.Get(query)
 	if err != nil {
 		fmt.Println("Encountered an error during HTTP GET request: ", err)
