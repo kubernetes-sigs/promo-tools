@@ -1158,9 +1158,11 @@ func (sc *SyncContext) IgnoreFromPromotion(regName RegistryName) {
 // user to provide these delineations for us.
 //
 // TODO: Can we simplify this to not use switch/case/goto?
-// TODO(nolint): Enable gocyclo
-// nolint[gocyclo]
-func ParseContainerParts(s string) (string, string, error) {
+func ParseContainerParts(s string) (
+	registry string,
+	repo string,
+	parseErr error,
+) {
 	parts := strings.Split(s, "/")
 	if len(parts) <= 1 {
 		goto InvalidString
@@ -1175,22 +1177,16 @@ func ParseContainerParts(s string) (string, string, error) {
 	}
 
 	switch parts[0] {
-	case "gcr.io":
-		fallthrough
-	case "asia.gcr.io":
-		fallthrough
-	case "eu.gcr.io":
-		fallthrough
-	case "us.gcr.io":
+	case "gcr.io", "asia.gcr.io", "eu.gcr.io", "us.gcr.io":
 		if len(parts) == 2 {
 			goto InvalidString
 		}
 		return strings.Join(parts[0:2], "/"), strings.Join(parts[2:], "/"), nil
-	case "k8s.gcr.io":
-		fallthrough
-	case "staging-k8s.gcr.io":
-		fallthrough
 	default:
+		if parts[0] != "k8s.gcr.io" && parts[0] != "staging-k8s.gcr.io" {
+			goto InvalidString
+		}
+
 		return parts[0], strings.Join(parts[1:], "/"), nil
 	}
 
