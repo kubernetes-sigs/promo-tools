@@ -82,7 +82,6 @@ func main() {
 
 // nolint[funlen]
 func runE2ETests(testsFile, repoRoot string) {
-
 	// Start tests
 	ts, err := readE2ETests(testsFile)
 	if err != nil {
@@ -161,7 +160,7 @@ func runE2ETests(testsFile, repoRoot string) {
 		uuid := guuid.New().String()
 
 		fmt.Printf("\n===> Running e2e test '%s' (%s)...\n", t.Name, uuid)
-		err := testSetup(repoRoot, pushRepo, projectNumber, projectID, t)
+		err := testSetup(repoRoot, projectID, t)
 		if err != nil {
 			klog.Fatal("error with test setup stage:", err)
 		}
@@ -253,11 +252,7 @@ func runE2ETests(testsFile, repoRoot string) {
 // [1]: https://cloud.google.com/pubsub/docs/admin#pubsub-delete-topic-gcloud
 //
 // nolint[funlen]
-func testSetup(
-	repoRoot, pushRepo, projectNumber, projectID string,
-	t E2ETest,
-) error {
-
+func testSetup(repoRoot, projectID string, t E2ETest) error {
 	// Clear GCR state.
 	if err := t.clearRepositories(); err != nil {
 		return err

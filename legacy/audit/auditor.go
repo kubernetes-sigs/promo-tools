@@ -287,10 +287,10 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 	// is so that we can query the subproject to figure out all digests that
 	// belong there, so that we can validate the child manifest in the
 	// GCRPubSubPayload.
-	srcRegistries, err := GetMatchingSourceRegistries(&manifests, gcrPayload)
-
+	//
 	// If we can't find any source registry for this image, then reject the
 	// transaction.
+	srcRegistries, err := GetMatchingSourceRegistries(&manifests, gcrPayload)
 	if err != nil {
 		msg := fmt.Sprintf("(%s) TRANSACTION REJECTED: %v", s.ID, err)
 		_, _ = w.Write([]byte(msg))

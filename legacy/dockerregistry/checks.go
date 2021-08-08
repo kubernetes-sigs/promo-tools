@@ -323,16 +323,21 @@ func (check *ImageVulnCheck) Run() error {
 		reqs chan stream.ExternalRequest,
 		requestResults chan<- RequestResult,
 		wg *sync.WaitGroup,
-		mutex *sync.Mutex) {
+		mutex *sync.Mutex,
+	) {
 		for req := range reqs {
 			reqRes := RequestResult{Context: req}
 			errors := make(Errors, 0)
 			edge := req.RequestParams.(PromotionEdge)
 			occurrences, err := vulnProducer(edge)
 			if err != nil {
-				errors = append(errors, Error{
-					Context: "error getting vulnerabilities",
-					Error:   err})
+				errors = append(
+					errors,
+					Error{
+						Context: "error getting vulnerabilities",
+						Error:   err,
+					},
+				)
 			}
 
 			fixableSevereOccurrences := 0

@@ -2779,7 +2779,9 @@ func TestExecRequests(t *testing.T) {
 		{
 			"Error tracking for promotion with errors",
 			processRequestError,
-			fmt.Errorf("Encountered an error while executing requests"),
+			// TODO: We should have a better check here. Checking the exact
+			//       message will throw errors any time we change the copy.
+			fmt.Errorf("encountered an error while executing requests"),
 		},
 	}
 

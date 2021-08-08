@@ -148,7 +148,6 @@ func testSetup(repoRoot string, t E2ETest) error {
 	fmt.Println(std.Error())
 
 	return err
-
 }
 
 func runPromotion(repoRoot string, t *E2ETest) error {
