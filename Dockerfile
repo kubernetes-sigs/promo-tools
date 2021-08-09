@@ -23,7 +23,7 @@
 # Determine final build variant [prod | test].
 ARG variant
 
-FROM golang:latest AS base
+FROM golang:1.16.7 AS base
 # Transfer all project files to container.
 WORKDIR /go/src/app
 COPY . .
