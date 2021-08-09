@@ -639,7 +639,7 @@ func TestAudit(t *testing.T) {
 		alert  []string
 	}
 
-	var shouldBeValid = []struct {
+	shouldBeValid := []struct {
 		name             string
 		manifests        []reg.Manifest
 		payload          reg.GCRPubSubPayload
@@ -820,7 +820,6 @@ func TestAudit(t *testing.T) {
 	}
 
 	for _, test := range shouldBeValid {
-
 		// Create a new ResponseRecorder to record the response from Audit().
 		w := httptest.NewRecorder()
 
@@ -832,8 +831,11 @@ func TestAudit(t *testing.T) {
 		psm := audit.PubSubMessage{
 			Message: audit.PubSubMessageInner{
 				Data: payload,
-				ID:   "1"},
-			Subscription: "2"}
+				ID:   "1",
+			},
+			Subscription: "2",
+		}
+
 		b, err := json.Marshal(psm)
 		require.Nil(t, err)
 

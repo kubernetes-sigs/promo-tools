@@ -26,7 +26,7 @@ import (
 
 var (
 	// ExitSignals are used to determine if an incoming os.Signal should cause termination.
-	ExitSignals map[os.Signal]bool = map[os.Signal]bool{
+	ExitSignals = map[os.Signal]bool{
 		syscall.SIGHUP:  true,
 		syscall.SIGINT:  true,
 		syscall.SIGABRT: true,
@@ -37,14 +37,14 @@ var (
 		syscall.SIGTSTP: true,
 	}
 	// ExitChannel is for gracefully terminating the LogSignals() function.
-	ExitChannel chan bool = make(chan bool, 1)
+	ExitChannel = make(chan bool, 1)
 	// SignalChannel is for listening to OS signals.
-	SignalChannel chan os.Signal = make(chan os.Signal, 1)
+	SignalChannel = make(chan os.Signal, 1)
 	// Debug is defined globally for mocking logrus.Debug statements.
 	Debug func(args ...interface{}) = logrus.Debug
 )
 
-// Watch concurrenlty logs debug statements when encountering interrupt signals from the OS.
+// Watch concurrently logs debug statements when encountering interrupt signals from the OS.
 // This function relies on the os/signal package which may not capture SIGKILL and SIGSTOP.
 func Watch() {
 	Debug("Watching for OS Signals...")

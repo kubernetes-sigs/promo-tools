@@ -562,7 +562,7 @@ func TestImageVulnCheck(t *testing.T) {
 	for _, test := range tests {
 		sc := reg.SyncContext{}
 		check := reg.MKImageVulnCheck(
-			sc,
+			&sc,
 			test.edges,
 			test.severityThreshold,
 			mkVulnProducerFake(test.vulnerabilities),

@@ -242,10 +242,11 @@ func ParseThinManifestsFromDir(
 		return mfests, err
 	}
 
-	var parseAsManifest filepath.WalkFunc = func(path string,
+	var parseAsManifest filepath.WalkFunc = func(
+		path string,
 		info os.FileInfo,
-		err error) error {
-
+		err error,
+	) error {
 		if err != nil {
 			// Prevent panic in case of incoming errors accessing this path.
 			logrus.Errorf("failure accessing a path %q: %v\n", path, err)
@@ -575,7 +576,6 @@ func (sc *SyncContext) getDigestForTag(inputTag Tag) *Digest {
 // nolint[gocyclo]
 func CheckOverlappingEdges(
 	edges map[PromotionEdge]interface{}) (map[PromotionEdge]interface{}, error) {
-
 	// Build up a "promotionIntent". This will be checked below.
 	promotionIntent := make(map[string]map[Digest][]PromotionEdge)
 	checked := make(map[PromotionEdge]interface{})
@@ -620,6 +620,9 @@ func CheckOverlappingEdges(
 					checked[edgeList[0]] = nil
 				default:
 					logrus.Infof("redundant promotion: multiple edges want to promote the same digest to the same destination endpoint %v:", pqin)
+
+					// TODO(lint): rangeValCopy: each iteration copies 192 bytes (consider pointers or indexing)
+					//nolint:gocritic
 					for _, edge := range edgeList {
 						logrus.Infof("%v", edge)
 					}
@@ -631,6 +634,9 @@ func CheckOverlappingEdges(
 			logrus.Errorf("multiple edges want to promote *different* images (digests) to the same destination endpoint %v:", pqin)
 			for digest, edgeList := range digestToEdges {
 				logrus.Errorf("  for digest %v:\n", digest)
+
+				// TODO(lint): rangeValCopy: each iteration copies 192 bytes (consider pointers or indexing)
+				//nolint:gocritic
 				for _, edge := range edgeList {
 					logrus.Errorf("%v\n", edge)
 				}
@@ -816,31 +822,36 @@ func (m Manifest) srcRegistryName() RegistryName {
 
 // nolint[gocyclo]
 func validateRequiredComponents(m Manifest) error {
+	// TODO: Should we return []error here instead?
 	errs := make([]string, 0)
 	srcRegistryName := RegistryName("")
 
 	if len(m.Registries) > 0 {
 		if m.srcRegistryCount() > 1 {
-			errs = append(errs, fmt.Sprintf("cannot have more than 1 source registry"))
+			errs = append(errs, "cannot have more than 1 source registry")
 		}
 
 		srcRegistryName = m.srcRegistryName()
 		if len(srcRegistryName) == 0 {
-			errs = append(errs, fmt.Sprintf("source registry must be set"))
+			errs = append(errs, "source registry must be set")
 		}
 	}
 
 	knownRegistries := make([]RegistryName, 0)
 	if len(m.Registries) == 0 {
-		errs = append(errs, fmt.Sprintf("'registries' field cannot be empty"))
+		errs = append(errs, "'registries' field cannot be empty")
 	}
 
 	for _, registry := range m.Registries {
 		if len(registry.Name) == 0 {
 			errs = append(
 				errs,
-				fmt.Sprintf("registries: 'name' field cannot be empty"))
+				"registries: 'name' field cannot be empty",
+			)
 		}
+
+		// TODO(lint): SA4010: this result of append is never used, except maybe in other appends
+		//nolint:staticcheck
 		knownRegistries = append(knownRegistries, registry.Name)
 	}
 
@@ -848,13 +859,15 @@ func validateRequiredComponents(m Manifest) error {
 		if len(image.ImageName) == 0 {
 			errs = append(
 				errs,
-				fmt.Sprintf("images: 'name' field cannot be empty"))
+				"images: 'name' field cannot be empty",
+			)
 		}
 
 		if len(image.Dmap) == 0 {
 			errs = append(
 				errs,
-				fmt.Sprintf("images: 'dmap' field cannot be empty"))
+				"images: 'dmap' field cannot be empty",
+			)
 		}
 	}
 
@@ -1152,39 +1165,40 @@ func (sc *SyncContext) IgnoreFromPromotion(regName RegistryName) {
 // could be removed in a future promoter manifest version which could force the
 // user to provide these delineations for us.
 //
-// nolint[gocyclo]
-func ParseContainerParts(s string) (string, string, error) {
+// TODO: Can we simplify this to not use switch/case/goto?
+func ParseContainerParts(s string) (
+	registry string,
+	repo string,
+	parseErr error,
+) {
 	parts := strings.Split(s, "/")
 	if len(parts) <= 1 {
-		goto error
+		goto InvalidString
 	}
+
 	// String may not have a double slash, or a trailing slash (which would
 	// result in an empty substring).
 	for _, part := range parts {
-		if len(part) == 0 {
-			goto error
+		if part == "" {
+			goto InvalidString
 		}
 	}
+
 	switch parts[0] {
-	case "gcr.io":
-		fallthrough
-	case "asia.gcr.io":
-		fallthrough
-	case "eu.gcr.io":
-		fallthrough
-	case "us.gcr.io":
+	case "gcr.io", "asia.gcr.io", "eu.gcr.io", "us.gcr.io":
 		if len(parts) == 2 {
-			goto error
+			goto InvalidString
 		}
 		return strings.Join(parts[0:2], "/"), strings.Join(parts[2:], "/"), nil
-	case "k8s.gcr.io":
-		fallthrough
-	case "staging-k8s.gcr.io":
-		fallthrough
 	default:
+		if parts[0] != "k8s.gcr.io" && parts[0] != "staging-k8s.gcr.io" {
+			goto InvalidString
+		}
+
 		return parts[0], strings.Join(parts[1:], "/"), nil
 	}
-error:
+
+InvalidString:
 	return "", "", fmt.Errorf("invalid string '%s'", s)
 }
 
@@ -1266,7 +1280,6 @@ func (sc *SyncContext) ReadRegistries(
 		sc *SyncContext,
 		reqs chan<- stream.ExternalRequest,
 		wg *sync.WaitGroup) {
-
 		// For each registry, start the very first root "repo" read call.
 		for _, rc := range toRead {
 			// Create the request.
@@ -1278,13 +1291,14 @@ func (sc *SyncContext) ReadRegistries(
 			reqs <- req
 		}
 	}
+
 	var processRequest ProcessRequest = func(
 		sc *SyncContext,
 		reqs chan stream.ExternalRequest,
 		requestResults chan<- RequestResult,
 		wg *sync.WaitGroup,
-		mutex *sync.Mutex) {
-
+		mutex *sync.Mutex,
+	) {
 		for req := range reqs {
 			reqRes := RequestResult{Context: req}
 
@@ -1312,6 +1326,7 @@ func (sc *SyncContext) ReadRegistries(
 
 				continue
 			}
+
 			// Process the current repo.
 			rName := req.RequestParams.(RegistryContext).Name
 			digestTags := make(DigestTags)
@@ -1363,6 +1378,8 @@ func (sc *SyncContext) ReadRegistries(
 			// Process child repos.
 			if recurse {
 				for _, childRepoName := range tagsStruct.Children {
+					// TODO: Check result of type assertion
+					//nolint:errcheck
 					parentRC, _ := req.RequestParams.(RegistryContext)
 
 					childRc := RegistryContext{
@@ -1390,12 +1407,16 @@ func (sc *SyncContext) ReadRegistries(
 					reqs <- childReq
 				}
 			}
+
 			// When we're done processing this node (req), decrement the
 			// semaphore.
 			reqRes.Errors = Errors{}
 			requestResults <- reqRes
 		}
 	}
+
+	// TODO(lint): Check error return value
+	//nolint:errcheck
 	sc.ExecRequests(populateRequests, processRequest)
 }
 
@@ -1408,8 +1429,8 @@ func (sc *SyncContext) ReadRegistries(
 //
 // nolint[gocyclo]
 func (sc *SyncContext) ReadGCRManifestLists(
-	mkProducer func(*SyncContext, *GCRManifestListContext) stream.Producer) {
-
+	mkProducer func(*SyncContext, *GCRManifestListContext) stream.Producer,
+) {
 	// Collect all images in sc.Inv (the src and dest registry names found in
 	// the manifest).
 	var populateRequests PopulateRequests = func(
@@ -1428,25 +1449,30 @@ func (sc *SyncContext) ReadGCRManifestLists(
 			}
 			for imageName, digestTags := range rii {
 				for digest, tagSlice := range digestTags {
-					if sc.DigestMediaType[digest] == ggcrV1Types.DockerManifestList {
-						// Create the request.
-						var req stream.ExternalRequest
-						var tag Tag
-						if len(tagSlice) > 0 {
-							// It could be that this ManifestList has been
-							// tagged multiple times. Just grab the first tag.
-							tag = tagSlice[0]
-						}
-						gmlc := GCRManifestListContext{
-							RegistryContext: rc,
-							ImageName:       imageName,
-							Tag:             tag,
-							Digest:          digest}
-						req.RequestParams = gmlc
-						req.StreamProducer = mkProducer(sc, &gmlc)
-						wg.Add(1)
-						reqs <- req
+					if sc.DigestMediaType[digest] != ggcrV1Types.DockerManifestList {
+						continue
 					}
+
+					// Create the request.
+					var req stream.ExternalRequest
+					var tag Tag
+					if len(tagSlice) > 0 {
+						// It could be that this ManifestList has been
+						// tagged multiple times. Just grab the first tag.
+						tag = tagSlice[0]
+					}
+
+					gmlc := GCRManifestListContext{
+						RegistryContext: rc,
+						ImageName:       imageName,
+						Tag:             tag,
+						Digest:          digest,
+					}
+
+					req.RequestParams = gmlc
+					req.StreamProducer = mkProducer(sc, &gmlc)
+					wg.Add(1)
+					reqs <- req
 				}
 			}
 		}
@@ -1478,11 +1504,13 @@ func (sc *SyncContext) ReadGCRManifestLists(
 				continue
 			}
 
+			// TODO: Check result of type assertion
+			//nolint:errcheck
 			gmlc := req.RequestParams.(GCRManifestListContext)
 
 			for _, gManifest := range gcrManifestList.Manifests {
 				mutex.Lock()
-				sc.ParentDigest[(Digest)((gManifest.Digest.Algorithm)+":"+(gManifest.Digest.Hex))] = gmlc.Digest
+				sc.ParentDigest[Digest((gManifest.Digest.Algorithm)+":"+(gManifest.Digest.Hex))] = gmlc.Digest
 				mutex.Unlock()
 			}
 
@@ -1491,6 +1519,8 @@ func (sc *SyncContext) ReadGCRManifestLists(
 		}
 	}
 
+	// TODO(lint): Check error return value
+	//nolint:errcheck
 	sc.ExecRequests(populateRequests, processRequest)
 }
 
@@ -1704,7 +1734,7 @@ func (sc *SyncContext) ExecRequests(
 		for reqRes := range requestResults {
 			if len(reqRes.Errors) > 0 {
 				(*mutex).Lock()
-				err = fmt.Errorf("Encountered an error while executing requests")
+				err = fmt.Errorf("encountered an error while executing requests")
 				sc.Logs.Errors = append(sc.Logs.Errors, reqRes.Errors...)
 				(*mutex).Unlock()
 
@@ -2043,6 +2073,7 @@ func MKPopulateRequestsForPromotionEdges(
 				oldDigest,
 				promoteMe.DstImageTag.Tag,
 			}
+
 			wg.Add(1)
 			reqs <- req
 		}
@@ -2183,9 +2214,10 @@ func (sc *SyncContext) Promote(
 		ImageName,
 		Digest,
 		Tag,
-		TagOp) stream.Producer,
-	customProcessRequest *ProcessRequest) error {
-
+		TagOp,
+	) stream.Producer,
+	customProcessRequest *ProcessRequest,
+) error {
 	if len(edges) == 0 {
 		logrus.Info("Nothing to promote.")
 		return nil
@@ -2202,63 +2234,73 @@ func (sc *SyncContext) Promote(
 		return err
 	}
 
-	var populateRequests = MKPopulateRequestsForPromotionEdges(
-		edges,
-		mkProducer)
+	var (
+		populateRequests = MKPopulateRequestsForPromotionEdges(
+			edges,
+			mkProducer,
+		)
 
-	var processRequest ProcessRequest
-	var processRequestReal ProcessRequest = func(
-		sc *SyncContext,
-		reqs chan stream.ExternalRequest,
-		requestResults chan<- RequestResult,
-		wg *sync.WaitGroup,
-		mutex *sync.Mutex) {
+		processRequest     ProcessRequest
+		processRequestReal ProcessRequest = func(
+			sc *SyncContext,
+			reqs chan stream.ExternalRequest,
+			requestResults chan<- RequestResult,
+			wg *sync.WaitGroup,
+			mutex *sync.Mutex,
+		) {
+			for req := range reqs {
+				reqRes := RequestResult{Context: req}
+				errors := make(Errors, 0)
+				// If we're adding or moving (i.e., creating a new image or
+				// overwriting), do not bother shelling out to gcloud. Instead just
+				// use the gcrane.doCopy() method directly.
 
-		for req := range reqs {
-			reqRes := RequestResult{Context: req}
-			errors := make(Errors, 0)
-			// If we're adding or moving (i.e., creating a new image or
-			// overwriting), do not bother shelling out to gcloud. Instead just
-			// use the gcrane.doCopy() method directly.
+				// TODO: Check result of type assertion
+				//nolint:errcheck
+				rpr := req.RequestParams.(PromotionRequest)
+				switch rpr.TagOp {
+				case Add:
+					srcVertex := ToFQIN(rpr.RegistrySrc, rpr.ImageNameSrc, rpr.Digest)
 
-			rpr := req.RequestParams.(PromotionRequest)
-			switch rpr.TagOp {
-			case Add:
-				srcVertex := ToFQIN(rpr.RegistrySrc, rpr.ImageNameSrc, rpr.Digest)
+					var dstVertex string
 
-				var dstVertex string
+					if len(rpr.Tag) > 0 {
+						dstVertex = ToPQIN(
+							rpr.RegistryDest,
+							rpr.ImageNameDest,
+							rpr.Tag)
+					} else {
+						// If there is no tag, then it is a tagless promotion. So
+						// the destination vertex must be referenced with a digest
+						// (FQIN), not a tag (PQIN).
+						dstVertex = ToFQIN(
+							rpr.RegistryDest,
+							rpr.ImageNameDest,
+							rpr.Digest,
+						)
+					}
 
-				if len(rpr.Tag) > 0 {
-					dstVertex = ToPQIN(
-						rpr.RegistryDest,
-						rpr.ImageNameDest,
-						rpr.Tag)
-				} else {
-					// If there is no tag, then it is a tagless promotion. So
-					// the destination vertex must be referenced with a digest
-					// (FQIN), not a tag (PQIN).
-					dstVertex = ToFQIN(
-						rpr.RegistryDest,
-						rpr.ImageNameDest,
-						rpr.Digest)
+					if err := crane.Copy(srcVertex, dstVertex); err != nil {
+						logrus.Error(err)
+						errors = append(
+							errors,
+							Error{
+								Context: "running writeImage()",
+								Error:   err,
+							},
+						)
+					}
+				case Move:
+					logrus.Infof("tag moves are no longer supported")
+				case Delete:
+					logrus.Infof("deletions are no longer supported")
 				}
 
-				if err := crane.Copy(srcVertex, dstVertex); err != nil {
-					logrus.Error(err)
-					errors = append(errors, Error{
-						Context: "running writeImage()",
-						Error:   err})
-				}
-			case Move:
-				logrus.Infof("tag moves are no longer supported")
-			case Delete:
-				logrus.Infof("deletions are no longer supported")
+				reqRes.Errors = errors
+				requestResults <- reqRes
 			}
-
-			reqRes.Errors = errors
-			requestResults <- reqRes
 		}
-	}
+	)
 
 	captured := make(CapturedRequests)
 
@@ -2378,44 +2420,48 @@ func MkRequestCapturer(captured *CapturedRequests) ProcessRequest {
 func (sc *SyncContext) GarbageCollect(
 	mfest Manifest,
 	mkProducer func(RegistryContext, ImageName, Digest) stream.Producer,
-	customProcessRequest *ProcessRequest) {
-
+	customProcessRequest *ProcessRequest,
+) {
 	var populateRequests PopulateRequests = func(
 		sc *SyncContext,
 		reqs chan<- stream.ExternalRequest,
-		wg *sync.WaitGroup) {
-
+		wg *sync.WaitGroup,
+	) {
 		for _, registry := range mfest.Registries {
 			if registry.Name == sc.SrcRegistry.Name {
 				continue
 			}
+
 			for imageName, digestTags := range sc.Inv[registry.Name] {
 				for digest, tagArray := range digestTags {
-					if len(tagArray) == 0 {
-						var req stream.ExternalRequest
-						req.StreamProducer = mkProducer(
-							registry,
-							imageName,
-							digest)
-						req.RequestParams = PromotionRequest{
-							Delete,
-							sc.SrcRegistry.Name,
-							registry.Name,
-							registry.ServiceAccount,
-
-							// No source image name, because tag deletions
-							// should only delete the what's in the
-							// destination registry
-							ImageName(""),
-
-							imageName,
-							digest,
-							"",
-							"",
-						}
-						wg.Add(1)
-						reqs <- req
+					if len(tagArray) != 0 {
+						continue
 					}
+
+					var req stream.ExternalRequest
+					req.StreamProducer = mkProducer(
+						registry,
+						imageName,
+						digest)
+					req.RequestParams = PromotionRequest{
+						Delete,
+						sc.SrcRegistry.Name,
+						registry.Name,
+						registry.ServiceAccount,
+
+						// No source image name, because tag deletions
+						// should only delete the what's in the
+						// destination registry
+						ImageName(""),
+
+						imageName,
+						digest,
+						"",
+						"",
+					}
+
+					wg.Add(1)
+					reqs <- req
 				}
 			}
 		}
@@ -2427,8 +2473,8 @@ func (sc *SyncContext) GarbageCollect(
 		reqs chan stream.ExternalRequest,
 		requestResults chan<- RequestResult,
 		wg *sync.WaitGroup,
-		mutex *sync.Mutex) {
-
+		mutex *sync.Mutex,
+	) {
 		for req := range reqs {
 			reqRes := RequestResult{Context: req}
 			jsons, errors := getJSONSFromProcess(req)
@@ -2492,17 +2538,18 @@ func supportedMediaType(v string) (ggcrV1Types.MediaType, error) {
 func (sc *SyncContext) ClearRepository(
 	regName RegistryName,
 	mkProducer func(RegistryContext, ImageName, Digest) stream.Producer,
-	customProcessRequest *ProcessRequest) {
-
+	customProcessRequest *ProcessRequest,
+) {
 	// deleteRequestsPopulator returns a PopulateRequests that
 	// varies by a predicate. Closure city!
-	var deleteRequestsPopulator func(func(ggcrV1Types.MediaType) bool) PopulateRequests = func(predicate func(ggcrV1Types.MediaType) bool) PopulateRequests {
-
+	deleteRequestsPopulator := func(
+		predicate func(ggcrV1Types.MediaType) bool,
+	) PopulateRequests {
 		var populateRequests PopulateRequests = func(
 			sc *SyncContext,
 			reqs chan<- stream.ExternalRequest,
-			wg *sync.WaitGroup) {
-
+			wg *sync.WaitGroup,
+		) {
 			for _, registry := range sc.RegistryContexts {
 				// Skip over any registry that does not match the regName we want to
 				// wipe.
@@ -2556,8 +2603,8 @@ func (sc *SyncContext) ClearRepository(
 		reqs chan stream.ExternalRequest,
 		requestResults chan<- RequestResult,
 		wg *sync.WaitGroup,
-		mutex *sync.Mutex) {
-
+		mutex *sync.Mutex,
+	) {
 		for req := range reqs {
 			reqRes := RequestResult{Context: req}
 			jsons, errors := getJSONSFromProcess(req)
@@ -2582,17 +2629,20 @@ func (sc *SyncContext) ClearRepository(
 		processRequest = *customProcessRequest
 	}
 
-	var isEqualTo (func(ggcrV1Types.MediaType) func(ggcrV1Types.MediaType) bool) = func(want ggcrV1Types.MediaType) func(ggcrV1Types.MediaType) bool {
-		return func(got ggcrV1Types.MediaType) bool {
-			return want == got
+	// TODO: These variables can likely be condensed into a single function
+	var (
+		isEqualTo = func(want ggcrV1Types.MediaType) func(ggcrV1Types.MediaType) bool {
+			return func(got ggcrV1Types.MediaType) bool {
+				return want == got
+			}
 		}
-	}
 
-	var isNotEqualTo (func(ggcrV1Types.MediaType) func(ggcrV1Types.MediaType) bool) = func(want ggcrV1Types.MediaType) func(ggcrV1Types.MediaType) bool {
-		return func(got ggcrV1Types.MediaType) bool {
-			return want != got
+		isNotEqualTo = func(want ggcrV1Types.MediaType) func(ggcrV1Types.MediaType) bool {
+			return func(got ggcrV1Types.MediaType) bool {
+				return want != got
+			}
 		}
-	}
+	)
 
 	// Avoid the GCR error that complains if you try to delete an image which is
 	// referenced by a DockerManifestList, by first deleting all such manifest

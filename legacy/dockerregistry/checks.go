@@ -259,15 +259,14 @@ func (check *ImageSizeCheck) Run() error {
 
 // MKImageVulnCheck returns an instance of ImageVulnCheck which
 // checks against images that have known vulnerabilities.
-// nolint[funlen]
 func MKImageVulnCheck(
-	syncContext SyncContext,
+	syncContext *SyncContext,
 	newPullEdges map[PromotionEdge]interface{},
 	severityThreshold int,
 	fakeVulnProducer ImageVulnProducer,
 ) *ImageVulnCheck {
 	return &ImageVulnCheck{
-		syncContext,
+		*syncContext,
 		newPullEdges,
 		severityThreshold,
 		fakeVulnProducer,
@@ -323,16 +322,25 @@ func (check *ImageVulnCheck) Run() error {
 		reqs chan stream.ExternalRequest,
 		requestResults chan<- RequestResult,
 		wg *sync.WaitGroup,
-		mutex *sync.Mutex) {
+		mutex *sync.Mutex,
+	) {
 		for req := range reqs {
 			reqRes := RequestResult{Context: req}
-			errors := make(Errors, 0)
-			edge := req.RequestParams.(PromotionEdge)
+			errs := make(Errors, 0)
+			edge, ok := req.RequestParams.(PromotionEdge)
+			if !ok {
+				logrus.Errorf("invalid type for promotion edge: %v", edge)
+			}
+
 			occurrences, err := vulnProducer(edge)
 			if err != nil {
-				errors = append(errors, Error{
-					Context: "error getting vulnerabilities",
-					Error:   err})
+				errs = append(
+					errs,
+					Error{
+						Context: "error getting vulnerabilities",
+						Error:   err,
+					},
+				)
 			}
 
 			fixableSevereOccurrences := 0
@@ -348,7 +356,7 @@ func (check *ImageVulnCheck) Run() error {
 				// vulnerabilities that are both fixable and severe
 				if vuln.GetFixAvailable() &&
 					IsSevereOccurrence(vuln, check.SeverityThreshold) {
-					errors = append(errors, Error{
+					errs = append(errs, Error{
 						Context: "Vulnerability Occurrence w/ Fix Available",
 						Error:   vulnErr,
 					})
@@ -368,7 +376,7 @@ func (check *ImageVulnCheck) Run() error {
 						len(occurrences)))
 			}
 
-			reqRes.Errors = errors
+			reqRes.Errors = errs
 			requestResults <- reqRes
 		}
 	}
