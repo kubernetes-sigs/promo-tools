@@ -36,7 +36,6 @@ import (
 	"sigs.k8s.io/release-utils/command"
 )
 
-// nolint[lll]
 func main() {
 	// NOTE: We can't run the tests in parallel because we only have 1 pair of
 	// staging/prod GCRs.
@@ -80,7 +79,6 @@ func main() {
 	runE2ETests(*testsPtr, *repoRootPtr)
 }
 
-// nolint[funlen]
 func runE2ETests(testsFile, repoRoot string) {
 	// Start tests
 	ts, err := readE2ETests(testsFile)
@@ -250,9 +248,7 @@ func runE2ETests(testsFile, repoRoot string) {
 // the regions to behave as the staging registry.
 //
 // [1]: https://cloud.google.com/pubsub/docs/admin#pubsub-delete-topic-gcloud
-//
-// nolint[funlen]
-func testSetup(repoRoot, projectID string, t E2ETest) error {
+func testSetup(repoRoot, projectID string, t *E2ETest) error {
 	// Clear GCR state.
 	if err := t.clearRepositories(); err != nil {
 		return err
@@ -284,7 +280,6 @@ func testSetup(repoRoot, projectID string, t E2ETest) error {
 	return populateGoldenImages(repoRoot)
 }
 
-// nolint[funlen]
 func populateGoldenImages(repoRoot string) error {
 	goldenPush := fmt.Sprintf("%s/test-e2e/golden-images/push-golden.sh", repoRoot)
 	cmd := command.NewWithWorkDir(
@@ -375,7 +370,6 @@ func getCmdListLogs(projectID string) []string {
 	}
 }
 
-// nolint[lll]
 func getCmdDeleteLogs(projectID string) []string {
 	return []string{
 		"gcloud",
@@ -483,7 +477,6 @@ func getCmdCreateTopic(projectID, topic string) []string {
 	}
 }
 
-// nolint[lll]
 func getCmdEnablePubSubTokenCreation(
 	projectNumber,
 	projectID string,
@@ -562,7 +555,6 @@ func getCmdCreatePubSubSubscription(
 	}
 }
 
-// nolint[lll]
 func getCmdShowLogs(projectID, uuid, pattern string) []string {
 	fullLogName := fmt.Sprintf("projects/%s/logs/%s", projectID, auditLogName)
 	uuidAndPattern := fmt.Sprintf("(%s) %s", uuid, pattern)
@@ -583,7 +575,6 @@ const (
 	maxLogMatchAttempts = 10
 )
 
-// nolint[lll]
 func getCmdsDeployCloudRun(
 	pushRepo,
 	projectID,
@@ -973,7 +964,7 @@ type E2ETest struct {
 }
 
 // E2ETests is an array of E2ETest.
-type E2ETests []E2ETest
+type E2ETests []*E2ETest
 
 func readE2ETests(filePath string) (E2ETests, error) {
 	var ts E2ETests

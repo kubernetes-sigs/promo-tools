@@ -36,7 +36,6 @@ import (
 	"sigs.k8s.io/release-utils/command"
 )
 
-// nolint[lll]
 func main() {
 	// NOTE: We can't run the tests in parallel because we only have 1 pair of
 	// staging/prod GCRs.
@@ -85,7 +84,7 @@ func main() {
 	// Loop through each e2e test case.
 	for _, t := range ts {
 		fmt.Printf("\n===> Running e2e test '%s'...\n", t.Name)
-		err := testSetup(*repoRootPtr, t)
+		err := testSetup(*repoRootPtr, &t)
 		if err != nil {
 			klog.Fatal("error with test setup:", err)
 		}
@@ -128,8 +127,7 @@ func checkSnapshot(
 	}
 }
 
-// nolint[funlen]
-func testSetup(repoRoot string, t E2ETest) error {
+func testSetup(repoRoot string, t *E2ETest) error {
 	if err := t.clearRepositories(); err != nil {
 		return err
 	}
