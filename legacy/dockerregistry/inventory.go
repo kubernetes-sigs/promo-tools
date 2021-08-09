@@ -620,6 +620,9 @@ func CheckOverlappingEdges(
 					checked[edgeList[0]] = nil
 				default:
 					logrus.Infof("redundant promotion: multiple edges want to promote the same digest to the same destination endpoint %v:", pqin)
+
+					// TODO(lint): rangeValCopy: each iteration copies 192 bytes (consider pointers or indexing)
+					//nolint:gocritic
 					for _, edge := range edgeList {
 						logrus.Infof("%v", edge)
 					}
@@ -631,6 +634,9 @@ func CheckOverlappingEdges(
 			logrus.Errorf("multiple edges want to promote *different* images (digests) to the same destination endpoint %v:", pqin)
 			for digest, edgeList := range digestToEdges {
 				logrus.Errorf("  for digest %v:\n", digest)
+
+				// TODO(lint): rangeValCopy: each iteration copies 192 bytes (consider pointers or indexing)
+				//nolint:gocritic
 				for _, edge := range edgeList {
 					logrus.Errorf("%v\n", edge)
 				}
@@ -844,6 +850,8 @@ func validateRequiredComponents(m Manifest) error {
 			)
 		}
 
+		// TODO(lint): SA4010: this result of append is never used, except maybe in other appends
+		//nolint:staticcheck
 		knownRegistries = append(knownRegistries, registry.Name)
 	}
 
@@ -1370,6 +1378,8 @@ func (sc *SyncContext) ReadRegistries(
 			// Process child repos.
 			if recurse {
 				for _, childRepoName := range tagsStruct.Children {
+					// TODO: Check result of type assertion
+					//nolint:errcheck
 					parentRC, _ := req.RequestParams.(RegistryContext)
 
 					childRc := RegistryContext{
@@ -1405,6 +1415,8 @@ func (sc *SyncContext) ReadRegistries(
 		}
 	}
 
+	// TODO(lint): Check error return value
+	//nolint:errcheck
 	sc.ExecRequests(populateRequests, processRequest)
 }
 
@@ -1492,6 +1504,8 @@ func (sc *SyncContext) ReadGCRManifestLists(
 				continue
 			}
 
+			// TODO: Check result of type assertion
+			//nolint:errcheck
 			gmlc := req.RequestParams.(GCRManifestListContext)
 
 			for _, gManifest := range gcrManifestList.Manifests {
@@ -1505,6 +1519,8 @@ func (sc *SyncContext) ReadGCRManifestLists(
 		}
 	}
 
+	// TODO(lint): Check error return value
+	//nolint:errcheck
 	sc.ExecRequests(populateRequests, processRequest)
 }
 
@@ -2239,6 +2255,8 @@ func (sc *SyncContext) Promote(
 				// overwriting), do not bother shelling out to gcloud. Instead just
 				// use the gcrane.doCopy() method directly.
 
+				// TODO: Check result of type assertion
+				//nolint:errcheck
 				rpr := req.RequestParams.(PromotionRequest)
 				switch rpr.TagOp {
 				case Add:

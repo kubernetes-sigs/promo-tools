@@ -1787,8 +1787,8 @@ func TestToPromotionEdges(t *testing.T) {
 	for _, test := range tests {
 		// Finalize Manifests.
 		for i := range test.input {
-			// Skip errors.
-			// nolint[errcheck]
+			// TODO(lint): Check error return value
+			//nolint:errcheck
 			_ = test.input[i].Finalize()
 		}
 
