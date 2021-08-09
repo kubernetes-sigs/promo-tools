@@ -26,9 +26,9 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/sirupsen/logrus"
 	yaml "gopkg.in/yaml.v2"
 
-	"k8s.io/klog/v2"
 	"sigs.k8s.io/k8s-container-image-promoter/internal/version"
 	reg "sigs.k8s.io/k8s-container-image-promoter/legacy/dockerregistry"
 	"sigs.k8s.io/k8s-container-image-promoter/legacy/gcloud"
@@ -67,17 +67,17 @@ func main() {
 	}
 
 	if *repoRootPtr == "" {
-		klog.Fatal(fmt.Errorf("-repo-root=... flag is required"))
+		logrus.Fatalf("-repo-root=... flag is required")
 	}
 
 	ts, err := readE2ETests(*testsPtr)
 	if err != nil {
-		klog.Fatal(err)
+		logrus.Fatal(err)
 	}
 
 	if len(*keyFilePtr) > 0 {
 		if err := gcloud.ActivateServiceAccount(*keyFilePtr); err != nil {
-			klog.Fatal("could not activate service account from .json", err)
+			logrus.Fatalf("activating service account from .json: %q", err)
 		}
 	}
 
@@ -86,7 +86,7 @@ func main() {
 		fmt.Printf("\n===> Running e2e test '%s'...\n", t.Name)
 		err := testSetup(*repoRootPtr, &t)
 		if err != nil {
-			klog.Fatal("error with test setup:", err)
+			logrus.Fatalf("error with test setup: %q", err)
 		}
 
 		fmt.Println("checking snapshots BEFORE promotion:")
@@ -96,7 +96,7 @@ func main() {
 
 		err = runPromotion(*repoRootPtr, &t)
 		if err != nil {
-			klog.Fatal("error with promotion:", err)
+			logrus.Fatalf("error with promotion: %q", err)
 		}
 
 		fmt.Println("checking snapshots AFTER promotion:")
@@ -120,10 +120,10 @@ func checkSnapshot(
 		rcs,
 	)
 	if err != nil {
-		klog.Exitf("could not get snapshot of %s: %s\n", repo, err)
+		logrus.Fatalf("could not get snapshot of %s: %q", repo, err)
 	}
 	if err := checkEqual(got, expected); err != nil {
-		klog.Exitln(err)
+		logrus.Fatal(err)
 	}
 }
 
@@ -139,7 +139,7 @@ func testSetup(repoRoot string, t *E2ETest) error {
 		goldenPush,
 	)
 
-	klog.Infof("executing %s\n", cmd.String())
+	logrus.Infof("executing %s\n", cmd.String())
 
 	std, err := cmd.RunSuccessOutput()
 	fmt.Println(std.Output())
@@ -312,7 +312,7 @@ func readE2ETests(filePath string) (E2ETests, error) {
 }
 
 func printVersion() {
-	klog.Infof("\n%s", version.Get().String())
+	logrus.Infof("%s", version.Get().String())
 }
 
 func printUsage() {
