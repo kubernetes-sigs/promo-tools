@@ -173,6 +173,8 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 
 	defer func() {
 		if msg := recover(); msg != nil {
+			// TODO: Check result of type assertion
+			//nolint:errcheck
 			panicStr := msg.(string)
 
 			stacktrace := debug.Stack()
@@ -196,8 +198,12 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 		// notifies us of any changes in how the messages are created in the
 		// first place.
 		msg := fmt.Sprintf("(%s) TRANSACTION REJECTED: parse failure: %v", s.ID, err)
+
+		// TODO: Properly catch write errors
+		//nolint:errcheck
 		_, _ = w.Write([]byte(msg))
 
+		// TODO(panic): Don't panic!
 		panic(msg)
 	}
 
@@ -206,8 +212,12 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 	// deletions are prohibited.
 	if err := ValidatePayload(gcrPayload); err != nil {
 		msg := fmt.Sprintf("(%s) TRANSACTION REJECTED: validation failure: %v", s.ID, err)
+
+		// TODO: Properly catch write errors
+		//nolint:errcheck
 		_, _ = w.Write([]byte(msg))
 
+		// TODO(panic): Don't panic!
 		panic(msg)
 	}
 
@@ -245,6 +255,9 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 
 			logInfo.Println(msg)
 			logrus.Infoln(msg)
+
+			// TODO: Properly catch write errors
+			//nolint:errcheck
 			_, _ = w.Write([]byte(msg))
 			return
 		}
@@ -293,7 +306,12 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 	srcRegistries, err := GetMatchingSourceRegistries(&manifests, gcrPayload)
 	if err != nil {
 		msg := fmt.Sprintf("(%s) TRANSACTION REJECTED: %v", s.ID, err)
+
+		// TODO: Properly catch write errors
+		//nolint:errcheck
 		_, _ = w.Write([]byte(msg))
+
+		// TODO(panic): Don't panic!
 		panic(msg)
 	}
 
@@ -309,7 +327,12 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 	sc.ReadGCRManifestLists(s.GcrReadingFacility.ReadManifestList)
 	if gcrPayload.Digest == "" {
 		msg := fmt.Sprintf("(%s) TRANSACTION REJECTED: digest missing from payload --- cannot check parent digest: %v", s.ID, gcrPayload.Digest)
+
+		// TODO: Properly catch write errors
+		//nolint:errcheck
 		_, _ = w.Write([]byte(msg))
+
+		// TODO(panic): Don't panic!
 		panic(msg)
 	}
 
@@ -319,6 +342,9 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 			"(%s) TRANSACTION VERIFIED: %v: agrees with manifest (parent digest %v)\n", s.ID, gcrPayload, parentDigest)
 		logInfo.Println(msg)
 		logrus.Infoln(msg)
+
+		// TODO: Properly catch write errors
+		//nolint:errcheck
 		_, _ = w.Write([]byte(msg))
 
 		return
@@ -331,7 +357,12 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 	// Return 200 OK, because we don't want to re-process this transaction.
 	// "Terminating" the auditing here simplifies debugging as well, because the
 	// same message is not repeated over and over again in the logs.
+
+	// TODO: Properly catch write errors
+	//nolint:errcheck
 	_, _ = w.Write([]byte(msg))
+
+	// TODO(panic): Don't panic!
 	panic(msg)
 }
 
