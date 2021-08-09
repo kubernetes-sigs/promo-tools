@@ -344,7 +344,7 @@ necessarily mean that a new version of the image layer is available.`,
 		err = sc.RunChecks(
 			[]reg.PreCheck{
 				reg.MKImageVulnCheck(
-					sc,
+					&sc,
 					promotionEdges,
 					opts.SeverityThreshold,
 					nil,
