@@ -19,3 +19,23 @@ dependencies:
     refPaths:
     - path: hack/verify-golangci-lint.sh
       match: VERSION=v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?
+
+  # Golang
+  - name: "golang"
+    version: 1.16.7
+    refPaths:
+    - path: Dockerfile
+      match: FROM golang:\d+.\d+(alpha|beta|rc)?\.?(\d+) AS base
+
+  # Golang pre-releases are denoted as `1.y<pre-release stage>.z`
+  # Example: go1.16rc1
+  #
+  # This entry is a stub of the major and minor version to allow dependency
+  # checks to pass when building using a pre-release of Golang.
+  - name: "golang: <major>.<minor>"
+    version: 1.16
+    refPaths:
+    - path: Dockerfile
+      match: FROM golang:\d+.\d+(alpha|beta|rc)?\.?(\d+) AS base
+    - path: go.mod
+      match: go \d+.\d+(alpha|beta|rc)?\.?(\d+)?
