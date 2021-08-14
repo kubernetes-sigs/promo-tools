@@ -23,9 +23,10 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
-	"reflect"
 	"strings"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	yaml "gopkg.in/yaml.v2"
 
@@ -91,7 +92,10 @@ func main() {
 
 		fmt.Println("checking snapshots BEFORE promotion:")
 		for _, snapshot := range t.Snapshots {
-			checkSnapshot(snapshot.Name, snapshot.Before, *repoRootPtr, t.Registries)
+			err := checkSnapshot(snapshot.Name, snapshot.Before, *repoRootPtr, t.Registries)
+			if err != nil {
+				logrus.Fatalf("error checking snapshot for %s: %q", snapshot.Name, err)
+			}
 		}
 
 		err = runPromotion(*repoRootPtr, &t)
@@ -101,7 +105,10 @@ func main() {
 
 		fmt.Println("checking snapshots AFTER promotion:")
 		for _, snapshot := range t.Snapshots {
-			checkSnapshot(snapshot.Name, snapshot.After, *repoRootPtr, t.Registries)
+			err := checkSnapshot(snapshot.Name, snapshot.After, *repoRootPtr, t.Registries)
+			if err != nil {
+				logrus.Fatalf("error checking snapshot for %s: %q", snapshot.Name, err)
+			}
 		}
 
 		fmt.Printf("\n===> e2e test '%s': OK\n", t.Name)
@@ -113,18 +120,25 @@ func checkSnapshot(
 	expected []reg.Image,
 	repoRoot string,
 	rcs []reg.RegistryContext,
-) {
+) error {
 	got, err := getSnapshot(
 		repoRoot,
 		repo,
 		rcs,
 	)
 	if err != nil {
-		logrus.Fatalf("could not get snapshot of %s: %q", repo, err)
+		return errors.Wrapf(err, "getting snapshot of %s", repo)
 	}
-	if err := checkEqual(got, expected); err != nil {
-		logrus.Fatal(err)
+
+	diff := cmp.Diff(got, expected)
+	if diff != "" {
+		return errors.Errorf(
+			"expected equivalent image sets, but the following diff exists: %s",
+			diff,
+		)
 	}
+
+	return nil
 }
 
 func testSetup(repoRoot string, t *E2ETest) error {
@@ -318,22 +332,4 @@ func printVersion() {
 func printUsage() {
 	fmt.Fprintf(os.Stderr, "Usage of %s:\n", os.Args[0])
 	flag.PrintDefaults()
-}
-
-// TODO: Use the version of checkEqual found in
-// lib/dockerregistry/inventory_test.go.
-func checkEqual(got, expected interface{}) error {
-	if !reflect.DeepEqual(got, expected) {
-		return fmt.Errorf(
-			`<<<<<<< got (type %T)
-%v
-=======
-%v
->>>>>>> expected (type %T)`,
-			got,
-			got,
-			expected,
-			expected)
-	}
-	return nil
 }
