@@ -132,10 +132,8 @@ func checkSnapshot(
 
 	diff := cmp.Diff(got, expected)
 	if diff != "" {
-		return errors.Errorf(
-			"expected equivalent image sets, but the following diff exists: %s",
-			diff,
-		)
+		fmt.Printf("the following diff exists: %s", diff)
+		return errors.Errorf("expected equivalent image sets")
 	}
 
 	return nil
