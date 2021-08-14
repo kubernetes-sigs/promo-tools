@@ -6,6 +6,7 @@ require (
 	cloud.google.com/go v0.91.1
 	cloud.google.com/go/logging v1.4.2
 	github.com/cenkalti/backoff/v4 v4.1.1
+	github.com/google/go-cmp v0.5.6
 	github.com/google/go-containerregistry v0.6.0
 	github.com/google/uuid v1.3.0
 	github.com/kevinburke/ssh_config v1.1.0 // indirect
