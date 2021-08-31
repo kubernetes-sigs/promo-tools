@@ -73,7 +73,7 @@ container: init-docker-buildx
 			--tag $(IMAGE)-$${platform##*/}:latest \
 			$(BUILD_ARGS) \
 			-f $(CURDIR)/Dockerfile \
-			../../.; \
+			.; \
 	done
 
 .PHONY: push
@@ -95,4 +95,4 @@ manifest: push
 # enable buildx
 .PHONY: init-docker-buildx
 init-docker-buildx:
-	./../../hack/init-buildx.sh
+	./hack/init-buildx.sh
