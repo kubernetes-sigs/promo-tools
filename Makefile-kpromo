@@ -72,7 +72,7 @@ container: init-docker-buildx
 			--tag $(IMAGE)-$${platform##*/}:$(TAG) \
 			--tag $(IMAGE)-$${platform##*/}:latest \
 			$(BUILD_ARGS) \
-			-f $(CURDIR)/Dockerfile \
+			-f $(CURDIR)/Dockerfile-kpromo \
 			.; \
 	done
 
