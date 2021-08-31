@@ -21,7 +21,7 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/release/pkg/api/files"
+	"sigs.k8s.io/k8s-container-image-promoter/api/files"
 )
 
 func TestValidateFilestores(t *testing.T) {

@@ -24,7 +24,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	api "k8s.io/release/pkg/api/files"
+	api "sigs.k8s.io/k8s-container-image-promoter/api/files"
 	"sigs.k8s.io/release-utils/hash"
 )
 
