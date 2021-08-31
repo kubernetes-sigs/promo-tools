@@ -105,12 +105,7 @@ func (o *copyFileOp) Run(ctx context.Context) error {
 	}
 
 	// Upload to the destination
-	if err := o.Dest.filestore.UploadFile(
-		ctx, o.Dest.RelativePath, tempFilename); err != nil {
-		return err
-	}
-
-	return nil
+	return o.Dest.filestore.UploadFile(ctx, o.Dest.RelativePath, tempFilename)
 }
 
 // String is the pretty-printer for an operation, as used by dry-run.

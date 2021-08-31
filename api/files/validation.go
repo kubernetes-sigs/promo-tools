@@ -30,10 +30,8 @@ func (m *Manifest) Validate() error {
 	if err := ValidateFilestores(m.Filestores); err != nil {
 		return err
 	}
-	if err := ValidateFiles(m.Files); err != nil {
-		return err
-	}
-	return nil
+
+	return ValidateFiles(m.Files)
 }
 
 // ValidateFilestores validates the Filestores field of the manifest.
