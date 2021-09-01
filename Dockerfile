@@ -24,7 +24,7 @@
 ARG variant
 
 # Base image
-FROM golang:1.17 AS base
+FROM golang:1.17-buster AS base
 
 # Transfer all project files to container.
 WORKDIR /go/src/app

@@ -19,6 +19,8 @@ dependencies:
     # Must match distroless Debian version as well
     - path: cloudbuild.yaml
       match: "OS_CODENAME: '(bullseye|buster)'"
+    - path: Dockerfile
+      match: FROM golang:\d+.\d+(alpha|beta|rc)?\.?(\d+)-(bullseye|buster)
     - path: Makefile-kpromo
       match: OS_CODENAME\ \?=\ (bullseye|buster)
 
@@ -47,7 +49,7 @@ dependencies:
     - path: Makefile-kpromo
       match: GO_VERSION\ \?=\ \d+.\d+(alpha|beta|rc)?\.?(\d+)?
     - path: Dockerfile
-      match: FROM golang:\d+.\d+(alpha|beta|rc)?\.?(\d+) AS base
+      match: FROM golang:\d+.\d+(alpha|beta|rc)?\.?(\d+)-(bullseye|buster) AS base
 
   # Golang pre-releases are denoted as `1.y<pre-release stage>.z`
   # Example: go1.17rc1
@@ -58,7 +60,7 @@ dependencies:
     version: 1.17
     refPaths:
     - path: Dockerfile
-      match: FROM golang:\d+.\d+(alpha|beta|rc)?\.?(\d+) AS base
+      match: FROM golang:\d+.\d+(alpha|beta|rc)?\.?(\d+)-(bullseye|buster)
 
   - name: "golang: go.mod"
     version: 1.17
