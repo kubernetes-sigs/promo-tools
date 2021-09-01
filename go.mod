@@ -1,6 +1,6 @@
 module sigs.k8s.io/k8s-container-image-promoter
 
-go 1.16
+go 1.17
 
 require (
 	cloud.google.com/go/containeranalysis v0.1.0
