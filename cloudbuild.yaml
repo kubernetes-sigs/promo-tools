@@ -1,4 +1,7 @@
-# See https://cloud.google.com/cloud-build/docs/build-config
+# Google Cloud Build configuration: https://cloud.google.com/cloud-build/docs/build-config
+# Image building process: https://git.k8s.io/test-infra/config/jobs/image-pushing/README.md
+
+# this must be specified in seconds. If omitted, defaults to 600s (10 mins)
 timeout: 1200s
 
 options:
@@ -15,21 +18,53 @@ steps:
   args:
   - image-push
 
+- name: 'gcr.io/k8s-testimages/gcb-docker-gcloud:v20201130-750d12f'
+  entrypoint: 'bash'
+  env:
+  - DOCKER_CLI_EXPERIMENTAL=enabled
+  - REGISTRY=gcr.io/$PROJECT_ID
+  - HOME=/root
+  - TAG=$_GIT_TAG
+  - PULL_BASE_REF=$_PULL_BASE_REF
+  - IMAGE_VERSION=$_IMAGE_VERSION
+  - GO_VERSION=$_GO_VERSION
+  - OS_CODENAME=$_OS_CODENAME
+  - DISTROLESS_IMAGE=$_DISTROLESS_IMAGE
+  args:
+  - '-c'
+  - |
+    gcloud auth configure-docker \
+    && make -f Makefile-kpromo manifest
+  waitFor: ['-']
+
 substitutions:
-  # _GIT_TAG will be filled with a git-based tag for the image, of the form vYYYYMMDD-hash, and
-  # can be used as a substitution
+  # _GIT_TAG will be filled with a git-based tag for the image, of the form
+  # vYYYYMMDD-hash, and can be used as a substitution
   _GIT_TAG: '12345'
   _PULL_BASE_REF: 'dev'
+  # TODO(kpromo): Capture in dependencies.yaml
+  _IMAGE_VERSION: 'v0.1.0-1'
+  _GO_VERSION: '1.17'
+  _OS_CODENAME: 'buster'
+  _DISTROLESS_IMAGE: 'static-debian10'
 
 tags:
 - 'cip'
+- 'kpromo'
 - ${_GIT_TAG}
 - ${_PULL_BASE_REF}
+- ${_IMAGE_VERSION}
+- ${_GO_VERSION}
+- ${_OS_CODENAME}
+- ${_DISTROLESS_IMAGE}
 
+images:
 # TODO: Temporarily disabling this check, which is currently failing in
 #       postsubmit: https://github.com/kubernetes-sigs/k8s-container-image-promoter/issues/312
-#images:
 #  - 'gcr.io/$PROJECT_ID/cip:$_GIT_TAG'
 #  - 'gcr.io/$PROJECT_ID/cip:latest'
 #  - 'gcr.io/$PROJECT_ID/cip-auditor:$_GIT_TAG'
 #  - 'gcr.io/$PROJECT_ID/cip-auditor:latest'
+- 'gcr.io/$PROJECT_ID/kpromo-amd64:$_IMAGE_VERSION'
+- 'gcr.io/$PROJECT_ID/kpromo-amd64:$_GIT_TAG'
+- 'gcr.io/$PROJECT_ID/kpromo-amd64:latest'

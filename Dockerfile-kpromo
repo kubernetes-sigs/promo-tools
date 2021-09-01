@@ -19,13 +19,13 @@ ARG OS_CODENAME
 ARG DISTROLESS_IMAGE
 FROM golang:${GO_VERSION}-${OS_CODENAME} as builder
 
-WORKDIR /go/src/k8s.io/release
+WORKDIR /go/src/sigs.k8s.io/k8s-container-image-promoter
 
 # Copy the sources
 ENV package="./cmd/kpromo"
-COPY ../../go.mod ../../go.sum ./
-COPY ../../pkg ./pkg/
-COPY ../../cmd/kpromo ${package}/
+
+# TODO(kpromo): Consider restricting the files copied in after refactor
+COPY . ./
 
 RUN go mod download
 
@@ -46,6 +46,6 @@ LABEL maintainers="Kubernetes Authors"
 LABEL description="kpromo: The Kubernetes project artifact promoter"
 
 WORKDIR /
-COPY --from=builder /go/src/k8s.io/release/kpromo .
+COPY --from=builder /go/src/sigs.k8s.io/k8s-container-image-promoter/kpromo .
 
 ENTRYPOINT ["/kpromo"]
