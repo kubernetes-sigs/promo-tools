@@ -29,14 +29,14 @@ func TestReadManifests(t *testing.T) {
 		Options  promobot.PromoteFilesOptions
 	}{
 		{
-			Expected: "testdata/manifests/onefiles/expected.yaml",
+			Expected: "testdata/expected/onefile.yaml",
 			Options: promobot.PromoteFilesOptions{
-				FilestoresPath: "testdata/manifests/onefiles/filestores.yaml",
-				FilesPath:      "testdata/manifests/onefiles/files.yaml",
+				FilestoresPath: "testdata/manifests/onefile/filestores.yaml",
+				FilesPath:      "testdata/manifests/onefile/files.yaml",
 			},
 		},
 		{
-			Expected: "testdata/manifests/manyfiles/expected.yaml",
+			Expected: "testdata/expected/manyfiles.yaml",
 			Options: promobot.PromoteFilesOptions{
 				FilestoresPath: "testdata/manifests/manyfiles/filestores.yaml",
 				FilesPath:      "testdata/manifests/manyfiles/files/",
