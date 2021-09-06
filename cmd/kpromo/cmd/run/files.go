@@ -56,6 +56,13 @@ func init() {
 		"path to the `files` manifest",
 	)
 
+	filesCmd.PersistentFlags().StringVar(
+		&filesOpts.ManifestsPath,
+		"manifests",
+		filesOpts.ManifestsPath,
+		"path to manifests for multiple projects",
+	)
+
 	// TODO: Consider moving this to the root command
 	filesCmd.PersistentFlags().BoolVar(
 		&filesOpts.DryRun,
@@ -71,11 +78,7 @@ func init() {
 		"allow service account usage with gcloud calls",
 	)
 
-	// TODO: Consider moving this into a validation function
-	// nolint: errcheck
-	filesCmd.MarkPersistentFlagRequired("filestores")
-	// nolint: errcheck
-	filesCmd.MarkPersistentFlagRequired("files")
+	// TODO(kpromo): Consider marking manifest flags as required
 
 	RunCmd.AddCommand(filesCmd)
 }

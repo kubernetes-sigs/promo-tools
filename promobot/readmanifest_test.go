@@ -31,15 +31,21 @@ func TestReadManifests(t *testing.T) {
 		{
 			Expected: "testdata/expected/onefile.yaml",
 			Options: promobot.PromoteFilesOptions{
-				FilestoresPath: "testdata/manifests/onefile/filestores.yaml",
+				FilestoresPath: "testdata/manifests/onefile/filepromoter-manifest.yaml",
 				FilesPath:      "testdata/manifests/onefile/files.yaml",
 			},
 		},
 		{
 			Expected: "testdata/expected/manyfiles.yaml",
 			Options: promobot.PromoteFilesOptions{
-				FilestoresPath: "testdata/manifests/manyfiles/filestores.yaml",
+				FilestoresPath: "testdata/manifests/manyfiles/filepromoter-manifest.yaml",
 				FilesPath:      "testdata/manifests/manyfiles/files/",
+			},
+		},
+		{
+			Expected: "testdata/expected/manyprojects.yaml",
+			Options: promobot.PromoteFilesOptions{
+				ManifestsPath: "testdata/manifests/manyprojects/",
 			},
 		},
 	}
@@ -47,12 +53,12 @@ func TestReadManifests(t *testing.T) {
 	for _, g := range grid {
 		g := g // avoid closure go-tcha
 		t.Run(g.Expected, func(t *testing.T) {
-			manifest, err := promobot.ReadManifest(g.Options)
+			manifests, err := promobot.ReadManifests(g.Options)
 			if err != nil {
-				t.Fatalf("failed to read manifest: %v", err)
+				t.Fatalf("failed to read manifests: %v", err)
 			}
 
-			manifestYAML, err := yaml.Marshal(manifest)
+			manifestYAML, err := yaml.Marshal(manifests)
 			if err != nil {
 				t.Fatalf("error serializing manifest: %v", err)
 			}
