@@ -13,6 +13,26 @@ dependencies:
     - path: hack/verify-dependencies.sh
       match: VERSION=v(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)\.(?P<patch>0|[1-9]\d*)(?:-(?P<prerelease>(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+(?P<buildmetadata>[0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?
 
+  - name: "Debian: codename (default)"
+    version: buster
+    refPaths:
+    # Must match distroless Debian version as well
+    - path: cloudbuild.yaml
+      match: "OS_CODENAME: '(bullseye|buster)'"
+    - path: Dockerfile
+      match: FROM golang:\d+.\d+(alpha|beta|rc)?\.?(\d+)-(bullseye|buster)
+    - path: Makefile-kpromo
+      match: OS_CODENAME\ \?=\ (bullseye|buster)
+
+  - name: "distroless"
+    version: static-debian10
+    refPaths:
+    # Must match distroless Debian version as well
+    - path: cloudbuild.yaml
+      match: "_DISTROLESS_IMAGE: 'static-debian[0-9]{2}'"
+    - path: Makefile-kpromo
+      match: DISTROLESS_IMAGE\ \?=\ static-debian[0-9]{2}
+
   # golangci-lint
   - name: "golangci-lint"
     version: 1.41.1
@@ -22,20 +42,36 @@ dependencies:
 
   # Golang
   - name: "golang"
-    version: 1.16.7
+    version: 1.17
     refPaths:
+    - path: cloudbuild.yaml
+      match: "_GO_VERSION: '\\d+.\\d+(alpha|beta|rc)?\\.?(\\d+)?'"
+    - path: Makefile-kpromo
+      match: GO_VERSION\ \?=\ \d+.\d+(alpha|beta|rc)?\.?(\d+)?
     - path: Dockerfile
-      match: FROM golang:\d+.\d+(alpha|beta|rc)?\.?(\d+) AS base
+      match: FROM golang:\d+.\d+(alpha|beta|rc)?\.?(\d+)-(bullseye|buster) AS base
 
   # Golang pre-releases are denoted as `1.y<pre-release stage>.z`
-  # Example: go1.16rc1
+  # Example: go1.17rc1
   #
-  # This entry is a stub of the major and minor version to allow dependency
-  # checks to pass when building using a pre-release of Golang.
-  - name: "golang: <major>.<minor>"
-    version: 1.16
+  # This entry is a stub of the major version to allow dependency checks to
+  # pass when building Kubernetes using a pre-release of Golang.
+  - name: "golang: 1.<major>"
+    version: 1.17
     refPaths:
     - path: Dockerfile
-      match: FROM golang:\d+.\d+(alpha|beta|rc)?\.?(\d+) AS base
+      match: FROM golang:\d+.\d+(alpha|beta|rc)?\.?(\d+)-(bullseye|buster)
+
+  - name: "golang: go.mod"
+    version: 1.17
+    refPaths:
     - path: go.mod
-      match: go \d+.\d+(alpha|beta|rc)?\.?(\d+)?
+      match: go \d+.\d+
+
+  - name: "k8s.gcr.io/artifact-promoter/kpromo"
+    version: v0.2.0-1
+    refPaths:
+    - path: cloudbuild.yaml
+      match: v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)-([0-9]+)
+    - path: Makefile-kpromo
+      match: IMAGE_VERSION\ \?=\ v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)-([0-9]+)

@@ -23,29 +23,40 @@
 # Determine final build variant [prod | test].
 ARG variant
 
-FROM golang:1.16.7 AS base
+# Base image
+FROM golang:1.17-buster AS base
+
 # Transfer all project files to container.
 WORKDIR /go/src/app
 COPY . .
+
 # Build and export cip command.
 RUN ./go_with_version.sh build ./cmd/cip
 RUN cp ./cip /bin/cip
+
 # Provide docker config for repo information.
 RUN mkdir /.docker
 RUN cp ./docker/config.json /.docker/config.json
 
+# gcloud-base image
 FROM gcr.io/google.com/cloudsdktool/cloud-sdk:latest AS gcloud-base
+
 COPY --from=base / /
 
+# Testing image
 FROM base AS test-variant
+
 # Include cip-auditor testing fixtures.
 RUN mkdir /e2e-fixtures
 RUN cp -r ./test-e2e/cip-auditor/fixture/* /e2e-fixtures
+
 # Trigger the auditor on startup.
 ENV HOME=/
 ENTRYPOINT ["cip", "audit", "--verbose"]
 
+# Production image
 FROM gcloud-base as prod-variant
+
 ENV HOME=/
 ENTRYPOINT ["/bin/bash", "-c"]
 

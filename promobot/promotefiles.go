@@ -39,6 +39,27 @@ type PromoteFilesOptions struct {
 	// FilesPath specifies a path to manifest files containing the files section.
 	FilesPath string
 
+	// ManifestsPath specifies a path containing filestores and files for
+	// multiple projects.
+	//
+	// Example layout:
+	//
+	// ├── filestores
+	// │   ├── project1
+	// │   │   └── filepromoter-manifest.yaml
+	// │   └── project2
+	// │       └── filepromoter-manifest.yaml
+	// └── manifests
+	//     ├── project1
+	//     │   ├── blue.yaml
+	//     │   ├── green.yaml
+	//     │   └── red.yaml
+	//     └── project2
+	//         ├── blue.yaml
+	//         ├── green.yaml
+	//         └── red.yaml
+	ManifestsPath string
+
 	// DryRun (if set) will not perform operations, but print them instead
 	DryRun bool
 
@@ -59,7 +80,7 @@ func (o *PromoteFilesOptions) PopulateDefaults() {
 
 // RunPromoteFiles executes a file promotion command
 func RunPromoteFiles(ctx context.Context, options PromoteFilesOptions) error {
-	manifest, err := ReadManifest(options)
+	manifests, err := ReadManifests(options)
 	if err != nil {
 		return err
 	}
@@ -74,16 +95,19 @@ func RunPromoteFiles(ctx context.Context, options PromoteFilesOptions) error {
 			"********** START **********\n")
 	}
 
-	promoter := &filepromoter.ManifestPromoter{
-		Manifest:          manifest,
-		UseServiceAccount: options.UseServiceAccount,
-	}
+	var ops []filepromoter.SyncFileOp
+	for _, manifest := range manifests {
+		promoter := &filepromoter.ManifestPromoter{
+			Manifest:          manifest,
+			UseServiceAccount: options.UseServiceAccount,
+		}
 
-	ops, err := promoter.BuildOperations(ctx)
-	if err != nil {
-		return fmt.Errorf(
-			"error building operations: %v",
-			err)
+		o, err := promoter.BuildOperations(ctx)
+		if err != nil {
+			return fmt.Errorf("error building operations: %v", err)
+		}
+
+		ops = append(ops, o...)
 	}
 
 	// So that we can support future parallel execution, an error
@@ -92,8 +116,10 @@ func RunPromoteFiles(ctx context.Context, options PromoteFilesOptions) error {
 	var errors []error
 	for _, op := range ops {
 		if _, err := fmt.Fprintf(options.Out, "%v\n", op); err != nil {
-			errors = append(errors, fmt.Errorf(
-				"error writing to output: %v", err))
+			errors = append(
+				errors,
+				fmt.Errorf("error writing to output: %v", err),
+			)
 		}
 
 		if !options.DryRun {
@@ -126,6 +152,75 @@ func RunPromoteFiles(ctx context.Context, options PromoteFilesOptions) error {
 	}
 
 	return nil
+}
+
+// ReadManifests reads a set of manifests.
+func ReadManifests(options PromoteFilesOptions) ([]*api.Manifest, error) {
+	manifests := make([]*api.Manifest, 0)
+	mPath := options.ManifestsPath
+	if mPath == "" {
+		m, err := ReadManifest(options)
+		if err != nil {
+			return nil, err
+		}
+
+		manifests = append(manifests, m)
+		return manifests, nil
+	}
+
+	filestoresDir := filepath.Join(mPath, "filestores")
+	manifestsDir := filepath.Join(mPath, "manifests")
+
+	var projects []string
+
+	// TODO: Consider using filepath.WalkDir() instead
+	if err := filepath.Walk(
+		filestoresDir,
+		func(p string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+
+			if !info.IsDir() || info.Name() == "filestores" {
+				return nil
+			}
+
+			projects = append(projects, info.Name())
+			return nil
+		},
+	); err != nil {
+		return nil, xerrors.Errorf("error listing projects: %w", err)
+	}
+
+	for _, prj := range projects {
+		filestores := filepath.Join(
+			filestoresDir,
+			prj,
+			"filepromoter-manifest.yaml",
+		)
+
+		files := filepath.Join(
+			manifestsDir,
+			prj,
+		)
+
+		prjOpts := &PromoteFilesOptions{
+			FilestoresPath:    filestores,
+			FilesPath:         files,
+			DryRun:            options.DryRun,
+			UseServiceAccount: options.UseServiceAccount,
+			Out:               options.Out,
+		}
+
+		m, err := ReadManifest(*prjOpts)
+		if err != nil {
+			return nil, err
+		}
+
+		manifests = append(manifests, m)
+	}
+
+	return manifests, nil
 }
 
 // ReadManifest reads a manifest.

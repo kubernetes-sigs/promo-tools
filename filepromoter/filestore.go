@@ -112,11 +112,14 @@ func (p *FilestorePromoter) computeNeededOperations(
 		relativePath := f.Name
 		sourceFile := source[relativePath]
 		if sourceFile == nil {
-			// TODO: Should this be a warning?
 			absolutePath := joinFilepath(p.Source, relativePath)
-			return nil, fmt.Errorf(
+			logrus.Debugf(
 				"file %q not found in source (%q)",
-				relativePath, absolutePath)
+				relativePath,
+				absolutePath,
+			)
+
+			continue
 		}
 
 		destFile := dest[relativePath]
