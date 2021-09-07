@@ -24,15 +24,6 @@ dependencies:
     - path: Makefile-kpromo
       match: OS_CODENAME\ \?=\ (bullseye|buster)
 
-  - name: "distroless"
-    version: static-debian10
-    refPaths:
-    # Must match distroless Debian version as well
-    - path: cloudbuild.yaml
-      match: "_DISTROLESS_IMAGE: 'static-debian[0-9]{2}'"
-    - path: Makefile-kpromo
-      match: DISTROLESS_IMAGE\ \?=\ static-debian[0-9]{2}
-
   # golangci-lint
   - name: "golangci-lint"
     version: 1.41.1
