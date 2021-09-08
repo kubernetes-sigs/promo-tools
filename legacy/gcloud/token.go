@@ -42,7 +42,10 @@ func GetServiceAccountToken(
 	args = MaybeUseServiceAccount(serviceAccount, useServiceAccount, args)
 
 	cmd := command.New("gcloud", args...)
-	std, err := cmd.RunSuccessOutput()
+
+	// We use RunSilentSuccessOutput() to ensure the access token is captured,
+	// but not displayed in logs.
+	std, err := cmd.RunSilentSuccessOutput()
 	// Do not log the token (stdout) on error, because it could
 	// be that the token was valid, but that Run() failed for
 	// other reasons. NEVER print the token as part of an error message!
