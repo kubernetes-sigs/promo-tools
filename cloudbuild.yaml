@@ -29,7 +29,6 @@ steps:
   - IMAGE_VERSION=$_IMAGE_VERSION
   - GO_VERSION=$_GO_VERSION
   - OS_CODENAME=$_OS_CODENAME
-  - DISTROLESS_IMAGE=$_DISTROLESS_IMAGE
   args:
   - '-c'
   - |
@@ -42,10 +41,9 @@ substitutions:
   # vYYYYMMDD-hash, and can be used as a substitution
   _GIT_TAG: '12345'
   _PULL_BASE_REF: 'dev'
-  _IMAGE_VERSION: 'v0.2.1-1'
+  _IMAGE_VERSION: 'v0.2.1-2'
   _GO_VERSION: '1.17'
   _OS_CODENAME: 'buster'
-  _DISTROLESS_IMAGE: 'static-debian10'
 
 tags:
 - 'cip'
@@ -55,7 +53,6 @@ tags:
 - ${_IMAGE_VERSION}
 - ${_GO_VERSION}
 - ${_OS_CODENAME}
-- ${_DISTROLESS_IMAGE}
 
 images:
 # TODO: Temporarily disabling this check, which is currently failing in
