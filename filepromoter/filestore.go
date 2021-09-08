@@ -73,11 +73,18 @@ func openFilestore(
 	}
 
 	var opts []option.ClientOption
-	if useServiceAccount && filestore.ServiceAccount != "" {
+	if filestore.Src {
+		opts = append(opts, option.WithoutAuthentication())
+	} else {
+		if filestore.ServiceAccount == "" {
+			return nil, fmt.Errorf(
+				"service account must be specified for destination filestore %s",
+				filestore.Base,
+			)
+		}
+
 		ts := &gcloudTokenSource{ServiceAccount: filestore.ServiceAccount}
 		opts = append(opts, option.WithTokenSource(ts))
-	} else {
-		opts = append(opts, option.WithoutAuthentication())
 	}
 
 	client, err := storage.NewClient(ctx, opts...)
