@@ -63,10 +63,6 @@ type PromoteFilesOptions struct {
 	// DryRun (if set) will not perform operations, but print them instead
 	DryRun bool
 
-	// UseServiceAccount must be true, for service accounts to be used
-	// This gives some protection against a hostile manifest.
-	UseServiceAccount bool
-
 	// Out is the destination for "normal" output (such as dry-run)
 	Out io.Writer
 }
@@ -74,7 +70,6 @@ type PromoteFilesOptions struct {
 // PopulateDefaults sets the default values for PromoteFilesOptions
 func (o *PromoteFilesOptions) PopulateDefaults() {
 	o.DryRun = true
-	o.UseServiceAccount = false
 	o.Out = os.Stdout
 }
 
@@ -98,8 +93,7 @@ func RunPromoteFiles(ctx context.Context, options PromoteFilesOptions) error {
 	var ops []filepromoter.SyncFileOp
 	for _, manifest := range manifests {
 		promoter := &filepromoter.ManifestPromoter{
-			Manifest:          manifest,
-			UseServiceAccount: options.UseServiceAccount,
+			Manifest: manifest,
 		}
 
 		o, err := promoter.BuildOperations(ctx)
@@ -205,11 +199,10 @@ func ReadManifests(options PromoteFilesOptions) ([]*api.Manifest, error) {
 		)
 
 		prjOpts := &PromoteFilesOptions{
-			FilestoresPath:    filestores,
-			FilesPath:         files,
-			DryRun:            options.DryRun,
-			UseServiceAccount: options.UseServiceAccount,
-			Out:               options.Out,
+			FilestoresPath: filestores,
+			FilesPath:      files,
+			DryRun:         options.DryRun,
+			Out:            options.Out,
 		}
 
 		m, err := ReadManifest(*prjOpts)

@@ -71,13 +71,6 @@ func init() {
 		"test run promotion without modifying any filestore",
 	)
 
-	filesCmd.PersistentFlags().BoolVar(
-		&filesOpts.UseServiceAccount,
-		"use-service-account",
-		filesOpts.UseServiceAccount,
-		"allow service account usage with gcloud calls",
-	)
-
 	// TODO(kpromo): Consider marking manifest flags as required
 
 	RunCmd.AddCommand(filesCmd)
