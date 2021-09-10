@@ -139,7 +139,7 @@ func WriteImages(manifest Manifest, rii RegInvImage) error {
 
 	// Write the file.
 	err := ioutil.WriteFile(
-		imagesPath, []byte(rii.ToYAML(YamlMarshalingOpts{})), 0644)
+		imagesPath, []byte(rii.ToYAML(YamlMarshalingOpts{})), 0o644)
 	return err
 }
 
