@@ -201,7 +201,6 @@ func RunPromoteCmd(opts *RunOptions) error {
 		// Print version to make Prow logs more self-explanatory.
 		printVersion()
 
-		
 		if opts.SeverityThreshold >= 0 {
 			logrus.Info("********** START (VULN CHECK) **********")
 			logrus.Info(
@@ -361,7 +360,6 @@ necessarily mean that a new version of the image layer is available.`,
 		}
 	}
 
-	
 	if opts.SeverityThreshold >= 0 {
 		logrus.Info("********** FINISHED (VULN CHECK) **********")
 	} else if opts.DryRun {
@@ -372,7 +370,6 @@ necessarily mean that a new version of the image layer is available.`,
 
 	return nil
 }
-
 
 func validateImageOptions(o *RunOptions) error {
 	// TODO: Validate options

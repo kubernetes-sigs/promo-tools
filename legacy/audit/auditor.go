@@ -75,9 +75,7 @@ func (s *ServerContext) RunAuditor() {
 	logrus.Info("Starting Auditor")
 	logrus.Infoln(s)
 
-	// nolint[errcheck]
 	defer s.LoggingFacility.Close()
-	// nolint[errcheck]
 	defer s.ErrorReportingFacility.Close()
 
 	http.HandleFunc(
@@ -165,7 +163,6 @@ func ValidatePayload(gcrPayload *reg.GCRPubSubPayload) error {
 // parse the request body to understand the GCR state change, (2) update the Git
 // repo of the promoter manifests, and (3) reconcile these two against each
 // other.
-// nolint[funlen]
 func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 	logInfo := s.LoggingFacility.GetInfoLogger()
 	logError := s.LoggingFacility.GetErrorLogger()
@@ -173,8 +170,7 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 
 	defer func() {
 		if msg := recover(); msg != nil {
-			// TODO: Check result of type assertion
-			//nolint:errcheck
+			//nolint:errcheck // TODO: Check result of type assertion
 			panicStr := msg.(string)
 
 			stacktrace := debug.Stack()

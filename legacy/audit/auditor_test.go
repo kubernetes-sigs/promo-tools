@@ -175,7 +175,6 @@ func TestValidatePayload(t *testing.T) {
 	}
 }
 
-// nolint[gocyclo]
 func TestAudit(t *testing.T) {
 	// Regression test case for
 	// https://github.com/kubernetes-sigs/k8s-container-image-promoter/issues/191.

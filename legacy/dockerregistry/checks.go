@@ -275,7 +275,6 @@ func MKImageVulnCheck(
 
 // Run is a function of ImageVulnCheck and checks that none of the
 // images to be promoted have any severe vulnerabilities.
-// nolint[errcheck]
 func (check *ImageVulnCheck) Run() error {
 	var populateRequests PopulateRequests = func(
 		sc *SyncContext,
@@ -426,7 +425,6 @@ func parseImageProjectID(edge *PromotionEdge) (string, error) {
 // mkRealVulnProducer returns an ImageVulnProducer that gets all vulnerability
 // Occurrences associated with the image represented in the PromotionEdge
 // using the Container Analysis Service client library.
-// nolint[errcheck]
 func mkRealVulnProducer(client *containeranalysis.Client) ImageVulnProducer {
 	return func(
 		edge PromotionEdge,
