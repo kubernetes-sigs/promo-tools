@@ -72,16 +72,13 @@ func openFilestore(
 	}
 
 	var opts []option.ClientOption
-	if filestore.Src {
+	if filestore.ServiceAccount == "" {
+		logrus.Warnf("a service account was not specified for this filestore (%s), so all operations will run without authentication",
+			filestore.Base,
+		)
+
 		opts = append(opts, option.WithoutAuthentication())
 	} else {
-		if filestore.ServiceAccount == "" {
-			return nil, fmt.Errorf(
-				"service account must be specified for destination filestore %s",
-				filestore.Base,
-			)
-		}
-
 		ts := &gcloudTokenSource{ServiceAccount: filestore.ServiceAccount}
 		opts = append(opts, option.WithTokenSource(ts))
 	}

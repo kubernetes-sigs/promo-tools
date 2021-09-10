@@ -41,7 +41,7 @@ substitutions:
   # vYYYYMMDD-hash, and can be used as a substitution
   _GIT_TAG: '12345'
   _PULL_BASE_REF: 'dev'
-  _IMAGE_VERSION: 'v0.2.1-2'
+  _IMAGE_VERSION: 'v0.2.2-1'
   _GO_VERSION: '1.17'
   _OS_CODENAME: 'buster'
 
