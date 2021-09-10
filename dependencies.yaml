@@ -1,4 +1,10 @@
 dependencies:
+  # Release version
+  - name: "repo release version"
+    version: 1.338.0
+    refPaths:
+    - path: VERSION
+
   # repo infra
   - name: "repo-infra"
     version: 0.2.2
