@@ -433,22 +433,30 @@ type digest struct {
 }
 
 // GCRPubSubPayload is the message payload sent to a Pub/Sub topic by a GCR.
-// nolint[lll]
 type GCRPubSubPayload struct {
 	Action string `json:"action"`
+
 	// The payload field is "digest", but really it is a FQIN like
-	//  "gcr.io/linusa/small@sha256:35f442d8d56cc7a2d4000f3417d71f44a730b900f3df440c09a9c40c42c40f86".
+	// "gcr.io/linusa/small@sha256:35f442d8d56cc7a2d4000f3417d71f44a730b900f3df440c09a9c40c42c40f86".
 	FQIN string `json:"digest,omitempty"`
-	// Similarly, the field "tag is always a PQIN. E.g.,
+
+	// Similarly, the field "tag is always a PQIN.
+	//
+	// Example:
 	// "gcr.io/linusa/small:a".
 	PQIN string `json:"tag,omitempty"`
 
-	// Everything leading up to either the tag or digest. E.g., given
-	// "us.gcr.io/k8s-artifacts-prod/foo/bar:1.0", this would be
+	// Everything leading up to either the tag or digest.
+	//
+	// Example:
+	// Given "us.gcr.io/k8s-artifacts-prod/foo/bar:1.0", this would be
 	// "us.gcr.io/k8s-artifacts-prod/foo/bar".
+
 	Path string
+
 	// Image digest, if any.
 	Digest Digest
+
 	// Tag, if any.
 	Tag Tag
 }

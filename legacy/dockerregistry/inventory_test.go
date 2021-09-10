@@ -499,9 +499,6 @@ func TestParseThinManifestsFromDir(t *testing.T) {
 		expectedModified := test.expectedOutput[:0]
 		for _, mfest := range test.expectedOutput {
 			mfest.Filepath = filepath.Join(fixtureDir, mfest.Filepath)
-
-			// SA4010: this result of append is never used, except maybe in other appends
-			// nolint: staticcheck
 			expectedModified = append(expectedModified, mfest)
 		}
 

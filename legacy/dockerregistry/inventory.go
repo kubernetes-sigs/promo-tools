@@ -228,8 +228,6 @@ func (m *Manifest) Finalize() error {
 // ParseThinManifestsFromDir parses all thin Manifest files within a directory.
 // We effectively have to create a map of manifests, keyed by the source
 // registry (there can only be 1 source registry).
-//
-// nolint[funlen]
 func ParseThinManifestsFromDir(
 	dir string,
 ) ([]Manifest, error) {
@@ -303,8 +301,6 @@ func ParseThinManifestsFromDir(
 // structure for thin manifests. Most importantly, it requires that if a file
 // named "foo/manifests/bar/promoter-manifest.yaml" exists, that a corresponding
 // file named "foo/images/bar/promoter-manifest.yaml" must also exist.
-//
-// nolint[gocyclo]
 func ValidateThinManifestDirectoryStructure(
 	dir string,
 ) error {
@@ -461,8 +457,6 @@ func mkPromotionEdge(
 // This filters out those edges from ToPromotionEdges (found in []Manifest), to
 // only those PromotionEdges that makes sense to keep around. For example, we
 // want to remove all edges that have already been promoted.
-//
-// nolint[gocyclo]
 func (sc *SyncContext) GetPromotionCandidates(edges map[PromotionEdge]interface{}) (
 	map[PromotionEdge]interface{},
 	bool,
@@ -476,11 +470,16 @@ func (sc *SyncContext) GetPromotionCandidates(edges map[PromotionEdge]interface{
 	}
 
 	toPromote := make(map[PromotionEdge]interface{})
-	// nolint[lll]
 	for edge := range edges {
-		// If the edge should be ignored because of a bad read in sc.Inv, drop it
+		// If the edge should be ignored because of a bad read in sc.Inv,
+		// drop it.
 		if img, ok := ignoreMap[edge.SrcImageTag.ImageName]; ok {
-			logrus.Warnf("edge %v: ignoring because src image could not be read: %s\n", edge, img)
+			logrus.Warnf(
+				"edge %v: ignoring because src image could not be read: %s\n",
+				edge,
+				img,
+			)
+
 			continue
 		}
 
@@ -572,8 +571,6 @@ func (sc *SyncContext) getDigestForTag(inputTag Tag) *Digest {
 // different, because most likely this is at best just human error and at worst
 // a malicious attack (someone trying to push an image to an endpoint they
 // shouldn't own).
-//
-// nolint[gocyclo]
 func CheckOverlappingEdges(
 	edges map[PromotionEdge]interface{}) (map[PromotionEdge]interface{}, error) {
 	// Build up a "promotionIntent". This will be checked below.
@@ -820,7 +817,6 @@ func (m Manifest) srcRegistryName() RegistryName {
 	return RegistryName("")
 }
 
-// nolint[gocyclo]
 func validateRequiredComponents(m Manifest) error {
 	// TODO: Should we return []error here instead?
 	errs := make([]string, 0)
@@ -879,8 +875,6 @@ func validateRequiredComponents(m Manifest) error {
 }
 
 // PrettyValue creates a prettified string representation of MasterInventory.
-//
-// nolint[gocyclo]
 func (mi *MasterInventory) PrettyValue() string {
 	var b strings.Builder
 	regNames := []RegistryName{}
@@ -1020,7 +1014,6 @@ func getRegistryTagsFrom(req stream.ExternalRequest,
 		return nil, err
 	}
 
-	// nolint[errcheck]
 	defer req.StreamProducer.Close()
 
 	tags, err := extractRegistryTags(reader)
@@ -1071,7 +1064,6 @@ func getGCRManifestListFrom(req stream.ExternalRequest) (*ggcrV1.IndexManifest, 
 		return nil, err
 	}
 
-	// nolint[errcheck]
 	defer req.StreamProducer.Close()
 
 	gcrManifestList, err := extractGCRManifestList(reader)
@@ -1267,8 +1259,6 @@ func GetTokenKeyDomainRepoPath(registryName RegistryName) (key, domain, repoPath
 // NOTE: Repository names may overlap with image names. e.g., it may be in the
 // example above that there are images named gcr.io/google-containers/foo:2.0
 // and gcr.io/google-containers/foo/baz:2.0.
-//
-// nolint[gocyclo]
 func (sc *SyncContext) ReadRegistries(
 	toRead []RegistryContext,
 	recurse bool,
@@ -1426,8 +1416,6 @@ func (sc *SyncContext) ReadRegistries(
 // it is referenced by a parent DockerManifestList.
 //
 // TODO: Combine this function with ReadRegistries().
-//
-// nolint[gocyclo]
 func (sc *SyncContext) ReadGCRManifestLists(
 	mkProducer func(*SyncContext, *GCRManifestListContext) stream.Producer,
 ) {
@@ -1585,8 +1573,6 @@ func SplitByKnownRegistries(
 	for _, rc := range rcs {
 		if strings.HasPrefix(string(r), string(rc.Name)) {
 			trimmed := strings.TrimPrefix(string(r), string(rc.Name))
-
-			// nolint[gocritic]
 			if trimmed == "" {
 				// The unparsed full image path `r` and rc.Name is the same ---
 				// this happens for images pushed to the root directory. Just
@@ -1706,8 +1692,6 @@ func MkReadManifestListCmdReal(sc *SyncContext, gmlc *GCRManifestListContext) st
 
 // ExecRequests uses the Worker Pool pattern, where MaxConcurrentRequests
 // determines the number of workers to spawn.
-//
-// nolint[funlen]
 func (sc *SyncContext) ExecRequests(
 	populateRequests PopulateRequests,
 	processRequest ProcessRequest,
@@ -1877,8 +1861,6 @@ func (rii *RegInvImage) ToSorted() []ImageWithDigestSlice {
 
 // ToYAML displays a RegInvImage as YAML, but with the map items sorted
 // alphabetically.
-//
-// nolint[gocognit]
 func (rii *RegInvImage) ToYAML(o YamlMarshalingOpts) string {
 	images := rii.ToSorted()
 
@@ -1924,9 +1906,7 @@ func (rii *RegInvImage) ToYAML(o YamlMarshalingOpts) string {
 // format, it prints one image on each line as a CSV. If there is a tag pointing
 // to the image, then it is printed next to the image on the same line.
 //
-// E.g.
-//
-// nolint[lll]
+// Example:
 // a@sha256:0000000000000000000000000000000000000000000000000000000000000000,a:1.0
 // a@sha256:0000000000000000000000000000000000000000000000000000000000000000,a:latest
 // b@sha256:1111111111111111111111111111111111111111111111111111111111111111,-
@@ -2203,8 +2183,6 @@ func getRegistriesToRead(edges map[PromotionEdge]interface{}) []RegistryContext 
 
 // Promote performs container image promotion by realizing the intent in the
 // Manifest.
-//
-// nolint[gocyclo]
 func (sc *SyncContext) Promote(
 	edges map[PromotionEdge]interface{},
 	mkProducer func(
@@ -2416,7 +2394,6 @@ func MkRequestCapturer(captured *CapturedRequests) ProcessRequest {
 }
 
 // GarbageCollect deletes all images that are not referenced by Docker tags.
-// nolint[gocyclo]
 func (sc *SyncContext) GarbageCollect(
 	mfest Manifest,
 	mkProducer func(RegistryContext, ImageName, Digest) stream.Producer,
@@ -2531,7 +2508,6 @@ func supportedMediaType(v string) (ggcrV1Types.MediaType, error) {
 }
 
 // ClearRepository wipes out all Docker images from a registry! Use with caution.
-// nolint[gocyclo]
 //
 // TODO: Maybe split this into 2 parts, so that each part can be unit-tested
 // separately (deletion of manifest lists vs deletion of other media types).
@@ -2853,7 +2829,6 @@ func (payload *GCRPubSubPayload) PopulateExtraFields() error {
 	// Populate digest, if found.
 	if len(payload.FQIN) > 0 {
 		parsed := strings.Split(payload.FQIN, "@")
-		// nolint[gomnd]
 		if len(parsed) != 2 {
 			return fmt.Errorf("invalid FQIN: %v", payload.FQIN)
 		}
@@ -2864,7 +2839,6 @@ func (payload *GCRPubSubPayload) PopulateExtraFields() error {
 	// Populate tag, if found.
 	if len(payload.PQIN) > 0 {
 		parsed := strings.Split(payload.PQIN, ":")
-		// nolint[gomnd]
 		if len(parsed) != 2 {
 			return fmt.Errorf("invalid PQIN: %v", payload.PQIN)
 		}

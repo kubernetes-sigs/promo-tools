@@ -139,7 +139,7 @@ func WriteImages(manifest Manifest, rii RegInvImage) error {
 
 	// Write the file.
 	err := ioutil.WriteFile(
-		imagesPath, []byte(rii.ToYAML(YamlMarshalingOpts{})), 0644)
+		imagesPath, []byte(rii.ToYAML(YamlMarshalingOpts{})), 0o644)
 	return err
 }
 
@@ -225,9 +225,9 @@ func ApplyFilters(o *GrowManifestOptions, rii RegInvImage) (RegInvImage, error) 
 	rii = ExcludeTags(rii, excludeTags)
 
 	if len(rii) == 0 {
-		// nolint[lll]
 		return RegInvImage{}, xerrors.New(
-			"no images survived filtering; double-check your --filter_* flag(s) for typos")
+			"no images survived filtering; double-check your --filter_* flag(s) for typos",
+		)
 	}
 
 	return rii, nil
