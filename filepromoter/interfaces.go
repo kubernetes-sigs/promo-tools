@@ -18,7 +18,10 @@ package filepromoter
 
 import "context"
 
+//go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate
+
 // SyncFileOp defines a synchronization operation.
+//counterfeiter:generate . SyncFileOp
 type SyncFileOp interface {
 	Run(ctx context.Context) error
 }

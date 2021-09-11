@@ -39,6 +39,7 @@ type FilestorePromoter struct {
 	Files []api.File
 }
 
+//counterfeiter:generate . syncFilestore
 type syncFilestore interface {
 	// OpenReader opens an io.ReadCloser for the specified file
 	OpenReader(ctx context.Context, name string) (io.ReadCloser, error)

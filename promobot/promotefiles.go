@@ -31,6 +31,8 @@ import (
 	"sigs.k8s.io/k8s-container-image-promoter/filepromoter"
 )
 
+//go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate
+
 // PromoteFilesOptions holds the flag-values for a file promotion
 type PromoteFilesOptions struct {
 	// FilestoresPath is the path to the manifest file containing the filestores section
