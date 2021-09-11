@@ -111,7 +111,7 @@ update-mocks: ## Update all generated mocks
 
 .PHONY: verify verify-boilerplate verify-dependencies verify-golangci-lint verify-go-mod
 
-verify: verify-boilerplate verify-dependencies verify-golangci-lint verify-go-mod ## Runs verification scripts to ensure correct execution
+verify: verify-boilerplate verify-dependencies verify-golangci-lint verify-go-mod verify-mocks ## Runs verification scripts to ensure correct execution
 
 verify-boilerplate: ## Runs the file header check
 	./hack/verify-boilerplate.sh
@@ -127,6 +127,9 @@ verify-golangci-lint: ## Runs all golang linters
 
 verify-archives: ### Check golden image archives
 	./hack/verify-archives.sh $(REPO_ROOT)
+
+verify-mocks: ## Verify that mocks do not require updates
+	./hack/verify-mocks.sh
 
 ##@ Helpers
 
