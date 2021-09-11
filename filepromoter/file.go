@@ -28,8 +28,8 @@ import (
 	"sigs.k8s.io/release-utils/hash"
 )
 
-// syncFileInfo tracks a file during the synchronization operation.
-type syncFileInfo struct {
+// SyncFileInfo tracks a file during the synchronization operation.
+type SyncFileInfo struct {
 	RelativePath string
 	AbsolutePath string
 
@@ -45,8 +45,8 @@ type syncFileInfo struct {
 
 // copyFileOp manages copying a single file.
 type copyFileOp struct {
-	Source *syncFileInfo
-	Dest   *syncFileInfo
+	Source *SyncFileInfo
+	Dest   *SyncFileInfo
 
 	ManifestFile *api.File
 }

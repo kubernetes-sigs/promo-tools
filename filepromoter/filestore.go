@@ -48,7 +48,7 @@ type syncFilestore interface {
 	UploadFile(ctx context.Context, dest string, localFile string) error
 
 	// ListFiles returns all the file artifacts in the filestore, recursively.
-	ListFiles(ctx context.Context) (map[string]*syncFileInfo, error)
+	ListFiles(ctx context.Context) (map[string]*SyncFileInfo, error)
 }
 
 func openFilestore(
@@ -107,7 +107,7 @@ func openFilestore(
 
 // computeNeededOperations determines the list of files that need to be copied
 func (p *FilestorePromoter) computeNeededOperations(
-	source, dest map[string]*syncFileInfo,
+	source, dest map[string]*SyncFileInfo,
 	destFilestore syncFilestore) ([]SyncFileOp, error) {
 	ops := make([]SyncFileOp, 0)
 
@@ -128,7 +128,7 @@ func (p *FilestorePromoter) computeNeededOperations(
 
 		destFile := dest[relativePath]
 		if destFile == nil {
-			destFile = &syncFileInfo{}
+			destFile = &SyncFileInfo{}
 			destFile.RelativePath = sourceFile.RelativePath
 			destFile.AbsolutePath = joinFilepath(
 				p.Dest,
