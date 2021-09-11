@@ -99,11 +99,19 @@ update: ## Update go modules (source of truth!).
 	GO111MODULE=on go mod verify
 	GO111MODULE=on go mod tidy
 
+update-mocks: ## Update all generated mocks
+	go generate ./...
+	for f in $(shell find . -name fake_*.go); do \
+		cp hack/boilerplate/boilerplate.generatego.txt tmp ;\
+		cat $$f >> tmp ;\
+		mv tmp $$f ;\
+	done
+
 ##@ Verify
 
 .PHONY: verify verify-boilerplate verify-dependencies verify-golangci-lint verify-go-mod
 
-verify: verify-boilerplate verify-dependencies verify-golangci-lint verify-go-mod ## Runs verification scripts to ensure correct execution
+verify: verify-boilerplate verify-dependencies verify-golangci-lint verify-go-mod verify-mocks ## Runs verification scripts to ensure correct execution
 
 verify-boilerplate: ## Runs the file header check
 	./hack/verify-boilerplate.sh
@@ -119,6 +127,9 @@ verify-golangci-lint: ## Runs all golang linters
 
 verify-archives: ### Check golden image archives
 	./hack/verify-archives.sh $(REPO_ROOT)
+
+verify-mocks: ## Verify that mocks do not require updates
+	./hack/verify-mocks.sh
 
 ##@ Helpers
 

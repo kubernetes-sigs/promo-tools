@@ -105,8 +105,8 @@ func (s *gcsSyncFilestore) UploadFile(ctx context.Context, dest, localFile strin
 
 // ListFiles returns all the file artifacts in the filestore, recursively.
 func (s *gcsSyncFilestore) ListFiles(
-	ctx context.Context) (map[string]*syncFileInfo, error) {
-	files := make(map[string]*syncFileInfo)
+	ctx context.Context) (map[string]*SyncFileInfo, error) {
+	files := make(map[string]*SyncFileInfo)
 
 	q := &storage.Query{Prefix: s.prefix}
 	logrus.Infof("listing files in bucket %s with prefix %q", s.bucket, s.prefix)
@@ -128,7 +128,7 @@ func (s *gcsSyncFilestore) ListFiles(
 				name, s.prefix)
 		}
 
-		file := &syncFileInfo{}
+		file := &SyncFileInfo{}
 		file.AbsolutePath = object.GcsPrefix + s.bucket + "/" + obj.Name
 		file.RelativePath = strings.TrimPrefix(name, s.prefix)
 		if obj.MD5 == nil {

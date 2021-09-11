@@ -1,5 +1,7 @@
+// +build tools
+
 /*
-Copyright 2019 The Kubernetes Authors.
+Copyright 2021 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,14 +16,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package filepromoter
+// This is used to import things required by build scripts, to force `go mod` to see them as dependencies
 
-import "context"
+package internal
 
-//go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate
-
-// SyncFileOp defines a synchronization operation.
-//counterfeiter:generate . SyncFileOp
-type SyncFileOp interface {
-	Run(ctx context.Context) error
-}
+import (
+	_ "github.com/maxbrunsfeld/counterfeiter/v6"
+)
