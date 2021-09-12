@@ -23,11 +23,17 @@ aliases:
     - thejoycekung # Release Manager Associate
     - verolop # Release Manager Associate
     - wilsonehusin # Release Manager Associate
-  cip-approvers:
+  promo-tools-approvers:
+    - cpanato
+    - jeremyrickard
     - justaugustus
-    - justinsb
     - listx
-  cip-reviewers:
+    - puerco
+    - saschagrunert
+  promo-tools-reviewers:
+    - cpanato
+    - jeremyrickard
     - justaugustus
-    - justinsb
     - listx
+    - puerco
+    - saschagrunert
