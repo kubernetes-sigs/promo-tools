@@ -2,21 +2,27 @@
 
 aliases:
   sig-release-leads:
+    - cpanato # SIG Technical Lead
     - jeremyrickard # SIG Technical Lead
     - justaugustus # SIG Chair
+    - puerco # SIG Technical Lead
     - saschagrunert # SIG Chair
   release-engineering-approvers:
     - cpanato # Release Manager
-    - justaugustus # subproject owner / Release Manager
     - puerco # Release Manager
     - saschagrunert # subproject owner / Release Manager
+    - justaugustus # subproject owner / Release Manager
     - xmudrii # Release Manager
   release-engineering-reviewers:
-    - cpanato # Release Manager
-    - justaugustus # subproject owner / Release Manager
-    - puerco # Release Manager
-    - saschagrunert # subproject owner / Release Manager
-    - xmudrii # Release Manager
+    - ameukam # Release Manager Associate
+    - jimangel # Release Manager Associate
+    - mkorbi # Release Manager Associate
+    - palnabarun # Release Manager Associate
+    - onlydole # Release Manager Associate
+    - sethmccombs # Release Manager Associate
+    - thejoycekung # Release Manager Associate
+    - verolop # Release Manager Associate
+    - wilsonehusin # Release Manager Associate
   wg-k8s-infra-leads:
     - ameukam
     - dims
