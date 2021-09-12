@@ -101,6 +101,7 @@ func RunPromoteFiles(ctx context.Context, options PromoteFilesOptions) error {
 	for _, manifest := range manifests {
 		promoter := &filepromoter.ManifestPromoter{
 			Manifest:          manifest,
+			DryRun:            options.DryRun,
 			UseServiceAccount: options.UseServiceAccount,
 		}
 

@@ -29,6 +29,8 @@ import (
 type ManifestPromoter struct {
 	Manifest *api.Manifest
 
+	DryRun bool
+
 	// UseServiceAccount must be true, for service accounts to be used
 	// This gives some protection against a hostile manifest.
 	UseServiceAccount bool
@@ -55,6 +57,7 @@ func (p *ManifestPromoter) BuildOperations(
 			Source:            source,
 			Dest:              filestore,
 			Files:             p.Manifest.Files,
+			DryRun:            p.DryRun,
 			UseServiceAccount: p.UseServiceAccount,
 		}
 		ops, err := fp.BuildOperations(ctx)
