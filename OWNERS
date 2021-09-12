@@ -3,11 +3,9 @@
 approvers:
 - sig-release-leads
 - release-engineering-approvers
-- wg-k8s-infra-leads
 - cip-approvers
 reviewers:
 - release-engineering-reviewers
-- cip-approvers
 - cip-reviewers
 
 labels:

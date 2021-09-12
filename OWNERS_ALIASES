@@ -23,10 +23,6 @@ aliases:
     - thejoycekung # Release Manager Associate
     - verolop # Release Manager Associate
     - wilsonehusin # Release Manager Associate
-  wg-k8s-infra-leads:
-    - ameukam
-    - dims
-    - spiffxp
   cip-approvers:
     - justaugustus
     - justinsb
