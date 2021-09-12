@@ -1,7 +1,7 @@
 dependencies:
   # Release version
   - name: "repo release version"
-    version: 1.338.0
+    version: 1.339.0
     refPaths:
     - path: VERSION
 
