@@ -57,6 +57,17 @@ func Test_useStorageClientAuth(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name: "production source filestore without service account",
+			args: args{
+				filestore: &api.Filestore{
+					Src: true,
+				},
+				dryRun: false,
+			},
+			want:    false,
+			wantErr: false,
+		},
+		{
 			name: "non-production",
 			args: args{
 				filestore: &api.Filestore{},

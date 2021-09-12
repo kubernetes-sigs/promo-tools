@@ -86,12 +86,18 @@ func openFilestore(
 
 	var opts []option.ClientOption
 	if withAuth {
-		logrus.Infof("requesting an authenticated storage client")
+		logrus.Infof(
+			"requesting an authenticated storage client for %s",
+			filestore.Base,
+		)
 
 		ts := &gcloudTokenSource{ServiceAccount: filestore.ServiceAccount}
 		opts = append(opts, option.WithTokenSource(ts))
 	} else {
-		logrus.Warnf("requesting an UNAUTHENTICATED storage client")
+		logrus.Warnf(
+			"requesting an UNAUTHENTICATED storage client for %s",
+			filestore.Base,
+		)
 
 		opts = append(opts, option.WithoutAuthentication())
 	}
@@ -122,6 +128,13 @@ func useStorageClientAuth(
 	useServiceAccount, dryRun bool,
 ) (bool, error) {
 	withAuth := false
+
+	// Source filestores should be world-readable, so authentication should
+	// not be required.
+	if filestore.Src {
+		return withAuth, nil
+	}
+
 	if !dryRun {
 		if filestore.ServiceAccount == "" {
 			return withAuth, fmt.Errorf("cannot execute a production file promotion without a service account")
