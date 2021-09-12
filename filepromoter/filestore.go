@@ -37,6 +37,10 @@ type FilestorePromoter struct {
 	Dest   *api.Filestore
 
 	Files []api.File
+
+	// UseServiceAccount must be true, for service accounts to be used
+	// This gives some protection against a hostile manifest.
+	UseServiceAccount bool
 }
 
 //counterfeiter:generate . syncFilestore
@@ -54,6 +58,7 @@ type syncFilestore interface {
 func openFilestore(
 	ctx context.Context,
 	filestore *api.Filestore,
+	useServiceAccount bool,
 ) (syncFilestore, error) {
 	u, err := url.Parse(filestore.Base)
 	if err != nil {
@@ -186,11 +191,11 @@ func joinFilepath(filestore *api.Filestore, relativePath string) string {
 // Source Filestore to the Dest Filestore.
 func (p *FilestorePromoter) BuildOperations(
 	ctx context.Context) ([]SyncFileOp, error) {
-	sourceFilestore, err := openFilestore(ctx, p.Source)
+	sourceFilestore, err := openFilestore(ctx, p.Source, p.UseServiceAccount)
 	if err != nil {
 		return nil, err
 	}
-	destFilestore, err := openFilestore(ctx, p.Dest)
+	destFilestore, err := openFilestore(ctx, p.Dest, p.UseServiceAccount)
 	if err != nil {
 		return nil, err
 	}

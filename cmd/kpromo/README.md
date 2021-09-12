@@ -75,6 +75,7 @@ Flags:
       --filestores filestores   path to the filestores promoter manifest
   -h, --help                    help for files
       --manifests string        path to manifests for multiple projects
+      --use-service-account     allow service account usage with gcloud calls
 
 Global Flags:
       --log-level string   the logging verbosity, either 'panic', 'fatal', 'error', 'warning', 'info', 'debug', 'trace' (default "info")
