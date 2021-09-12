@@ -28,6 +28,12 @@ import (
 // ManifestPromoter promotes files as described in Manifest.
 type ManifestPromoter struct {
 	Manifest *api.Manifest
+
+	DryRun bool
+
+	// UseServiceAccount must be true, for service accounts to be used
+	// This gives some protection against a hostile manifest.
+	UseServiceAccount bool
 }
 
 // BuildOperations builds the required operations to sync from the
@@ -48,9 +54,11 @@ func (p *ManifestPromoter) BuildOperations(
 		}
 		logrus.Infof("processing destination %q", filestore.Base)
 		fp := &FilestorePromoter{
-			Source: source,
-			Dest:   filestore,
-			Files:  p.Manifest.Files,
+			Source:            source,
+			Dest:              filestore,
+			Files:             p.Manifest.Files,
+			DryRun:            p.DryRun,
+			UseServiceAccount: p.UseServiceAccount,
 		}
 		ops, err := fp.BuildOperations(ctx)
 		if err != nil {

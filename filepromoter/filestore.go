@@ -37,6 +37,12 @@ type FilestorePromoter struct {
 	Dest   *api.Filestore
 
 	Files []api.File
+
+	DryRun bool
+
+	// UseServiceAccount must be true, for service accounts to be used
+	// This gives some protection against a hostile manifest.
+	UseServiceAccount bool
 }
 
 //counterfeiter:generate . syncFilestore
@@ -54,6 +60,7 @@ type syncFilestore interface {
 func openFilestore(
 	ctx context.Context,
 	filestore *api.Filestore,
+	useServiceAccount, dryRun bool,
 ) (syncFilestore, error) {
 	u, err := url.Parse(filestore.Base)
 	if err != nil {
@@ -72,16 +79,21 @@ func openFilestore(
 		)
 	}
 
-	var opts []option.ClientOption
-	if filestore.ServiceAccount == "" {
-		logrus.Warnf("a service account was not specified for this filestore (%s), so all operations will run without authentication",
-			filestore.Base,
-		)
+	withAuth, err := useStorageClientAuth(filestore, useServiceAccount, dryRun)
+	if err != nil {
+		return nil, err
+	}
 
-		opts = append(opts, option.WithoutAuthentication())
-	} else {
+	var opts []option.ClientOption
+	if withAuth {
+		logrus.Infof("requesting an authenticated storage client")
+
 		ts := &gcloudTokenSource{ServiceAccount: filestore.ServiceAccount}
 		opts = append(opts, option.WithTokenSource(ts))
+	} else {
+		logrus.Warnf("requesting an UNAUTHENTICATED storage client")
+
+		opts = append(opts, option.WithoutAuthentication())
 	}
 
 	client, err := storage.NewClient(ctx, opts...)
@@ -103,6 +115,28 @@ func openFilestore(
 		prefix:    prefix,
 	}
 	return s, nil
+}
+
+func useStorageClientAuth(
+	filestore *api.Filestore,
+	useServiceAccount, dryRun bool,
+) (bool, error) {
+	withAuth := false
+	if !dryRun {
+		if filestore.ServiceAccount == "" {
+			return withAuth, fmt.Errorf("cannot execute a production file promotion without a service account")
+		}
+
+		withAuth = true
+	} else if useServiceAccount {
+		if filestore.ServiceAccount == "" {
+			return withAuth, fmt.Errorf("requested an authenticated file promotion, but a service account was not specified")
+		}
+
+		withAuth = true
+	}
+
+	return withAuth, nil
 }
 
 // computeNeededOperations determines the list of files that need to be copied
@@ -186,13 +220,30 @@ func joinFilepath(filestore *api.Filestore, relativePath string) string {
 // Source Filestore to the Dest Filestore.
 func (p *FilestorePromoter) BuildOperations(
 	ctx context.Context) ([]SyncFileOp, error) {
-	sourceFilestore, err := openFilestore(ctx, p.Source)
+	sourceFilestore, err := openFilestore(
+		ctx,
+		p.Source,
+		p.UseServiceAccount,
+		p.DryRun,
+	)
 	if err != nil {
 		return nil, err
 	}
-	destFilestore, err := openFilestore(ctx, p.Dest)
+	if sourceFilestore == nil {
+		return nil, fmt.Errorf("source filestore cannot be nil")
+	}
+
+	destFilestore, err := openFilestore(
+		ctx,
+		p.Dest,
+		p.UseServiceAccount,
+		p.DryRun,
+	)
 	if err != nil {
 		return nil, err
+	}
+	if destFilestore == nil {
+		return nil, fmt.Errorf("destination filestore cannot be nil")
 	}
 
 	sourceFiles, err := sourceFilestore.ListFiles(ctx)
