@@ -328,7 +328,7 @@ func (t *E2ETest) clearRepositories() error {
 			{Registries: t.Registries},
 		},
 		10,
-		false,
+		true,
 		true)
 	if err != nil {
 		return err
