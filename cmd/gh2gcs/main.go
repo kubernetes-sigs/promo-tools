@@ -16,7 +16,7 @@ limitations under the License.
 
 package main
 
-import "k8s.io/release/cmd/gh2gcs/cmd"
+import "sigs.k8s.io/k8s-container-image-promoter/cmd/gh2gcs/cmd"
 
 func main() {
 	cmd.Execute()
