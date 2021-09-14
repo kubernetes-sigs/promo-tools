@@ -27,9 +27,9 @@ import (
 	cr "github.com/google/go-containerregistry/pkg/v1/types"
 	"github.com/stretchr/testify/require"
 
-	reg "sigs.k8s.io/k8s-container-image-promoter/legacy/dockerregistry"
-	"sigs.k8s.io/k8s-container-image-promoter/legacy/json"
-	"sigs.k8s.io/k8s-container-image-promoter/legacy/stream"
+	reg "sigs.k8s.io/k8s-container-image-promoter/v3/legacy/dockerregistry"
+	"sigs.k8s.io/k8s-container-image-promoter/v3/legacy/json"
+	"sigs.k8s.io/k8s-container-image-promoter/v3/legacy/stream"
 )
 
 type ParseJSONStreamResult struct {

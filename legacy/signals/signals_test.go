@@ -25,7 +25,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"sigs.k8s.io/k8s-container-image-promoter/legacy/signals"
+	"sigs.k8s.io/k8s-container-image-promoter/v3/legacy/signals"
 )
 
 func TestLogSignal(t *testing.T) {

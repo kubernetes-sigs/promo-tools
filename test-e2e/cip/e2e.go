@@ -30,10 +30,10 @@ import (
 	"github.com/sirupsen/logrus"
 	yaml "gopkg.in/yaml.v2"
 
-	"sigs.k8s.io/k8s-container-image-promoter/internal/version"
-	reg "sigs.k8s.io/k8s-container-image-promoter/legacy/dockerregistry"
-	"sigs.k8s.io/k8s-container-image-promoter/legacy/gcloud"
-	"sigs.k8s.io/k8s-container-image-promoter/legacy/stream"
+	"sigs.k8s.io/k8s-container-image-promoter/v3/internal/version"
+	reg "sigs.k8s.io/k8s-container-image-promoter/v3/legacy/dockerregistry"
+	"sigs.k8s.io/k8s-container-image-promoter/v3/legacy/gcloud"
+	"sigs.k8s.io/k8s-container-image-promoter/v3/legacy/stream"
 	"sigs.k8s.io/release-utils/command"
 )
 

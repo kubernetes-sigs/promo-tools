@@ -22,7 +22,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
-	"sigs.k8s.io/k8s-container-image-promoter/legacy/cli"
+	"sigs.k8s.io/k8s-container-image-promoter/v3/legacy/cli"
 	"sigs.k8s.io/release-utils/log"
 )
 
