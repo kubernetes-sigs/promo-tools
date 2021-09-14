@@ -85,16 +85,14 @@ func main() {
 	// Loop through each e2e test case.
 	for _, t := range ts {
 		fmt.Printf("\n===> Running e2e test '%s'...\n", t.Name)
-		err := testSetup(*repoRootPtr, &t)
-		if err != nil {
+		if err := testSetup(*repoRootPtr, &t); err != nil {
 			logrus.Fatalf("error with test setup: %q", err)
 		}
 
 		fmt.Println("checking snapshots BEFORE promotion:")
 		for _, snapshot := range t.Snapshots {
-			err := checkSnapshot(snapshot.Name, snapshot.Before, *repoRootPtr, t.Registries)
-			if err != nil {
-				logrus.Fatalf("error checking snapshot for %s: %q", snapshot.Name, err)
+			if err := checkSnapshot(snapshot.Name, snapshot.Before, *repoRootPtr, t.Registries); err != nil {
+				logrus.Fatalf("error checking snapshot before promotion for %s: %q", snapshot.Name, err)
 			}
 		}
 
@@ -132,10 +130,8 @@ func checkSnapshot(
 
 	diff := cmp.Diff(got, expected)
 	if diff != "" {
-		return errors.Errorf(
-			"expected equivalent image sets, but the following diff exists: %s",
-			diff,
-		)
+		fmt.Printf("the following diff exists: %s", diff)
+		return errors.Errorf("expected equivalent image sets")
 	}
 
 	return nil
@@ -143,7 +139,7 @@ func checkSnapshot(
 
 func testSetup(repoRoot string, t *E2ETest) error {
 	if err := t.clearRepositories(); err != nil {
-		return err
+		return errors.Wrap(err, "cleaning test repository")
 	}
 
 	goldenPush := fmt.Sprintf("%s/test-e2e/golden-images/push-golden.sh", repoRoot)
@@ -158,7 +154,6 @@ func testSetup(repoRoot string, t *E2ETest) error {
 	std, err := cmd.RunSuccessOutput()
 	fmt.Println(std.Output())
 	fmt.Println(std.Error())
-
 	return err
 }
 
@@ -167,7 +162,7 @@ func runPromotion(repoRoot string, t *E2ETest) error {
 		"run",
 		fmt.Sprintf("%s/cmd/cip/main.go", repoRoot),
 		"run",
-		"--dry-run=false",
+		"--confirm",
 		"--log-level=debug",
 		"--use-service-account",
 		// There is no need to use -key-files=... because we already activated
@@ -251,10 +246,10 @@ func (t *E2ETest) clearRepositories() error {
 			{Registries: t.Registries},
 		},
 		10,
-		false,
+		true,
 		true)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "trying to create sync context")
 	}
 
 	sc.ReadRegistries(

@@ -60,11 +60,11 @@ func GetSrcRegistry(rcs []RegistryContext) (*RegistryContext, error) {
 func MakeSyncContext(
 	mfests []Manifest,
 	threads int,
-	dryRun, useSvcAcc bool,
+	confirm, useSvcAcc bool,
 ) (SyncContext, error) {
 	sc := SyncContext{
 		Threads:           threads,
-		DryRun:            dryRun,
+		Confirm:           confirm,
 		UseServiceAccount: useSvcAcc,
 		Inv:               make(MasterInventory),
 		InvIgnore:         []ImageName{},
@@ -2012,10 +2012,10 @@ func MKPopulateRequestsForPromotionEdges(
 			return
 		}
 
-		if sc.DryRun {
-			logrus.Info("---------- BEGIN PROMOTION (DRY RUN) ----------")
-		} else {
+		if sc.Confirm {
 			logrus.Info("---------- BEGIN PROMOTION ----------")
+		} else {
+			logrus.Info("---------- BEGIN PROMOTION (DRY RUN) ----------")
 		}
 
 		for promoteMe := range toPromote {
@@ -2282,24 +2282,19 @@ func (sc *SyncContext) Promote(
 
 	captured := make(CapturedRequests)
 
-	if sc.DryRun {
+	if sc.Confirm {
+		processRequest = processRequestReal
+	} else {
 		processRequestDryRun := MkRequestCapturer(&captured)
 		processRequest = processRequestDryRun
-	} else {
-		processRequest = processRequestReal
 	}
 
 	if customProcessRequest != nil {
 		processRequest = *customProcessRequest
 	}
 
-	err := sc.ExecRequests(populateRequests, processRequest)
-
-	if sc.DryRun {
-		sc.PrintCapturedRequests(&captured)
-	}
-
-	return err
+	sc.PrintCapturedRequests(&captured)
+	return sc.ExecRequests(populateRequests, processRequest)
 }
 
 // PrintCapturedRequests pretty-prints all given PromotionRequests.
@@ -2470,24 +2465,21 @@ func (sc *SyncContext) GarbageCollect(
 
 	captured := make(CapturedRequests)
 
-	if sc.DryRun {
+	if sc.Confirm {
+		processRequest = processRequestReal
+	} else {
 		processRequestDryRun := MkRequestCapturer(&captured)
 		processRequest = processRequestDryRun
-	} else {
-		processRequest = processRequestReal
 	}
 
 	if customProcessRequest != nil {
 		processRequest = *customProcessRequest
 	}
 
+	sc.PrintCapturedRequests(&captured)
 	err := sc.ExecRequests(populateRequests, processRequest)
 	if err != nil {
 		logrus.Info(err)
-	}
-
-	if sc.DryRun {
-		sc.PrintCapturedRequests(&captured)
 	}
 }
 
@@ -2594,16 +2586,18 @@ func (sc *SyncContext) ClearRepository(
 
 	captured := make(CapturedRequests)
 
-	if sc.DryRun {
+	if sc.Confirm {
+		processRequest = processRequestReal
+	} else {
 		processRequestDryRun := MkRequestCapturer(&captured)
 		processRequest = processRequestDryRun
-	} else {
-		processRequest = processRequestReal
 	}
 
 	if customProcessRequest != nil {
 		processRequest = *customProcessRequest
 	}
+
+	sc.PrintCapturedRequests(&captured)
 
 	// TODO: These variables can likely be condensed into a single function
 	var (
@@ -2632,10 +2626,6 @@ func (sc *SyncContext) ClearRepository(
 	err = sc.ExecRequests(deleteOthers, processRequest)
 	if err != nil {
 		logrus.Info(err)
-	}
-
-	if sc.DryRun {
-		sc.PrintCapturedRequests(&captured)
 	}
 }
 
