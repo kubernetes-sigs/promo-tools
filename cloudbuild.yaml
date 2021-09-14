@@ -55,12 +55,10 @@ tags:
 - ${_OS_CODENAME}
 
 images:
-# TODO: Temporarily disabling this check, which is currently failing in
-#       postsubmit: https://github.com/kubernetes-sigs/k8s-container-image-promoter/issues/312
-#  - 'gcr.io/$PROJECT_ID/cip:$_GIT_TAG'
-#  - 'gcr.io/$PROJECT_ID/cip:latest'
-#  - 'gcr.io/$PROJECT_ID/cip-auditor:$_GIT_TAG'
-#  - 'gcr.io/$PROJECT_ID/cip-auditor:latest'
+- 'gcr.io/$PROJECT_ID/cip:$_GIT_TAG'
+- 'gcr.io/$PROJECT_ID/cip:latest'
+- 'gcr.io/$PROJECT_ID/cip-auditor:$_GIT_TAG'
+- 'gcr.io/$PROJECT_ID/cip-auditor:latest'
 - 'gcr.io/$PROJECT_ID/kpromo-amd64:$_IMAGE_VERSION'
 - 'gcr.io/$PROJECT_ID/kpromo-amd64:$_GIT_TAG'
 - 'gcr.io/$PROJECT_ID/kpromo-amd64:latest'
