@@ -19,7 +19,7 @@ package cmd
 import (
 	"github.com/spf13/cobra"
 
-	"sigs.k8s.io/k8s-container-image-promoter/legacy/cli"
+	"sigs.k8s.io/k8s-container-image-promoter/v3/legacy/cli"
 )
 
 var versionOpts = &cli.VersionOptions{}

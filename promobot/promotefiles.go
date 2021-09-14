@@ -27,8 +27,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/xerrors"
 
-	api "sigs.k8s.io/k8s-container-image-promoter/api/files"
-	"sigs.k8s.io/k8s-container-image-promoter/filepromoter"
+	api "sigs.k8s.io/k8s-container-image-promoter/v3/api/files"
+	"sigs.k8s.io/k8s-container-image-promoter/v3/filepromoter"
 )
 
 //go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate

@@ -21,7 +21,7 @@ import (
 	"context"
 	"sync"
 
-	"sigs.k8s.io/k8s-container-image-promoter/filepromoter"
+	"sigs.k8s.io/k8s-container-image-promoter/v3/filepromoter"
 )
 
 type FakeSyncFileOp struct {
