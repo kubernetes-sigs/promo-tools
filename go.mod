@@ -1,4 +1,4 @@
-module sigs.k8s.io/k8s-container-image-promoter/v3
+module sigs.k8s.io/promo-tools/v3
 
 go 1.17
 

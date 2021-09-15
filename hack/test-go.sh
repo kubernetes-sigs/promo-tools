@@ -57,7 +57,7 @@ go_test_flags=(
 )
 
 packages=()
-mapfile -t packages < <(go list ./... | grep -v 'sigs.k8s.io/k8s-container-image-promoter/cmd\|test-e2e')
+mapfile -t packages < <(go list ./... | grep -v 'sigs.k8s.io/promo-tools/cmd\|test-e2e')
 
 export GO111MODULE=on
 

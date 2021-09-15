@@ -27,12 +27,12 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"sigs.k8s.io/k8s-container-image-promoter/v3/legacy/audit"
-	reg "sigs.k8s.io/k8s-container-image-promoter/v3/legacy/dockerregistry"
-	"sigs.k8s.io/k8s-container-image-promoter/v3/legacy/logclient"
-	"sigs.k8s.io/k8s-container-image-promoter/v3/legacy/remotemanifest"
-	"sigs.k8s.io/k8s-container-image-promoter/v3/legacy/report"
-	"sigs.k8s.io/k8s-container-image-promoter/v3/legacy/stream"
+	"sigs.k8s.io/promo-tools/v3/legacy/audit"
+	reg "sigs.k8s.io/promo-tools/v3/legacy/dockerregistry"
+	"sigs.k8s.io/promo-tools/v3/legacy/logclient"
+	"sigs.k8s.io/promo-tools/v3/legacy/remotemanifest"
+	"sigs.k8s.io/promo-tools/v3/legacy/report"
+	"sigs.k8s.io/promo-tools/v3/legacy/stream"
 )
 
 func TestParsePubSubMessageBody(t *testing.T) {
@@ -177,7 +177,7 @@ func TestValidatePayload(t *testing.T) {
 
 func TestAudit(t *testing.T) {
 	// Regression test case for
-	// https://github.com/kubernetes-sigs/k8s-container-image-promoter/issues/191.
+	// https://github.com/kubernetes-sigs/promo-tools/issues/191.
 	manifests1 := []reg.Manifest{
 		{
 			Registries: []reg.RegistryContext{

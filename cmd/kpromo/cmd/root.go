@@ -22,8 +22,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
-	"sigs.k8s.io/k8s-container-image-promoter/v3/cmd/kpromo/cmd/manifest"
-	"sigs.k8s.io/k8s-container-image-promoter/v3/cmd/kpromo/cmd/run"
+	"sigs.k8s.io/promo-tools/v3/cmd/kpromo/cmd/manifest"
+	"sigs.k8s.io/promo-tools/v3/cmd/kpromo/cmd/run"
 	"sigs.k8s.io/release-utils/log"
 )
 

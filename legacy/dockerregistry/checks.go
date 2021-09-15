@@ -34,7 +34,7 @@ import (
 	gogit "gopkg.in/src-d/go-git.v4"
 	"gopkg.in/src-d/go-git.v4/plumbing"
 
-	"sigs.k8s.io/k8s-container-image-promoter/v3/legacy/stream"
+	"sigs.k8s.io/promo-tools/v3/legacy/stream"
 )
 
 // MBToBytes converts a value from MiB to Bytes.

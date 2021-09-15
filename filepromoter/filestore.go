@@ -27,7 +27,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"google.golang.org/api/option"
 
-	api "sigs.k8s.io/k8s-container-image-promoter/v3/api/files"
+	api "sigs.k8s.io/promo-tools/v3/api/files"
 	"sigs.k8s.io/release-sdk/object"
 )
 

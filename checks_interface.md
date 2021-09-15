@@ -9,7 +9,7 @@ check requirements in the future.
 
 ## Interface Explanation
 The `PreCheck` interface is implemented like so in the 
-[types.go](https://github.com/kubernetes-sigs/k8s-container-image-promoter/blob/master/lib/dockerregistry/types.go) 
+[types.go](https://github.com/kubernetes-sigs/promo-tools/blob/master/lib/dockerregistry/types.go)
 file. The `Run` function is the method used in order to actually execute the 
 check that implements this interface.
 
@@ -54,7 +54,7 @@ func (f *foo) Run() error
 ```
 Then add that check type you've created to the input list of PreChecks for 
 the RunChecks method, which is called in the 
-[cip.go](https://github.com/kubernetes-sigs/k8s-container-image-promoter/blob/master/cip.go) 
+[cip.go](https://github.com/kubernetes-sigs/promo-tools/blob/master/cip.go)
 file.
 
 Note that the `Run` method of the precheck interface does not accept any 

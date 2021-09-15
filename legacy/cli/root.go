@@ -19,7 +19,7 @@ package cli
 import (
 	"fmt"
 
-	"sigs.k8s.io/k8s-container-image-promoter/v3/internal/version"
+	"sigs.k8s.io/promo-tools/v3/internal/version"
 )
 
 type RootOptions struct {

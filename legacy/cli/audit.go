@@ -23,9 +23,9 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
-	"sigs.k8s.io/k8s-container-image-promoter/v3/legacy/audit"
-	"sigs.k8s.io/k8s-container-image-promoter/v3/legacy/reqcounter"
-	"sigs.k8s.io/k8s-container-image-promoter/v3/legacy/signals"
+	"sigs.k8s.io/promo-tools/v3/legacy/audit"
+	"sigs.k8s.io/promo-tools/v3/legacy/reqcounter"
+	"sigs.k8s.io/promo-tools/v3/legacy/signals"
 )
 
 type AuditOptions struct {
