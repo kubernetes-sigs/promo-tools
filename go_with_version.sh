@@ -40,7 +40,7 @@ fi
 
 tool="$2"
 git_tree_state=dirty
-pkg=sigs.k8s.io/k8s-container-image-promoter/internal/version
+pkg=sigs.k8s.io/promo-tools/internal/version
 
 if git_status=$(git status --porcelain --untracked=no 2>/dev/null) && [[ -z "${git_status}" ]]; then
 git_tree_state=clean

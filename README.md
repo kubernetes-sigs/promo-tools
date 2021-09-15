@@ -33,8 +33,8 @@ Currently only Google Container Registry (GCR) is supported.
 2. Run the steps below:
 
 ```console
-go get sigs.k8s.io/k8s-container-image-promoter
-cd $GOPATH/src/sigs.k8s.io/k8s-container-image-promoter
+go get sigs.k8s.io/promo-tools
+cd $GOPATH/src/sigs.k8s.io/promo-tools
 
 # Install the "cip" binary into $GOPATH/bin
 make install
@@ -384,7 +384,7 @@ the VERSION file often as the Docker images will always get a unique identifier.
 
 ## Checks Interface
 
-Read more [here](https://github.com/kubernetes-sigs/k8s-container-image-promoter/blob/master/checks_interface.md).
+Read more [here](https://github.com/kubernetes-sigs/promo-tools/blob/master/checks_interface.md).
 
 The addition of the checks interface to the Container Image Promoter is meant
 to make it easy to add checks against pull requests affecting the promoter

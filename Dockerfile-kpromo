@@ -17,7 +17,7 @@ ARG GO_VERSION
 ARG OS_CODENAME
 FROM golang:${GO_VERSION}-${OS_CODENAME} as builder
 
-WORKDIR /go/src/sigs.k8s.io/k8s-container-image-promoter
+WORKDIR /go/src/sigs.k8s.io/promo-tools
 
 # Copy the sources
 ENV package="./cmd/kpromo"
@@ -44,6 +44,6 @@ LABEL maintainers="Kubernetes Authors"
 LABEL description="kpromo: The Kubernetes project artifact promoter"
 
 WORKDIR /
-COPY --from=builder /go/src/sigs.k8s.io/k8s-container-image-promoter/kpromo .
+COPY --from=builder /go/src/sigs.k8s.io/promo-tools/kpromo .
 
 ENTRYPOINT ["/kpromo"]
