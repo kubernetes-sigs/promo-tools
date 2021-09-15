@@ -12,8 +12,8 @@ Google Cloud has [documentation on installing and configuring the Google Cloud S
 
 The simplest way to install the `gh2gcs` CLI is via `go get`:
 
-```
-$ go get k8s.io/release/cmd/gh2gcs
+```console
+go get k8s.io/release/cmd/gh2gcs
 ```
 
 This will install `gh2gcs` to `$(go env GOPATH)/bin/gh2gcs`.
@@ -46,4 +46,7 @@ The following GCS buckets are managed by SIG Release:
 - k8s-artifacts-cni - contains [CNI plugins](https://github.com/containernetworking/plugins) artifacts
 - k8s-artifacts-cri-tools - contains [CRI tools](https://github.com/kubernetes-sigs/cri-tools) artifacts (`crictl` and `critest`)
 
-The artifacts are pushed to GCS by [Release Managers](https://github.com/kubernetes/sig-release/blob/master/release-managers.md). The pushing is done manually by running the appropriate `gh2gcs` command. It's recommended for Release Managers to watch the appropriate repositories for new releases.
+The artifacts are pushed to GCS by
+[Release Managers](https://k8s.io/releases/release-managers/). The pushing is
+done manually by running the appropriate `gh2gcs` command. It's recommended for
+Release Managers to watch the appropriate repositories for new releases.
