@@ -23,9 +23,9 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
-	reg "sigs.k8s.io/k8s-container-image-promoter/v3/legacy/dockerregistry"
-	"sigs.k8s.io/k8s-container-image-promoter/v3/legacy/gcloud"
-	"sigs.k8s.io/k8s-container-image-promoter/v3/legacy/stream"
+	reg "sigs.k8s.io/promo-tools/v3/legacy/dockerregistry"
+	"sigs.k8s.io/promo-tools/v3/legacy/gcloud"
+	"sigs.k8s.io/promo-tools/v3/legacy/stream"
 )
 
 type RunOptions struct {

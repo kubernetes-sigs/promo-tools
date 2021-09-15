@@ -27,9 +27,9 @@ import (
 	cr "github.com/google/go-containerregistry/pkg/v1/types"
 	"github.com/stretchr/testify/require"
 
-	reg "sigs.k8s.io/k8s-container-image-promoter/v3/legacy/dockerregistry"
-	"sigs.k8s.io/k8s-container-image-promoter/v3/legacy/json"
-	"sigs.k8s.io/k8s-container-image-promoter/v3/legacy/stream"
+	reg "sigs.k8s.io/promo-tools/v3/legacy/dockerregistry"
+	"sigs.k8s.io/promo-tools/v3/legacy/json"
+	"sigs.k8s.io/promo-tools/v3/legacy/stream"
 )
 
 type ParseJSONStreamResult struct {
@@ -790,7 +790,7 @@ func TestSplitRegistryImagePath(t *testing.T) {
 func TestSplitByKnownRegistries(t *testing.T) {
 	knownRegistryNames := []reg.RegistryName{
 		// See
-		// https://github.com/kubernetes-sigs/k8s-container-image-promoter/issues/188.
+		// https://github.com/kubernetes-sigs/promo-tools/issues/188.
 		`us.gcr.io/k8s-artifacts-prod/kube-state-metrics`,
 		`us.gcr.io/k8s-artifacts-prod/metrics-server`,
 		`us.gcr.io/k8s-artifacts-prod`,

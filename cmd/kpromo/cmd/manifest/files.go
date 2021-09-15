@@ -24,7 +24,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
-	"sigs.k8s.io/k8s-container-image-promoter/v3/promobot"
+	"sigs.k8s.io/promo-tools/v3/promobot"
 	"sigs.k8s.io/yaml"
 )
 

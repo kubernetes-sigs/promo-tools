@@ -18,7 +18,7 @@ limitations under the License.
 
 package main
 
-import "sigs.k8s.io/k8s-container-image-promoter/v3/cmd/kpromo/cmd"
+import "sigs.k8s.io/promo-tools/v3/cmd/kpromo/cmd"
 
 func main() {
 	cmd.Execute()
