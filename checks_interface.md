@@ -4,12 +4,12 @@ to make it easy to add checks against pull requests affecting the promoter
 manifests. The interface allows engineers to add checks without worrying about 
 any pre-existing checks and test their own checks individually, while also 
 giving freedom as to what conditionals or tags might be necessary for the 
-check to occur. Aditionally, using an interface means easy expandability of 
+check to occur. Additionally, using an interface means easy expandability of
 check requirements in the future.
 
 ## Interface Explanation
 The `PreCheck` interface is implemented like so in the 
-[types.go](https://github.com/kubernetes-sigs/promo-tools/blob/master/lib/dockerregistry/types.go)
+[types.go](/legacy/dockerregistry/types.go)
 file. The `Run` function is the method used in order to actually execute the 
 check that implements this interface.
 
@@ -33,15 +33,13 @@ func (sc *SyncContext) RunChecks(
 ```
 
 #### Integration With PROW
-The Container Image Promoter has several Prow jobs that run whenever a pull 
-request attempts to modify the promoter manifests. The 
-[*pull-k8s-cip*](https://github.com/kubernetes/test-infra/blob/master/config/jobs/kubernetes/sig-release/cip/container-image-promoter.yaml) 
-and the 
-[*pull-k8s-cip-vuln*](https://github.com/kubernetes/test-infra/blob/master/config/jobs/kubernetes/sig-release/cip/container-image-promoter.yaml) 
-Prow jobs call the `RunChecks` function and actually run their respective checks. 
-New Prow jobs can be [added](https://github.com/kubernetes/test-infra/blob/master/config/jobs/README.md#adding-or-updating-jobs) 
-to run an individual check in the future if that check requires it's own separate 
-job for some reason. 
+The Container Image Promoter has several Prow jobs that run whenever a pull
+request attempts to modify the promoter manifests. The
+[*pull-k8sio-cip*][k8sio-presubmits] and the
+[*pull-k8sio-cip-vuln*][k8sio-presubmits] Prow jobs call the `RunChecks`
+function and actually run their respective checks. New Prow jobs can be
+[added][add-prow-job] to run an individual check in the future if that check
+requires a separate job.
 
 ### How To Add A Check
 In order to add a check, all you need to do is create a check type that 
@@ -52,13 +50,12 @@ type foo struct {}
 ...
 func (f *foo) Run() error
 ```
-Then add that check type you've created to the input list of PreChecks for 
-the RunChecks method, which is called in the 
-[cip.go](https://github.com/kubernetes-sigs/promo-tools/blob/master/cip.go)
-file.
+
+Then add that check type you've created to the input list of PreChecks for
+the `RunChecks` method [here](/legacy/dockerregistry/inventory.go).
 
 Note that the `Run` method of the precheck interface does not accept any 
-paramaters, so any information that you need for your check should be passed 
+parameters, so any information that you need for your check should be passed
 into the check type as a field. For example, if you are running a check over 
 promotion edges, then you can set up your check like so:
 
@@ -81,11 +78,11 @@ func (f * foo) Run() error {
 Images that have been promoted are pushed to production; and once pushed to 
 production, they should never be removed. The `ImageRemovalCheck` checks if 
 any images are removed in the pull request by comparing the state of the 
-promoter manifests in the pull request's branch to the master branch. Two sets 
-of Promotion Edges are generated (one for both the master branch and pull 
-request) and then compared to make sure that every destination image (defined 
-by its image tag and digest) found in the master branch is found in the pull 
-request.
+promoter manifests in the pull request's branch to the default development
+branch. Two sets of Promotion Edges are generated (one for both the default
+development branch and pull request) and then compared to make sure that every
+destination image (defined by its image tag and digest) found in the default
+development branch is found in the pull request.
 
 This method for detecting removed images should ensure that pull requests are 
 only rejected if an image is completely removed from production, while still 
@@ -112,21 +109,21 @@ all images for any vulnerabilities they might already have before promoting
 them. A vulnerability check also serves as a method for surfacing all 
 vulnerabilities regardless if they have a fix to the user. To emphasize this 
 point, the vulnerability check has been implemented in it's own separate Prow 
-job 
-[*pull-k8s-cip-vuln*](https://github.com/kubernetes/test-infra/blob/master/config/jobs/kubernetes/sig-release/cip/container-image-promoter.yaml)
+job [*pull-k8sio-cip-vuln*][k8sio-presubmits]
 so that the check's logs (which will detail all the vulnerabilities that exist 
 in the new images to be promoted) won't get mixed in with the logs from the 
 promoter's other checks. 
 
-The vulnerability check makes use of the Container Analysis API in order to 
-1. scan all new staging images for vulnerabilities whenever they are added to 
-an image staging project 
-2. get vulnerability information when we are 
-checking a the images to be promoted from a PR
+The vulnerability check makes use of the Container Analysis API in order to:
+
+1. scan all new staging images for vulnerabilities whenever they are added to
+   an image staging project
+2. get vulnerability information when we are checking the images to be promoted
+   from a PR
 
 To make use of this API, key pieces of infrastructure must be put in place, 
 such as enabling the Container Analysis API on all image staging projects 
-and authenticating the Prow job (pull-k8s-cip-vuln) with a Google service 
+and authenticating the Prow job (pull-k8sio-cip-vuln) with a Google service
 account that is authorized to access the vulnerability data for each 
 staging project.
 
@@ -134,3 +131,6 @@ The vulnerability check will reject a pull request if it finds any
 vulnerabilities that are both beyond the severity threshold (defined by the 
 *-vuln-severity-threshold*) and have a known fix; otherwise the check will 
 accept the PR.
+
+[add-prow-job]: https://git.k8s.io/test-infra/config/jobs/README.md#adding-or-updating-jobs
+[k8sio-presubmits]: https://git.k8s.io/test-infra/config/jobs/kubernetes/wg-k8s-infra/releng/artifact-promotion-presubmits.yaml
