@@ -1,7 +1,7 @@
 ---
 name: Bug Report
 about: Report a bug encountered while using container image promoter tooling
-labels: kind/bug, sig/release, area/release-eng, wg/k8s-infra
+labels: kind/bug, sig/release, area/release-eng
 
 ---
 
