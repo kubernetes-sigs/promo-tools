@@ -133,4 +133,4 @@ vulnerabilities that are both beyond the severity threshold (defined by the
 accept the PR.
 
 [add-prow-job]: https://git.k8s.io/test-infra/config/jobs/README.md#adding-or-updating-jobs
-[k8sio-presubmits]: https://git.k8s.io/test-infra/config/jobs/kubernetes/wg-k8s-infra/releng/artifact-promotion-presubmits.yaml
+[k8sio-presubmits]: https://git.k8s.io/test-infra/config/jobs/kubernetes/sig-k8s-infra/releng/artifact-promotion-presubmits.yaml
