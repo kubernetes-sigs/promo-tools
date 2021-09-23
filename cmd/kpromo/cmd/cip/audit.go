@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cmd
+package cip
 
 import (
 	"github.com/pkg/errors"
@@ -80,5 +80,5 @@ func init() {
 		"include extra logging information",
 	)
 
-	rootCmd.AddCommand(auditCmd)
+	CipCmd.AddCommand(auditCmd)
 }

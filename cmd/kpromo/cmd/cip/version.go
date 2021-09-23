@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cmd
+package cip
 
 import (
 	"github.com/spf13/cobra"
@@ -44,5 +44,5 @@ func init() {
 		"print JSON instead of text",
 	)
 
-	rootCmd.AddCommand(versionCmd)
+	CipCmd.AddCommand(versionCmd)
 }
