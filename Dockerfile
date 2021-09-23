@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# About: This dockerfile builds the cip binary for auditor tests and production use.
+# About: This dockerfile builds the kpromo binary for auditor tests and production use.
 #
 # Usage: Since there are two variants to build, you must include the variant name during build-time.
-# cip production binary: 
+# kpromo production binary:
 #   docker build --build-arg variant=prod /path/to/Dockerfile
 # test auditor:
 #   docker build --build-arg variant=test /path/to/Dockerfile
@@ -30,9 +30,9 @@ FROM golang:1.17-buster AS base
 WORKDIR /go/src/app
 COPY . .
 
-# Build and export cip command.
-RUN ./go_with_version.sh build ./cmd/cip
-RUN cp ./cip /bin/cip
+# Build and export kpromo command.
+RUN ./go_with_version.sh build ./cmd/kpromo
+RUN cp ./kpromo /bin/kpromo
 
 # Provide docker config for repo information.
 RUN mkdir /.docker
@@ -52,7 +52,7 @@ RUN cp -r ./test-e2e/cip-auditor/fixture/* /e2e-fixtures
 
 # Trigger the auditor on startup.
 ENV HOME=/
-ENTRYPOINT ["cip", "audit", "--verbose"]
+ENTRYPOINT ["kpromo", "cip", "audit", "--verbose"]
 
 # Production image
 FROM gcloud-base as prod-variant
