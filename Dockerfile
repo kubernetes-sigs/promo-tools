@@ -39,7 +39,7 @@ RUN mkdir /.docker
 RUN cp ./docker/config.json /.docker/config.json
 
 # gcloud-base image
-FROM gcr.io/google.com/cloudsdktool/cloud-sdk:latest AS gcloud-base
+FROM gcr.io/google.com/cloudsdktool/cloud-sdk:slim AS gcloud-base
 
 COPY --from=base / /
 
