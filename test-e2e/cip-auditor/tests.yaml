@@ -12,7 +12,7 @@
     service-account: k8s-infra-gcr-promoter@k8s-gcr-audit-test-prod.iam.gserviceaccount.com
   # This is the path to the manifests on local disk that the auditor image
   # should be pointed to when it is deployed to Cloud Run as part of the E2E
-  # test. We build 1 cip-auditor-test image, but we re-deploy it for each test
+  # test. We build 1 auditor test image, but we re-deploy it for each test
   # case, passing in this manifestDir argument each time (to make it point to
   # the correct set of manifests).
   manifestDir: "/e2e-fixtures/basic"

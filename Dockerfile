@@ -22,43 +22,47 @@
 
 # Determine final build variant [prod | test].
 ARG variant
+ARG GO_VERSION
+ARG OS_CODENAME
+FROM golang:1.17-buster AS builder
 
-# Base image
-FROM golang:1.17-buster AS base
+ENV package="./cmd/kpromo"
 
-# Transfer all project files to container.
+# Copy the sources
 WORKDIR /go/src/app
-COPY . .
+COPY . ./
 
-# Build and export kpromo command.
-RUN ./go_with_version.sh build ./cmd/kpromo
-RUN cp ./kpromo /bin/kpromo
+# Build
+ARG ARCH
 
-# Provide docker config for repo information.
-RUN mkdir /.docker
-RUN cp ./docker/config.json /.docker/config.json
+ENV CGO_ENABLED=0
+ENV GOOS=linux
+ENV GOARCH=${ARCH}
 
-# gcloud-base image
-FROM gcr.io/google.com/cloudsdktool/cloud-sdk:slim AS gcloud-base
+RUN go build -trimpath -ldflags '-s -w -buildid= -extldflags "-static"' \
+    -o kpromo ${package}
 
-COPY --from=base / /
+FROM gcr.io/google.com/cloudsdktool/cloud-sdk:slim AS base
+
+WORKDIR /
+COPY --from=builder /go/src/app/kpromo .
+
+ENTRYPOINT ["/kpromo"]
 
 # Testing image
 FROM base AS test-variant
 
-# Include cip-auditor testing fixtures.
-RUN mkdir /e2e-fixtures
-RUN cp -r ./test-e2e/cip-auditor/fixture/* /e2e-fixtures
+# Include auditor testing fixtures.
+COPY --from=builder /go/src/app/test-e2e/cip-auditor/fixture /e2e-fixtures
 
 # Trigger the auditor on startup.
-ENV HOME=/
-ENTRYPOINT ["kpromo", "cip", "audit", "--verbose"]
+ENTRYPOINT ["/kpromo", "cip", "audit", "--verbose"]
 
 # Production image
-FROM gcloud-base as prod-variant
+FROM base AS prod-variant
 
-ENV HOME=/
-ENTRYPOINT ["/bin/bash", "-c"]
+LABEL maintainers="Kubernetes Authors"
+LABEL description="kpromo: The Kubernetes project artifact promoter"
 
 # Allow the runtime argument to choose the final variant.
 FROM ${variant}-variant AS final

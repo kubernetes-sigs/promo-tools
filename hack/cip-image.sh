@@ -135,16 +135,19 @@ main() {
         # Only build and push the auditor image.
         handleVariant "auditor" \
             "${test_tag_prefix}-auditor-test:latest" \
-            "${test_tag_prefix}-auditor-test:${STABLE_IMG_TAG}"
+            "${test_tag_prefix}-auditor-test:${STABLE_IMG_TAG}" \
+            "${test_tag_prefix}-auditor-test:${STABLE_IMG_VERSION}"
     else
         # Build and push auditor and cip images.
         handleVariant "auditor" \
             "${stable_tag_prefix}-auditor:latest" \
-            "${stable_tag_prefix}-auditor:${STABLE_IMG_TAG}"
+            "${stable_tag_prefix}-auditor:${STABLE_IMG_TAG}" \
+            "${stable_tag_prefix}-auditor:${STABLE_IMG_VERSION}"
 
         handleVariant "cip" \
             "${stable_tag_prefix}:latest" \
-            "${stable_tag_prefix}:${STABLE_IMG_TAG}"
+            "${stable_tag_prefix}:${STABLE_IMG_TAG}" \
+            "${stable_tag_prefix}:${STABLE_IMG_VERSION}"
     fi
 
     >&2 echo "$0" finished.

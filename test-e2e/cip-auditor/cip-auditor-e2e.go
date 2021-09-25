@@ -571,7 +571,7 @@ func getCmdShowLogs(projectID, uuid, pattern string) []string {
 
 const (
 	subscriptionName    = "cip-auditor-test-invoker"
-	auditorName         = "cip-auditor-test"
+	auditorName         = "kpromo-auditor-test"
 	auditLogName        = audit.LogName
 	maxLogMatchAttempts = 10
 )
