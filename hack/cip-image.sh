@@ -121,12 +121,12 @@ main() {
 
     # Change the repo for cloudbuild jobs only.
     if [[ -n "${CLOUDBUILD_REPO:-}" ]]; then
-        STABLE_IMG_REPOSITORY=${CLOUDBUILD_REPO}
+        IMG_REPOSITORY=${CLOUDBUILD_REPO}
     fi
 
     # Assemble image tag prefixes.
-    local stable_tag_prefix=${STABLE_IMG_REGISTRY}/${STABLE_IMG_REPOSITORY}/${STABLE_IMG_NAME}
-    local test_tag_prefix=${STABLE_TEST_AUDIT_STAGING_IMG_REPOSITORY}/${STABLE_IMG_NAME}
+    local tag_prefix=${IMG_REGISTRY}/${IMG_REPOSITORY}/${IMG_NAME}
+    local test_tag_prefix=${TEST_AUDIT_STAGING_IMG_REPOSITORY}/${IMG_NAME}
 
     # NOTE: Both cip and auditor variants build an auditor image. Although they are named differently,
     # the image contents are the exact same.
@@ -135,19 +135,19 @@ main() {
         # Only build and push the auditor image.
         handleVariant "auditor" \
             "${test_tag_prefix}-auditor-test:latest" \
-            "${test_tag_prefix}-auditor-test:${STABLE_IMG_TAG}" \
-            "${test_tag_prefix}-auditor-test:${STABLE_IMG_VERSION}"
+            "${test_tag_prefix}-auditor-test:${IMG_TAG}" \
+            "${test_tag_prefix}-auditor-test:${IMG_VERSION}"
     else
         # Build and push auditor and cip images.
         handleVariant "auditor" \
-            "${stable_tag_prefix}-auditor:latest" \
-            "${stable_tag_prefix}-auditor:${STABLE_IMG_TAG}" \
-            "${stable_tag_prefix}-auditor:${STABLE_IMG_VERSION}"
+            "${tag_prefix}-auditor:latest" \
+            "${tag_prefix}-auditor:${IMG_TAG}" \
+            "${tag_prefix}-auditor:${IMG_VERSION}"
 
         handleVariant "cip" \
-            "${stable_tag_prefix}:latest" \
-            "${stable_tag_prefix}:${STABLE_IMG_TAG}" \
-            "${stable_tag_prefix}:${STABLE_IMG_VERSION}"
+            "${tag_prefix}:latest" \
+            "${tag_prefix}:${IMG_TAG}" \
+            "${tag_prefix}:${IMG_VERSION}"
     fi
 
     >&2 echo "$0" finished.

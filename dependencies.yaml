@@ -60,4 +60,4 @@ dependencies:
     version: v3.2.1-1
     refPaths:
     - path: workspace_status.sh
-      match: p_ STABLE_IMG_VERSION v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)-([0-9]+)
+      match: p_ IMG_VERSION v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)-([0-9]+)

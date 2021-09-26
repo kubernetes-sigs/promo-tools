@@ -60,15 +60,15 @@ if [[ ${git_commit} == "$null_git_commit" ]]; then
     image_tag="${GIT_TAG}"
 fi
 
-p_ STABLE_GIT_COMMIT "${git_commit}"
-p_ STABLE_IMG_REGISTRY gcr.io
-p_ STABLE_IMG_REPOSITORY k8s-staging-artifact-promoter
-p_ STABLE_IMG_NAME kpromo
-p_ STABLE_IMG_TAG "${image_tag}"
-p_ STABLE_IMG_VERSION v3.2.1-1
-p_ STABLE_TEST_AUDIT_PROD_IMG_REPOSITORY us.gcr.io/k8s-gcr-audit-test-prod
-p_ STABLE_TEST_AUDIT_STAGING_IMG_REPOSITORY gcr.io/k8s-gcr-audit-test-prod
-p_ STABLE_TEST_AUDIT_PROJECT_ID k8s-gcr-audit-test-prod
-p_ STABLE_TEST_AUDIT_PROJECT_NUMBER 375340694213
-p_ STABLE_TEST_AUDIT_INVOKER_SERVICE_ACCOUNT k8s-infra-gcr-promoter@k8s-gcr-audit-test-prod.iam.gserviceaccount.com
-p_ STABLE_TEST_STAGING_IMG_REPOSITORY gcr.io/k8s-staging-cip-test
+p_ GIT_COMMIT "${git_commit}"
+p_ IMG_REGISTRY gcr.io
+p_ IMG_REPOSITORY k8s-staging-artifact-promoter
+p_ IMG_NAME kpromo
+p_ IMG_TAG "${image_tag}"
+p_ IMG_VERSION v3.2.1-1
+p_ TEST_AUDIT_PROD_IMG_REPOSITORY us.gcr.io/k8s-gcr-audit-test-prod
+p_ TEST_AUDIT_STAGING_IMG_REPOSITORY gcr.io/k8s-gcr-audit-test-prod
+p_ TEST_AUDIT_PROJECT_ID k8s-gcr-audit-test-prod
+p_ TEST_AUDIT_PROJECT_NUMBER 375340694213
+p_ TEST_AUDIT_INVOKER_SERVICE_ACCOUNT k8s-infra-gcr-promoter@k8s-gcr-audit-test-prod.iam.gserviceaccount.com
+p_ TEST_STAGING_IMG_REPOSITORY gcr.io/k8s-staging-cip-test

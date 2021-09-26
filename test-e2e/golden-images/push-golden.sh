@@ -17,8 +17,8 @@
 # About: This script automatest the process of pushing golden iamges for both e2e tests.
 # Images are loaded from local archives and pushed to the designated staging repo. When
 # passed the --audit flag, images will be tagged and pushed to
-# STABLE_TEST_AUDIT_STAGING_IMG_REPOSITORY, otherwise defaulting to
-# STABLE_TEST_STAGING_IMG_REPOSITORY (both defined in workspace_status.sh).
+# TEST_AUDIT_STAGING_IMG_REPOSITORY, otherwise defaulting to
+# TEST_STAGING_IMG_REPOSITORY (both defined in workspace_status.sh).
 #
 # Usage:
 #   ./push-golden.sh [--audit]
@@ -35,11 +35,11 @@ repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)
 archive_path="${repo_root}/test-e2e/golden-images/archives"
 # Inject workspace variables
 source <(${repo_root}/workspace_status.sh inject)
-staging_repo="$STABLE_TEST_STAGING_IMG_REPOSITORY"
+staging_repo="$TEST_STAGING_IMG_REPOSITORY"
 
 if [[ $# == 1 ]]; then
     if [[ "$1" == --audit ]]; then
-        staging_repo="$STABLE_TEST_AUDIT_STAGING_IMG_REPOSITORY"
+        staging_repo="$TEST_AUDIT_STAGING_IMG_REPOSITORY"
     else
         >&2 echo "ERROR: Malformed flag!"
         printUsage
@@ -58,11 +58,11 @@ docker load -i "${archive_path}/foo/1.0-linux_s390x.tar"
 docker load -i "${archive_path}/foo/NOTAG-0.tar"
 
 # Re-tag images (only for auditor)
-if [[ "$staging_repo" == "$STABLE_TEST_AUDIT_STAGING_IMG_REPOSITORY" ]]; then
-    docker tag "${STABLE_TEST_STAGING_IMG_REPOSITORY}/golden-bar/bar:1.0" "${staging_repo}/golden-bar/bar:1.0"
-    docker tag "${STABLE_TEST_STAGING_IMG_REPOSITORY}/golden-foo/foo:1.0-linux_amd64" "${staging_repo}/golden-foo/foo:1.0-linux_amd64"
-    docker tag "${STABLE_TEST_STAGING_IMG_REPOSITORY}/golden-foo/foo:1.0-linux_s390x" "${staging_repo}/golden-foo/foo:1.0-linux_s390x"
-    docker tag "${STABLE_TEST_STAGING_IMG_REPOSITORY}/golden-foo/foo:NOTAG-0" "${staging_repo}/golden-foo/foo:NOTAG-0"
+if [[ "$staging_repo" == "$TEST_AUDIT_STAGING_IMG_REPOSITORY" ]]; then
+    docker tag "${TEST_STAGING_IMG_REPOSITORY}/golden-bar/bar:1.0" "${staging_repo}/golden-bar/bar:1.0"
+    docker tag "${TEST_STAGING_IMG_REPOSITORY}/golden-foo/foo:1.0-linux_amd64" "${staging_repo}/golden-foo/foo:1.0-linux_amd64"
+    docker tag "${TEST_STAGING_IMG_REPOSITORY}/golden-foo/foo:1.0-linux_s390x" "${staging_repo}/golden-foo/foo:1.0-linux_s390x"
+    docker tag "${TEST_STAGING_IMG_REPOSITORY}/golden-foo/foo:NOTAG-0" "${staging_repo}/golden-foo/foo:NOTAG-0"
 fi
 
 # Push to k8s-staging-cip-test.
