@@ -1,12 +1,8 @@
 dependencies:
   # Release version
   - name: "repo release version"
-    version: 3.2.0
+    version: 3.2.1
     refPaths:
-    - path: cloudbuild.yaml
-      match: v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)-([0-9]+)
-    - path: Makefile-kpromo
-      match: IMAGE_VERSION\ \?=\ v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)-([0-9]+)
     - path: VERSION
 
   # repo infra
@@ -26,13 +22,8 @@ dependencies:
   - name: "Debian: codename (default)"
     version: buster
     refPaths:
-    # Must match distroless Debian version as well
-    - path: cloudbuild.yaml
-      match: "OS_CODENAME: '(bullseye|buster)'"
     - path: Dockerfile
       match: FROM golang:\d+.\d+(alpha|beta|rc)?\.?(\d+)-(bullseye|buster)
-    - path: Makefile-kpromo
-      match: OS_CODENAME\ \?=\ (bullseye|buster)
 
   # golangci-lint
   - name: "golangci-lint"
@@ -45,12 +36,8 @@ dependencies:
   - name: "golang"
     version: 1.17
     refPaths:
-    - path: cloudbuild.yaml
-      match: "_GO_VERSION: '\\d+.\\d+(alpha|beta|rc)?\\.?(\\d+)?'"
-    - path: Makefile-kpromo
-      match: GO_VERSION\ \?=\ \d+.\d+(alpha|beta|rc)?\.?(\d+)?
     - path: Dockerfile
-      match: FROM golang:\d+.\d+(alpha|beta|rc)?\.?(\d+)-(bullseye|buster) AS base
+      match: FROM golang:\d+.\d+(alpha|beta|rc)?\.?(\d+)-(bullseye|buster)
 
   # Golang pre-releases are denoted as `1.y<pre-release stage>.z`
   # Example: go1.17rc1
@@ -70,9 +57,9 @@ dependencies:
       match: go \d+.\d+
 
   - name: "k8s.gcr.io/artifact-promoter/kpromo"
-    version: v3.2.0-1
+    version: v3.2.1-1
     refPaths:
     - path: cloudbuild.yaml
-      match: v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)-([0-9]+)
-    - path: Makefile-kpromo
-      match: IMAGE_VERSION\ \?=\ v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)-([0-9]+)
+      match: "_IMG_VERSION: 'v((([0-9]+)\\.([0-9]+)\\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*))?)(?:\\+([0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*))?)-([0-9]+)'"
+    - path: workspace_status.sh
+      match: p_ IMG_VERSION v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)-([0-9]+)

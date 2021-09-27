@@ -37,6 +37,8 @@ import (
 	"sigs.k8s.io/release-utils/command"
 )
 
+const kpromoMain = "cmd/kpromo/main.go"
+
 func main() {
 	// NOTE: We can't run the tests in parallel because we only have 1 pair of
 	// staging/prod GCRs.
@@ -160,8 +162,12 @@ func testSetup(repoRoot string, t *E2ETest) error {
 func runPromotion(repoRoot string, t *E2ETest) error {
 	args := []string{
 		"run",
-		fmt.Sprintf("%s/cmd/cip/main.go", repoRoot),
-		"run",
+		fmt.Sprintf(
+			"%s/%s",
+			repoRoot,
+			kpromoMain,
+		),
+		"cip",
 		"--confirm",
 		"--log-level=debug",
 		"--use-service-account",
@@ -201,8 +207,12 @@ func getSnapshot(
 	// TODO: Consider setting flag names in `cip` instead
 	invocation := []string{
 		"run",
-		fmt.Sprintf("%s/cmd/cip/main.go", repoRoot),
-		"run",
+		fmt.Sprintf(
+			"%s/%s",
+			repoRoot,
+			kpromoMain,
+		),
+		"cip",
 		"--snapshot=" + string(registry),
 	}
 

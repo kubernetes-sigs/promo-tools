@@ -15,50 +15,27 @@ steps:
   - GIT_TAG=$_GIT_TAG
   - PULL_BASE_REF=$_PULL_BASE_REF
   - CLOUDBUILD_REPO=$PROJECT_ID
+  - IMG_VERSION=$_IMG_VERSION
   args:
   - image-push
-
-- name: 'gcr.io/k8s-testimages/gcb-docker-gcloud:v20201130-750d12f'
-  entrypoint: 'bash'
-  env:
-  - DOCKER_CLI_EXPERIMENTAL=enabled
-  - REGISTRY=gcr.io/$PROJECT_ID
-  - HOME=/root
-  - TAG=$_GIT_TAG
-  - PULL_BASE_REF=$_PULL_BASE_REF
-  - IMAGE_VERSION=$_IMAGE_VERSION
-  - GO_VERSION=$_GO_VERSION
-  - OS_CODENAME=$_OS_CODENAME
-  args:
-  - '-c'
-  - |
-    gcloud auth configure-docker \
-    && make -f Makefile-kpromo manifest
-  waitFor: ['-']
 
 substitutions:
   # _GIT_TAG will be filled with a git-based tag for the image, of the form
   # vYYYYMMDD-hash, and can be used as a substitution
   _GIT_TAG: '12345'
   _PULL_BASE_REF: 'dev'
-  _IMAGE_VERSION: 'v3.2.0-1'
-  _GO_VERSION: '1.17'
-  _OS_CODENAME: 'buster'
+  _IMG_VERSION: 'v3.2.1-1'
 
 tags:
-- 'cip'
 - 'kpromo'
 - ${_GIT_TAG}
 - ${_PULL_BASE_REF}
-- ${_IMAGE_VERSION}
-- ${_GO_VERSION}
-- ${_OS_CODENAME}
+- ${_IMG_VERSION}
 
 images:
-- 'gcr.io/$PROJECT_ID/cip:$_GIT_TAG'
-- 'gcr.io/$PROJECT_ID/cip:latest'
-- 'gcr.io/$PROJECT_ID/cip-auditor:$_GIT_TAG'
-- 'gcr.io/$PROJECT_ID/cip-auditor:latest'
-- 'gcr.io/$PROJECT_ID/kpromo-amd64:$_IMAGE_VERSION'
-- 'gcr.io/$PROJECT_ID/kpromo-amd64:$_GIT_TAG'
-- 'gcr.io/$PROJECT_ID/kpromo-amd64:latest'
+- 'gcr.io/$PROJECT_ID/kpromo:$_GIT_TAG'
+- 'gcr.io/$PROJECT_ID/kpromo:$_IMG_VERSION'
+- 'gcr.io/$PROJECT_ID/kpromo:latest'
+- 'gcr.io/$PROJECT_ID/kpromo-auditor:$_GIT_TAG'
+- 'gcr.io/$PROJECT_ID/kpromo-auditor:$_IMG_VERSION'
+- 'gcr.io/$PROJECT_ID/kpromo-auditor:latest'

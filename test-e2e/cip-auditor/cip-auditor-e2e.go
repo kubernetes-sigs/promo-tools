@@ -109,16 +109,16 @@ func runE2ETests(testsFile, repoRoot string) {
 
 	// Obtain project information defined in workspace_status.sh
 	status := getWorkspaceStatus(repoRoot)
-	projectID := status["STABLE_TEST_AUDIT_PROJECT_ID"]
-	projectNumber := status["STABLE_TEST_AUDIT_PROJECT_NUMBER"]
-	invokerServiceAccount := status["STABLE_TEST_AUDIT_INVOKER_SERVICE_ACCOUNT"]
-	pushRepo := status["STABLE_TEST_AUDIT_STAGING_IMG_REPOSITORY"]
+	projectID := status["TEST_AUDIT_PROJECT_ID"]
+	projectNumber := status["TEST_AUDIT_PROJECT_NUMBER"]
+	invokerServiceAccount := status["TEST_AUDIT_INVOKER_SERVICE_ACCOUNT"]
+	pushRepo := status["TEST_AUDIT_STAGING_IMG_REPOSITORY"]
 
 	// TODO: All of the workspace options, not just this one, should be non-empty
 	// values.
 	if pushRepo == "" {
 		logrus.Fatal(
-			"could not dereference STABLE_TEST_AUDIT_STAGING_IMG_REPOSITORY",
+			"could not dereference TEST_AUDIT_STAGING_IMG_REPOSITORY",
 		)
 	}
 
@@ -571,7 +571,7 @@ func getCmdShowLogs(projectID, uuid, pattern string) []string {
 
 const (
 	subscriptionName    = "cip-auditor-test-invoker"
-	auditorName         = "cip-auditor-test"
+	auditorName         = "kpromo-auditor-test"
 	auditLogName        = audit.LogName
 	maxLogMatchAttempts = 10
 )

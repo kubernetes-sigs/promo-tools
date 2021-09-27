@@ -48,7 +48,6 @@ image-push: image-build ## Build and push auditor and cip images
 image-push-cip-auditor-e2e: image-build-cip-auditor-e2e ## Build and push auditor e2e images
 	./hack/cip-image.sh push --audit
 
-
 ##@ Lints
 
 .PHONY: lint

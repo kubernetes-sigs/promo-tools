@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cmd
+package cip
 
 import (
 	"fmt"
@@ -25,10 +25,10 @@ import (
 	"sigs.k8s.io/promo-tools/v3/legacy/cli"
 )
 
-// runCmd represents the base command when called without any subcommands
+// CipCmd represents the base command when called without any subcommands
 // TODO: Update command description.
-var runCmd = &cobra.Command{
-	Use:   "run",
+var CipCmd = &cobra.Command{
+	Use:   "cip",
 	Short: "Promote images from a staging registry to production",
 	Long: `cip - Kubernetes container image promoter
 
@@ -49,7 +49,7 @@ var runOpts = &cli.RunOptions{}
 // TODO: Function 'init' is too long (171 > 60) (funlen)
 // nolint: funlen
 func init() {
-	runCmd.PersistentFlags().BoolVar(
+	CipCmd.PersistentFlags().BoolVar(
 		&runOpts.Confirm,
 		"confirm",
 		runOpts.Confirm,
@@ -57,14 +57,14 @@ func init() {
 	)
 
 	// TODO: Move this into a default options function in pkg/promobot
-	runCmd.PersistentFlags().StringVar(
+	CipCmd.PersistentFlags().StringVar(
 		&runOpts.Manifest,
 		cli.PromoterManifestFlag,
 		runOpts.Manifest,
 		"the manifest file to load",
 	)
 
-	runCmd.PersistentFlags().StringVar(
+	CipCmd.PersistentFlags().StringVar(
 		&runOpts.ThinManifestDir,
 		cli.PromoterThinManifestDirFlag,
 		runOpts.ThinManifestDir,
@@ -75,28 +75,28 @@ manifests but instead of defining the 'images: ...' field directly, the
 the 'images: ...' contents`,
 	)
 
-	runCmd.PersistentFlags().IntVar(
+	CipCmd.PersistentFlags().IntVar(
 		&runOpts.Threads,
 		"threads",
 		cli.PromoterDefaultThreads,
 		"number of concurrent goroutines to use when talking to GCR",
 	)
 
-	runCmd.PersistentFlags().BoolVar(
+	CipCmd.PersistentFlags().BoolVar(
 		&runOpts.JSONLogSummary,
 		"json-log-summary",
 		runOpts.JSONLogSummary,
 		"only log a JSON summary of important errors",
 	)
 
-	runCmd.PersistentFlags().BoolVar(
+	CipCmd.PersistentFlags().BoolVar(
 		&runOpts.ParseOnly,
 		"parse-only",
 		runOpts.ParseOnly,
 		"only check that the given manifest file is parsable as a Manifest",
 	)
 
-	runCmd.PersistentFlags().StringVar(
+	CipCmd.PersistentFlags().StringVar(
 		&runOpts.KeyFiles,
 		"key-files",
 		runOpts.KeyFiles,
@@ -104,21 +104,21 @@ the 'images: ...' contents`,
 promotion (<json-key-file-path>,...)`,
 	)
 
-	runCmd.PersistentFlags().StringVar(
+	CipCmd.PersistentFlags().StringVar(
 		&runOpts.Snapshot,
 		cli.PromoterSnapshotFlag,
 		runOpts.Snapshot,
 		"read all images in a repository and print to stdout",
 	)
 
-	runCmd.PersistentFlags().StringVar(
+	CipCmd.PersistentFlags().StringVar(
 		&runOpts.SnapshotTag,
 		"snapshot-tag",
 		runOpts.SnapshotTag,
 		"only snapshot images with the given tag",
 	)
 
-	runCmd.PersistentFlags().BoolVar(
+	CipCmd.PersistentFlags().BoolVar(
 		&runOpts.MinimalSnapshot,
 		"minimal-snapshot",
 		runOpts.MinimalSnapshot,
@@ -129,7 +129,7 @@ from snapshot output if they are referenced by a manifest list`,
 		),
 	)
 
-	runCmd.PersistentFlags().StringVar(
+	CipCmd.PersistentFlags().StringVar(
 		&runOpts.OutputFormat,
 		cli.PromoterOutputFlag,
 		cli.PromoterDefaultOutputFormat,
@@ -141,7 +141,7 @@ format of the snapshot (allowed values: %q)`,
 		),
 	)
 
-	runCmd.PersistentFlags().StringVar(
+	CipCmd.PersistentFlags().StringVar(
 		&runOpts.SnapshotSvcAcct,
 		"snapshot-service-account",
 		runOpts.SnapshotSvcAcct,
@@ -151,7 +151,7 @@ format of the snapshot (allowed values: %q)`,
 		),
 	)
 
-	runCmd.PersistentFlags().StringVar(
+	CipCmd.PersistentFlags().StringVar(
 		&runOpts.ManifestBasedSnapshotOf,
 		cli.PromoterManifestBasedSnapshotOfFlag,
 		runOpts.ManifestBasedSnapshotOf,
@@ -165,14 +165,14 @@ network from a registry, it reads from the local manifests only`,
 		),
 	)
 
-	runCmd.PersistentFlags().BoolVar(
+	CipCmd.PersistentFlags().BoolVar(
 		&runOpts.UseServiceAcct,
 		"use-service-account",
 		runOpts.UseServiceAcct,
 		"pass '--account=...' to all gcloud calls",
 	)
 
-	runCmd.PersistentFlags().IntVar(
+	CipCmd.PersistentFlags().IntVar(
 		&runOpts.MaxImageSize,
 		"max-image-size",
 		cli.PromoterDefaultMaxImageSize,
@@ -184,7 +184,7 @@ network from a registry, it reads from the local manifests only`,
 		runOpts.MaxImageSize = 2048
 	}
 
-	runCmd.PersistentFlags().IntVar(
+	CipCmd.PersistentFlags().IntVar(
 		&runOpts.SeverityThreshold,
 		"vuln-severity-threshold",
 		cli.PromoterDefaultSeverityThreshold,
@@ -193,6 +193,4 @@ check. Found vulnerabilities at or above this threshold will result in the
 vulnerability check failing [severity levels between 0 and 5; 0 - UNSPECIFIED,
 1 - MINIMAL, 2 - LOW, 3 - MEDIUM, 4 - HIGH, 5 - CRITICAL]`,
 	)
-
-	rootCmd.AddCommand(runCmd)
 }
