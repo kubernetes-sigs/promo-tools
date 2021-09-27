@@ -29,7 +29,8 @@ import (
 type ManifestPromoter struct {
 	Manifest *api.Manifest
 
-	DryRun bool
+	// Confirm, if set, will trigger a PRODUCTION artifact promotion.
+	Confirm bool
 
 	// UseServiceAccount must be true, for service accounts to be used
 	// This gives some protection against a hostile manifest.
@@ -57,7 +58,7 @@ func (p *ManifestPromoter) BuildOperations(
 			Source:            source,
 			Dest:              filestore,
 			Files:             p.Manifest.Files,
-			DryRun:            p.DryRun,
+			Confirm:           p.Confirm,
 			UseServiceAccount: p.UseServiceAccount,
 		}
 		ops, err := fp.BuildOperations(ctx)

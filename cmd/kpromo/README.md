@@ -70,7 +70,7 @@ Usage:
   kpromo run files [flags]
 
 Flags:
-      --dry-run                 test run promotion without modifying any filestore (default true)
+      --confirm                 initiate a PRODUCTION artifact promotion
       --files files             path to the files manifest
       --filestores filestores   path to the filestores promoter manifest
   -h, --help                    help for files

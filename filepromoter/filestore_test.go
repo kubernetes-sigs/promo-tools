@@ -28,7 +28,7 @@ func Test_useStorageClientAuth(t *testing.T) {
 	type args struct {
 		filestore         *api.Filestore
 		useServiceAccount bool
-		dryRun            bool
+		confirm           bool
 	}
 	tests := []struct {
 		name    string
@@ -42,7 +42,7 @@ func Test_useStorageClientAuth(t *testing.T) {
 				filestore: &api.Filestore{
 					ServiceAccount: "good@service.account",
 				},
-				dryRun: false,
+				confirm: true,
 			},
 			want:    true,
 			wantErr: false,
@@ -51,7 +51,7 @@ func Test_useStorageClientAuth(t *testing.T) {
 			name: "production without service account",
 			args: args{
 				filestore: &api.Filestore{},
-				dryRun:    false,
+				confirm:   true,
 			},
 			want:    false,
 			wantErr: true,
@@ -62,7 +62,7 @@ func Test_useStorageClientAuth(t *testing.T) {
 				filestore: &api.Filestore{
 					Src: true,
 				},
-				dryRun: false,
+				confirm: true,
 			},
 			want:    false,
 			wantErr: false,
@@ -71,7 +71,7 @@ func Test_useStorageClientAuth(t *testing.T) {
 			name: "non-production",
 			args: args{
 				filestore: &api.Filestore{},
-				dryRun:    true,
+				confirm:   false,
 			},
 			want:    false,
 			wantErr: false,
@@ -80,7 +80,7 @@ func Test_useStorageClientAuth(t *testing.T) {
 			name: "non-production with service account failure",
 			args: args{
 				filestore:         &api.Filestore{},
-				dryRun:            true,
+				confirm:           false,
 				useServiceAccount: true,
 			},
 			want:    false,
@@ -92,7 +92,7 @@ func Test_useStorageClientAuth(t *testing.T) {
 				filestore: &api.Filestore{
 					ServiceAccount: "good@service.account",
 				},
-				dryRun:            true,
+				confirm:           false,
 				useServiceAccount: true,
 			},
 			want:    true,
@@ -104,7 +104,7 @@ func Test_useStorageClientAuth(t *testing.T) {
 			got, err := useStorageClientAuth(
 				tt.args.filestore,
 				tt.args.useServiceAccount,
-				tt.args.dryRun,
+				tt.args.confirm,
 			)
 
 			if tt.wantErr {

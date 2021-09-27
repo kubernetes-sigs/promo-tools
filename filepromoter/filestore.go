@@ -38,7 +38,8 @@ type FilestorePromoter struct {
 
 	Files []api.File
 
-	DryRun bool
+	// Confirm, if set, will trigger a PRODUCTION artifact promotion.
+	Confirm bool
 
 	// UseServiceAccount must be true, for service accounts to be used
 	// This gives some protection against a hostile manifest.
@@ -60,7 +61,7 @@ type syncFilestore interface {
 func openFilestore(
 	ctx context.Context,
 	filestore *api.Filestore,
-	useServiceAccount, dryRun bool,
+	useServiceAccount, confirm bool,
 ) (syncFilestore, error) {
 	u, err := url.Parse(filestore.Base)
 	if err != nil {
@@ -79,7 +80,7 @@ func openFilestore(
 		)
 	}
 
-	withAuth, err := useStorageClientAuth(filestore, useServiceAccount, dryRun)
+	withAuth, err := useStorageClientAuth(filestore, useServiceAccount, confirm)
 	if err != nil {
 		return nil, err
 	}
@@ -125,7 +126,7 @@ func openFilestore(
 
 func useStorageClientAuth(
 	filestore *api.Filestore,
-	useServiceAccount, dryRun bool,
+	useServiceAccount, confirm bool,
 ) (bool, error) {
 	withAuth := false
 
@@ -135,7 +136,7 @@ func useStorageClientAuth(
 		return withAuth, nil
 	}
 
-	if !dryRun {
+	if confirm {
 		if filestore.ServiceAccount == "" {
 			return withAuth, fmt.Errorf("cannot execute a production file promotion without a service account")
 		}
@@ -237,7 +238,7 @@ func (p *FilestorePromoter) BuildOperations(
 		ctx,
 		p.Source,
 		p.UseServiceAccount,
-		p.DryRun,
+		p.Confirm,
 	)
 	if err != nil {
 		return nil, err
@@ -250,7 +251,7 @@ func (p *FilestorePromoter) BuildOperations(
 		ctx,
 		p.Dest,
 		p.UseServiceAccount,
-		p.DryRun,
+		p.Confirm,
 	)
 	if err != nil {
 		return nil, err
