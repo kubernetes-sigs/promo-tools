@@ -65,10 +65,10 @@ func init() {
 
 	// TODO: Consider moving this to the root command
 	filesCmd.PersistentFlags().BoolVar(
-		&filesOpts.DryRun,
-		"dry-run",
-		filesOpts.DryRun,
-		"test run promotion without modifying any filestore",
+		&filesOpts.Confirm,
+		"confirm",
+		filesOpts.Confirm,
+		"initiate a PRODUCTION artifact promotion",
 	)
 
 	filesCmd.PersistentFlags().BoolVar(

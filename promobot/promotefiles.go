@@ -62,8 +62,8 @@ type PromoteFilesOptions struct {
 	//         └── red.yaml
 	ManifestsPath string
 
-	// DryRun (if set) will not perform operations, but print them instead
-	DryRun bool
+	// Confirm, if set, will trigger a PRODUCTION artifact promotion.
+	Confirm bool
 
 	// UseServiceAccount must be true, for service accounts to be used
 	// This gives some protection against a hostile manifest.
@@ -75,7 +75,7 @@ type PromoteFilesOptions struct {
 
 // PopulateDefaults sets the default values for PromoteFilesOptions
 func (o *PromoteFilesOptions) PopulateDefaults() {
-	o.DryRun = true
+	o.Confirm = false
 	o.UseServiceAccount = false
 	o.Out = os.Stdout
 }
@@ -87,21 +87,23 @@ func RunPromoteFiles(ctx context.Context, options PromoteFilesOptions) error {
 		return err
 	}
 
-	if options.DryRun {
+	if options.Confirm {
 		fmt.Fprintf(
 			options.Out,
-			"********** START (DRY RUN) **********\n")
+			"********** START **********\n",
+		)
 	} else {
 		fmt.Fprintf(
 			options.Out,
-			"********** START **********\n")
+			"********** START (DRY RUN) **********\n",
+		)
 	}
 
 	var ops []filepromoter.SyncFileOp
 	for _, manifest := range manifests {
 		promoter := &filepromoter.ManifestPromoter{
 			Manifest:          manifest,
-			DryRun:            options.DryRun,
+			Confirm:           options.Confirm,
 			UseServiceAccount: options.UseServiceAccount,
 		}
 
@@ -125,7 +127,7 @@ func RunPromoteFiles(ctx context.Context, options PromoteFilesOptions) error {
 			)
 		}
 
-		if !options.DryRun {
+		if options.Confirm {
 			if err := op.Run(ctx); err != nil {
 				logrus.Warnf("error copying file: %v", err)
 				errors = append(errors, err)
@@ -144,14 +146,16 @@ func RunPromoteFiles(ctx context.Context, options PromoteFilesOptions) error {
 		return errors[0]
 	}
 
-	if options.DryRun {
+	if options.Confirm {
 		fmt.Fprintf(
 			options.Out,
-			"********** FINISHED (DRY RUN) **********\n")
+			"********** FINISHED **********\n",
+		)
 	} else {
 		fmt.Fprintf(
 			options.Out,
-			"********** FINISHED **********\n")
+			"********** FINISHED (DRY RUN) **********\n",
+		)
 	}
 
 	return nil
@@ -210,7 +214,7 @@ func ReadManifests(options PromoteFilesOptions) ([]*api.Manifest, error) {
 		prjOpts := &PromoteFilesOptions{
 			FilestoresPath:    filestores,
 			FilesPath:         files,
-			DryRun:            options.DryRun,
+			Confirm:           options.Confirm,
 			UseServiceAccount: options.UseServiceAccount,
 			Out:               options.Out,
 		}
