@@ -35,22 +35,31 @@ ifeq ($(DIFF), 1)
 endif
 
 PKG=sigs.k8s.io/promo-tools/v3/internal/version
-EXTRA_LDFLAGS='"-X $(PKG).gitVersion=$(GIT_VERSION) -X $(PKG).gitCommit=$(GIT_HASH) -X $(PKG).gitTreeState=$(GIT_TREESTATE) -X $(PKG).buildDate=$(BUILD_DATE)"'
+LDFLAGS='"-X $(PKG).gitVersion=$(GIT_VERSION) -X $(PKG).gitCommit=$(GIT_HASH) -X $(PKG).gitTreeState=$(GIT_TREESTATE) -X $(PKG).buildDate=$(BUILD_DATE)"'
 
 .PHONY: kpromo
 kpromo:
-	go build -trimpath -ldflags '-s -w -buildid= -extldflags "-static" $(EXTRA_LDFLAGS)' -o kpromo ./cmd/kpromo
+	${REPO_ROOT}/go_with_version.sh build -trimpath -ldflags '-s -w -buildid= -extldflags "-static" $(LDFLAGS)' -o ./bin/kpromo ./cmd/kpromo
+
+.PHONY: cip-mm
+cip-mm:
+	${REPO_ROOT}/go_with_version.sh build -trimpath -o ./bin/cip-mm ./cmd/cip-mm
+
+.PHONY: gh2gcs
+gh2gcs:
+	${REPO_ROOT}/go_with_version.sh build -trimpath -o ./bin/gh2gcs ./cmd/gh2gcs
 
 ##@ Build
 .PHONY: build
-build: ## Go build cip-mm
-	${REPO_ROOT}/go_with_version.sh build ${REPO_ROOT}/cmd/cip-mm
-	${REPO_ROOT}/go_with_version.sh build ${REPO_ROOT}/test-e2e/cip-auditor/cip-auditor-e2e.go
-	${REPO_ROOT}/go_with_version.sh build ${REPO_ROOT}/test-e2e/cip/e2e.go
+build: kpromo cip-mm gh2gcs ## Build go tools within the repository
+	${REPO_ROOT}/go_with_version.sh build -o ./bin/cip-auditor-e2e ${REPO_ROOT}/test-e2e/cip-auditor/cip-auditor-e2e.go
+	${REPO_ROOT}/go_with_version.sh build -o ./bin/cip-e2e ${REPO_ROOT}/test-e2e/cip/e2e.go
 
 .PHONY: install
-install: build ## Install cip-mm
-	cp cip-mm $(shell go env GOPATH)/bin
+install: build ## Install
+	${REPO_ROOT}/go_with_version.sh install ${REPO_ROOT}/cmd/cip-mm
+	${REPO_ROOT}/go_with_version.sh install ${REPO_ROOT}/cmd/gh2gcs
+	${REPO_ROOT}/go_with_version.sh install ${REPO_ROOT}/cmd/kpromo
 
 ##@ Images
 

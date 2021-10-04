@@ -16,7 +16,7 @@
 
 # About: Stamp internal/version with logging information before either
 # building or running the provided go-code.
-# 
+#
 # Usage:
 #   ./go_with_version.sh (build | run) path/to/code.go [args...]
 
