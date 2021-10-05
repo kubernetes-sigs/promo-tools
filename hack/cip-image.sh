@@ -64,7 +64,7 @@ for arg in "$@"; do
     esac
 done
 
-# Ensure an operation was found. 
+# Ensure an operation was found.
 if [[ -z "${operation:-}" ]]; then
     >&2 echo "ERROR: Command not found."
     printUsage
@@ -88,7 +88,7 @@ buildImage() {
         variant="test"
     else
         variant="prod"
-    fi 
+    fi
     local cmd="docker build --build-arg variant=$variant "
     # Concatenate tags.
     shift

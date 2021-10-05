@@ -19,16 +19,47 @@ REPO_ROOT:=$(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
 
 all: test
 
+GIT_VERSION=$(shell git describe --tags --always --dirty)
+GIT_HASH ?= $(shell git rev-parse HEAD)
+DATE_FMT = +'%Y-%m-%dT%H:%M:%SZ'
+SOURCE_DATE_EPOCH ?= $(shell git log -1 --pretty=%ct)
+ifdef SOURCE_DATE_EPOCH
+    BUILD_DATE ?= $(shell date -u -d "@$(SOURCE_DATE_EPOCH)" "$(DATE_FMT)" 2>/dev/null || date -u -r "$(SOURCE_DATE_EPOCH)" "$(DATE_FMT)" 2>/dev/null || date -u "$(DATE_FMT)")
+else
+    BUILD_DATE ?= $(shell date "$(DATE_FMT)")
+endif
+GIT_TREESTATE = "clean"
+DIFF = $(shell git diff --quiet >/dev/null 2>&1; if [ $$? -eq 1 ]; then echo "1"; fi)
+ifeq ($(DIFF), 1)
+    GIT_TREESTATE = "dirty"
+endif
+
+PKG=sigs.k8s.io/promo-tools/v3/internal/version
+LDFLAGS='"-X $(PKG).gitVersion=$(GIT_VERSION) -X $(PKG).gitCommit=$(GIT_HASH) -X $(PKG).gitTreeState=$(GIT_TREESTATE) -X $(PKG).buildDate=$(BUILD_DATE)"'
+
+.PHONY: kpromo
+kpromo:
+	${REPO_ROOT}/go_with_version.sh build -trimpath -ldflags '-s -w -buildid= -extldflags "-static" $(LDFLAGS)' -o ./bin/kpromo ./cmd/kpromo
+
+.PHONY: cip-mm
+cip-mm:
+	${REPO_ROOT}/go_with_version.sh build -trimpath -o ./bin/cip-mm ./cmd/cip-mm
+
+.PHONY: gh2gcs
+gh2gcs:
+	${REPO_ROOT}/go_with_version.sh build -trimpath -o ./bin/gh2gcs ./cmd/gh2gcs
+
 ##@ Build
 .PHONY: build
-build: ## Go build
-	${REPO_ROOT}/go_with_version.sh build ${REPO_ROOT}/cmd/cip
-	${REPO_ROOT}/go_with_version.sh build ${REPO_ROOT}/test-e2e/cip-auditor/cip-auditor-e2e.go
-	${REPO_ROOT}/go_with_version.sh build ${REPO_ROOT}/test-e2e/cip/e2e.go
+build: kpromo cip-mm gh2gcs ## Build go tools within the repository
+	${REPO_ROOT}/go_with_version.sh build -o ./bin/cip-auditor-e2e ${REPO_ROOT}/test-e2e/cip-auditor/cip-auditor-e2e.go
+	${REPO_ROOT}/go_with_version.sh build -o ./bin/cip-e2e ${REPO_ROOT}/test-e2e/cip/e2e.go
 
 .PHONY: install
 install: build ## Install
-	cp cip $(shell go env GOPATH)/bin
+	${REPO_ROOT}/go_with_version.sh install ${REPO_ROOT}/cmd/cip-mm
+	${REPO_ROOT}/go_with_version.sh install ${REPO_ROOT}/cmd/gh2gcs
+	${REPO_ROOT}/go_with_version.sh install ${REPO_ROOT}/cmd/kpromo
 
 ##@ Images
 

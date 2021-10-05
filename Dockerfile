@@ -26,8 +26,6 @@ ARG GO_VERSION
 ARG OS_CODENAME
 FROM golang:1.17-buster AS builder
 
-ENV package="./cmd/kpromo"
-
 # Copy the sources
 WORKDIR /go/src/app
 COPY . ./
@@ -39,13 +37,12 @@ ENV CGO_ENABLED=0
 ENV GOOS=linux
 ENV GOARCH=${ARCH}
 
-RUN go build -trimpath -ldflags '-s -w -buildid= -extldflags "-static"' \
-    -o kpromo ${package}
+RUN make kpromo
 
 FROM gcr.io/google.com/cloudsdktool/cloud-sdk:slim AS base
 
 WORKDIR /
-COPY --from=builder /go/src/app/kpromo .
+COPY --from=builder /go/src/app/bin/kpromo .
 
 ENTRYPOINT ["/kpromo"]
 

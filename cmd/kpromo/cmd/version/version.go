@@ -14,21 +14,45 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cli
+package version
 
 import (
 	"fmt"
 
 	"github.com/pkg/errors"
+	"github.com/spf13/cobra"
 
 	"sigs.k8s.io/promo-tools/v3/internal/version"
 )
 
-type VersionOptions struct {
+type versionOptions struct {
 	JSON bool
 }
 
-func RunVersionCmd(opts *VersionOptions) error {
+var versionOpts = &versionOptions{}
+
+// VersionCmd is the command when calling `kpromo version`.
+var VersionCmd = &cobra.Command{
+	Use:           "version",
+	Short:         "output version information",
+	SilenceUsage:  true,
+	SilenceErrors: true,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return runVersionCmd(versionOpts)
+	},
+}
+
+func init() {
+	VersionCmd.PersistentFlags().BoolVarP(
+		&versionOpts.JSON,
+		"json",
+		"j",
+		false,
+		"print JSON instead of text",
+	)
+}
+
+func runVersionCmd(opts *versionOptions) error {
 	v := version.Get()
 	res := v.String()
 

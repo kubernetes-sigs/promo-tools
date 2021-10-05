@@ -24,7 +24,7 @@ INJECTION=false
 
 # By specifying the injection argument, variables will separated by
 # their values with an '=', instead of a ' '. This allows for easier
-# variable injection when consuming this script in shell environments. 
+# variable injection when consuming this script in shell environments.
 if (( $# == 1 )) && [ "$1" == "inject" ]; then
     INJECTION=true
 fi
