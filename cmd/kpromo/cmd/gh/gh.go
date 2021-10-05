@@ -14,10 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cmd
+package gh
 
 import (
-	"fmt"
 	"os"
 	"strings"
 
@@ -30,17 +29,15 @@ import (
 	"sigs.k8s.io/promo-tools/v3/gh2gcs"
 	"sigs.k8s.io/release-sdk/gcli"
 	"sigs.k8s.io/release-sdk/github"
-	"sigs.k8s.io/release-utils/log"
 )
 
-// rootCmd represents the base command when called without any subcommands
-var rootCmd = &cobra.Command{
-	Use:               "gh2gcs --org kubernetes --repo release --bucket <bucket> --release-dir <release-dir> [--tags v0.0.0] [--include-prereleases] [--output-dir <temp-dir>] [--download-only] [--config <config-file>]",
-	Short:             "gh2gcs uploads GitHub releases to Google Cloud Storage",
-	Example:           "gh2gcs --org kubernetes --repo release --bucket k8s-staging-release-test --release-dir release --tags v0.0.0,v0.0.1",
-	SilenceUsage:      true,
-	SilenceErrors:     true,
-	PersistentPreRunE: initLogging,
+// GHCmd represents the base command when called without any subcommands
+var GHCmd = &cobra.Command{
+	Use:           "gh --org kubernetes --repo release --bucket <bucket> --release-dir <release-dir> [--tags v0.0.0] [--include-prereleases] [--output-dir <temp-dir>] [--download-only] [--config <config-file>]",
+	Short:         "Uploads GitHub releases to Google Cloud Storage",
+	Example:       "gh --org kubernetes --repo release --bucket k8s-staging-release-test --release-dir release --tags v0.0.0,v0.0.1",
+	SilenceUsage:  true,
+	SilenceErrors: true,
 	PreRunE: func(cmd *cobra.Command, args []string) error {
 		return checkRequiredFlags(cmd.Flags())
 	},
@@ -57,7 +54,6 @@ type options struct {
 	bucket             string
 	releaseDir         string
 	outputDir          string
-	logLevel           string
 	tags               []string
 	configFilePath     string
 }
@@ -84,93 +80,69 @@ var (
 	}
 )
 
-// Execute adds all child commands to the root command and sets flags appropriately.
-// This is called by main.main(). It only needs to happen once to the rootCmd.
-func Execute() {
-	if err := rootCmd.Execute(); err != nil {
-		logrus.Fatal(err)
-	}
-
-	if !rootCmd.Flags().Changed(outputDirFlag) {
-		logrus.Infof("Cleaning temporary directory %s", opts.outputDir)
-		os.RemoveAll(opts.outputDir)
-	}
-}
-
 func init() {
-	rootCmd.PersistentFlags().StringVar(
+	GHCmd.PersistentFlags().StringVar(
 		&opts.org,
 		orgFlag,
 		"",
 		"GitHub org/user",
 	)
 
-	rootCmd.PersistentFlags().StringVar(
+	GHCmd.PersistentFlags().StringVar(
 		&opts.repo,
 		repoFlag,
 		"",
 		"GitHub repo",
 	)
 
-	rootCmd.PersistentFlags().StringSliceVar(
+	GHCmd.PersistentFlags().StringSliceVar(
 		&opts.tags,
 		tagsFlag,
 		[]string{},
 		"release tags to upload to GCS",
 	)
 
-	rootCmd.PersistentFlags().BoolVar(
+	GHCmd.PersistentFlags().BoolVar(
 		&opts.includePrereleases,
 		includePrereleasesFlag,
 		false,
 		"specifies whether prerelease assets should be uploaded to GCS",
 	)
 
-	rootCmd.PersistentFlags().StringVar(
+	GHCmd.PersistentFlags().StringVar(
 		&opts.bucket,
 		bucketFlag,
 		"",
 		"GCS bucket to upload to",
 	)
 
-	rootCmd.PersistentFlags().StringVar(
+	GHCmd.PersistentFlags().StringVar(
 		&opts.releaseDir,
 		releaseDirFlag,
 		"",
 		"directory to upload to within the specified GCS bucket",
 	)
 
-	rootCmd.PersistentFlags().StringVar(
+	GHCmd.PersistentFlags().StringVar(
 		&opts.outputDir,
 		outputDirFlag,
 		"",
 		"local directory for releases to be downloaded to",
 	)
 
-	rootCmd.PersistentFlags().BoolVar(
+	GHCmd.PersistentFlags().BoolVar(
 		&opts.downloadOnly,
 		downloadOnlyFlag,
 		false,
 		"only download the releases, do not push them to GCS. Requires the output-dir flag to also be set",
 	)
 
-	rootCmd.PersistentFlags().StringVar(
-		&opts.logLevel,
-		"log-level",
-		"info",
-		fmt.Sprintf("the logging verbosity, either %s", log.LevelNames()),
-	)
-
-	rootCmd.PersistentFlags().StringVar(
+	GHCmd.PersistentFlags().StringVar(
 		&opts.configFilePath,
 		configFlag,
 		"",
 		"config file to set all the branch/repositories the user wants to",
 	)
-}
-
-func initLogging(*cobra.Command, []string) error {
-	return log.SetupGlobalLogger(opts.logLevel)
 }
 
 func checkRequiredFlags(flags *pflag.FlagSet) error {
@@ -267,7 +239,7 @@ func (o *options) SetAndValidate() error {
 			return errors.Errorf("when %s flag is set you need to specify the %s", downloadOnlyFlag, outputDirFlag)
 		}
 
-		tmpDir, err := os.MkdirTemp("", "gh2gcs")
+		tmpDir, err := os.MkdirTemp("", "gh")
 		if err != nil {
 			return errors.Wrap(err, "creating temp directory")
 		}

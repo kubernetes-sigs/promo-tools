@@ -23,6 +23,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"sigs.k8s.io/promo-tools/v3/cmd/kpromo/cmd/cip"
+	"sigs.k8s.io/promo-tools/v3/cmd/kpromo/cmd/gh"
 	"sigs.k8s.io/promo-tools/v3/cmd/kpromo/cmd/manifest"
 	"sigs.k8s.io/promo-tools/v3/cmd/kpromo/cmd/run"
 	"sigs.k8s.io/promo-tools/v3/cmd/kpromo/cmd/version"
@@ -74,6 +75,7 @@ func init() {
 
 	rootCmd.AddCommand(run.RunCmd)
 	rootCmd.AddCommand(cip.CipCmd)
+	rootCmd.AddCommand(gh.GHCmd)
 	rootCmd.AddCommand(manifest.ManifestCmd)
 	rootCmd.AddCommand(version.VersionCmd)
 }
