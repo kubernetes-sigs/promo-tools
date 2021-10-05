@@ -139,12 +139,15 @@ update-mocks: ## Update all generated mocks
 
 ##@ Verify
 
-.PHONY: verify verify-boilerplate verify-dependencies verify-golangci-lint verify-go-mod
+.PHONY: verify verify-boilerplate verify-build verify-dependencies verify-golangci-lint verify-go-mod
 
-verify: verify-boilerplate verify-dependencies verify-golangci-lint verify-go-mod verify-mocks ## Runs verification scripts to ensure correct execution
+verify: verify-boilerplate verify-dependencies verify-golangci-lint verify-go-mod verify-mocks verify-build ## Runs verification scripts to ensure correct execution
 
 verify-boilerplate: ## Runs the file header check
 	./hack/verify-boilerplate.sh
+
+verify-build: ## Ensures repo CLI tools can be built
+	./hack/verify-build.sh
 
 verify-dependencies: ## Runs zeitgeist to verify dependency versions
 	./hack/verify-dependencies.sh
