@@ -43,6 +43,7 @@ FROM gcr.io/google.com/cloudsdktool/cloud-sdk:slim AS base
 
 WORKDIR /
 COPY --from=builder /go/src/app/bin/kpromo .
+COPY --from=builder /go/src/app/docker/config.json /.docker/config.json
 
 ENTRYPOINT ["/kpromo"]
 
