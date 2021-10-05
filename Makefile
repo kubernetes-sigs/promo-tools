@@ -45,20 +45,15 @@ kpromo:
 cip-mm:
 	${REPO_ROOT}/go_with_version.sh build -trimpath -o ./bin/cip-mm ./cmd/cip-mm
 
-.PHONY: gh2gcs
-gh2gcs:
-	${REPO_ROOT}/go_with_version.sh build -trimpath -o ./bin/gh2gcs ./cmd/gh2gcs
-
 ##@ Build
 .PHONY: build
-build: kpromo cip-mm gh2gcs ## Build go tools within the repository
+build: kpromo cip-mm ## Build go tools within the repository
 	${REPO_ROOT}/go_with_version.sh build -o ./bin/cip-auditor-e2e ${REPO_ROOT}/test-e2e/cip-auditor/cip-auditor-e2e.go
 	${REPO_ROOT}/go_with_version.sh build -o ./bin/cip-e2e ${REPO_ROOT}/test-e2e/cip/e2e.go
 
 .PHONY: install
 install: build ## Install
 	${REPO_ROOT}/go_with_version.sh install ${REPO_ROOT}/cmd/cip-mm
-	${REPO_ROOT}/go_with_version.sh install ${REPO_ROOT}/cmd/gh2gcs
 	${REPO_ROOT}/go_with_version.sh install ${REPO_ROOT}/cmd/kpromo
 
 ##@ Images

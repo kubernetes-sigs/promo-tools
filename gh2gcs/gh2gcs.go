@@ -33,7 +33,7 @@ type Config struct {
 }
 
 // ReleaseConfig contains source (GitHub) and destination (GCS) information
-// to perform a copy/upload operation using gh2gcs.
+// to perform a copy/upload operation.
 type ReleaseConfig struct {
 	// GitHub options
 	Org                string   `yaml:"org"`
