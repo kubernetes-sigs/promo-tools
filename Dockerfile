@@ -43,7 +43,12 @@ FROM gcr.io/google.com/cloudsdktool/cloud-sdk:slim AS base
 
 WORKDIR /
 COPY --from=builder /go/src/app/bin/kpromo .
-COPY --from=builder /go/src/app/docker/config.json /.docker/config.json
+
+# The Docker configuration file (which include credential helpers for
+# authenticating to various container registries) should be placed in the home
+# directory of the running user, so it can be detected by artifact promotion
+# tooling.
+COPY --from=builder /go/src/app/docker/config.json $HOME/.docker/config.json
 
 ENTRYPOINT ["/kpromo"]
 
