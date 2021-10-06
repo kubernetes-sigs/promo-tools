@@ -1,0 +1,5 @@
+schemaVersion: 2.0.0
+fileExistenceTests:
+- name: 'Docker configuration file'
+  path: '/root/.docker/config.json'
+  shouldExist: true
