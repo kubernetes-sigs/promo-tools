@@ -65,7 +65,7 @@ p_ IMG_REGISTRY gcr.io
 p_ IMG_REPOSITORY k8s-staging-artifact-promoter
 p_ IMG_NAME kpromo
 p_ IMG_TAG "${image_tag}"
-p_ IMG_VERSION v3.3.0-beta.1-2
+p_ IMG_VERSION v3.3.0-beta.1-3
 p_ TEST_AUDIT_PROD_IMG_REPOSITORY us.gcr.io/k8s-gcr-audit-test-prod
 p_ TEST_AUDIT_STAGING_IMG_REPOSITORY gcr.io/k8s-gcr-audit-test-prod
 p_ TEST_AUDIT_PROJECT_ID k8s-gcr-audit-test-prod
