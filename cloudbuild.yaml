@@ -19,6 +19,13 @@ steps:
   args:
   - image-push
 
+- name: 'gcr.io/gcp-runtimes/container-structure-test'
+  id: structure-test
+  args:
+  - test
+  - --image=gcr.io/$PROJECT_ID/kpromo:$_GIT_TAG
+  - --config=container-structure.yaml
+
 substitutions:
   # _GIT_TAG will be filled with a git-based tag for the image, of the form
   # vYYYYMMDD-hash, and can be used as a substitution
