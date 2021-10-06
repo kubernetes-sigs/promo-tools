@@ -48,7 +48,7 @@ COPY --from=builder /go/src/app/bin/kpromo .
 # authenticating to various container registries) should be placed in the home
 # directory of the running user, so it can be detected by artifact promotion
 # tooling.
-COPY --from=builder /go/src/app/docker/config.json $HOME/.docker/config.json
+COPY --from=builder /go/src/app/docker/config.json /root/.docker/config.json
 
 ENTRYPOINT ["/kpromo"]
 
