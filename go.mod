@@ -7,7 +7,7 @@ require (
 	cloud.google.com/go/errorreporting v0.1.0
 	cloud.google.com/go/grafeas v0.0.0-20210817223811-71387f0142a4 // indirect
 	cloud.google.com/go/logging v1.4.2
-	cloud.google.com/go/storage v1.18.0
+	cloud.google.com/go/storage v1.18.1
 	github.com/cenkalti/backoff/v4 v4.1.1
 	github.com/google/go-cmp v0.5.6
 	github.com/google/go-containerregistry v0.6.0
@@ -23,7 +23,7 @@ require (
 	github.com/stretchr/testify v1.7.0
 	github.com/xanzy/ssh-agent v0.3.0 // indirect
 	golang.org/x/crypto v0.0.0-20210817164053-32db794688a5 // indirect
-	golang.org/x/oauth2 v0.0.0-20210819190943-2bc19b11175f
+	golang.org/x/oauth2 v0.0.0-20211005180243-6b3c2da341f1
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1
 	google.golang.org/api v0.58.0
 	google.golang.org/genproto v0.0.0-20210924002016-3dee208752a0
