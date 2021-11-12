@@ -8,7 +8,7 @@ require (
 	cloud.google.com/go/grafeas v0.0.0-20210817223811-71387f0142a4 // indirect
 	cloud.google.com/go/logging v1.4.2
 	cloud.google.com/go/storage v1.18.2
-	github.com/cenkalti/backoff/v4 v4.1.1
+	github.com/cenkalti/backoff/v4 v4.1.2
 	github.com/google/go-cmp v0.5.6
 	github.com/google/go-containerregistry v0.6.0
 	github.com/google/uuid v1.3.0
