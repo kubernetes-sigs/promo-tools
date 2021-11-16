@@ -25,7 +25,6 @@ Currently only Google Container Registry (GCR) is supported.
 - [Versioning](#versioning)
   - [Default versioning](#default-versioning)
 - [Checks Interface](#checks-interface)
-- [Vulnerability Dashboard](#vulnerability-dashboard)
 
 ## Install
 
@@ -395,12 +394,6 @@ any pre-existing checks and test their own checks individually, while also
 giving freedom as to what conditionals or tags might be necessary for the
 check to occur.
 
-## Vulnerability Dashboard
-
-The vulnerability dashboard (`vulndash`) has moved to [`kubernetes/release`][k/release].
-
-Read more [here][vulndash-readme].
-
 [cip-prow-integration]: https://git.k8s.io/k8s.io/k8s.gcr.io/Vanity-Domain-Flip.md#prow-integration
 [docker]: https://docs.docker.com/get-docker
 [golang]: https://golang.org/doc/install
@@ -408,4 +401,3 @@ Read more [here][vulndash-readme].
 [k/release]: https://git.k8s.io/release
 [k/test-infra]: https://git.k8s.io/test-infra
 [k8sio-manifests-dir]: https://git.k8s.io/k8s.io/k8s.gcr.io
-[vulndash-readme]: https://git.k8s.io/release/docs/vuln-dashboard.md
