@@ -25,6 +25,7 @@ import (
 	"sigs.k8s.io/promo-tools/v3/cmd/kpromo/cmd/cip"
 	"sigs.k8s.io/promo-tools/v3/cmd/kpromo/cmd/gh"
 	"sigs.k8s.io/promo-tools/v3/cmd/kpromo/cmd/manifest"
+	"sigs.k8s.io/promo-tools/v3/cmd/kpromo/cmd/pr"
 	"sigs.k8s.io/promo-tools/v3/cmd/kpromo/cmd/run"
 	"sigs.k8s.io/promo-tools/v3/cmd/kpromo/cmd/version"
 	"sigs.k8s.io/release-utils/log"
@@ -77,6 +78,7 @@ func init() {
 	rootCmd.AddCommand(cip.CipCmd)
 	rootCmd.AddCommand(gh.GHCmd)
 	rootCmd.AddCommand(manifest.ManifestCmd)
+	rootCmd.AddCommand(pr.PRCmd)
 	rootCmd.AddCommand(version.VersionCmd)
 }
 

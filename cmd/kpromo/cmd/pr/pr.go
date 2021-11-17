@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cmd
+package pr
 
 import (
 	"context"
@@ -44,14 +44,14 @@ const (
 	defaultReviewers = "@kubernetes/release-engineering"
 )
 
-// promoteCommand is the krel subcommand to promote conainer images
-var imagePromoteCommand = &cobra.Command{
-	Use:   "promote-images",
-	Short: "Starts an image promotion for a tag of kubernetes or kubernetes-sigs images",
-	Long: `krel promote
+// PRCmd is the kpromo subcommand to promote container images
+var PRCmd = &cobra.Command{
+	Use:   "pr",
+	Short: "Starts an image promotion for a given image tag",
+	Long: `kpromo pr
 
-The 'promote' subcommand of krel updates the image promoter manifests
-and creates a PR in kubernetes/k8s.io`,
+This command updates image promoter manifests and creates a PR in
+kubernetes/k8s.io`,
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -99,14 +99,14 @@ func (o *promoteOptions) Validate() error {
 var promoteOpts = &promoteOptions{}
 
 func init() {
-	imagePromoteCommand.PersistentFlags().StringVar(
+	PRCmd.PersistentFlags().StringVar(
 		&promoteOpts.project,
 		"project",
 		defaultProject,
 		"the name of the project to promote images for",
 	)
 
-	imagePromoteCommand.PersistentFlags().StringSliceVarP(
+	PRCmd.PersistentFlags().StringSliceVarP(
 		&promoteOpts.tags,
 		"tag",
 		"t",
@@ -114,21 +114,21 @@ func init() {
 		"version tag of the images we will promote",
 	)
 
-	imagePromoteCommand.PersistentFlags().StringVar(
+	PRCmd.PersistentFlags().StringVar(
 		&promoteOpts.userFork,
 		"fork",
 		"",
 		"the user's fork of kubernetes/k8s.io",
 	)
 
-	imagePromoteCommand.PersistentFlags().StringVar(
+	PRCmd.PersistentFlags().StringVar(
 		&promoteOpts.reviewers,
 		"reviewers",
 		defaultReviewers,
 		"the list of GitHub users or teams to assign to the PR",
 	)
 
-	imagePromoteCommand.PersistentFlags().BoolVarP(
+	PRCmd.PersistentFlags().BoolVarP(
 		&promoteOpts.interactiveMode,
 		"interactive",
 		"i",
@@ -137,12 +137,10 @@ func init() {
 	)
 
 	for _, flagName := range []string{"tag", "fork"} {
-		if err := imagePromoteCommand.MarkPersistentFlagRequired(flagName); err != nil {
+		if err := PRCmd.MarkPersistentFlagRequired(flagName); err != nil {
 			logrus.Error(errors.Wrapf(err, "marking tag %s as required", flagName))
 		}
 	}
-
-	rootCmd.AddCommand(imagePromoteCommand)
 }
 
 func runPromote(opts *promoteOptions) error {
@@ -352,8 +350,8 @@ func generatePRBody(opts *promoteOptions) string {
 	}
 
 	prBody := fmt.Sprintf("Image promotion for %s %s\n", opts.project, strings.Join(opts.tags, " / "))
-	prBody += "This is an automated PR generated from `krel The Kubernetes Release Toolbox`\n"
-	prBody += fmt.Sprintf("```\nkrel promote-images %s\n```\n\n", args)
+	prBody += "This is an automated PR generated from `kpromo`\n"
+	prBody += fmt.Sprintf("```\nkpromo pr %s\n```\n\n", args)
 	prBody += fmt.Sprintf("/hold\ncc: %s\n", opts.reviewers)
 
 	return prBody
