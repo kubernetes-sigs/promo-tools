@@ -268,7 +268,10 @@ func runPromote(opts *promoteOptions) error {
 		return errors.Wrap(err, "adding image manifest to staging area")
 	}
 
-	commitMessage := "releng: Image promotion for " + opts.project + " " + strings.Join(opts.tags, " / ")
+	commitMessage := "Image promotion for " + opts.project + " " + strings.Join(opts.tags, " / ")
+	if opts.project == image.StagingRepoSuffix {
+		commitMessage = "releng: " + commitMessage
+	}
 
 	// Commit files
 	logrus.Debug("Creating commit")
