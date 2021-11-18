@@ -21,14 +21,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v2"
 
+	"sigs.k8s.io/promo-tools/v3/image"
 	reg "sigs.k8s.io/promo-tools/v3/legacy/dockerregistry"
 	"sigs.k8s.io/release-sdk/git"
 	"sigs.k8s.io/release-sdk/github"
@@ -39,9 +38,8 @@ const (
 	k8sioRepo             = "k8s.io"
 	k8sioDefaultBranch    = "main"
 	promotionBranchSuffix = "-image-promotion"
-	// TODO: Consider a more descriptive name for this constant
-	defaultProject   = Kubernetes
-	defaultReviewers = "@kubernetes/release-engineering"
+	defaultProject        = image.StagingRepoSuffix
+	defaultReviewers      = "@kubernetes/release-engineering"
 )
 
 // PRCmd is the kpromo subcommand to promote container images
@@ -189,9 +187,9 @@ func runPromote(opts *promoteOptions) error {
 
 	// Path to the promoter image list
 	imagesListPath := filepath.Join(
-		GCRIOPathProd,
+		image.ProdRegistry,
 		"images",
-		filepath.Base(GCRIOPathStagingPrefix)+opts.project,
+		filepath.Base(image.StagingRepoPrefix)+opts.project,
 		"images.yaml",
 	)
 
@@ -211,8 +209,8 @@ func runPromote(opts *promoteOptions) error {
 		for _, tag := range opts.tags {
 			opt := reg.GrowManifestOptions{}
 			if err := opt.Populate(
-				filepath.Join(repo.Dir(), GCRIOPathProd),
-				GCRIOPathStagingPrefix+opts.project, "", "", tag); err != nil {
+				filepath.Join(repo.Dir(), image.ProdRegistry),
+				image.StagingRepoPrefix+opts.project, "", "", tag); err != nil {
 				return errors.Wrapf(err, "populating image promoter options for tag %s", tag)
 			}
 
@@ -228,13 +226,13 @@ func runPromote(opts *promoteOptions) error {
 	}
 
 	// Re-write the image list without the mock images
-	rawImageList, err := NewPromoterImageListFromFile(filepath.Join(repo.Dir(), imagesListPath))
+	rawImageList, err := image.NewManifestListFromFile(filepath.Join(repo.Dir(), imagesListPath))
 	if err != nil {
 		return errors.Wrap(err, "parsing the current manifest")
 	}
 
 	// Create a new imagelist to copy the non-mock images
-	newImageList := &ImagePromoterImages{}
+	newImageList := &image.ManifestList{}
 
 	// Copy all non mock-images:
 	for _, imageData := range *rawImageList {
@@ -440,109 +438,4 @@ func verifyFork(branchName, forkOwner, forkRepo, parentOwner, parentRepo string)
 		)
 	}
 	return nil
-}
-
-// TODO: Consider moving this section to its own package
-
-// Copied from https://github.com/kubernetes/release/blob/971affe6bdc00c8cdb770c4b7930584e2d13a8eb/pkg/release/release.go
-
-const (
-	// name of the kubernetes project
-	// TODO: Consider a more descriptive name for this constant
-	Kubernetes = "kubernetes"
-
-	// Production registry root URL
-	GCRIOPathProd = "k8s.gcr.io"
-
-	// Staging registry root URL prefix
-	GCRIOPathStagingPrefix = "gcr.io/k8s-staging-"
-)
-
-// NewPromoterImageListFromFile parses an image promoter manifest file
-func NewPromoterImageListFromFile(manifestPath string) (imagesList *ImagePromoterImages, err error) {
-	if !util.Exists(manifestPath) {
-		return nil, errors.New("could not find image promoter manifest")
-	}
-	yamlCode, err := os.ReadFile(manifestPath)
-	if err != nil {
-		return nil, errors.Wrap(err, "reading yaml code from file")
-	}
-
-	imagesList = &ImagePromoterImages{}
-	if err := imagesList.Parse(yamlCode); err != nil {
-		return nil, errors.Wrap(err, "parsing manifest yaml")
-	}
-
-	return imagesList, nil
-}
-
-// ImagePromoterImages abtracts the manifest used by the image promoter
-type ImagePromoterImages []struct {
-	Name string              `json:"name"`
-	DMap map[string][]string `json:"dmap"` // eg "sha256:ef9493aff21f7e368fb3968b46ff2542b0f6863a5de2b9bc58d8d151d8b0232c": ["v1.17.12-rc.0"]
-}
-
-// Parse reads yaml code into an ImagePromoterManifest object
-func (imagesList *ImagePromoterImages) Parse(yamlCode []byte) error {
-	if err := yaml.Unmarshal(yamlCode, imagesList); err != nil {
-		return err
-	}
-	return nil
-}
-
-// Write writes the promoter image list into an YAML file.
-func (imagesList *ImagePromoterImages) Write(filePath string) error {
-	yamlCode, err := imagesList.ToYAML()
-	if err != nil {
-		return errors.Wrap(err, "while marshalling image list")
-	}
-	// Write the yaml into the specified file
-	if err := os.WriteFile(filePath, yamlCode, os.FileMode(0o644)); err != nil {
-		return errors.Wrap(err, "writing yaml code into file")
-	}
-
-	return nil
-}
-
-// ToYAML serializes an image list into an YAML file.
-// We serialize the data by hand to emulate the way it's done by the image promoter
-func (imagesList *ImagePromoterImages) ToYAML() ([]byte, error) {
-	// The image promoter code sorts images by:
-	//	  1. Name 2. Digest SHA (asc)  3. Tag
-
-	// First, sort by name (sort #1)
-	sort.Slice(*imagesList, func(i, j int) bool {
-		return (*imagesList)[i].Name < (*imagesList)[j].Name
-	})
-
-	// Let's build the YAML code
-	yamlCode := ""
-	for _, imgData := range *imagesList {
-		// Add the new name key (it is not sorted in the promoter code)
-		yamlCode += fmt.Sprintf("- name: %s\n", imgData.Name)
-		yamlCode += "  dmap:\n"
-
-		// Now, lets sort by the digest sha (sort #2)
-		keys := make([]string, 0, len(imgData.DMap))
-		for k := range imgData.DMap {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
-
-		for _, digestSHA := range keys {
-			// Finally, sort bt tag (sort #3)
-			tags := imgData.DMap[digestSHA]
-			sort.Strings(tags)
-			yamlCode += fmt.Sprintf("    %q: [", digestSHA)
-			for i, tag := range tags {
-				if i > 0 {
-					yamlCode += ","
-				}
-				yamlCode += fmt.Sprintf("%q", tag)
-			}
-			yamlCode += "]\n"
-		}
-	}
-
-	return []byte(yamlCode), nil
 }
