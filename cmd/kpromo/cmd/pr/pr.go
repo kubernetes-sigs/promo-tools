@@ -165,14 +165,14 @@ func runPromote(opts *promoteOptions) error {
 	gh := github.New()
 
 	// Verify the repository is a fork of k8s.io
-	if err = verifyFork(
+	if err = github.VerifyFork(
 		branchname, userForkOrg, userForkRepo, git.DefaultGithubOrg, k8sioRepo,
 	); err != nil {
 		return errors.Wrapf(err, "while checking fork of %s/%s ", git.DefaultGithubOrg, k8sioRepo)
 	}
 
 	// Clone k8s.io
-	repo, err := prepareFork(branchname, git.DefaultGithubOrg, k8sioRepo, userForkOrg, userForkRepo)
+	repo, err := github.PrepareFork(branchname, git.DefaultGithubOrg, k8sioRepo, userForkOrg, userForkRepo)
 	if err != nil {
 		return errors.Wrap(err, "while preparing k/k8s.io fork")
 	}
@@ -268,7 +268,10 @@ func runPromote(opts *promoteOptions) error {
 		return errors.Wrap(err, "adding image manifest to staging area")
 	}
 
-	commitMessage := "releng: Image promotion for " + opts.project + " " + strings.Join(opts.tags, " / ")
+	commitMessage := "Image promotion for " + opts.project + " " + strings.Join(opts.tags, " / ")
+	if opts.project == image.StagingRepoSuffix {
+		commitMessage = "releng: " + commitMessage
+	}
 
 	// Commit files
 	logrus.Debug("Creating commit")
@@ -279,8 +282,8 @@ func runPromote(opts *promoteOptions) error {
 	// Push to fork
 	if mustRun(opts, fmt.Sprintf("Push changes to user's fork at %s/%s?", userForkOrg, userForkRepo)) {
 		logrus.Infof("Pushing manifest changes to %s/%s", userForkOrg, userForkRepo)
-		if err := repo.PushToRemote(userForkName, branchname); err != nil {
-			return errors.Wrapf(err, "pushing %s to %s/%s", userForkName, userForkOrg, userForkRepo)
+		if err := repo.PushToRemote(github.UserForkName, branchname); err != nil {
+			return errors.Wrapf(err, "pushing %s to %s/%s", github.UserForkName, userForkOrg, userForkRepo)
 		}
 	} else {
 		// Exit if no push was made
@@ -353,89 +356,4 @@ func generatePRBody(opts *promoteOptions) string {
 	prBody += fmt.Sprintf("/hold\ncc: %s\n", opts.reviewers)
 
 	return prBody
-}
-
-// TODO: Consider moving this section to sigs.k8s.io/release-sdk
-
-// Copied from https://github.com/kubernetes/release/blob/df4a45eead2cfb79deb1337a9817e137c9739d41/cmd/krel/cmd/release_notes.go
-
-const (
-	// userForkName The name we will give to the user's remote when adding it to repos
-	userForkName = "userfork"
-)
-
-// prepareFork Prepare a branch a repo
-func prepareFork(branchName, upstreamOrg, upstreamRepo, myOrg, myRepo string) (repo *git.Repo, err error) {
-	// checkout the upstream repository
-	logrus.Infof("Cloning/updating repository %s/%s", upstreamOrg, upstreamRepo)
-
-	repo, err = git.CleanCloneGitHubRepo(
-		upstreamOrg, upstreamRepo, false,
-	)
-	if err != nil {
-		return nil, errors.Wrapf(err, "cloning %s/%s", upstreamOrg, upstreamRepo)
-	}
-
-	// test if the fork remote is already existing
-	url := git.GetRepoURL(myOrg, myRepo, false)
-	if repo.HasRemote(userForkName, url) {
-		logrus.Infof(
-			"Using already existing remote %s (%s) in repository",
-			userForkName, url,
-		)
-	} else {
-		// add the user's fork as a remote
-		err = repo.AddRemote(userForkName, myOrg, myRepo)
-		if err != nil {
-			return nil, errors.Wrap(err, "adding user's fork as remote repository")
-		}
-	}
-
-	// checkout the new branch
-	err = repo.Checkout("-B", branchName)
-	if err != nil {
-		return nil, errors.Wrapf(err, "creating new branch %s", branchName)
-	}
-
-	return repo, nil
-}
-
-// verifyFork does a pre-check of a fork to see if we can create a PR from it
-func verifyFork(branchName, forkOwner, forkRepo, parentOwner, parentRepo string) error {
-	logrus.Infof("Checking if a PR can be created from %s/%s", forkOwner, forkRepo)
-	gh := github.New()
-
-	// Check th PR
-	isrepo, err := gh.RepoIsForkOf(
-		forkOwner, forkRepo, parentOwner, parentRepo,
-	)
-	if err != nil {
-		return errors.Wrapf(
-			err, "while checking if repository is a fork of %s/%s",
-			parentOwner, parentRepo,
-		)
-	}
-
-	if !isrepo {
-		return errors.Errorf(
-			"cannot create PR, %s/%s is not a fork of %s/%s",
-			forkOwner, forkRepo, parentOwner, parentRepo,
-		)
-	}
-
-	// verify the branch does not previously exist
-	branchExists, err := gh.BranchExists(
-		forkOwner, forkRepo, branchName,
-	)
-	if err != nil {
-		return errors.Wrap(err, "while checking if branch can be created")
-	}
-
-	if branchExists {
-		return errors.Errorf(
-			"a branch named %s already exists in %s/%s",
-			branchName, forkOwner, forkRepo,
-		)
-	}
-	return nil
 }
