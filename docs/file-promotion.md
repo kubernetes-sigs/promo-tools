@@ -1,23 +1,4 @@
-# kpromo - Artifact promoter
-
-kpromo is a tool responsible for artifact promotion.
-
-It has two operation modes:
-
-- `run` - Execute a file promotion (formerly "promobot-files") (image promotion coming soon)
-- `manifest` - Generate/modify a file manifest to target for promotion (image support coming soon)
-
-Expectations:
-
-- `kpromo run` should only be run in auditable environments
-- `kpromo manifest` should primarily be run by contributors
-
-- [File promotion](#file-promotion)
-  - [Running the file promoter](#running-the-file-promoter)
-  - [Generating a file promotion manifest](#generating-a-file-promotion-manifest)
-  - [Consumers](#consumers)
-
-## File promotion
+# File promotion
 
 The file promoter copies files from source GCS buckets to one or more
 destination buckets, by reading a `Manifest` file (in YAML).
@@ -59,7 +40,7 @@ attempt to copy remaining files, but the process will report the error.
 Currently only Google Cloud Storage (GCS) buckets supported, with a prefix of
 `gs://`
 
-### Running the file promoter
+## Running the file promoter
 
 ```console
 $ kpromo run files --help
@@ -81,7 +62,7 @@ Global Flags:
       --log-level string   the logging verbosity, either 'panic', 'fatal', 'error', 'warning', 'info', 'debug', 'trace' (default "info")
 ```
 
-### Generating a file promotion manifest
+## Generating a file promotion manifest
 
 This tool will generate a manifest fragment for uploading a set of
 files, located in the specified path.
@@ -108,7 +89,7 @@ Global Flags:
       --log-level string   the logging verbosity, either 'panic', 'fatal', 'error', 'warning', 'info', 'debug', 'trace' (default "info")
 ```
 
-### Consumers
+## Consumers
 
 - [`kOps`][kops-release-process]
 
