@@ -1,5 +1,9 @@
 # Creating Promotion Pull Requests
 
+**DISCLAIMER:** This document was originally written for Release Managers, but can be adapted to be used for any subproject.
+
+Please feel free to propose PRs to adjust the language as needed.
+
 - [Preparing Environment](#preparing-environment)
 - [Promoting Images](#promoting-images)
 - [Completing the Image Promotion](#completing-the-image-promotion)
@@ -12,9 +16,7 @@ When cutting a new Kubernetes release, we need to publish images to the `k8s-sta
 
 First, take the following steps to prepare your environment for promoting images:
 
-- Ensure a recent (supported) version of Golang is installed.
-  Installation instructions can be found [here](https://go.dev/doc/install).
-- Install the [promotion tooling](https://sigs.k8s.io/promo-tools):
+- Install the [promotion tooling](/README#installation):
 
   ```shell
   go install sigs.k8s.io/promo-tools/v3/cmd/kpromo@v3.3.0-beta.2
@@ -24,6 +26,7 @@ First, take the following steps to prepare your environment for promoting images
   image promotion PR functionality. When `sigs.k8s.io/promo-tools` has a new minor
   release, this document should be updated to instead use:
   `go install sigs.k8s.io/promo-tools/v3/cmd/kpromo@latest`._
+
 - Promoting images will require a GitHub Personal Access Token in order to
   create a PR on your behalf.
 
@@ -90,5 +93,5 @@ Once the `kpromo pr` command is done take the following steps to complete image 
 - Edit the PR description to add links for GCB jobs for `Mock Stage`, `Mock Release`, and `Official Stage` steps, or a link to the release tracking issue which includes the needed links
 - Once the PR is approved by Release Managers:
   - If you're cutting Alpha, Beta, or RC release, lift the hold and proceed with the release process
-  - If you're cutting a stable release, ensure that a [Build Admin](https://git.k8s.io/sig-release/release-managers.md#build-admins) is available to cut the packages before lifting the hold and proceeding with the release
+  - If you're cutting a stable release, ensure that a [Build Admin](https://kubernetes.io/releases/release-managers/#build-admins) is available to cut the packages before lifting the hold and proceeding with the release
 - After the Pull Request is merged and **before** starting the `Official Release` step, we need to watch the following [Prow Job](https://prow.k8s.io/?job=post-k8sio-image-promo) to succeed. When the latest master ran without errors, then we can continue with `Official Release`.
