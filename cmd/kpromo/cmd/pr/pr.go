@@ -339,11 +339,11 @@ func generatePRBody(opts *promoteOptions) string {
 	}
 
 	if opts.project != defaultProject {
-		args += " --project" + opts.project
+		args += " --project " + opts.project
 	}
 
 	if opts.reviewers != defaultReviewers {
-		args += " --reviewers" + opts.reviewers
+		args += " --reviewers " + opts.reviewers
 	}
 
 	for _, tag := range opts.tags {
