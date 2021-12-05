@@ -31,13 +31,11 @@ const (
 	targetStatusCode int = 429
 )
 
-var (
-	queries []string = []string{
-		"https://us.gcr.io/v2/k8s-artifacts-prod/addon-builder/tags/list",
-		"https://gcr.io/v2/k8s-staging-autoscaling/addon-resizer-amd64/tags/list",
-		"https://gcr.io/v2/k8s-staging-cloud-provider-gcp/gcp-filestore-csi-driver/tags/list",
-	}
-)
+var queries = []string{
+	"https://us.gcr.io/v2/k8s-artifacts-prod/addon-builder/tags/list",
+	"https://gcr.io/v2/k8s-staging-autoscaling/addon-resizer-amd64/tags/list",
+	"https://gcr.io/v2/k8s-staging-cloud-provider-gcp/gcp-filestore-csi-driver/tags/list",
+}
 
 // message holds information about the HTTP response.
 type message struct {
@@ -51,14 +49,17 @@ func main() {
 	// Determine how many workers should be used.
 	numWorkers := runtime.NumCPU() * 2
 	c := make(chan message, numWorkers)
+
 	// Create all the workers.
 	start := time.Now()
 	spawnWorkers(numWorkers, c)
 	requests := numWorkers
+
 	// Continuously make HTTP requests.
 	for {
 		// Reveal the total number of HTTP requests so far.
 		fmt.Println("Requests: ", requests)
+
 		// Wait for response.
 		msg := <-c
 		if msg.statusCode == targetStatusCode {
@@ -72,11 +73,11 @@ func main() {
 			fmt.Println("Time to ")
 			break
 		}
+
 		// Spawn a new worker.
 		go worker(c)
 		requests++
 	}
-
 }
 
 // getRandQuery randomly selects a query from the list of queries.
@@ -101,12 +102,15 @@ func worker(c chan message) {
 	if err != nil {
 		fmt.Println("Encountered an error during HTTP GET request: ", err)
 	}
+
 	defer resp.Body.Close()
+
 	// Parse the request.
 	bodyBytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		fmt.Println("Encountered an error when reading response body: ", err)
 	}
+
 	// Build the response message.
 	c <- message{
 		body:       string(bodyBytes),
