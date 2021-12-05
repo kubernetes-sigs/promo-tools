@@ -37,14 +37,21 @@ type RunOptions struct {
 	OutputFormat            string
 	SnapshotSvcAcct         string
 	ManifestBasedSnapshotOf string
-	Threads                 int
-	MaxImageSize            int
-	SeverityThreshold       int
-	Confirm                 bool
-	JSONLogSummary          bool
-	ParseOnly               bool
-	MinimalSnapshot         bool
-	UseServiceAcct          bool
+
+	// TODO: Review/optimize/de-dupe (https://github.com/kubernetes-sigs/promo-tools/pull/351)
+	CheckManifestLists string
+
+	// TODO: Review/optimize/de-dupe (https://github.com/kubernetes-sigs/promo-tools/pull/351)
+	Repository string
+
+	Threads           int
+	MaxImageSize      int
+	SeverityThreshold int
+	Confirm           bool
+	JSONLogSummary    bool
+	ParseOnly         bool
+	MinimalSnapshot   bool
+	UseServiceAcct    bool
 }
 
 const (
@@ -74,10 +81,20 @@ func RunPromoteCmd(opts *RunOptions) error {
 	}
 
 	// Activate service accounts.
+	// TODO: Move this into the validation function
 	if opts.UseServiceAcct && opts.KeyFiles != "" {
 		if err := gcloud.ActivateServiceAccounts(opts.KeyFiles); err != nil {
 			return errors.Wrap(err, "activating service accounts")
 		}
+	}
+
+	// TODO: Move this into the validation function
+	if opts.CheckManifestLists != "" {
+		if opts.Repository == "" {
+			logrus.Fatalf("a repository must be specified when checking manifest lists")
+		}
+
+		return validateManifestLists(opts)
 	}
 
 	var (
@@ -294,7 +311,7 @@ necessarily mean that a new version of the image layer is available.`,
 			snapshot = rii.ToYAML(reg.YamlMarshalingOpts{})
 		}
 
-		fmt.Print(snapshot)
+		fmt.Println(snapshot)
 		return nil
 	}
 
@@ -374,5 +391,26 @@ necessarily mean that a new version of the image layer is available.`,
 
 func validateImageOptions(o *RunOptions) error {
 	// TODO: Validate options
+	return nil
+}
+
+// validateManifestLists ONLY reads yaml at the moment
+// TODO: Review/optimize/de-dupe (https://github.com/kubernetes-sigs/promo-tools/pull/351)
+func validateManifestLists(opts *RunOptions) error {
+	pathToSnapshot := opts.CheckManifestLists
+	registry := reg.RegistryName(opts.Repository)
+	images := make([]reg.ImageWithDigestSlice, 0)
+	err := reg.ParseSnapshot(pathToSnapshot, &images)
+	if err != nil {
+		return err
+	}
+
+	imgs, err := reg.FilterParentImages(registry, &images)
+	if err != nil {
+		return err
+	}
+
+	reg.ValidateParentImages(registry, imgs)
+	fmt.Println("FINISHED")
 	return nil
 }
