@@ -89,7 +89,7 @@ func RunPromoteCmd(opts *RunOptions) error {
 
 	// TODO: Review/optimize/de-dupe (https://github.com/kubernetes-sigs/promo-tools/pull/351)
 	if len(opts.CheckManifestLists) > 0 {
-		if len(opts.Repository) == 0 {
+		if opts.Repository == "" {
 			logrus.Fatalf("--repository flag is required")
 		}
 		return validateManifestLists(opts)
