@@ -17,6 +17,7 @@ limitations under the License.
 package pr
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -256,7 +257,7 @@ func runPromote(opts *promoteOptions) error {
 		}
 
 		// If the manifest was not modified, exit now
-		if string(newlist) == string(oldlist) {
+		if bytes.Equal(newlist, oldlist) {
 			logrus.Info("No changes detected in the promoter images list, exiting without changes")
 			return nil
 		}

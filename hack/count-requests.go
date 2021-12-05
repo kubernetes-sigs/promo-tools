@@ -34,7 +34,7 @@ type request struct {
 
 type Manifest struct {
 	ImageSizeBytes string   `json:"imageSizeBytes"`
-	LayerId        string   `json:"layerId"`
+	LayerID        string   `json:"layerId"`
 	MediaType      string   `json:"mediaType"`
 	Tag            StrArray `json:"tag"`
 	TimeCreatedMs  string   `json:"timeCreatedMs"`
@@ -42,6 +42,7 @@ type Manifest struct {
 }
 
 type ManifestMap map[string]Manifest
+
 type StrArray []string
 
 type response struct {
@@ -117,20 +118,22 @@ func getPayload(resp *http.Response) response {
 }
 
 func makeRequest(query string) response {
-	retries := 5
 	var resp *http.Response
+	var payload response
 	var err error
+
 	// Keep requesting until valid response or too many retries.
-	resp, err = http.Get(query)
-	for err != nil {
-		if retries == 0 {
+	for retries := 5; retries >= 1; retries-- {
+		resp, err = http.Get(query)
+		if err == nil {
+			payload = getPayload(resp)
+		} else if retries == 0 {
 			panic(query + " could not be reached.")
 		}
-		resp, err = http.Get(query)
-		retries--
 	}
+
 	// Extract the payload from the HTTP response.
-	return getPayload(resp)
+	return payload
 }
 
 // countQueries returns the total number of HTTP requests needed to validate the request.
