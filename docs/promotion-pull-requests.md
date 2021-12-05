@@ -19,13 +19,8 @@ First, take the following steps to prepare your environment for promoting images
 - Install the [promotion tooling](/README#installation):
 
   ```shell
-  go install sigs.k8s.io/promo-tools/v3/cmd/kpromo@v3.3.0-beta.2
+  go install sigs.k8s.io/promo-tools/v3/cmd/kpromo@latest
   ```
-
-  _NOTE: At the time of writing, `v3.3.0-beta.2` is the tag that includes the
-  image promotion PR functionality. When `sigs.k8s.io/promo-tools` has a new minor
-  release, this document should be updated to instead use:
-  `go install sigs.k8s.io/promo-tools/v3/cmd/kpromo@latest`._
 
 - Promoting images will require a GitHub Personal Access Token in order to
   create a PR on your behalf.
