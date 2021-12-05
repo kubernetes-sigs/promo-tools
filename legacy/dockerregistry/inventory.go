@@ -2886,6 +2886,7 @@ func ParseSnapshot(pathToSnapshot string, images *[]ImageWithDigestSlice) error 
 			if len(img.name) > 0 {
 				*images = append(*images, img)
 			}
+
 			imageName := line[8:]
 			img = ImageWithDigestSlice{
 				name:    imageName,
@@ -2893,13 +2894,16 @@ func ParseSnapshot(pathToSnapshot string, images *[]ImageWithDigestSlice) error 
 			}
 		} else if strings.Contains(line, "sha256:") {
 			// Parse the line for sha256 and tags. The length and format of these
-			// lines are consistent, therefore it's safe to use fixed idicies.
+			// lines are consistent, therefore it's safe to use fixed indices.
 			imageSha256 := line[5:76]
 			imageTags := getTags(line[79:])
-			img.digests = append(img.digests, digest{
-				hash: imageSha256,
-				tags: imageTags,
-			})
+			img.digests = append(
+				img.digests,
+				digest{
+					hash: imageSha256,
+					tags: imageTags,
+				},
+			)
 		}
 	}
 
@@ -2918,6 +2922,7 @@ func FilterParentImages(registry RegistryName, images *[]ImageWithDigestSlice) (
 	// All other images are not of interest.
 	mediaType := `"mediaType": "application/vnd.docker.distribution.manifest.list.v2+json"`
 	results := make([]ImageWithParentDigestSlice, 0)
+
 	// Split the registry into prefix and postfix
 	// For example: "us.gcr.io/k8s-artifacts-prod/addon-builder"
 	// prefix: "us.gcr.io"
@@ -2934,6 +2939,7 @@ func FilterParentImages(registry RegistryName, images *[]ImageWithDigestSlice) (
 	filterImage := func(img ImageWithDigestSlice, c chan ImageWithParentDigestSlice) {
 		defer wg.Done()
 		imageLocation := fmt.Sprintf("%s/%s", registryPostfix, img.name)
+
 		// This is a standard endpoint all container registries must adopt. This will reveal
 		// information about the manifest for the particular image. The output is in JSON form,
 		// with a field "mediaType" that reveals if the given image is a parent image.
@@ -2954,6 +2960,7 @@ func FilterParentImages(registry RegistryName, images *[]ImageWithDigestSlice) (
 				fmt.Println("retrying,", imgEndpoint)
 				numRetries--
 			}
+
 			if response == "" {
 				fmt.Println("Could not reach endpoint:", imgEndpoint)
 				continue
@@ -2962,12 +2969,14 @@ func FilterParentImages(registry RegistryName, images *[]ImageWithDigestSlice) (
 			if !strings.Contains(response, mediaType) {
 				continue
 			}
+
 			// A new parent has been found.
 			parent := parentDigest{
 				hash:     digest.hash,
 				children: []string{},
 			}
-			// Easily parse all children by looking for digest fields within response.
+
+			// Parse all children by looking for digest fields within response.
 			children := strings.Split(response, "},")
 			for _, child := range children {
 				digestIdx := strings.LastIndex(child, `"digest":`)
@@ -2976,13 +2985,16 @@ func FilterParentImages(registry RegistryName, images *[]ImageWithDigestSlice) (
 					parent.children = append(parent.children, childHash)
 				}
 			}
+
 			result.parentDigests = append(result.parentDigests, parent)
 		}
+
 		c <- result
 	}
 
 	fmt.Printf("Searching for parent images with %d workers...\n", numWorkers)
 	received := 0
+
 	// Engage all workers.
 	for i := 0; i < numWorkers; i++ {
 		img := (*images)[i]
@@ -2998,6 +3010,7 @@ func FilterParentImages(registry RegistryName, images *[]ImageWithDigestSlice) (
 			results = append(results, found)
 			fmt.Println("FOUND parent:", found.Name)
 		}
+
 		img := (*images)[i]
 		go filterImage(img, signal)
 		wg.Add(1)
@@ -3011,6 +3024,7 @@ func FilterParentImages(registry RegistryName, images *[]ImageWithDigestSlice) (
 			results = append(results, found)
 			fmt.Println("FOUND parent:", found.Name)
 		}
+
 		if received == len(*images) {
 			break
 		}
@@ -3032,12 +3046,14 @@ func ValidateParentImages(registry RegistryName, images []ImageWithParentDigestS
 			c <- ""
 			return
 		}
+
 		fmt.Println("FAILED - ", image.Name)
 		c <- image.Name
 	}
 
 	fmt.Printf("Inspecting children of %d parents...\n", len(images))
 	received := 0
+
 	// Engage all workers.
 	for i := 0; i < numWorkers; i++ {
 		img := images[i]
@@ -3052,6 +3068,7 @@ func ValidateParentImages(registry RegistryName, images []ImageWithParentDigestS
 		if len(found) > 0 {
 			fmt.Println("FAILED ", found)
 		}
+
 		img := images[i]
 		go validateImg(img, signal)
 		wg.Add(1)
@@ -3064,6 +3081,7 @@ func ValidateParentImages(registry RegistryName, images []ImageWithParentDigestS
 		if len(found) > 0 {
 			fmt.Println("FAILED ", found)
 		}
+
 		if received == len(images) {
 			break
 		}
@@ -3095,9 +3113,9 @@ func IsParentImageValid(registry RegistryName, image ImageWithParentDigestSlice)
 			// This is a standard endpoint all container registries must adopt. This will reveal
 			// information about the manifest for the particular image. The output is in JSON form,
 			// with a field "mediaType" that reveals if the given image is a parent image.
-
 			imgEndpoint := manifestEndpoint + childHash
 			retries := 8
+
 			// Inspect the image. If it doesn't exist, we know the parent child relationship
 			// can't be assumed.
 			for retries > 0 {
@@ -3106,7 +3124,8 @@ func IsParentImageValid(registry RegistryName, image ImageWithParentDigestSlice)
 					response = string(out)
 					break
 				}
-				fmt.Println("trouble obtaining child mainifest...")
+
+				fmt.Println("trouble obtaining child manifest...")
 				fmt.Println("curl response:", err)
 				fmt.Println("retrying ", imgEndpoint)
 				retries--
@@ -3123,5 +3142,6 @@ func IsParentImageValid(registry RegistryName, image ImageWithParentDigestSlice)
 			}
 		}
 	}
+
 	return true
 }

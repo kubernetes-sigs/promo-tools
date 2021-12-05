@@ -81,17 +81,19 @@ func RunPromoteCmd(opts *RunOptions) error {
 	}
 
 	// Activate service accounts.
+	// TODO: Move this into the validation function
 	if opts.UseServiceAcct && opts.KeyFiles != "" {
 		if err := gcloud.ActivateServiceAccounts(opts.KeyFiles); err != nil {
 			return errors.Wrap(err, "activating service accounts")
 		}
 	}
 
-	// TODO: Review/optimize/de-dupe (https://github.com/kubernetes-sigs/promo-tools/pull/351)
-	if len(opts.CheckManifestLists) > 0 {
+	// TODO: Move this into the validation function
+	if opts.CheckManifestLists != "" {
 		if opts.Repository == "" {
-			logrus.Fatalf("--repository flag is required")
+			logrus.Fatalf("a repository must be specified when checking manifest lists")
 		}
+
 		return validateManifestLists(opts)
 	}
 
@@ -402,6 +404,7 @@ func validateManifestLists(opts *RunOptions) error {
 	if err != nil {
 		return err
 	}
+
 	imgs, err := reg.FilterParentImages(registry, &images)
 	if err != nil {
 		return err
