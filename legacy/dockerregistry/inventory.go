@@ -877,6 +877,7 @@ func validateRequiredComponents(m Manifest) error {
 	return fmt.Errorf(strings.Join(errs, "\n"))
 }
 
+/* TODO(unused): MARKED FOR DELETION
 // PrettyValue creates a prettified string representation of MasterInventory.
 func (mi *MasterInventory) PrettyValue() string {
 	var b strings.Builder
@@ -935,7 +936,9 @@ func (mi *MasterInventory) PrettyValue() string {
 
 	return b.String()
 }
+*/
 
+/* TODO(unused): MARKED FOR DELETION
 // PrettyValue converts a Registry to a prettified string representation.
 func (r *Registry) PrettyValue() string {
 	var b strings.Builder
@@ -943,7 +946,9 @@ func (r *Registry) PrettyValue() string {
 	fmt.Fprintln(&b, r.RegInvImageDigest.PrettyValue())
 	return b.String()
 }
+*/
 
+/* TODO(unused): MARKED FOR DELETION
 // PrettyValue converts a RegInvImageDigest to a prettified string
 // representation.
 func (riid *RegInvImageDigest) PrettyValue() string {
@@ -975,6 +980,7 @@ func (riid *RegInvImageDigest) PrettyValue() string {
 	}
 	return b.String()
 }
+*/
 
 func getRegistryTagsWrapper(
 	req stream.ExternalRequest,
@@ -1806,12 +1812,14 @@ func extractGCRManifestList(reader io.Reader) (*ggcrV1.IndexManifest, error) {
 	return &gcrManifestList, nil
 }
 
+/* TODO(unused): MARKED FOR DELETION
 // Overwrite insert's b's values into a.
 func (a DigestTags) Overwrite(b DigestTags) {
 	for k, v := range b {
 		a[k] = v
 	}
 }
+*/
 
 // ToFQIN combines a RegistryName, ImageName, and Digest to form a
 // fully-qualified image name (FQIN).

@@ -32,11 +32,13 @@ type Producer interface {
 	Close() error
 }
 
+/* TODO(unused): MARKED FOR DELETION
 // Consumer is really only defined for symmetry with "Producer"; nothing
 // actually uses it.
 type Consumer interface {
 	Consume(io.Reader) error
 }
+*/
 
 // An ExternalRequest is anything that can create and then consume any stream.
 // The request comes bundled with something that can produce a stream

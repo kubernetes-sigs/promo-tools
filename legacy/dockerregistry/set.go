@@ -23,6 +23,7 @@ import (
 // Various set manipulation operations. Some set operations are missing,
 // because, we don't use them.
 
+/* TODO(unused): MARKED FOR DELETION
 // Minus is a set operation.
 func (a RegInvImageDigest) Minus(b RegInvImageDigest) RegInvImageDigest {
 	aSet := a.ToSet()
@@ -31,7 +32,9 @@ func (a RegInvImageDigest) Minus(b RegInvImageDigest) RegInvImageDigest {
 
 	return setToRegInvImageDigest(cSet)
 }
+*/
 
+/* TODO(unused): MARKED FOR DELETION
 // Intersection is a set operation.
 // TODO: ST1016: methods on the same type should have the same receiver name
 // nolint: stylecheck
@@ -42,7 +45,9 @@ func (a RegInvImageDigest) Intersection(b RegInvImageDigest) RegInvImageDigest {
 
 	return setToRegInvImageDigest(cSet)
 }
+*/
 
+/* TODO(unused): MARKED FOR DELETION
 // ToSet converts a RegInvFlat to a Set.
 func (a RegInvImageDigest) ToSet() container.Set {
 	b := make(container.Set)
@@ -52,7 +57,9 @@ func (a RegInvImageDigest) ToSet() container.Set {
 
 	return b
 }
+*/
 
+/* TODO(unused): MARKED FOR DELETION
 func setToRegInvImageDigest(a container.Set) RegInvImageDigest {
 	b := make(RegInvImageDigest)
 	for k, v := range a {
@@ -63,7 +70,9 @@ func setToRegInvImageDigest(a container.Set) RegInvImageDigest {
 
 	return b
 }
+*/
 
+/* TODO(unused): MARKED FOR DELETION
 // ToSet converts a RegInvFlat to a Set.
 func (a RegInvFlat) ToSet() container.Set {
 	b := make(container.Set)
@@ -73,7 +82,9 @@ func (a RegInvFlat) ToSet() container.Set {
 
 	return b
 }
+*/
 
+/* TODO(unused): MARKED FOR DELETION
 // Minus is a set operation.
 func (a RegInvImageTag) Minus(b RegInvImageTag) RegInvImageTag {
 	aSet := a.ToSet()
@@ -82,7 +93,9 @@ func (a RegInvImageTag) Minus(b RegInvImageTag) RegInvImageTag {
 
 	return setToRegInvImageTag(cSet)
 }
+*/
 
+/* TODO(unused): MARKED FOR DELETION
 // Intersection is a set operation.
 // TODO: ST1016: methods on the same type should have the same receiver name
 // nolint: stylecheck
@@ -93,7 +106,9 @@ func (a RegInvImageTag) Intersection(b RegInvImageTag) RegInvImageTag {
 
 	return setToRegInvImageTag(cSet)
 }
+*/
 
+/* TODO(unused): MARKED FOR DELETION
 // ToSet converts a RegInvImageTag to a Set.
 func (a RegInvImageTag) ToSet() container.Set {
 	b := make(container.Set)
@@ -103,7 +118,9 @@ func (a RegInvImageTag) ToSet() container.Set {
 
 	return b
 }
+*/
 
+/* TODO(unused): MARKED FOR DELETION
 func setToRegInvImageTag(a container.Set) RegInvImageTag {
 	b := make(RegInvImageTag)
 	for k, v := range a {
@@ -114,6 +131,7 @@ func setToRegInvImageTag(a container.Set) RegInvImageTag {
 
 	return b
 }
+*/
 
 // ToSet converts a RegInvImage to a Set.
 func (a RegInvImage) ToSet() container.Set {

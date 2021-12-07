@@ -1454,6 +1454,7 @@ func TestSetManipulationsTags(t *testing.T) {
 	}
 }
 
+/* TODO(unused): MARKED FOR DELETION
 func TestSetManipulationsRegInvImageTag(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -1557,6 +1558,7 @@ func TestSetManipulationsRegInvImageTag(t *testing.T) {
 		require.Equal(t, expected, got)
 	}
 }
+*/
 
 func TestToPromotionEdges(t *testing.T) {
 	srcRegName := reg.RegistryName("gcr.io/foo")

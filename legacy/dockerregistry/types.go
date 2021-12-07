@@ -168,6 +168,7 @@ type MasterInventory map[RegistryName]RegInvImage
 // the image name is the string after the last slash (in this case, "baz").
 type RegInvImage map[ImageName]DigestTags
 
+/* TODO(unused): MARKED FOR DELETION
 // Registry is another way to look at a Docker Registry; it is used during
 // Promotion.
 type Registry struct {
@@ -175,20 +176,27 @@ type Registry struct {
 	RegistryNameLong  RegistryName
 	RegInvImageDigest RegInvImageDigest
 }
+*/
 
+/* TODO(unused): MARKED FOR DELETION
 // RegInvFlat is a flattened view of a Docker Registry, where the keys contain
 // all 3 attributes --- the image name, digest, and tag.
 type RegInvFlat map[ImageDigestTag]interface{}
+*/
 
+/* TODO(unused): MARKED FOR DELETION
 // ImageDigestTag is a flattened key used by RegInvFlat.
 type ImageDigestTag struct {
 	ImageName ImageName
 	Digest    Digest
 	Tag       Tag
 }
+*/
 
+/* TODO(unused): MARKED FOR DELETION
 // RegInvImageTag is keyed by a ImageTag.
 type RegInvImageTag map[ImageTag]Digest
+*/
 
 // ImageTag is a combination of the ImageName and Tag.
 type ImageTag struct {
@@ -196,14 +204,18 @@ type ImageTag struct {
 	Tag       Tag
 }
 
+/* TODO(unused): MARKED FOR DELETION
 // RegInvImageDigest is a view of a Docker Reqistry, keyed by ImageDigest.
 type RegInvImageDigest map[ImageDigest]TagSlice
+*/
 
+/* TODO(unused): MARKED FOR DELETION
 // ImageDigest is a combination of the ImageName and Digest.
 type ImageDigest struct {
 	ImageName ImageName
 	Digest    Digest
 }
+*/
 
 // TagOp is an enum that describes the various types of tag-modifying
 // operations. These actions are a bit more low-level, and currently support 3
@@ -380,6 +392,7 @@ type TagSlice []Tag
 // TagSet is a set of Tags.
 type TagSet map[Tag]interface{}
 
+/* TODO(unused): MARKED FOR DELETION
 // DigestTagsContext holds information about the request that was used to fetch
 // the list of digests and associated tags for a particular image. It is used in
 // ReadDigestsAndTags().
@@ -387,6 +400,7 @@ type DigestTagsContext struct {
 	ImageName    ImageName
 	RegistryName RegistryName
 }
+*/
 
 // PopulateRequests is a function that can generate requests used to fetch
 // information about a Docker Registry, or to promote images. It basically
@@ -503,6 +517,7 @@ type YamlMarshalingOpts struct {
 
 // Various conversion functions.
 
+/* TODO(unused): MARKED FOR DELETION
 // ToRegInvImageDigest converts a Manifest to a RegInvImageDigest.
 func (m Manifest) ToRegInvImageDigest() RegInvImageDigest {
 	riid := make(RegInvImageDigest)
@@ -516,7 +531,9 @@ func (m Manifest) ToRegInvImageDigest() RegInvImageDigest {
 	}
 	return riid
 }
+*/
 
+/* TODO(unused): MARKED FOR DELETION
 // ToRegInvImageTag converts a Manifest to a RegInvImageTag.
 func (m Manifest) ToRegInvImageTag() RegInvImageTag {
 	riit := make(RegInvImageTag)
@@ -532,7 +549,9 @@ func (m Manifest) ToRegInvImageTag() RegInvImageTag {
 	}
 	return riit
 }
+*/
 
+/* TODO(unused): MARKED FOR DELETION
 // ToRegInvImageDigest takes a RegInvImage and converts it to a
 // RegInvImageDigest.
 func (ri RegInvImage) ToRegInvImageDigest() RegInvImageDigest {
@@ -547,7 +566,9 @@ func (ri RegInvImage) ToRegInvImageDigest() RegInvImageDigest {
 	}
 	return riid
 }
+*/
 
+/* TODO(unused): MARKED FOR DELETION
 // ToRegInvImageTag converts a RegInvImage to a RegInvImageTag.
 func (ri RegInvImage) ToRegInvImageTag() RegInvImageTag {
 	riit := make(RegInvImageTag)
@@ -563,7 +584,9 @@ func (ri RegInvImage) ToRegInvImageTag() RegInvImageTag {
 	}
 	return riit
 }
+*/
 
+/* TODO(unused): MARKED FOR DELETION
 // ToRegInvImageTag converts a RegInvImageDigest to a RegInvImageTag.
 func (riid RegInvImageDigest) ToRegInvImageTag() RegInvImageTag {
 	riit := make(RegInvImageTag)
@@ -577,7 +600,9 @@ func (riid RegInvImageDigest) ToRegInvImageTag() RegInvImageTag {
 	}
 	return riit
 }
+*/
 
+/* TODO(unused): MARKED FOR DELETION
 // ToRegInvImageDigest converts a RegInvImageTag to a RegInvImageDigest.
 func (riit RegInvImageTag) ToRegInvImageDigest() RegInvImageDigest {
 	riid := make(RegInvImageDigest)
@@ -594,3 +619,4 @@ func (riit RegInvImageTag) ToRegInvImageDigest() RegInvImageDigest {
 	}
 	return riid
 }
+*/
