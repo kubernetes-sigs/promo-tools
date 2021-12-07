@@ -22,12 +22,6 @@ import (
 	"sigs.k8s.io/promo-tools/v3/internal/version"
 )
 
-/* TODO(unused): MARKED FOR DELETION
-type RootOptions struct {
-	LogLevel string
-}
-*/
-
 func printVersion() {
 	fmt.Println(version.Get())
 }

@@ -877,111 +877,6 @@ func validateRequiredComponents(m Manifest) error {
 	return fmt.Errorf(strings.Join(errs, "\n"))
 }
 
-/* TODO(unused): MARKED FOR DELETION
-// PrettyValue creates a prettified string representation of MasterInventory.
-func (mi *MasterInventory) PrettyValue() string {
-	var b strings.Builder
-	regNames := []RegistryName{}
-	for regName := range *mi {
-		regNames = append(regNames, regName)
-	}
-
-	sort.Slice(
-		regNames,
-		func(i, j int) bool {
-			return regNames[i] < regNames[j]
-		},
-	)
-
-	for _, regName := range regNames {
-		v, ok := (*mi)[regName]
-		if !ok {
-			logrus.Error("corrupt MasterInventory")
-			return ""
-		}
-
-		fmt.Fprintln(&b, regName)
-		imageNamesSorted := make([]string, 0)
-		for imageName := range v {
-			imageNamesSorted = append(imageNamesSorted, string(imageName))
-		}
-
-		sort.Strings(imageNamesSorted)
-		for _, imageName := range imageNamesSorted {
-			fmt.Fprintf(&b, "  %v\n", imageName)
-			digestTags, ok := v[ImageName(imageName)]
-			if !ok {
-				continue
-			}
-
-			digestSorted := make([]string, 0)
-			for digest := range digestTags {
-				digestSorted = append(digestSorted, string(digest))
-			}
-
-			sort.Strings(digestSorted)
-			for _, digest := range digestSorted {
-				fmt.Fprintf(&b, "    %v\n", digest)
-				tags, ok := digestTags[Digest(digest)]
-				if !ok {
-					continue
-				}
-
-				for _, tag := range tags {
-					fmt.Fprintf(&b, "      %v\n", tag)
-				}
-			}
-		}
-	}
-
-	return b.String()
-}
-*/
-
-/* TODO(unused): MARKED FOR DELETION
-// PrettyValue converts a Registry to a prettified string representation.
-func (r *Registry) PrettyValue() string {
-	var b strings.Builder
-	fmt.Fprintf(&b, "%v (%v)\n", r.RegistryNameLong, r.RegistryName)
-	fmt.Fprintln(&b, r.RegInvImageDigest.PrettyValue())
-	return b.String()
-}
-*/
-
-/* TODO(unused): MARKED FOR DELETION
-// PrettyValue converts a RegInvImageDigest to a prettified string
-// representation.
-func (riid *RegInvImageDigest) PrettyValue() string {
-	var b strings.Builder
-	ids := make([]ImageDigest, 0)
-	for id := range *riid {
-		ids = append(ids, id)
-	}
-	sort.Slice(ids, func(i, j int) bool {
-		iID := string(ids[i].ImageName) + string(ids[i].Digest)
-		jID := string(ids[j].ImageName) + string(ids[i].Digest)
-		return iID < jID
-	})
-	for _, id := range ids {
-		fmt.Fprintf(&b, "  %v\n", id.ImageName)
-		fmt.Fprintf(&b, "    %v\n", id.Digest)
-		tagArray, ok := (*riid)[id]
-		if !ok {
-			continue
-		}
-		tagArraySorted := make([]string, 0)
-		for _, tag := range tagArray {
-			tagArraySorted = append(tagArraySorted, string(tag))
-		}
-		sort.Strings(tagArraySorted)
-		for _, tag := range tagArraySorted {
-			fmt.Fprintf(&b, "      %v\n", tag)
-		}
-	}
-	return b.String()
-}
-*/
-
 func getRegistryTagsWrapper(
 	req stream.ExternalRequest,
 ) (*ggcrV1Google.Tags, error) {
@@ -1811,15 +1706,6 @@ func extractGCRManifestList(reader io.Reader) (*ggcrV1.IndexManifest, error) {
 	}
 	return &gcrManifestList, nil
 }
-
-/* TODO(unused): MARKED FOR DELETION
-// Overwrite insert's b's values into a.
-func (a DigestTags) Overwrite(b DigestTags) {
-	for k, v := range b {
-		a[k] = v
-	}
-}
-*/
 
 // ToFQIN combines a RegistryName, ImageName, and Digest to form a
 // fully-qualified image name (FQIN).
