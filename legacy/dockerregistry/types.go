@@ -168,41 +168,10 @@ type MasterInventory map[RegistryName]RegInvImage
 // the image name is the string after the last slash (in this case, "baz").
 type RegInvImage map[ImageName]DigestTags
 
-// Registry is another way to look at a Docker Registry; it is used during
-// Promotion.
-type Registry struct {
-	RegistryName      string
-	RegistryNameLong  RegistryName
-	RegInvImageDigest RegInvImageDigest
-}
-
-// RegInvFlat is a flattened view of a Docker Registry, where the keys contain
-// all 3 attributes --- the image name, digest, and tag.
-type RegInvFlat map[ImageDigestTag]interface{}
-
-// ImageDigestTag is a flattened key used by RegInvFlat.
-type ImageDigestTag struct {
-	ImageName ImageName
-	Digest    Digest
-	Tag       Tag
-}
-
-// RegInvImageTag is keyed by a ImageTag.
-type RegInvImageTag map[ImageTag]Digest
-
 // ImageTag is a combination of the ImageName and Tag.
 type ImageTag struct {
 	ImageName ImageName
 	Tag       Tag
-}
-
-// RegInvImageDigest is a view of a Docker Reqistry, keyed by ImageDigest.
-type RegInvImageDigest map[ImageDigest]TagSlice
-
-// ImageDigest is a combination of the ImageName and Digest.
-type ImageDigest struct {
-	ImageName ImageName
-	Digest    Digest
 }
 
 // TagOp is an enum that describes the various types of tag-modifying
@@ -380,14 +349,6 @@ type TagSlice []Tag
 // TagSet is a set of Tags.
 type TagSet map[Tag]interface{}
 
-// DigestTagsContext holds information about the request that was used to fetch
-// the list of digests and associated tags for a particular image. It is used in
-// ReadDigestsAndTags().
-type DigestTagsContext struct {
-	ImageName    ImageName
-	RegistryName RegistryName
-}
-
 // PopulateRequests is a function that can generate requests used to fetch
 // information about a Docker Registry, or to promote images. It basically
 // generates the set of "gcloud ..." commands used to manipulate Docker
@@ -502,95 +463,3 @@ type YamlMarshalingOpts struct {
 }
 
 // Various conversion functions.
-
-// ToRegInvImageDigest converts a Manifest to a RegInvImageDigest.
-func (m Manifest) ToRegInvImageDigest() RegInvImageDigest {
-	riid := make(RegInvImageDigest)
-	for _, image := range m.Images {
-		for digest, tagArray := range image.Dmap {
-			id := ImageDigest{}
-			id.ImageName = image.ImageName
-			id.Digest = digest
-			riid[id] = tagArray
-		}
-	}
-	return riid
-}
-
-// ToRegInvImageTag converts a Manifest to a RegInvImageTag.
-func (m Manifest) ToRegInvImageTag() RegInvImageTag {
-	riit := make(RegInvImageTag)
-	for _, image := range m.Images {
-		for digest, tagArray := range image.Dmap {
-			for _, tag := range tagArray {
-				it := ImageTag{}
-				it.ImageName = image.ImageName
-				it.Tag = tag
-				riit[it] = digest
-			}
-		}
-	}
-	return riit
-}
-
-// ToRegInvImageDigest takes a RegInvImage and converts it to a
-// RegInvImageDigest.
-func (ri RegInvImage) ToRegInvImageDigest() RegInvImageDigest {
-	riid := make(RegInvImageDigest)
-	for imageName, digestTags := range ri {
-		for digest, tagArray := range digestTags {
-			id := ImageDigest{}
-			id.ImageName = imageName
-			id.Digest = digest
-			riid[id] = tagArray
-		}
-	}
-	return riid
-}
-
-// ToRegInvImageTag converts a RegInvImage to a RegInvImageTag.
-func (ri RegInvImage) ToRegInvImageTag() RegInvImageTag {
-	riit := make(RegInvImageTag)
-	for imageName, digestTags := range ri {
-		for digest, tagArray := range digestTags {
-			for _, tag := range tagArray {
-				it := ImageTag{}
-				it.ImageName = imageName
-				it.Tag = tag
-				riit[it] = digest
-			}
-		}
-	}
-	return riit
-}
-
-// ToRegInvImageTag converts a RegInvImageDigest to a RegInvImageTag.
-func (riid RegInvImageDigest) ToRegInvImageTag() RegInvImageTag {
-	riit := make(RegInvImageTag)
-	for imageDigest, tagArray := range riid {
-		for _, tag := range tagArray {
-			it := ImageTag{}
-			it.ImageName = imageDigest.ImageName
-			it.Tag = tag
-			riit[it] = imageDigest.Digest
-		}
-	}
-	return riit
-}
-
-// ToRegInvImageDigest converts a RegInvImageTag to a RegInvImageDigest.
-func (riit RegInvImageTag) ToRegInvImageDigest() RegInvImageDigest {
-	riid := make(RegInvImageDigest)
-	for imageTag, digest := range riit {
-		id := ImageDigest{}
-		id.ImageName = imageTag.ImageName
-		id.Digest = digest
-
-		if tagSlice, ok := riid[id]; ok {
-			riid[id] = append(tagSlice, imageTag.Tag)
-		} else {
-			riid[id] = TagSlice{imageTag.Tag}
-		}
-	}
-	return riid
-}

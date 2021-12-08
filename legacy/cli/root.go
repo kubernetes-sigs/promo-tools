@@ -22,10 +22,6 @@ import (
 	"sigs.k8s.io/promo-tools/v3/internal/version"
 )
 
-type RootOptions struct {
-	LogLevel string
-}
-
 func printVersion() {
 	fmt.Println(version.Get())
 }

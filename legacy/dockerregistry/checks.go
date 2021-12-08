@@ -18,10 +18,8 @@ package inventory
 
 import (
 	"context"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"os"
 	"path"
 	"sort"
 	"strings"
@@ -32,7 +30,6 @@ import (
 	"google.golang.org/api/iterator"
 	grafeaspb "google.golang.org/genproto/googleapis/grafeas/v1"
 	gogit "gopkg.in/src-d/go-git.v4"
-	"gopkg.in/src-d/go-git.v4/plumbing"
 
 	"sigs.k8s.io/promo-tools/v3/legacy/stream"
 )
@@ -49,6 +46,7 @@ func BytesToMB(value int) int {
 	return value >> bytesToMBShift
 }
 
+/* TODO(unused): MARKED FOR DELETION
 func getGitShaFromEnv(envVar string) (plumbing.Hash, error) {
 	potenitalSHA := os.Getenv(envVar)
 	const gitShaLength = 40
@@ -63,7 +61,9 @@ func getGitShaFromEnv(envVar string) (plumbing.Hash, error) {
 	}
 	return plumbing.NewHash(potenitalSHA), nil
 }
+*/
 
+/* TODO(unused): MARKED FOR DELETION
 // MKRealImageRemovalCheck returns an instance of ImageRemovalCheck.
 func MKRealImageRemovalCheck(
 	gitRepoPath string,
@@ -90,6 +90,7 @@ func MKRealImageRemovalCheck(
 		},
 		nil
 }
+*/
 
 // Run executes ImageRemovalCheck on a set of promotion edges.
 // Returns an error if the pull request removes images from the
@@ -215,6 +216,7 @@ func (err ImageSizeError) joinImageSizesToString(
 	return imageSizesStr
 }
 
+/* TODO(unused): MARKED FOR DELETION
 // MKRealImageSizeCheck returns an instance of ImageSizeCheck which
 // checks that all images to be promoted are under a max size.
 func MKRealImageSizeCheck(
@@ -228,6 +230,7 @@ func MKRealImageSizeCheck(
 		edges,
 	}
 }
+*/
 
 // Run is a function of ImageSizeCheck and checks that all
 // images to be promoted are under the max file size.
