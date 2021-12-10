@@ -25,15 +25,15 @@ set -o nounset
 set -o pipefail
 
 printUsage() {
-    >&2 echo "Usage: $0 (build | run) path/to/code.go [args...]"
+    >&2 echo "Usage: $0 (build | install | run ) path/to/code.go [args...]"
 }
 
 if [[ $# -lt 2 ]]; then
     >&2 echo "ERROR: Invalid number of arguments!"
     printUsage
     exit 1
-elif [ "$1" != build ] && [ "$1" != run ]; then
-    >&2 echo "ERROR: First argument was not 'build' or 'run'!"
+elif [ "$1" != build ] && [ "$1" != install ] && [ "$1" != run ]; then
+    >&2 echo "ERROR: First argument was not 'build', 'install', or 'run'!"
     printUsage
     exit 1
 fi
