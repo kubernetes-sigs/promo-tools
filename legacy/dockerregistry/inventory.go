@@ -1627,12 +1627,14 @@ func (sc *SyncContext) ExecRequests(
 				(*mutex).Unlock()
 
 				logrus.Errorf(
-					"Request %v: error(s) encountered: %v\n",
+					// TODO(log): Consider logging with fields
+					"request %v: error(s) encountered: %v",
 					reqRes.Context,
 					reqRes.Errors,
 				)
 			} else {
-				logrus.Infof("Request %v: OK\n", reqRes.Context.RequestParams)
+				// TODO(log): Consider logging with fields
+				logrus.Infof("request %v: OK", reqRes.Context.RequestParams)
 			}
 
 			// Log the HTTP request to GCR.
@@ -1983,7 +1985,7 @@ func (sc *SyncContext) FilterPromotionEdges(
 	if readRepos {
 		regs := getRegistriesToRead(edges)
 		for _, reg := range regs {
-			logrus.Info("reading this reg:", reg)
+			logrus.Infof("reading registry %s (src=%v)", reg.Name, reg.Src)
 		}
 
 		sc.ReadRegistries(
@@ -2100,7 +2102,16 @@ func (sc *SyncContext) Promote(
 
 	logrus.Info("Pending promotions:")
 	for edge := range edges {
-		logrus.Infof("  %v\n", edge)
+		// TODO(log): Consider logging with fields
+		logrus.Infof(
+			"%s/%s:%s (%s) to %s/%s",
+			edge.SrcRegistry.Name,
+			edge.SrcImageTag.ImageName,
+			edge.SrcImageTag.Tag,
+			edge.Digest,
+			edge.DstRegistry.Name,
+			edge.DstImageTag.ImageName,
+		)
 	}
 
 	// If we detect that we have malformed edges, such as a tag move attempt, we
