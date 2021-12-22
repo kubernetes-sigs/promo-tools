@@ -141,6 +141,18 @@ func checkSnapshot(
 }
 
 func testSetup(repoRoot string, t *E2ETest) error {
+	gcloudConfigCmd := command.New("gcloud", "config", "configurations", "list")
+
+	logrus.Infof("executing %s", gcloudConfigCmd.String())
+
+	configStream, err := gcloudConfigCmd.RunSuccessOutput()
+	if err != nil {
+		logrus.Errorf("%+v", err)
+	}
+
+	fmt.Println(configStream.Output())
+	fmt.Println(configStream.Error())
+
 	if err := t.clearRepositories(); err != nil {
 		return errors.Wrap(err, "cleaning test repository")
 	}
