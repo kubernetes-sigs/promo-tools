@@ -1,5 +1,8 @@
 {
   "credHelpers": {
+    "asia-docker.pkg.dev": "gcloud",
+    "europe-docker.pkg.dev": "gcloud",
+    "us-docker.pkg.dev": "gcloud",
     "gcr.io": "gcloud",
     "us.gcr.io": "gcloud",
     "eu.gcr.io": "gcloud",
