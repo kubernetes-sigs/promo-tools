@@ -87,6 +87,7 @@ func main() {
 	// Loop through each e2e test case.
 	for _, t := range ts {
 		fmt.Printf("\n===> Running e2e test '%s'...\n", t.Name)
+		// TODO(e2e): Potential nil pointer
 		if err := testSetup(*repoRootPtr, &t); err != nil {
 			logrus.Fatalf("error with test setup: %q", err)
 		}
@@ -151,9 +152,10 @@ func testSetup(repoRoot string, t *E2ETest) error {
 		goldenPush,
 	)
 
-	logrus.Infof("executing %s\n", cmd.String())
+	logrus.Infof("executing %s", cmd.String())
 
 	std, err := cmd.RunSuccessOutput()
+	// TODO(e2e): Potential nil pointer
 	fmt.Println(std.Output())
 	fmt.Println(std.Error())
 	return err
