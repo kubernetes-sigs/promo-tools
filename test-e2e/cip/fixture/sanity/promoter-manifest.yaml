@@ -1,5 +1,5 @@
 registries:
-- name: gcr.io/k8s-staging-cip-test/golden-foo
+- name: us-docker.pkg.dev/k8s-staging-cip-test/i/golden-foo
   service-account: k8s-infra-gcr-promoter@k8s-cip-test-prod.iam.gserviceaccount.com
   src: true
 - name: us.gcr.io/k8s-cip-test-prod/some/subdir

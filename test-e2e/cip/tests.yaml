@@ -4,7 +4,7 @@
 # - tag restoration (move tag back from one Digest to another)
 - name: "sanity (basic promotion on single manifest file)"
   registries:
-  - name: gcr.io/k8s-staging-cip-test
+  - name: us-docker.pkg.dev/k8s-staging-cip-test/i
     service-account: k8s-infra-gcr-promoter@k8s-cip-test-prod.iam.gserviceaccount.com
   - name: us.gcr.io/k8s-cip-test-prod
     service-account: k8s-infra-gcr-promoter@k8s-cip-test-prod.iam.gserviceaccount.com
@@ -35,7 +35,7 @@
     after: *golden-images
 - name: "recursive-thin"
   registries:
-  - name: gcr.io/k8s-staging-cip-test
+  - name: us-docker.pkg.dev/k8s-staging-cip-test/i
     service-account: k8s-infra-gcr-promoter@k8s-cip-test-prod.iam.gserviceaccount.com
   - name: us.gcr.io/k8s-cip-test-prod
     service-account: k8s-infra-gcr-promoter@k8s-cip-test-prod.iam.gserviceaccount.com

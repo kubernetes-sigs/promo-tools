@@ -71,4 +71,4 @@ p_ TEST_AUDIT_STAGING_IMG_REPOSITORY gcr.io/k8s-gcr-audit-test-prod
 p_ TEST_AUDIT_PROJECT_ID k8s-gcr-audit-test-prod
 p_ TEST_AUDIT_PROJECT_NUMBER 375340694213
 p_ TEST_AUDIT_INVOKER_SERVICE_ACCOUNT k8s-infra-gcr-promoter@k8s-gcr-audit-test-prod.iam.gserviceaccount.com
-p_ TEST_STAGING_IMG_REPOSITORY gcr.io/k8s-staging-cip-test
+p_ TEST_STAGING_IMG_REPOSITORY us-docker.pkg.dev/k8s-staging-cip-test/i
