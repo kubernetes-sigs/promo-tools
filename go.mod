@@ -25,8 +25,8 @@ require (
 	golang.org/x/crypto v0.0.0-20210817164053-32db794688a5 // indirect
 	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1
-	google.golang.org/api v0.64.0
-	google.golang.org/genproto v0.0.0-20211223182754-3ac035c7e7cb
+	google.golang.org/api v0.65.0
+	google.golang.org/genproto v0.0.0-20220107163113-42d7afdf6368
 	gopkg.in/src-d/go-git.v4 v4.13.1
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/utils v0.0.0-20210305010621-2afb4311ab10
@@ -36,7 +36,9 @@ require (
 )
 
 require (
-	cloud.google.com/go v0.99.0 // indirect
+	cloud.google.com/go v0.100.2 // indirect
+	cloud.google.com/go/compute v0.1.0 // indirect
+	cloud.google.com/go/iam v0.1.0 // indirect
 	github.com/Microsoft/go-winio v0.5.1 // indirect
 	github.com/ProtonMail/go-crypto v0.0.0-20210428141323-04723f9f07d7 // indirect
 	github.com/acomagu/bufpipe v1.0.3 // indirect
