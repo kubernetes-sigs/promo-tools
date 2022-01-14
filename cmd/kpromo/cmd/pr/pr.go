@@ -65,6 +65,7 @@ type promoteOptions struct {
 	tags            []string
 	reviewers       string
 	interactiveMode bool
+	images          []string
 }
 
 func (o *promoteOptions) Validate() error {
@@ -133,6 +134,14 @@ func init() {
 		"i",
 		false,
 		"interactive mode, asks before every step",
+	)
+
+	PRCmd.PersistentFlags().StringSliceVarP(
+		&promoteOpts.images,
+		"image",
+		"",
+		[]string{""}, // default to a single empty string image filter which will promote all images matching the tag.
+		"image to promote. If not specified, all images matching the tag will be promoted",
 	)
 
 	for _, flagName := range []string{"tag", "fork"} {
@@ -208,20 +217,22 @@ func runPromote(opts *promoteOptions) error {
 		}
 
 		for _, tag := range opts.tags {
-			opt := reg.GrowManifestOptions{}
-			if err := opt.Populate(
-				filepath.Join(repo.Dir(), image.ProdRegistry),
-				image.StagingRepoPrefix+opts.project, "", "", tag); err != nil {
-				return errors.Wrapf(err, "populating image promoter options for tag %s", tag)
-			}
+			for _, filterImage := range opts.images {
+				opt := reg.GrowManifestOptions{}
+				if err := opt.Populate(
+					filepath.Join(repo.Dir(), image.ProdRegistry),
+					image.StagingRepoPrefix+opts.project, filterImage, "", tag); err != nil {
+					return errors.Wrapf(err, "populating image promoter options for tag %s with image filter %s", tag, filterImage)
+				}
 
-			if err := opt.Validate(); err != nil {
-				return errors.Wrapf(err, "validate promoter options for tag %s", tag)
-			}
+				if err := opt.Validate(); err != nil {
+					return errors.Wrapf(err, "validate promoter options tag %s with image filter %s", tag, filterImage)
+				}
 
-			logrus.Infof("Growing manifests with images matching tag %s", tag)
-			if err := reg.GrowManifest(ctx, &opt); err != nil {
-				return errors.Wrapf(err, "Growing manifest with tag %s", tag)
+				logrus.Infof("Growing manifests for images matching filter %s and matching tag %s", filterImage, tag)
+				if err := reg.GrowManifest(ctx, &opt); err != nil {
+					return errors.Wrapf(err, "Growing manifest with image filter %s and tag %s", filterImage, tag)
+				}
 			}
 		}
 	}
@@ -349,6 +360,12 @@ func generatePRBody(opts *promoteOptions) string {
 
 	for _, tag := range opts.tags {
 		args += " --tag " + tag
+	}
+
+	for _, filterImage := range opts.images {
+		if filterImage != "" {
+			args += " --image " + filterImage
+		}
 	}
 
 	prBody := fmt.Sprintf("Image promotion for %s %s\n", opts.project, strings.Join(opts.tags, " / "))
