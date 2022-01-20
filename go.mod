@@ -9,7 +9,7 @@ require (
 	cloud.google.com/go/logging v1.4.2
 	cloud.google.com/go/storage v1.18.2
 	github.com/cenkalti/backoff/v4 v4.1.2
-	github.com/google/go-cmp v0.5.6
+	github.com/google/go-cmp v0.5.7
 	github.com/google/go-containerregistry v0.7.1-0.20211118220127-abdc633f8305
 	github.com/google/uuid v1.3.0
 	github.com/kevinburke/ssh_config v1.1.0 // indirect
