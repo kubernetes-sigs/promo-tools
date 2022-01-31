@@ -29,9 +29,9 @@ require (
 	google.golang.org/genproto v0.0.0-20220118154757-00ab72f36ad5
 	gopkg.in/src-d/go-git.v4 v4.13.1
 	gopkg.in/yaml.v2 v2.4.0
-	k8s.io/utils v0.0.0-20210305010621-2afb4311ab10
+	k8s.io/utils v0.0.0-20211116205334-6203023598ed
 	sigs.k8s.io/release-sdk v0.6.0
-	sigs.k8s.io/release-utils v0.3.0
+	sigs.k8s.io/release-utils v0.4.0
 	sigs.k8s.io/yaml v1.3.0
 )
 
