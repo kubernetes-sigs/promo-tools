@@ -7,7 +7,7 @@ require (
 	cloud.google.com/go/errorreporting v0.1.0
 	cloud.google.com/go/grafeas v0.1.0 // indirect
 	cloud.google.com/go/logging v1.4.2
-	cloud.google.com/go/storage v1.19.0
+	cloud.google.com/go/storage v1.20.0
 	github.com/cenkalti/backoff/v4 v4.1.2
 	github.com/google/go-cmp v0.5.7
 	github.com/google/go-containerregistry v0.7.1-0.20211118220127-abdc633f8305
@@ -26,7 +26,7 @@ require (
 	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1
 	google.golang.org/api v0.67.0
-	google.golang.org/genproto v0.0.0-20220126215142-9970aeb2e350
+	google.golang.org/genproto v0.0.0-20220201184016-50beb8ab5c44
 	gopkg.in/src-d/go-git.v4 v4.13.1
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/utils v0.0.0-20211116205334-6203023598ed
