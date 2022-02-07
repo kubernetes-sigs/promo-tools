@@ -76,12 +76,15 @@ var PromoterAllowedOutputFormats = []string{
 // TODO: Function 'runPromoteCmd' has too many statements (97 > 40) (funlen)
 // nolint: funlen,gocognit,gocyclo
 func RunPromoteCmd(opts *RunOptions) error {
+	// NOTE(@puerco): Now available to all modes in impl.ValidateOptions
 	if err := validateImageOptions(opts); err != nil {
 		return errors.Wrap(err, "validating image options")
 	}
 
 	// Activate service accounts.
+
 	// TODO: Move this into the validation function
+	// NOTE(@puerco): Available to all modes in impl.ActivateServiceAccounts
 	if opts.UseServiceAcct && opts.KeyFiles != "" {
 		if err := gcloud.ActivateServiceAccounts(opts.KeyFiles); err != nil {
 			return errors.Wrap(err, "activating service accounts")
@@ -89,6 +92,9 @@ func RunPromoteCmd(opts *RunOptions) error {
 	}
 
 	// TODO: Move this into the validation function
+	// NOTE(@puerco): This code path ends here. no snapshot, sec scan or promo.
+	// It this is the main checking function, we need to deprecate this running
+	// in promotion and create a subcommand for it
 	if opts.CheckManifestLists != "" {
 		if opts.Repository == "" {
 			logrus.Fatalf("a repository must be specified when checking manifest lists")
@@ -109,6 +115,7 @@ func RunPromoteCmd(opts *RunOptions) error {
 	mi := make(reg.MasterInventory)
 
 	// TODO: Move this into the validation function
+	/// NOTE(@puerco): This is only for snapshots. No promo or sec scan
 	if opts.Snapshot != "" || opts.ManifestBasedSnapshotOf != "" {
 		if opts.Snapshot != "" {
 			srcRegistry = &reg.RegistryContext{
@@ -134,6 +141,7 @@ func RunPromoteCmd(opts *RunOptions) error {
 		}
 		// TODO: Move this into the validation function
 	} else if opts.Manifest == "" && opts.ThinManifestDir == "" {
+		// this is in the options check.
 		logrus.Fatalf(
 			"either %s or %s flag is required",
 			PromoterManifestFlag,
@@ -141,7 +149,17 @@ func RunPromoteCmd(opts *RunOptions) error {
 		)
 	}
 
+	// NOTE(@puerco): This flag determines if we enter the promotion
+	// path.
+	// if ThinManifestDir or Manifest are set, its set to true
 	doingPromotion := false
+
+	// NOTE(@puerco):
+	// The following two conditions are replaced by impl.ParseMenifests
+	// and MakeSyncContext
+	// one thing to note here (I think it's a bug) is that if a manifest file
+	// is set in opts.Manifest, it gets appended to the snaphot manifests
+	// set in the previous condition.
 
 	// TODO: is deeply nested (complexity: 5) (nestif)
 	// nolint: nestif
@@ -186,6 +204,7 @@ func RunPromoteCmd(opts *RunOptions) error {
 		doingPromotion = true
 	}
 
+	// this is an additional possible subcommand: parseonly
 	if opts.ParseOnly {
 		return nil
 	}
@@ -193,6 +212,39 @@ func RunPromoteCmd(opts *RunOptions) error {
 	// If there are no images in the manifest, it may be a stub manifest file
 	// (such as for brand new registries that would be watched by the promoter
 	// for the very first time).
+	//
+	// NOTE(@puerco):
+	// If we enter this loop. It means that:
+	//   1. Either opts.Manifest or opts.ThinManifestDir are set
+	//      thus causing doingPromotion == true. ie we are in a promotion
+	//   2. Snapshot may or may be not set. If it's set, then the promot
+	//      promo code will not run.
+	//
+	// If we enter this path, two (real) things will happen as the conditions in
+	// the if clause that apply to other modes of operation are only for
+	// printing log messages, the program version ,etc
+	//
+	//   1. promotionEdges is set set
+	//   2. Some checks are performed to check if there are images in
+	//      the manifests.
+	//
+	// - Promotion Edges will now be done in impl.GetPromotionEdges
+	//
+	// - The checks for images will now be done anyhow in a dedicated
+	// function: impl.CheckImagesInManifests
+	//
+	// This code path runs if any of opts.Manifest or opts.ThinManifestDir
+	// are set but regardeless if Snapshot is set
+	// Yet to determine if this has any effect when running the snapshot
+	//
+	// Generating the edges is also done when running ManifestBasedSnapshotOf
+	// bellow, so it can be refactored to a common function for snashots
+	// and promotion
+	//
+	//
+	//  TLDR: From this path, we only split the check code to another
+	//        function which should run only when snapshotting. Phew.
+	//
 	// TODO: is deeply nested (complexity: 6) (nestif)
 	// nolint: nestif
 	if doingPromotion && opts.ManifestBasedSnapshotOf == "" {
@@ -234,6 +286,10 @@ necessarily mean that a new version of the image layer is available.`,
 			logrus.Info("********** START (DRY RUN) **********")
 		}
 	}
+
+	// The following path ends here. It's the snapshot. It runs if
+	// opts.Snapshot or ManifestBasedSnapshotOf are set. This should be
+	// another subcommand.
 
 	// TODO: is deeply nested (complexity: 12) (nestif)
 	// nolint: nestif
@@ -315,9 +371,13 @@ necessarily mean that a new version of the image layer is available.`,
 		return nil
 	}
 
+	// Option summary applies to everything except snapshots
 	if opts.JSONLogSummary {
 		defer sc.LogJSONSummary()
 	}
+
+	// this check here runs when confirm is set. This means
+	// that here it would apply to security scan and promotion
 
 	// Check the pull request
 	if !opts.Confirm {
@@ -326,6 +386,11 @@ necessarily mean that a new version of the image layer is available.`,
 			return errors.Wrap(err, "running prechecks before promotion")
 		}
 	}
+
+	// This comment says "Promote.", but its really not it.
+	// actual promotion is further down
+	//
+	// This builds the function that will handle it
 
 	// Promote.
 	mkProducer := func(
@@ -350,6 +415,9 @@ necessarily mean that a new version of the image layer is available.`,
 		return &sp
 	}
 
+	// TODO: Implement this in impl
+	// NOTE(@puerco): This filter call will now live inside impl.GetPromotionEdges
+	// and will run when we create them
 	promotionEdges, ok := sc.FilterPromotionEdges(promotionEdges, true)
 	// If any funny business was detected during a comparison of the manifests
 	// with the state of the registries, then exit immediately.
@@ -357,6 +425,8 @@ necessarily mean that a new version of the image layer is available.`,
 		return errors.New("encountered errors during edge filtering")
 	}
 
+	// This is the main path separating security scans and
+	// the actual promotion. This is the scan
 	if opts.SeverityThreshold >= 0 {
 		err = sc.RunChecks(
 			[]reg.PreCheck{
@@ -371,7 +441,10 @@ necessarily mean that a new version of the image layer is available.`,
 		if err != nil {
 			return errors.Wrap(err, "checking image vulnerabilities")
 		}
+
 	} else {
+
+		// This is the actual call to promotion
 		err = sc.Promote(promotionEdges, mkProducer, nil)
 		if err != nil {
 			return errors.Wrap(err, "promoting images")
