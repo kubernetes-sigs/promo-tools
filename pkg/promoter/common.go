@@ -20,6 +20,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/sirupsen/logrus"
+	reg "sigs.k8s.io/promo-tools/v3/legacy/dockerregistry"
 	"sigs.k8s.io/promo-tools/v3/legacy/gcloud"
 )
 
@@ -43,4 +44,23 @@ func (di *defaultPromoterImplementation) ActivateServiceAccounts(opts *Options) 
 	}
 	// TODO: Output to log the accout used
 	return nil
+}
+
+// PrecheckAndExit run simple prechecks to exit before promotions
+// or security scans
+func (di *defaultPromoterImplementation) PrecheckAndExit(
+	opts *Options, mfests []reg.Manifest,
+) error {
+	// Make the sync context tu run the prechecks:
+	sc, err := di.MakeSyncContext(opts, mfests)
+	if err != nil {
+		return errors.Wrap(err, "generatinng sync context for prechecks")
+	}
+
+	// Run the prechecks, these will be run and the calling
+	// mode of operation should exit.
+	return errors.Wrap(
+		sc.RunChecks([]reg.PreCheck{}),
+		"running prechecks before promotion",
+	)
 }

@@ -20,6 +20,7 @@ package promoter
 
 import (
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	reg "sigs.k8s.io/promo-tools/v3/legacy/dockerregistry"
 	"sigs.k8s.io/promo-tools/v3/legacy/stream"
 )
@@ -49,6 +50,7 @@ type promoterImplementation interface {
 	// General methods common to all modes of the promoter
 	ValidateOptions(*Options) error
 	ActivateServiceAccounts(*Options) error
+	PrecheckAndExit(*Options, []reg.Manifest) error
 
 	// Methods for promotion mode:
 	ParseManifests(*Options) ([]reg.Manifest, error)
@@ -113,7 +115,16 @@ func (p *Promoter) PromoteImages(opts *Options) (err error) {
 	// MakeProducer
 	producerFunc := p.impl.MakeProducerFunction(sc.UseServiceAccount)
 
-	// If parseOnly from the original cli.Run fn is kept, this is where it goes
+	// TODO: Let's rethink this option
+	if opts.ParseOnly {
+		logrus.Info("Manifests parsed, exiting as ParseOnly is set")
+		return nil
+	}
+
+	// Check the pull request
+	if !opts.Confirm {
+		return p.impl.PrecheckAndExit(opts, mfests)
+	}
 
 	return errors.Wrap(
 		p.impl.PromoteImages(sc, promotionEdges, producerFunc),
@@ -181,6 +192,17 @@ func (p *Promoter) SecurityScan(opts *Options) error {
 	promotionEdges, err := p.impl.GetPromotionEdges(sc, mfests)
 	if err != nil {
 		return errors.Wrap(err, "filtering edges")
+	}
+
+	// TODO: Let's rethink this option
+	if opts.ParseOnly {
+		logrus.Info("Manifests parsed, exiting as ParseOnly is set")
+		return nil
+	}
+
+	// Check the pull request
+	if !opts.Confirm {
+		return p.impl.PrecheckAndExit(opts, mfests)
 	}
 
 	return errors.Wrap(
