@@ -76,6 +76,13 @@ type Options struct {
 	// (only works with --repository) read snapshot from file and checks all
 	// manifest lists have children from the same location
 	CheckManifestLists string
+
+	// ParseOnly is an options that causes the promoter to exit
+	// before promoting or generating a snapshot when set to true
+	ParseOnly bool
+
+	// MaxImageSize is the maximum size of an image accepted for promotion
+	MaxImageSize int
 }
 
 var DefaultOptions = &Options{}
