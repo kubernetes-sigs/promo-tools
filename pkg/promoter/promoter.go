@@ -43,8 +43,11 @@ type promoterImplementation interface {
 	GetRegistryImageInventory(*Options, []reg.Manifest) (reg.RegInvImage, error)
 	Snapshot(*Options, reg.RegInvImage) error
 
-	// Methods for image vulnerability scans
+	// Methods for image vulnerability scans:
 	ScanEdges(*Options, *reg.SyncContext, map[reg.PromotionEdge]interface{}) error
+
+	// Methods for manifest list verification:
+	ValidateManifestLists(opts *Options) error
 }
 
 // streamProducerFunc is a function that gets the required fields to
@@ -94,11 +97,6 @@ func (p *Promoter) PromoteImages(opts *Options) (err error) {
 	)
 }
 
-func (p *Promoter) ValidateManifestLists(opts *Options) error {
-	// STUB
-	return nil
-}
-
 // Snapshot runs the steps to output a representation in json or yaml of a registry
 func (p *Promoter) Snapshot(opts *Options) (err error) {
 	if err := p.impl.ValidateOptions(opts); err != nil {
@@ -128,7 +126,7 @@ func (p *Promoter) Snapshot(opts *Options) (err error) {
 }
 
 // SecurityScan runs just like an image promotion, but instead of
-// actually copied the new detected images, it will run a vulnerability
+// actually copying the new detected images, it will run a vulnerability
 // scan on them
 func (p *Promoter) SecurityScan(opts *Options) error {
 	if err := p.impl.ValidateOptions(opts); err != nil {
@@ -160,9 +158,38 @@ func (p *Promoter) SecurityScan(opts *Options) error {
 	)
 }
 
+// CheckManifestLists is a mode that just checks manifests
+// and exists.
 func (p *Promoter) CheckManifestLists(opts *Options) error {
-	// STUB
-	return nil
+	if err := p.impl.ValidateOptions(opts); err != nil {
+		return errors.Wrap(err, "validating options")
+	}
+
+	if err := p.impl.ActivateServiceAccounts(opts); err != nil {
+		return errors.Wrap(err, "activating service accounts")
+	}
+
+	return errors.Wrap(
+		p.impl.ValidateManifestLists(opts), "checking manifest lists",
+	)
 }
 
 type defaultPromoterImplementation struct{}
+
+func (di *defaultPromoterImplementation) ValidateManifestLists(opts *Options) error {
+	registry := reg.RegistryName(opts.Repository)
+	images := make([]reg.ImageWithDigestSlice, 0)
+
+	if err := reg.ParseSnapshot(opts.CheckManifestLists, &images); err != nil {
+		return errors.Wrap(err, "parsing snapshot")
+	}
+
+	imgs, err := reg.FilterParentImages(registry, &images)
+	if err != nil {
+		return errors.Wrap(err, "filtering parent images")
+	}
+
+	reg.ValidateParentImages(registry, imgs)
+	printSection("FINISHED (CHECKING MANIFESTS)", true)
+	return nil
+}

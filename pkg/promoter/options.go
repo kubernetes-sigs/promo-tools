@@ -65,6 +65,13 @@ type Options struct {
 var DefaultOptions = &Options{}
 
 func (o *Options) Validate() error {
+	// CheckManifestLists is one of the modes, it just needs a repository
+	if o.CheckManifestLists != "" && o.Repository == "" {
+		return errors.New(
+			"a repository must be specified when checking manifest lists",
+		)
+	}
+
 	// If one of the snapshot options is set, manifests will not be checked
 	if o.Snapshot == "" && o.ManifestBasedSnapshotOf == "" {
 		if o.Manifest == "" && o.ThinManifestDir == "" {
