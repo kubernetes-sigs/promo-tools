@@ -116,6 +116,8 @@ func RunPromoteCmd(opts *RunOptions) error {
 
 	// TODO: Move this into the validation function
 	/// NOTE(@puerco): This is only for snapshots. No promo or sec scan
+	///
+	/// This part now lives in impl.GetSnapshotManifests
 	if opts.Snapshot != "" || opts.ManifestBasedSnapshotOf != "" {
 		if opts.Snapshot != "" {
 			srcRegistry = &reg.RegistryContext{
@@ -160,7 +162,13 @@ func RunPromoteCmd(opts *RunOptions) error {
 	// one thing to note here (I think it's a bug) is that if a manifest file
 	// is set in opts.Manifest, it gets appended to the snaphot manifests
 	// set in the previous condition.
-
+	//
+	// Since the original code merged the manifests, we keep that logic
+	// in the refactor in impl.AppendManifestToSnapshot(). Note that
+	// if a thin manifests dir is specified it is redefined completely, not
+	// appended. Also of note, the SyncContext here is also not used when
+	// running a snapshot.
+	//
 	// TODO: is deeply nested (complexity: 5) (nestif)
 	// nolint: nestif
 	if opts.Manifest != "" {
@@ -287,12 +295,19 @@ necessarily mean that a new version of the image layer is available.`,
 		}
 	}
 
-	// The following path ends here. It's the snapshot. It runs if
+	// NOTE(@puerco): The following path ends here. It's the snapshot. It runs if
 	// opts.Snapshot or ManifestBasedSnapshotOf are set. This should be
 	// another subcommand.
+	//
+	// The snapshot consits of two parts: generating a reg.RegInvImage
+	// from two possible origins (manifest or thin manifest dir) and the
+	// actual snapshot which is simply dumping the RegInvImage to
+	// json, yaml or csv
 
 	// TODO: is deeply nested (complexity: 12) (nestif)
 	// nolint: nestif
+	//
+	// NOTE(@puerco): The firsat part now lives in impl.GetRegistryImageInventory
 	if len(opts.Snapshot) > 0 || len(opts.ManifestBasedSnapshotOf) > 0 {
 		rii := make(reg.RegInvImage)
 		if len(opts.ManifestBasedSnapshotOf) > 0 {
@@ -350,6 +365,8 @@ necessarily mean that a new version of the image layer is available.`,
 			}
 		}
 
+		// The snapshot will now be generated in
+		// impl.Snapshot
 		var snapshot string
 		switch strings.ToLower(opts.OutputFormat) {
 		case "csv":
