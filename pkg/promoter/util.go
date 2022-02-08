@@ -40,3 +40,9 @@ func printSection(message string, confirm bool) {
 	}
 	logrus.Infof("********** %s %s**********", message, dryRunLabel)
 }
+
+// printSecDisclaimer prints a disclaimer about false positives
+// that may be found in container image lauyers.
+func printSecDisclaimer() {
+	logrus.Info(vulnerabilityDiscalimer)
+}

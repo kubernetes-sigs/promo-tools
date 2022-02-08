@@ -39,5 +39,6 @@ func (di *defaultPromoterImplementation) ScanEdges(
 	); err != nil {
 		return errors.Wrap(err, "checking image vulnerabilities")
 	}
+	printSection("END (VULNSCAN)", opts.Confirm)
 	return nil
 }

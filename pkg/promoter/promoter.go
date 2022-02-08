@@ -97,6 +97,9 @@ func (p *Promoter) PromoteImages(opts *Options) (err error) {
 		return errors.Wrap(err, "parsing manifests")
 	}
 
+	printVersion()
+	printSection("START (PROMOTION)", opts.Confirm)
+
 	sc, err := p.impl.MakeSyncContext(opts, mfests)
 	if err != nil {
 		return errors.Wrap(err, "creating sync context")
@@ -127,6 +130,9 @@ func (p *Promoter) Snapshot(opts *Options) (err error) {
 	if err := p.impl.ActivateServiceAccounts(opts); err != nil {
 		return errors.Wrap(err, "activating service accounts")
 	}
+
+	printVersion()
+	printSection("START (SNAPSHOT)", opts.Confirm)
 
 	mfests, err := p.impl.GetSnapshotManifests(opts)
 	if err != nil {
@@ -162,6 +168,10 @@ func (p *Promoter) SecurityScan(opts *Options) error {
 	if err != nil {
 		return errors.Wrap(err, "parsing manifests")
 	}
+
+	printVersion()
+	printSection("START (VULN CHECK)", opts.Confirm)
+	printSecDisclaimer()
 
 	sc, err := p.impl.MakeSyncContext(opts, mfests)
 	if err != nil {

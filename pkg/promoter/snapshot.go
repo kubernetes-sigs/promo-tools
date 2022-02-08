@@ -40,6 +40,7 @@ func (di *defaultPromoterImplementation) Snapshot(opts *Options, rii reg.RegInvI
 	}
 
 	// TODO: Maybe store the snapshot somewhere?
+	printSection("END (SNAPSHOT)", opts.Confirm)
 	fmt.Println(snapshot)
 	return nil
 }

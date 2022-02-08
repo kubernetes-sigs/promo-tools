@@ -110,8 +110,9 @@ func (di *defaultPromoterImplementation) PromoteImages(
 	promotionEdges map[reg.PromotionEdge]interface{},
 	fn streamProducerFunc,
 ) error {
-	return errors.Wrap(
-		sc.Promote(promotionEdges, fn, nil),
-		"running image promotion",
-	)
+	if err := sc.Promote(promotionEdges, fn, nil); err != nil {
+		return errors.Wrap(err, "running image promotion")
+	}
+	printSection("END (PROMOTION)", true)
+	return nil
 }
