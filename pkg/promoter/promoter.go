@@ -25,13 +25,23 @@ func New() *Promoter {
 
 // promoterImplementation
 type promoterImplementation interface {
+	// General methods common to all modes of the promoter
 	ValidateOptions(*Options) error
 	ActivateServiceAccounts(*Options) error
+
+	// Methods for promotion mode:
 	ParseManifests(*Options) ([]reg.Manifest, error)
-	MakeSyncContext(*Options, []reg.Manifest) (reg.SyncContext, error)
-	GetPromotionEdges(reg.SyncContext, []reg.Manifest) (map[reg.PromotionEdge]interface{}, error)
+	MakeSyncContext(*Options, []reg.Manifest) (*reg.SyncContext, error)
+	GetPromotionEdges(*reg.SyncContext, []reg.Manifest) (map[reg.PromotionEdge]interface{}, error)
 	MakeProducerFunction(bool) streamProducerFunc
-	PromoteImages(reg.SyncContext, map[reg.PromotionEdge]interface{}, streamProducerFunc) error
+	PromoteImages(*reg.SyncContext, map[reg.PromotionEdge]interface{}, streamProducerFunc) error
+
+	// Methods for snapshot mode:
+	GetSnapshotSourceRegistry(*Options) (*reg.RegistryContext, error)
+	GetSnapshotManifests(*Options) ([]reg.Manifest, error)
+	AppendManifestToSnapshot(*Options, []reg.Manifest) ([]reg.Manifest, error)
+	GetRegistryImageInventory(*Options, []reg.Manifest) (reg.RegInvImage, error)
+	Snapshot(*Options, reg.RegInvImage) error
 }
 
 // streamProducerFunc is a function that gets the required fields to
@@ -86,9 +96,32 @@ func (p *Promoter) ValidateManifestLists(opts *Options) error {
 	return nil
 }
 
-func (p *Promoter) Snapshot(opts *Options) error {
-	// STUB
-	return nil
+// Snapshot runs the steps to output a representation in json or yaml of a registry
+func (p *Promoter) Snapshot(opts *Options) (err error) {
+	if err := p.impl.ValidateOptions(opts); err != nil {
+		return errors.Wrap(err, "validating options")
+	}
+
+	if err := p.impl.ActivateServiceAccounts(opts); err != nil {
+		return errors.Wrap(err, "activating service accounts")
+	}
+
+	mfests, err := p.impl.GetSnapshotManifests(opts)
+	if err != nil {
+		return errors.Wrap(err, "getting snapshot manifests")
+	}
+
+	mfests, err = p.impl.AppendManifestToSnapshot(opts, mfests)
+	if err != nil {
+		return errors.Wrap(err, "adding the specified manifest to the snapshot context")
+	}
+
+	rii, err := p.impl.GetRegistryImageInventory(opts, mfests)
+	if err != nil {
+		return errors.Wrap(err, "getting registry image inventory")
+	}
+
+	return errors.Wrap(p.impl.Snapshot(opts, rii), "generating snapshot")
 }
 
 func (p *Promoter) SecurityScan(opts *Options) error {
