@@ -42,6 +42,9 @@ type promoterImplementation interface {
 	AppendManifestToSnapshot(*Options, []reg.Manifest) ([]reg.Manifest, error)
 	GetRegistryImageInventory(*Options, []reg.Manifest) (reg.RegInvImage, error)
 	Snapshot(*Options, reg.RegInvImage) error
+
+	// Methods for image vulnerability scans
+	ScanEdges(*Options, *reg.SyncContext, map[reg.PromotionEdge]interface{}) error
 }
 
 // streamProducerFunc is a function that gets the required fields to
@@ -124,9 +127,37 @@ func (p *Promoter) Snapshot(opts *Options) (err error) {
 	return errors.Wrap(p.impl.Snapshot(opts, rii), "generating snapshot")
 }
 
+// SecurityScan runs just like an image promotion, but instead of
+// actually copied the new detected images, it will run a vulnerability
+// scan on them
 func (p *Promoter) SecurityScan(opts *Options) error {
-	// STUB
-	return nil
+	if err := p.impl.ValidateOptions(opts); err != nil {
+		return errors.Wrap(err, "validating options")
+	}
+
+	if err := p.impl.ActivateServiceAccounts(opts); err != nil {
+		return errors.Wrap(err, "activating service accounts")
+	}
+
+	mfests, err := p.impl.ParseManifests(opts)
+	if err != nil {
+		return errors.Wrap(err, "parsing manifests")
+	}
+
+	sc, err := p.impl.MakeSyncContext(opts, mfests)
+	if err != nil {
+		return errors.Wrap(err, "creating sync context")
+	}
+
+	promotionEdges, err := p.impl.GetPromotionEdges(sc, mfests)
+	if err != nil {
+		return errors.Wrap(err, "filtering edges")
+	}
+
+	return errors.Wrap(
+		p.impl.ScanEdges(opts, sc, promotionEdges),
+		"running vulnerability scan",
+	)
 }
 
 func (p *Promoter) CheckManifestLists(opts *Options) error {
