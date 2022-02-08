@@ -86,7 +86,7 @@ func (di *defaultPromoterImplementation) GetPromotionEdges(
 
 // MakeProducerFunction builds a function that will be called
 // during promotion to get the producer streams
-func (di *defaultPromoterImplementation) MakeProducerFunction(useServiceAccount bool) streamProducerFunc {
+func (di *defaultPromoterImplementation) MakeProducerFunction(useServiceAccount bool) StreamProducerFunc {
 	return func(
 		srcRegistry reg.RegistryName,
 		srcImageName reg.ImageName,
@@ -108,7 +108,7 @@ func (di *defaultPromoterImplementation) MakeProducerFunction(useServiceAccount 
 func (di *defaultPromoterImplementation) PromoteImages(
 	sc *reg.SyncContext,
 	promotionEdges map[reg.PromotionEdge]interface{},
-	fn streamProducerFunc,
+	fn StreamProducerFunc,
 ) error {
 	if err := sc.Promote(promotionEdges, fn, nil); err != nil {
 		return errors.Wrap(err, "running image promotion")

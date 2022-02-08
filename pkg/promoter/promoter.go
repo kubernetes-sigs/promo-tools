@@ -56,8 +56,8 @@ type promoterImplementation interface {
 	ParseManifests(*Options) ([]reg.Manifest, error)
 	MakeSyncContext(*Options, []reg.Manifest) (*reg.SyncContext, error)
 	GetPromotionEdges(*reg.SyncContext, []reg.Manifest) (map[reg.PromotionEdge]interface{}, error)
-	MakeProducerFunction(bool) streamProducerFunc
-	PromoteImages(*reg.SyncContext, map[reg.PromotionEdge]interface{}, streamProducerFunc) error
+	MakeProducerFunction(bool) StreamProducerFunc
+	PromoteImages(*reg.SyncContext, map[reg.PromotionEdge]interface{}, StreamProducerFunc) error
 
 	// Methods for snapshot mode:
 	GetSnapshotSourceRegistry(*Options) (*reg.RegistryContext, error)
@@ -75,7 +75,7 @@ type promoterImplementation interface {
 
 // streamProducerFunc is a function that gets the required fields to
 // construct a promotion stream producer
-type streamProducerFunc func(
+type StreamProducerFunc func(
 	srcRegistry reg.RegistryName, srcImageName reg.ImageName,
 	destRC reg.RegistryContext, imageName reg.ImageName,
 	digest reg.Digest, tag reg.Tag, tp reg.TagOp,
