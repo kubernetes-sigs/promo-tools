@@ -85,7 +85,12 @@ type Options struct {
 	MaxImageSize int
 }
 
-var DefaultOptions = &Options{}
+var DefaultOptions = &Options{
+	OutputFormat:      "yaml",
+	MaxImageSize:      2048,
+	Threads:           10,
+	SeverityThreshold: -1,
+}
 
 func (o *Options) Validate() error {
 	// CheckManifestLists is one of the modes, it just needs a repository

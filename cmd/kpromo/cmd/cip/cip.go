@@ -23,6 +23,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"sigs.k8s.io/promo-tools/v3/legacy/cli"
+	"sigs.k8s.io/promo-tools/v3/pkg/promoter"
 )
 
 // CipCmd represents the base command when called without any subcommands
@@ -44,7 +45,7 @@ Promote images from a staging registry to production
 	},
 }
 
-var runOpts = &cli.RunOptions{}
+var runOpts = &promoter.Options{}
 
 // TODO: Function 'init' is too long (171 > 60) (funlen)
 // nolint: funlen
@@ -78,7 +79,7 @@ the 'images: ...' contents`,
 	CipCmd.PersistentFlags().IntVar(
 		&runOpts.Threads,
 		"threads",
-		cli.PromoterDefaultThreads,
+		promoter.DefaultOptions.Threads,
 		"number of concurrent goroutines to use when talking to GCR",
 	)
 
@@ -132,12 +133,12 @@ from snapshot output if they are referenced by a manifest list`,
 	CipCmd.PersistentFlags().StringVar(
 		&runOpts.OutputFormat,
 		cli.PromoterOutputFlag,
-		cli.PromoterDefaultOutputFormat,
+		promoter.DefaultOptions.OutputFormat,
 		fmt.Sprintf(`(only works with '--%s' or '--%s') choose output
 format of the snapshot (allowed values: %q)`,
 			cli.PromoterSnapshotFlag,
 			cli.PromoterManifestBasedSnapshotOfFlag,
-			cli.PromoterAllowedOutputFormats,
+			promoter.AllowedOutputFormats,
 		),
 	)
 
@@ -192,7 +193,7 @@ network from a registry, it reads from the local manifests only`,
 	CipCmd.PersistentFlags().IntVar(
 		&runOpts.MaxImageSize,
 		"max-image-size",
-		cli.PromoterDefaultMaxImageSize,
+		promoter.DefaultOptions.MaxImageSize,
 		"the maximum image size (in MiB) allowed for promotion",
 	)
 
@@ -204,7 +205,7 @@ network from a registry, it reads from the local manifests only`,
 	CipCmd.PersistentFlags().IntVar(
 		&runOpts.SeverityThreshold,
 		"vuln-severity-threshold",
-		cli.PromoterDefaultSeverityThreshold,
+		promoter.DefaultOptions.SeverityThreshold,
 		`Using this flag will cause the promoter to only run the vulnerability
 check. Found vulnerabilities at or above this threshold will result in the
 vulnerability check failing [severity levels between 0 and 5; 0 - UNSPECIFIED,
