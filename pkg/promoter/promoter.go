@@ -1,5 +1,7 @@
 package promoter
 
+//go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate
+
 import (
 	"github.com/pkg/errors"
 	reg "sigs.k8s.io/promo-tools/v3/legacy/dockerregistry"
@@ -23,7 +25,10 @@ func New() *Promoter {
 	}
 }
 
-// promoterImplementation
+//counterfeiter:generate . promoterImplementation
+
+// promoterImplementation handles all the functionality in the promoter
+// modes of operation.
 type promoterImplementation interface {
 	// General methods common to all modes of the promoter
 	ValidateOptions(*Options) error
