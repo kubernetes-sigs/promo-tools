@@ -31,7 +31,7 @@ require (
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/utils v0.0.0-20211116205334-6203023598ed
 	sigs.k8s.io/release-sdk v0.6.0
-	sigs.k8s.io/release-utils v0.4.0
+	sigs.k8s.io/release-utils v0.5.0
 	sigs.k8s.io/yaml v1.3.0
 )
 
