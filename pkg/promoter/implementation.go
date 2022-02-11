@@ -18,11 +18,32 @@ package promoter
 
 import (
 	"github.com/pkg/errors"
-
 	"github.com/sirupsen/logrus"
 	reg "sigs.k8s.io/promo-tools/v3/legacy/dockerregistry"
 	"sigs.k8s.io/promo-tools/v3/legacy/gcloud"
 )
+
+type defaultPromoterImplementation struct{}
+
+// ValidateManifestLists implements one of the run modes of the promoter
+// where it parses the manifests, checks the images and exits
+func (di *defaultPromoterImplementation) ValidateManifestLists(opts *Options) error {
+	registry := reg.RegistryName(opts.Repository)
+	images := make([]reg.ImageWithDigestSlice, 0)
+
+	if err := reg.ParseSnapshot(opts.CheckManifestLists, &images); err != nil {
+		return errors.Wrap(err, "parsing snapshot")
+	}
+
+	imgs, err := reg.FilterParentImages(registry, &images)
+	if err != nil {
+		return errors.Wrap(err, "filtering parent images")
+	}
+
+	reg.ValidateParentImages(registry, imgs)
+	printSection("FINISHED (CHECKING MANIFESTS)", true)
+	return nil
+}
 
 // ValidateOptions checks an options set
 func (di *defaultPromoterImplementation) ValidateOptions(opts *Options) error {

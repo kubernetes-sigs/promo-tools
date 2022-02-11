@@ -226,23 +226,3 @@ func (p *Promoter) CheckManifestLists(opts *Options) error {
 		p.impl.ValidateManifestLists(opts), "checking manifest lists",
 	)
 }
-
-type defaultPromoterImplementation struct{}
-
-func (di *defaultPromoterImplementation) ValidateManifestLists(opts *Options) error {
-	registry := reg.RegistryName(opts.Repository)
-	images := make([]reg.ImageWithDigestSlice, 0)
-
-	if err := reg.ParseSnapshot(opts.CheckManifestLists, &images); err != nil {
-		return errors.Wrap(err, "parsing snapshot")
-	}
-
-	imgs, err := reg.FilterParentImages(registry, &images)
-	if err != nil {
-		return errors.Wrap(err, "filtering parent images")
-	}
-
-	reg.ValidateParentImages(registry, imgs)
-	printSection("FINISHED (CHECKING MANIFESTS)", true)
-	return nil
-}
