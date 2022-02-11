@@ -17,7 +17,7 @@ limitations under the License.
 package cli
 
 import (
-	"sigs.k8s.io/promo-tools/v3/pkg/promoter"
+	promoter "sigs.k8s.io/promo-tools/v3/imagepromoter"
 )
 
 const (

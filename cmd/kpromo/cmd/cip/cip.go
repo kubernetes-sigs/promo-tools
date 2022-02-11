@@ -22,8 +22,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
+	promoter "sigs.k8s.io/promo-tools/v3/imagepromoter"
 	"sigs.k8s.io/promo-tools/v3/legacy/cli"
-	"sigs.k8s.io/promo-tools/v3/pkg/promoter"
 )
 
 // CipCmd represents the base command when called without any subcommands
