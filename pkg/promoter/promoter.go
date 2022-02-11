@@ -21,9 +21,16 @@ package promoter
 import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"sigs.k8s.io/promo-tools/v3/internal/version"
 	reg "sigs.k8s.io/promo-tools/v3/legacy/dockerregistry"
 	"sigs.k8s.io/promo-tools/v3/legacy/stream"
 )
+
+const vulnerabilityDiscalimer = `DISCLAIMER: Vulnerabilities are found as issues with package
+binaries within image layers, not necessarily with the image layers themselves.
+So a 'fixable' vulnerability may not necessarily be immediately actionable. For
+example, even though a fixed version of the binary is available, it doesn't
+necessarily mean that a new version of the image layer is available.`
 
 var AllowedOutputFormats = []string{
 	"csv",
@@ -225,4 +232,24 @@ func (p *Promoter) CheckManifestLists(opts *Options) error {
 	return errors.Wrap(
 		p.impl.ValidateManifestLists(opts), "checking manifest lists",
 	)
+}
+
+func printVersion() {
+	logrus.Info(version.Get())
+}
+
+// printSection handles the start/finish labels in the
+// former legacy cli/run code
+func printSection(message string, confirm bool) {
+	dryRunLabel := ""
+	if !confirm {
+		dryRunLabel = "(DRY RUN) "
+	}
+	logrus.Infof("********** %s %s**********", message, dryRunLabel)
+}
+
+// printSecDisclaimer prints a disclaimer about false positives
+// that may be found in container image lauyers.
+func printSecDisclaimer() {
+	logrus.Info(vulnerabilityDiscalimer)
 }
