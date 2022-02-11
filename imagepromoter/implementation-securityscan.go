@@ -18,6 +18,7 @@ package promoter
 
 import (
 	"github.com/pkg/errors"
+
 	reg "sigs.k8s.io/promo-tools/v3/legacy/dockerregistry"
 )
 
