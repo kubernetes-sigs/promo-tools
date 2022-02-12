@@ -28,7 +28,7 @@ import (
 	"golang.org/x/xerrors"
 
 	api "sigs.k8s.io/promo-tools/v3/api/files"
-	"sigs.k8s.io/promo-tools/v3/filepromoter"
+	"sigs.k8s.io/promo-tools/v3/promoter/file"
 )
 
 //go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate
@@ -99,9 +99,9 @@ func RunPromoteFiles(ctx context.Context, options PromoteFilesOptions) error {
 		)
 	}
 
-	var ops []filepromoter.SyncFileOp
+	var ops []file.SyncFileOp
 	for _, manifest := range manifests {
-		promoter := &filepromoter.ManifestPromoter{
+		promoter := &file.ManifestPromoter{
 			Manifest:          manifest,
 			Confirm:           options.Confirm,
 			UseServiceAccount: options.UseServiceAccount,
