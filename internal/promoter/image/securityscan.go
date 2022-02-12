@@ -20,12 +20,13 @@ import (
 	"github.com/pkg/errors"
 
 	reg "sigs.k8s.io/promo-tools/v3/legacy/dockerregistry"
+	options "sigs.k8s.io/promo-tools/v3/promoter/image/options"
 )
 
 // ScanEdges runs the vulnerability scans on the new images
 // detected by the promoter.
-func (di *defaultPromoterImplementation) ScanEdges(
-	opts *Options, sc *reg.SyncContext,
+func (di *DefaultPromoterImplementation) ScanEdges(
+	opts *options.Options, sc *reg.SyncContext,
 	promotionEdges map[reg.PromotionEdge]interface{},
 ) error {
 	if err := sc.RunChecks(
@@ -40,6 +41,6 @@ func (di *defaultPromoterImplementation) ScanEdges(
 	); err != nil {
 		return errors.Wrap(err, "checking image vulnerabilities")
 	}
-	printSection("END (VULNSCAN)", opts.Confirm)
+	di.PrintSection("END (VULNSCAN)", opts.Confirm)
 	return nil
 }

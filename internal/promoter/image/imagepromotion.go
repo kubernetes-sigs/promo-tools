@@ -21,6 +21,7 @@ import (
 
 	reg "sigs.k8s.io/promo-tools/v3/legacy/dockerregistry"
 	"sigs.k8s.io/promo-tools/v3/legacy/stream"
+	options "sigs.k8s.io/promo-tools/v3/promoter/image/options"
 )
 
 // This file has all the promoter implementation functions
@@ -28,7 +29,7 @@ import (
 
 // ParseManifests reads the manifest file or manifest directory
 // and parses them to return a slice of Manifest objects.
-func (di *defaultPromoterImplementation) ParseManifests(opts *Options) (mfests []reg.Manifest, err error) {
+func (di *DefaultPromoterImplementation) ParseManifests(opts *options.Options) (mfests []reg.Manifest, err error) {
 	// If the options have a manifest file defined, we use that one
 	if opts.Manifest != "" {
 		mfest, err := reg.ParseManifestFromFile(opts.Manifest)
@@ -49,8 +50,8 @@ func (di *defaultPromoterImplementation) ParseManifests(opts *Options) (mfests [
 
 // MakeSyncContext takes a slice of manifests and creates a sync context
 // object based on them and the promoter options
-func (di defaultPromoterImplementation) MakeSyncContext(
-	opts *Options, mfests []reg.Manifest,
+func (di DefaultPromoterImplementation) MakeSyncContext(
+	opts *options.Options, mfests []reg.Manifest,
 ) (*reg.SyncContext, error) {
 	sc, err := reg.MakeSyncContext(
 		mfests, opts.Threads, opts.Confirm, opts.UseServiceAcct,
@@ -64,7 +65,7 @@ func (di defaultPromoterImplementation) MakeSyncContext(
 // GetPromotionEdges checks the manifests and determines from
 // them the promotion edges, ie the images that need to be
 // promoted.
-func (di *defaultPromoterImplementation) GetPromotionEdges(
+func (di *DefaultPromoterImplementation) GetPromotionEdges(
 	sc *reg.SyncContext, mfests []reg.Manifest,
 ) (promotionEdges map[reg.PromotionEdge]interface{}, err error) {
 	// First, get the "edges" from the manifests
@@ -87,7 +88,7 @@ func (di *defaultPromoterImplementation) GetPromotionEdges(
 
 // MakeProducerFunction builds a function that will be called
 // during promotion to get the producer streams
-func (di *defaultPromoterImplementation) MakeProducerFunction(useServiceAccount bool) StreamProducerFunc {
+func (di *DefaultPromoterImplementation) MakeProducerFunction(useServiceAccount bool) StreamProducerFunc {
 	return func(
 		srcRegistry reg.RegistryName,
 		srcImageName reg.ImageName,
@@ -106,7 +107,7 @@ func (di *defaultPromoterImplementation) MakeProducerFunction(useServiceAccount 
 }
 
 // PromoteImages starts an image promotion of a set of edges
-func (di *defaultPromoterImplementation) PromoteImages(
+func (di *DefaultPromoterImplementation) PromoteImages(
 	sc *reg.SyncContext,
 	promotionEdges map[reg.PromotionEdge]interface{},
 	fn StreamProducerFunc,
@@ -114,6 +115,6 @@ func (di *defaultPromoterImplementation) PromoteImages(
 	if err := sc.Promote(promotionEdges, fn, nil); err != nil {
 		return errors.Wrap(err, "running image promotion")
 	}
-	printSection("END (PROMOTION)", true)
+	di.PrintSection("END (PROMOTION)", true)
 	return nil
 }

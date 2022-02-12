@@ -20,15 +20,32 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
+	"sigs.k8s.io/promo-tools/v3/internal/version"
 	reg "sigs.k8s.io/promo-tools/v3/legacy/dockerregistry"
 	"sigs.k8s.io/promo-tools/v3/legacy/gcloud"
+	"sigs.k8s.io/promo-tools/v3/legacy/stream"
+	options "sigs.k8s.io/promo-tools/v3/promoter/image/options"
 )
 
-type defaultPromoterImplementation struct{}
+const vulnerabilityDiscalimer = `DISCLAIMER: Vulnerabilities are found as issues with package
+binaries within image layers, not necessarily with the image layers themselves.
+So a 'fixable' vulnerability may not necessarily be immediately actionable. For
+example, even though a fixed version of the binary is available, it doesn't
+necessarily mean that a new version of the image layer is available.`
+
+// streamProducerFunc is a function that gets the required fields to
+// construct a promotion stream producer
+type StreamProducerFunc func(
+	srcRegistry reg.RegistryName, srcImageName reg.ImageName,
+	destRC reg.RegistryContext, imageName reg.ImageName,
+	digest reg.Digest, tag reg.Tag, tp reg.TagOp,
+) stream.Producer
+
+type DefaultPromoterImplementation struct{}
 
 // ValidateManifestLists implements one of the run modes of the promoter
 // where it parses the manifests, checks the images and exits
-func (di *defaultPromoterImplementation) ValidateManifestLists(opts *Options) error {
+func (di *DefaultPromoterImplementation) ValidateManifestLists(opts *options.Options) error {
 	registry := reg.RegistryName(opts.Repository)
 	images := make([]reg.ImageWithDigestSlice, 0)
 
@@ -42,12 +59,12 @@ func (di *defaultPromoterImplementation) ValidateManifestLists(opts *Options) er
 	}
 
 	reg.ValidateParentImages(registry, imgs)
-	printSection("FINISHED (CHECKING MANIFESTS)", true)
+	di.PrintSection("FINISHED (CHECKING MANIFESTS)", true)
 	return nil
 }
 
 // ValidateOptions checks an options set
-func (di *defaultPromoterImplementation) ValidateOptions(opts *Options) error {
+func (di *DefaultPromoterImplementation) ValidateOptions(opts *options.Options) error {
 	if opts.Snapshot == "" && opts.ManifestBasedSnapshotOf == "" {
 		if opts.Manifest == "" && opts.ThinManifestDir == "" {
 			return errors.New("either a manifest ot a thin manifest dir have to be set")
@@ -57,7 +74,7 @@ func (di *defaultPromoterImplementation) ValidateOptions(opts *Options) error {
 }
 
 // ActivateServiceAccounts gets key files and activates service accounts
-func (di *defaultPromoterImplementation) ActivateServiceAccounts(opts *Options) error {
+func (di *DefaultPromoterImplementation) ActivateServiceAccounts(opts *options.Options) error {
 	if !opts.UseServiceAcct {
 		logrus.Warn("Not setting a service account")
 	}
@@ -70,8 +87,8 @@ func (di *defaultPromoterImplementation) ActivateServiceAccounts(opts *Options) 
 
 // PrecheckAndExit run simple prechecks to exit before promotions
 // or security scans
-func (di *defaultPromoterImplementation) PrecheckAndExit(
-	opts *Options, mfests []reg.Manifest,
+func (di *DefaultPromoterImplementation) PrecheckAndExit(
+	opts *options.Options, mfests []reg.Manifest,
 ) error {
 	// Make the sync context tu run the prechecks:
 	sc, err := di.MakeSyncContext(opts, mfests)
@@ -85,4 +102,24 @@ func (di *defaultPromoterImplementation) PrecheckAndExit(
 		sc.RunChecks([]reg.PreCheck{}),
 		"running prechecks before promotion",
 	)
+}
+
+func (di *DefaultPromoterImplementation) PrintVersion() {
+	logrus.Info(version.Get())
+}
+
+// printSection handles the start/finish labels in the
+// former legacy cli/run code
+func (di *DefaultPromoterImplementation) PrintSection(message string, confirm bool) {
+	dryRunLabel := ""
+	if !confirm {
+		dryRunLabel = "(DRY RUN) "
+	}
+	logrus.Infof("********** %s %s**********", message, dryRunLabel)
+}
+
+// printSecDisclaimer prints a disclaimer about false positives
+// that may be found in container image lauyers.
+func (di *DefaultPromoterImplementation) PrintSecDisclaimer() {
+	logrus.Info(vulnerabilityDiscalimer)
 }

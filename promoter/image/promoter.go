@@ -22,16 +22,10 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
-	"sigs.k8s.io/promo-tools/v3/internal/version"
+	impl "sigs.k8s.io/promo-tools/v3/internal/promoter/image"
 	reg "sigs.k8s.io/promo-tools/v3/legacy/dockerregistry"
-	"sigs.k8s.io/promo-tools/v3/legacy/stream"
+	options "sigs.k8s.io/promo-tools/v3/promoter/image/options"
 )
-
-const vulnerabilityDiscalimer = `DISCLAIMER: Vulnerabilities are found as issues with package
-binaries within image layers, not necessarily with the image layers themselves.
-So a 'fixable' vulnerability may not necessarily be immediately actionable. For
-example, even though a fixed version of the binary is available, it doesn't
-necessarily mean that a new version of the image layer is available.`
 
 var AllowedOutputFormats = []string{
 	"csv",
@@ -39,14 +33,14 @@ var AllowedOutputFormats = []string{
 }
 
 type Promoter struct {
-	Options *Options
+	Options *options.Options
 	impl    promoterImplementation
 }
 
 func New() *Promoter {
 	return &Promoter{
-		Options: DefaultOptions,
-		impl:    &defaultPromoterImplementation{},
+		Options: options.DefaultOptions,
+		impl:    &impl.DefaultPromoterImplementation{},
 	}
 }
 
@@ -56,42 +50,39 @@ func New() *Promoter {
 // modes of operation.
 type promoterImplementation interface {
 	// General methods common to all modes of the promoter
-	ValidateOptions(*Options) error
-	ActivateServiceAccounts(*Options) error
-	PrecheckAndExit(*Options, []reg.Manifest) error
+	ValidateOptions(*options.Options) error
+	ActivateServiceAccounts(*options.Options) error
+	PrecheckAndExit(*options.Options, []reg.Manifest) error
 
 	// Methods for promotion mode:
-	ParseManifests(*Options) ([]reg.Manifest, error)
-	MakeSyncContext(*Options, []reg.Manifest) (*reg.SyncContext, error)
+	ParseManifests(*options.Options) ([]reg.Manifest, error)
+	MakeSyncContext(*options.Options, []reg.Manifest) (*reg.SyncContext, error)
 	GetPromotionEdges(*reg.SyncContext, []reg.Manifest) (map[reg.PromotionEdge]interface{}, error)
-	MakeProducerFunction(bool) StreamProducerFunc
-	PromoteImages(*reg.SyncContext, map[reg.PromotionEdge]interface{}, StreamProducerFunc) error
+	MakeProducerFunction(bool) impl.StreamProducerFunc
+	PromoteImages(*reg.SyncContext, map[reg.PromotionEdge]interface{}, impl.StreamProducerFunc) error
 
 	// Methods for snapshot mode:
-	GetSnapshotSourceRegistry(*Options) (*reg.RegistryContext, error)
-	GetSnapshotManifests(*Options) ([]reg.Manifest, error)
-	AppendManifestToSnapshot(*Options, []reg.Manifest) ([]reg.Manifest, error)
-	GetRegistryImageInventory(*Options, []reg.Manifest) (reg.RegInvImage, error)
-	Snapshot(*Options, reg.RegInvImage) error
+	GetSnapshotSourceRegistry(*options.Options) (*reg.RegistryContext, error)
+	GetSnapshotManifests(*options.Options) ([]reg.Manifest, error)
+	AppendManifestToSnapshot(*options.Options, []reg.Manifest) ([]reg.Manifest, error)
+	GetRegistryImageInventory(*options.Options, []reg.Manifest) (reg.RegInvImage, error)
+	Snapshot(*options.Options, reg.RegInvImage) error
 
 	// Methods for image vulnerability scans:
-	ScanEdges(*Options, *reg.SyncContext, map[reg.PromotionEdge]interface{}) error
+	ScanEdges(*options.Options, *reg.SyncContext, map[reg.PromotionEdge]interface{}) error
 
 	// Methods for manifest list verification:
-	ValidateManifestLists(opts *Options) error
-}
+	ValidateManifestLists(opts *options.Options) error
 
-// streamProducerFunc is a function that gets the required fields to
-// construct a promotion stream producer
-type StreamProducerFunc func(
-	srcRegistry reg.RegistryName, srcImageName reg.ImageName,
-	destRC reg.RegistryContext, imageName reg.ImageName,
-	digest reg.Digest, tag reg.Tag, tp reg.TagOp,
-) stream.Producer
+	// Utility functions
+	PrintVersion()
+	PrintSecDisclaimer()
+	PrintSection(string, bool)
+}
 
 // PromoteImages is the main method for image promotion
 // it runs by taking all its parameters from a set of options.
-func (p *Promoter) PromoteImages(opts *Options) (err error) {
+func (p *Promoter) PromoteImages(opts *options.Options) (err error) {
 	// Validate the options. Perhaps another image-specific
 	// validation function may be needed.
 	if err := p.impl.ValidateOptions(opts); err != nil {
@@ -107,8 +98,8 @@ func (p *Promoter) PromoteImages(opts *Options) (err error) {
 		return errors.Wrap(err, "parsing manifests")
 	}
 
-	printVersion()
-	printSection("START (PROMOTION)", opts.Confirm)
+	p.impl.PrintVersion()
+	p.impl.PrintSection("START (PROMOTION)", opts.Confirm)
 
 	sc, err := p.impl.MakeSyncContext(opts, mfests)
 	if err != nil {
@@ -141,7 +132,7 @@ func (p *Promoter) PromoteImages(opts *Options) (err error) {
 }
 
 // Snapshot runs the steps to output a representation in json or yaml of a registry
-func (p *Promoter) Snapshot(opts *Options) (err error) {
+func (p *Promoter) Snapshot(opts *options.Options) (err error) {
 	if err := p.impl.ValidateOptions(opts); err != nil {
 		return errors.Wrap(err, "validating options")
 	}
@@ -150,8 +141,8 @@ func (p *Promoter) Snapshot(opts *Options) (err error) {
 		return errors.Wrap(err, "activating service accounts")
 	}
 
-	printVersion()
-	printSection("START (SNAPSHOT)", opts.Confirm)
+	p.impl.PrintVersion()
+	p.impl.PrintSection("START (SNAPSHOT)", opts.Confirm)
 
 	mfests, err := p.impl.GetSnapshotManifests(opts)
 	if err != nil {
@@ -174,7 +165,7 @@ func (p *Promoter) Snapshot(opts *Options) (err error) {
 // SecurityScan runs just like an image promotion, but instead of
 // actually copying the new detected images, it will run a vulnerability
 // scan on them
-func (p *Promoter) SecurityScan(opts *Options) error {
+func (p *Promoter) SecurityScan(opts *options.Options) error {
 	if err := p.impl.ValidateOptions(opts); err != nil {
 		return errors.Wrap(err, "validating options")
 	}
@@ -188,9 +179,9 @@ func (p *Promoter) SecurityScan(opts *Options) error {
 		return errors.Wrap(err, "parsing manifests")
 	}
 
-	printVersion()
-	printSection("START (VULN CHECK)", opts.Confirm)
-	printSecDisclaimer()
+	p.impl.PrintVersion()
+	p.impl.PrintSection("START (VULN CHECK)", opts.Confirm)
+	p.impl.PrintSecDisclaimer()
 
 	sc, err := p.impl.MakeSyncContext(opts, mfests)
 	if err != nil {
@@ -221,7 +212,7 @@ func (p *Promoter) SecurityScan(opts *Options) error {
 
 // CheckManifestLists is a mode that just checks manifests
 // and exists.
-func (p *Promoter) CheckManifestLists(opts *Options) error {
+func (p *Promoter) CheckManifestLists(opts *options.Options) error {
 	if err := p.impl.ValidateOptions(opts); err != nil {
 		return errors.Wrap(err, "validating options")
 	}
@@ -233,24 +224,4 @@ func (p *Promoter) CheckManifestLists(opts *Options) error {
 	return errors.Wrap(
 		p.impl.ValidateManifestLists(opts), "checking manifest lists",
 	)
-}
-
-func printVersion() {
-	logrus.Info(version.Get())
-}
-
-// printSection handles the start/finish labels in the
-// former legacy cli/run code
-func printSection(message string, confirm bool) {
-	dryRunLabel := ""
-	if !confirm {
-		dryRunLabel = "(DRY RUN) "
-	}
-	logrus.Infof("********** %s %s**********", message, dryRunLabel)
-}
-
-// printSecDisclaimer prints a disclaimer about false positives
-// that may be found in container image lauyers.
-func printSecDisclaimer() {
-	logrus.Info(vulnerabilityDiscalimer)
 }

@@ -24,10 +24,11 @@ import (
 	"github.com/sirupsen/logrus"
 
 	reg "sigs.k8s.io/promo-tools/v3/legacy/dockerregistry"
+	options "sigs.k8s.io/promo-tools/v3/promoter/image/options"
 )
 
 // Run a snapshot
-func (di *defaultPromoterImplementation) Snapshot(opts *Options, rii reg.RegInvImage) error {
+func (di *DefaultPromoterImplementation) Snapshot(opts *options.Options, rii reg.RegInvImage) error {
 	// Run the snapshot
 	var snapshot string
 	switch strings.ToLower(opts.OutputFormat) {
@@ -41,13 +42,13 @@ func (di *defaultPromoterImplementation) Snapshot(opts *Options, rii reg.RegInvI
 	}
 
 	// TODO: Maybe store the snapshot somewhere?
-	printSection("END (SNAPSHOT)", opts.Confirm)
+	di.PrintSection("END (SNAPSHOT)", opts.Confirm)
 	fmt.Println(snapshot)
 	return nil
 }
 
-func (di *defaultPromoterImplementation) GetSnapshotSourceRegistry(
-	opts *Options,
+func (di *DefaultPromoterImplementation) GetSnapshotSourceRegistry(
+	opts *options.Options,
 ) (*reg.RegistryContext, error) {
 	// Build the source registry:
 	srcRegistry := &reg.RegistryContext{
@@ -73,8 +74,8 @@ func (di *defaultPromoterImplementation) GetSnapshotSourceRegistry(
 
 // GetSnapshotManifest creates the manifest list from the
 // specified snapshot source
-func (di *defaultPromoterImplementation) GetSnapshotManifests(
-	opts *Options,
+func (di *DefaultPromoterImplementation) GetSnapshotManifests(
+	opts *options.Options,
 ) ([]reg.Manifest, error) {
 	// Build the source registry:
 	srcRegistry, err := di.GetSnapshotSourceRegistry(opts)
@@ -97,8 +98,8 @@ func (di *defaultPromoterImplementation) GetSnapshotManifests(
 // options passed to the promoter. If one is found, we parse it and
 // append it to the list of manifests generated for the snapshot
 // during GetSnapshotManifests()
-func (di *defaultPromoterImplementation) AppendManifestToSnapshot(
-	opts *Options, mfests []reg.Manifest,
+func (di *DefaultPromoterImplementation) AppendManifestToSnapshot(
+	opts *options.Options, mfests []reg.Manifest,
 ) ([]reg.Manifest, error) {
 	// If no manifest was passed in the options, we return the
 	// same list of manifests unchanged
@@ -117,8 +118,8 @@ func (di *defaultPromoterImplementation) AppendManifestToSnapshot(
 }
 
 //
-func (di *defaultPromoterImplementation) GetRegistryImageInventory(
-	opts *Options, mfests []reg.Manifest,
+func (di *DefaultPromoterImplementation) GetRegistryImageInventory(
+	opts *options.Options, mfests []reg.Manifest,
 ) (reg.RegInvImage, error) {
 	// I'm pretty sure the registry context here can be the same for
 	// both snapshot sources and when running in the original cli/run,

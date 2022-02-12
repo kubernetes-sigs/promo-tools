@@ -17,7 +17,8 @@ limitations under the License.
 package cli
 
 import (
-	promoter "sigs.k8s.io/promo-tools/v3/imagepromoter"
+	promoter "sigs.k8s.io/promo-tools/v3/promoter/image"
+	options "sigs.k8s.io/promo-tools/v3/promoter/image/options"
 )
 
 const (
@@ -29,7 +30,7 @@ const (
 	PromoterOutputFlag                  = "output"
 )
 
-func RunPromoteCmd(opts *promoter.Options) error {
+func RunPromoteCmd(opts *options.Options) error {
 	cip := promoter.New()
 
 	// Mode 1: Manifest list verification
