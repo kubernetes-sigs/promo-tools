@@ -16,12 +16,4 @@ limitations under the License.
 
 package cli
 
-import (
-	"fmt"
-
-	"sigs.k8s.io/promo-tools/v3/internal/version"
-)
-
-func printVersion() {
-	fmt.Println(version.Get())
-}
+// TODO: Refactor cli import functions into this file

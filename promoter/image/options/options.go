@@ -1,0 +1,119 @@
+/*
+Copyright 2022 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package imagepromoter
+
+import (
+	"errors"
+)
+
+// Options capture the switches available to run the image promoter
+type Options struct {
+	// Threads determines how many promotion threads will run
+	Threads int
+
+	// Confirm captures a cli flag with the same name. It runs the security
+	// scan and promotion when set. If false, the promoter will exit before\
+	// making any modifications.
+	Confirm bool
+
+	// Use a service account when true
+	UseServiceAcct bool
+
+	// Manifest is the path of a manifest file
+	Manifest string
+
+	// ThinManifestDir is a directory of thin manifests
+	ThinManifestDir string
+
+	// Snapshot takes a registry reference and renders a textual representation of
+	// how the imagtes stored there look like to the promoter.
+	Snapshot string
+
+	// SnapshotSvcAcct is the service account we use when snapshotting.
+	// TODO(puerco): Check as we can simplify to just one account
+	SnapshotSvcAcct string
+
+	// ManifestBasedSnapshotOf performs a snapshot from the given manifests
+	// as opposed of Snapshot which will snapshot a registry across the network
+	ManifestBasedSnapshotOf string
+
+	// KeyFiles is a string that points to file of service account keys
+	KeyFiles string
+
+	// SeverityThreshold is the level of security vulns to search for.
+	SeverityThreshold int
+
+	// JSONLogSummary signals to the promoter if it should print a JSON summary of the operation
+	JSONLogSummary bool
+
+	// OutputFormat is the format we will use for snapshots json/yaml
+	OutputFormat string
+
+	// MinimalSnapshot is used in snapshots. but im not sure
+	MinimalSnapshot bool
+
+	// SnapshotTag when set, only images with this tag will be snapshotted
+	SnapshotTag string
+
+	// Repository container repository to be parsed queried
+	Repository string
+
+	// CheckManifestLists this should be a subcommand:
+	// (only works with --repository) read snapshot from file and checks all
+	// manifest lists have children from the same location
+	CheckManifestLists string
+
+	// ParseOnly is an options that causes the promoter to exit
+	// before promoting or generating a snapshot when set to true
+	ParseOnly bool
+
+	// MaxImageSize is the maximum size of an image accepted for promotion
+	MaxImageSize int
+}
+
+var DefaultOptions = &Options{
+	OutputFormat:      "yaml",
+	MaxImageSize:      2048,
+	Threads:           10,
+	SeverityThreshold: -1,
+}
+
+func (o *Options) Validate() error {
+	// CheckManifestLists is one of the modes, it just needs a repository
+	if o.CheckManifestLists != "" && o.Repository == "" {
+		return errors.New(
+			"a repository must be specified when checking manifest lists",
+		)
+	}
+
+	// If one of the snapshot options is set, manifests will not be checked
+	if o.Snapshot == "" && o.ManifestBasedSnapshotOf == "" {
+		if o.Manifest == "" && o.ThinManifestDir == "" {
+			return errors.New("at least a manifest file or thin manifest directory have to be specified")
+		}
+	}
+	return nil
+}
+
+// RunOptions capture the options of a run
+type RunOptions struct {
+	// Confirm
+	Confirm bool
+
+	// Use a service account when true
+	UseServiceAcct bool
+}
