@@ -38,6 +38,7 @@ import (
 	ggcrV1 "github.com/google/go-containerregistry/pkg/v1"
 	ggcrV1Google "github.com/google/go-containerregistry/pkg/v1/google"
 	ggcrV1Types "github.com/google/go-containerregistry/pkg/v1/types"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	yaml "gopkg.in/yaml.v2"
 
@@ -108,15 +109,19 @@ func MakeSyncContext(
 			return len(sc.RegistryContexts[i].Name) > len(sc.RegistryContexts[j].Name)
 		},
 	)
-
-	// Populate access tokens for all registries listed in the manifest.
-	if useSvcAcc {
-		err := sc.PopulateTokens()
-		if err != nil {
-			return SyncContext{}, err
+	/*
+		// Populate access tokens for all registries listed in the manifest.
+		if useSvcAcc {
+			err := sc.PopulateTokens()
+			if err != nil {
+				return SyncContext{}, err
+			}
 		}
+	*/
+	if err := sc.PopulateTokens(); err != nil {
+		return SyncContext{},
+			errors.Wrap(err, "populating access tokens")
 	}
-
 	return sc, nil
 }
 
@@ -1102,18 +1107,23 @@ InvalidString:
 // access tokens.
 func (sc *SyncContext) PopulateTokens() error {
 	for _, rc := range sc.RegistryContexts {
-		token, err := gcloud.GetServiceAccountToken(rc.ServiceAccount, sc.UseServiceAccount)
-		if err != nil {
-			logrus.Errorf(
-				"could not get service account token for %v",
-				rc.ServiceAccount,
-			)
+		// If a service account for this registry is specified we get it
+		// and later we prefer it. Usual docker config data is read bellow
+		logrus.Infof("Searching credentials for %s", rc.Name)
+		if rc.ServiceAccount != "" && sc.UseServiceAccount {
+			token, err := gcloud.GetServiceAccountToken(rc.ServiceAccount, sc.UseServiceAccount)
+			if err != nil {
+				logrus.Errorf(
+					"could not get service account token for %v",
+					rc.ServiceAccount,
+				)
+				return err
+			}
 
-			return err
+			tokenKey, _, _ := GetTokenKeyDomainRepoPath(rc.Name)
+			sc.Tokens[RootRepo(tokenKey)] = token
+			logrus.Info("GCP Service Account token found for %s", tokenKey)
 		}
-
-		tokenKey, _, _ := GetTokenKeyDomainRepoPath(rc.Name)
-		sc.Tokens[RootRepo(tokenKey)] = token
 	}
 
 	return nil
@@ -1168,6 +1178,10 @@ func (sc *SyncContext) ReadRegistries(
 	recurse bool,
 	mkProducer func(*SyncContext, RegistryContext) stream.Producer,
 ) {
+	logrus.Infof("Reading %d registries:", len(sc.RegistryContexts))
+	for _, r := range sc.RegistryContexts {
+		logrus.Infof(" > %s", r.Name)
+	}
 	// Collect all images in sc.Inv (the src and dest registry names found in
 	// the manifest).
 	var populateRequests PopulateRequests = func(
@@ -1515,7 +1529,7 @@ func MkReadRepositoryCmdReal(
 	var sh stream.HTTP
 
 	tokenKey, domain, repoPath := GetTokenKeyDomainRepoPath(rc.Name)
-
+	logrus.Infof("Requesting %s", fmt.Sprintf("https://%s/v2/%s/tags/list", domain, repoPath))
 	httpReq, err := http.NewRequest(
 		"GET",
 		fmt.Sprintf("https://%s/v2/%s/tags/list", domain, repoPath),
@@ -1531,8 +1545,10 @@ func MkReadRepositoryCmdReal(
 	if sc.UseServiceAccount {
 		token, ok := sc.Tokens[RootRepo(tokenKey)]
 		if !ok {
-			logrus.Fatalf("access token for key '%s' not found\n", tokenKey)
+			logrus.Fatal("UseServiceAccount is set, but no token found")
 		}
+
+		logrus.Info("Found authentication for %s", tokenKey)
 
 		rc.Token = token
 		bearer := "Bearer " + string(rc.Token)

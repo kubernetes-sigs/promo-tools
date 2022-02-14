@@ -18,11 +18,20 @@ package stream
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
+	"path/filepath"
+	"strings"
 	"time"
 
+	"github.com/google/go-containerregistry/pkg/authn"
+	"github.com/google/go-containerregistry/pkg/authn/github"
+	"github.com/google/go-containerregistry/pkg/name"
+	"github.com/google/go-containerregistry/pkg/v1/google"
+	"github.com/google/go-containerregistry/pkg/v1/remote/transport"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -36,11 +45,66 @@ const (
 	requestTimeoutSeconds = 3
 )
 
+var (
+	keychain = authn.NewMultiKeychain(
+		authn.DefaultKeychain,
+		google.Keychain,
+		github.Keychain,
+	)
+)
+
 // Produce runs the external process and returns two io.Readers (to stdout and
 // stderr). In this case we equate the http.Respose "Body" with stdout.
 func (h *HTTP) Produce() (stdOut, stdErr io.Reader, err error) {
 	client := http.Client{
 		Timeout: time.Second * requestTimeoutSeconds,
+	}
+
+	// If we already have an authentication scheme it means that we have a GCP
+	// service account token set. Otherwise try to get it from the local config
+	// using the keychains from GGCR
+	if h.Req.Header.Get("Authorization") == "" {
+		// GCR uses oauth tokens but the promoter makes direct HTTP calls
+		// to the registry URLs. If we try to generate the oauth auth tokens
+		// for paths under under /v2/, it will fail because we need them scoped
+		// to the repo at project+image
+		repoPath := h.Req.URL.Path
+		if strings.HasSuffix(h.Req.URL.Host, "gcr.io") {
+			parts := strings.Split(repoPath, "/")
+			if len(parts) > 2 {
+				repoPath = string(filepath.Separator) + filepath.Join(parts[2:]...)
+			}
+		}
+		repo, err := name.NewRepository(h.Req.URL.Host + repoPath)
+
+		logrus.Infof("Making request to %s", h.Req.URL.Host+h.Req.URL.Path)
+		logrus.Infof("... with creds for %s", h.Req.URL.Host+repoPath)
+		if err != nil {
+			return nil, nil, errors.Wrapf(err, "getting repo from %s", h.Req.URL.String())
+		}
+
+		auth, err := keychain.Resolve(repo.Registry)
+		if err != nil {
+			return nil, nil, errors.Wrap(err, "resolving registry authorization")
+		}
+
+		a, err := auth.Authorization()
+		if err != nil {
+			return nil, nil, errors.Wrap(err, "creating authorization")
+		}
+		logrus.Debugf("Resolved auth info: Username: %v Password: %v Token: %v",
+			len(a.Username) > 0, len(a.Password) > 0, len(a.Auth) > 0,
+		)
+
+		t, err := transport.NewWithContext(
+			context.Background(), repo.Registry, auth, http.DefaultTransport,
+			[]string{repo.Scope(transport.PushScope)},
+		)
+		if err != nil {
+			return nil, nil, errors.Wrap(err, "creating transport")
+		}
+
+		client.Transport = t
 	}
 
 	// TODO: Does Close() need to be handled in a separate method?
@@ -49,10 +113,13 @@ func (h *HTTP) Produce() (stdOut, stdErr io.Reader, err error) {
 	h.Res, err = client.Do(h.Req)
 
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, errors.Wrap(err, "sending request")
 	}
 
 	if h.Res.StatusCode == http.StatusOK {
+		// FIXME: Quita el reader aqui
+		body, _ := io.ReadAll(h.Res.Body)
+		logrus.Info(string(body))
 		return h.Res.Body, nil, nil
 	}
 
