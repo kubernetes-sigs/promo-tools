@@ -17,8 +17,14 @@ limitations under the License.
 package imagepromoter
 
 import (
+	"fmt"
+
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
+
 	reg "sigs.k8s.io/promo-tools/v3/legacy/dockerregistry"
 	options "sigs.k8s.io/promo-tools/v3/promoter/image/options"
+	"sigs.k8s.io/release-sdk/sign"
 )
 
 // ValidateStagingSignatures checks if edges (images) have a signature
@@ -27,6 +33,24 @@ import (
 func (di *DefaultPromoterImplementation) ValidateStagingSignatures(
 	edges map[reg.PromotionEdge]interface{},
 ) error {
+	signer := sign.New(sign.Default())
+
+	for edge := range edges {
+		imageRef := fmt.Sprintf(
+			"%s/%s@%s",
+			edge.SrcRegistry.Name,
+			edge.SrcImageTag.ImageName,
+			edge.Digest,
+		)
+		logrus.Info("Verifying signatures of image %s", imageRef)
+
+		_, err := signer.VerifyImage(imageRef)
+		if err != nil {
+			return errors.Wrapf(
+				err, "verifying signatures of image %s", imageRef,
+			)
+		}
+	}
 	return nil
 }
 
