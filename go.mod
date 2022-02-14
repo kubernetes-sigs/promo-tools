@@ -31,7 +31,7 @@ require (
 	gopkg.in/src-d/go-git.v4 v4.13.1
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/utils v0.0.0-20220210201930-3a6ce19ff2f9
-	sigs.k8s.io/release-sdk v0.6.1-0.20220217082937-47e784ac2031
+	sigs.k8s.io/release-sdk v0.6.1-0.20220221131611-74b9e1f85cc0
 	sigs.k8s.io/release-utils v0.5.0
 	sigs.k8s.io/yaml v1.3.0
 )
@@ -67,7 +67,7 @@ require (
 	github.com/armon/go-metrics v0.3.10 // indirect
 	github.com/armon/go-radix v1.0.0 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20210307081110-f21760c49a8d // indirect
-	github.com/aws/aws-sdk-go v1.42.34 // indirect
+	github.com/aws/aws-sdk-go v1.42.43 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.13.0 // indirect
 	github.com/aws/aws-sdk-go-v2/config v1.13.0 // indirect
 	github.com/aws/aws-sdk-go-v2/credentials v1.8.0 // indirect
@@ -101,7 +101,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dimchansky/utfbom v1.1.1 // indirect
 	github.com/docker/cli v20.10.12+incompatible // indirect
-	github.com/docker/distribution v2.7.1+incompatible // indirect
+	github.com/docker/distribution v2.8.0+incompatible // indirect
 	github.com/docker/docker v20.10.12+incompatible // indirect
 	github.com/docker/docker-credential-helpers v0.6.4 // indirect
 	github.com/dustin/go-humanize v1.0.0 // indirect
@@ -223,10 +223,10 @@ require (
 	github.com/secure-systems-lab/go-securesystemslib v0.3.0 // indirect
 	github.com/segmentio/ksuid v1.0.4 // indirect
 	github.com/shibumi/go-pathspec v1.3.0 // indirect
-	github.com/sigstore/cosign v1.5.1-0.20220128133340-d2781b81e9d0 // indirect
+	github.com/sigstore/cosign v1.5.2 // indirect
 	github.com/sigstore/fulcio v0.1.2-0.20220114150912-86a2036f9bc7 // indirect
 	github.com/sigstore/rekor v0.4.1-0.20220114213500-23f583409af3 // indirect
-	github.com/sigstore/sigstore v1.1.1-0.20220115165716-9f61ddc98390 // indirect
+	github.com/sigstore/sigstore v1.1.1-0.20220130134424-bae9b66b8442 // indirect
 	github.com/skratchdot/open-golang v0.0.0-20200116055534-eef842397966 // indirect
 	github.com/soheilhy/cmux v0.1.5 // indirect
 	github.com/spf13/afero v1.8.0 // indirect
