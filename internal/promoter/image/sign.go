@@ -42,14 +42,26 @@ func (di *DefaultPromoterImplementation) ValidateStagingSignatures(
 			edge.SrcImageTag.ImageName,
 			edge.Digest,
 		)
-		logrus.Info("Verifying signatures of image %s", imageRef)
+		logrus.Infof("Verifying signatures of image %s", imageRef)
 
-		_, err := signer.VerifyImage(imageRef)
+		// If image is not signed, skip
+		isSigned, err := signer.IsImageSigned(imageRef)
 		if err != nil {
+			return errors.Wrapf(err, "checking if %s is signed", imageRef)
+		}
+
+		if !isSigned {
+			logrus.Infof("No signatures found for ref %s, not checking", imageRef)
+			continue
+		}
+
+		// Check the staged image signatures
+		if _, err := signer.VerifyImage(imageRef); err != nil {
 			return errors.Wrapf(
 				err, "verifying signatures of image %s", imageRef,
 			)
 		}
+		logrus.Infof("Signatures for ref %s verfified", imageRef)
 	}
 	return nil
 }
