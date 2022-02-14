@@ -74,6 +74,10 @@ type promoterImplementation interface {
 	// Methods for manifest list verification:
 	ValidateManifestLists(opts *options.Options) error
 
+	// Methods for image signing
+	ValidateStagingSignatures(map[reg.PromotionEdge]interface{}) error
+	SignImages(*options.Options, *reg.SyncContext, map[reg.PromotionEdge]interface{}) error
+
 	// Utility functions
 	PrintVersion()
 	PrintSecDisclaimer()
