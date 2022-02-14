@@ -77,6 +77,7 @@ type promoterImplementation interface {
 	// Methods for image signing
 	ValidateStagingSignatures(map[reg.PromotionEdge]interface{}) error
 	SignImages(*options.Options, *reg.SyncContext, map[reg.PromotionEdge]interface{}) error
+	WriteSBOMs(*options.Options, *reg.SyncContext, map[reg.PromotionEdge]interface{}) error
 
 	// Utility functions
 	PrintVersion()
@@ -124,15 +125,29 @@ func (p *Promoter) PromoteImages(opts *options.Options) (err error) {
 		return nil
 	}
 
+	// Verify any signatures in staged images
+	if err := p.impl.ValidateStagingSignatures(promotionEdges); err != nil {
+		return errors.Wrap(err, "checking signtaures in staging images")
+	}
+
 	// Check the pull request
 	if !opts.Confirm {
 		return p.impl.PrecheckAndExit(opts, mfests)
 	}
 
-	return errors.Wrap(
-		p.impl.PromoteImages(sc, promotionEdges, producerFunc),
-		"running promotion",
-	)
+	if err := p.impl.PromoteImages(sc, promotionEdges, producerFunc); err != nil {
+		return errors.Wrap(err, "running promotion")
+	}
+
+	if err := p.impl.SignImages(opts, sc, promotionEdges); err != nil {
+		return errors.Wrap(err, "signing images")
+	}
+
+	if err := p.impl.WriteSBOMs(opts, sc, promotionEdges); err != nil {
+		return errors.Wrap(err, "signing images")
+	}
+
+	return nil
 }
 
 // Snapshot runs the steps to output a representation in json or yaml of a registry
