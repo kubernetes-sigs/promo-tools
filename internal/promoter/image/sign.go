@@ -72,6 +72,19 @@ func (di *DefaultPromoterImplementation) ValidateStagingSignatures(
 func (di *DefaultPromoterImplementation) SignImages(
 	opts *options.Options, sc *reg.SyncContext, edges map[reg.PromotionEdge]interface{},
 ) error {
+	signer := sign.New(sign.Default())
+	for edge := range edges {
+		imageRef := fmt.Sprintf(
+			"%s/%s@%s",
+			edge.DstRegistry.Name,
+			edge.DstImageTag.Name,
+			edge.Digest,
+		)
+		if _, err := signer.SignImage(imageRef); err != nil {
+			return errors.Wrapf(err, "signing image %s", imageRef)
+		}
+		logrus.Infof("Signing image %s", imageRef)
+	}
 	return nil
 }
 
