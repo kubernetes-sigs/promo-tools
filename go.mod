@@ -10,11 +10,11 @@ require (
 	cloud.google.com/go/storage v1.21.0
 	github.com/cenkalti/backoff/v4 v4.1.2
 	github.com/google/go-cmp v0.5.7
-	github.com/google/go-containerregistry v0.8.1-0.20220125170349-50dfc2733d10
+	github.com/google/go-containerregistry v0.8.1-0.20220216220642-00c59d91847c
 	github.com/google/uuid v1.3.0
 	github.com/kevinburke/ssh_config v1.1.0 // indirect
 	github.com/maxbrunsfeld/counterfeiter/v6 v6.4.1
-	github.com/opencontainers/image-spec v1.0.2-0.20211117181255-693428a734f5 // indirect
+	github.com/opencontainers/image-spec v1.0.3-0.20220114050600-8b9d41f48198 // indirect
 	github.com/pkg/errors v0.9.1
 	github.com/sergi/go-diff v1.2.0 // indirect
 	github.com/sirupsen/logrus v1.8.1
@@ -22,14 +22,14 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.7.0
 	github.com/xanzy/ssh-agent v0.3.0 // indirect
-	golang.org/x/crypto v0.0.0-20220112180741-5e0467b6c7ce // indirect
+	golang.org/x/crypto v0.0.0-20220214200702-86341886e292 // indirect
 	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1
 	google.golang.org/api v0.69.0
-	google.golang.org/genproto v0.0.0-20220216160803-4663080d8bc8
+	google.golang.org/genproto v0.0.0-20220218161850-94dd64e39d7c
 	gopkg.in/src-d/go-git.v4 v4.13.1
 	gopkg.in/yaml.v2 v2.4.0
-	k8s.io/utils v0.0.0-20211208161948-7d6a63dca704
+	k8s.io/utils v0.0.0-20220210201930-3a6ce19ff2f9
 	sigs.k8s.io/release-sdk v0.6.1-0.20220217082937-47e784ac2031
 	sigs.k8s.io/release-utils v0.5.0
 	sigs.k8s.io/yaml v1.3.0
@@ -38,10 +38,10 @@ require (
 require (
 	bitbucket.org/creachadair/shell v0.0.6 // indirect
 	cloud.google.com/go v0.100.2 // indirect
-	cloud.google.com/go/compute v1.2.0 // indirect
-	cloud.google.com/go/iam v0.1.1 // indirect
-	cloud.google.com/go/kms v1.1.0 // indirect
-	cuelang.org/go v0.4.1 // indirect
+	cloud.google.com/go/compute v1.3.0 // indirect
+	cloud.google.com/go/iam v0.2.0 // indirect
+	cloud.google.com/go/kms v1.3.0 // indirect
+	cuelang.org/go v0.4.2 // indirect
 	github.com/Azure/azure-sdk-for-go v61.3.0+incompatible // indirect
 	github.com/Azure/go-autorest v14.2.0+incompatible // indirect
 	github.com/Azure/go-autorest/autorest v0.11.24 // indirect
@@ -92,7 +92,7 @@ require (
 	github.com/cncf/udpa/go v0.0.0-20210930031921-04548b0d99d4 // indirect
 	github.com/cncf/xds/go v0.0.0-20211130200136-a8f946100490 // indirect
 	github.com/cockroachdb/apd/v2 v2.0.1 // indirect
-	github.com/containerd/stargz-snapshotter/estargz v0.10.1 // indirect
+	github.com/containerd/stargz-snapshotter/estargz v0.11.0 // indirect
 	github.com/coreos/go-oidc/v3 v3.1.0 // indirect
 	github.com/coreos/go-semver v0.3.0 // indirect
 	github.com/coreos/go-systemd/v22 v22.3.2 // indirect
@@ -168,7 +168,7 @@ require (
 	github.com/hashicorp/go-secure-stdlib/strutil v0.1.2 // indirect
 	github.com/hashicorp/go-sockaddr v1.0.2 // indirect
 	github.com/hashicorp/go-uuid v1.0.2 // indirect
-	github.com/hashicorp/go-version v1.3.0 // indirect
+	github.com/hashicorp/go-version v1.4.0 // indirect
 	github.com/hashicorp/golang-lru v0.5.4 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/hashicorp/vault/api v1.3.1 // indirect
@@ -178,13 +178,13 @@ require (
 	github.com/in-toto/in-toto-golang v0.3.4-0.20211211042327-af1f9fb822bf // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
-	github.com/jedisct1/go-minisign v0.0.0-20210703085342-c1f07ee84431 // indirect
+	github.com/jedisct1/go-minisign v0.0.0-20211028175153-1c139d1cc84b // indirect
 	github.com/jhump/protoreflect v1.9.0 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/jonboulle/clockwork v0.2.2 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/klauspost/compress v1.13.6 // indirect
+	github.com/klauspost/compress v1.14.2 // indirect
 	github.com/leodido/go-urn v1.2.1 // indirect
 	github.com/magiconair/properties v1.8.5 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
@@ -283,7 +283,7 @@ require (
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211 // indirect
 	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/time v0.0.0-20211116232009-f0f3c7e86c11 // indirect
-	golang.org/x/tools v0.1.8 // indirect
+	golang.org/x/tools v0.1.9 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/grpc v1.44.0 // indirect
 	google.golang.org/protobuf v1.27.1 // indirect
