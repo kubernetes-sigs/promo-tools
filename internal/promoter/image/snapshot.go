@@ -170,7 +170,14 @@ func (di *DefaultPromoterImplementation) GetRegistryImageInventory(
 		reg.MkReadRepositoryCmdReal,
 	)
 
-	rii := sc.Inv[mfests[0].Registries[0].Name]
+	rii, ok := sc.Inv[mfests[0].Registries[0].Name]
+	if !ok {
+		logrus.Debugf("Retrieved inventory: %+v", sc.Inv)
+		return nil, errors.Errorf(
+			"unable to find inventory for registry %s",
+			mfests[0].Registries[0].Name,
+		)
+	}
 	if opts.SnapshotTag != "" {
 		rii = reg.FilterByTag(rii, opts.SnapshotTag)
 	}
