@@ -109,15 +109,7 @@ func MakeSyncContext(
 			return len(sc.RegistryContexts[i].Name) > len(sc.RegistryContexts[j].Name)
 		},
 	)
-	/*
-		// Populate access tokens for all registries listed in the manifest.
-		if useSvcAcc {
-			err := sc.PopulateTokens()
-			if err != nil {
-				return SyncContext{}, err
-			}
-		}
-	*/
+
 	if err := sc.PopulateTokens(); err != nil {
 		return SyncContext{},
 			errors.Wrap(err, "populating access tokens")
@@ -909,7 +901,7 @@ func getRegistryTagsWrapper(
 		logrus.Error(err)
 		return nil, err
 	}
-
+	logrus.Debugf("Tag data found: %+v", googleTags)
 	return googleTags, nil
 }
 
@@ -1122,7 +1114,7 @@ func (sc *SyncContext) PopulateTokens() error {
 
 			tokenKey, _, _ := GetTokenKeyDomainRepoPath(rc.Name)
 			sc.Tokens[RootRepo(tokenKey)] = token
-			logrus.Info("GCP Service Account token found for %s", tokenKey)
+			logrus.Debugf("GCP Service Account token found for %s", tokenKey)
 		}
 	}
 
@@ -1180,7 +1172,7 @@ func (sc *SyncContext) ReadRegistries(
 ) {
 	logrus.Infof("Reading %d registries:", len(sc.RegistryContexts))
 	for _, r := range sc.RegistryContexts {
-		logrus.Infof(" > %s", r.Name)
+		logrus.Debugf(" > %s", r.Name)
 	}
 	// Collect all images in sc.Inv (the src and dest registry names found in
 	// the manifest).
@@ -1235,6 +1227,13 @@ func (sc *SyncContext) ReadRegistries(
 				continue
 			}
 
+			// If no manifests are found in the tags output, the promoter we print
+			// an error. When listing images, it will fail but additional logic is
+			// needed if we want to bail here.
+			if len(tagsStruct.Manifests) == 0 {
+				logrus.Error("No manifests found in tag response")
+			}
+
 			// Process the current repo.
 			rName := req.RequestParams.(RegistryContext).Name
 			digestTags := make(DigestTags)
@@ -1250,7 +1249,7 @@ func (sc *SyncContext) ReadRegistries(
 				mutex.Lock()
 				mediaType, err := supportedMediaType(mfestInfo.MediaType)
 				if err != nil {
-					fmt.Printf("digest %s: %s\n", digest, err)
+					logrus.Error(errors.Wrapf(err, "processing digest %s", digest))
 				}
 				sc.DigestMediaType[Digest(digest)] = mediaType
 
@@ -1548,7 +1547,7 @@ func MkReadRepositoryCmdReal(
 			logrus.Fatal("UseServiceAccount is set, but no token found")
 		}
 
-		logrus.Info("Found authentication for %s", tokenKey)
+		logrus.Debugf("Found authentication for %s", tokenKey)
 
 		rc.Token = token
 		bearer := "Bearer " + string(rc.Token)
@@ -1878,15 +1877,15 @@ func SplitRegistryImagePath(
 // ValidatesEdges runs ValidateEdge for each given edge, collecting all errors
 // found.
 func (sc *SyncContext) ValidateEdges(edges map[PromotionEdge]interface{}) error {
-	errors := []error{}
+	errs := []error{}
 	for edge := range edges {
 		if err := sc.ValidateEdge(&edge); err != nil {
-			errors = append(errors, err)
+			errs = append(errs, err)
 		}
 	}
 
-	if len(errors) > 0 {
-		return fmt.Errorf("%v", errors)
+	if len(errs) > 0 {
+		return fmt.Errorf("%v", errs)
 	}
 
 	return nil
