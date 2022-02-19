@@ -45,12 +45,10 @@ const (
 	requestTimeoutSeconds = 3
 )
 
-var (
-	keychain = authn.NewMultiKeychain(
-		authn.DefaultKeychain,
-		google.Keychain,
-		github.Keychain,
-	)
+var keychain = authn.NewMultiKeychain(
+	authn.DefaultKeychain,
+	google.Keychain,
+	github.Keychain,
 )
 
 // Produce runs the external process and returns two io.Readers (to stdout and
@@ -77,8 +75,8 @@ func (h *HTTP) Produce() (stdOut, stdErr io.Reader, err error) {
 		}
 		repo, err := name.NewRepository(h.Req.URL.Host + repoPath)
 
-		logrus.Infof("Making request to %s", h.Req.URL.Host+h.Req.URL.Path)
-		logrus.Infof("... with creds for %s", h.Req.URL.Host+repoPath)
+		logrus.Debugf("Making request to %s", h.Req.URL.Host+h.Req.URL.Path)
+		logrus.Debugf("... with creds for %s", h.Req.URL.Host+repoPath)
 		if err != nil {
 			return nil, nil, errors.Wrapf(err, "getting repo from %s", h.Req.URL.String())
 		}
@@ -117,9 +115,15 @@ func (h *HTTP) Produce() (stdOut, stdErr io.Reader, err error) {
 	}
 
 	if h.Res.StatusCode == http.StatusOK {
-		// FIXME: Quita el reader aqui
-		body, _ := io.ReadAll(h.Res.Body)
-		logrus.Info(string(body))
+		// If debugging, log the output if the request
+		if logrus.StandardLogger().Level == logrus.DebugLevel {
+			body, err := io.ReadAll(h.Res.Body)
+			if err != nil {
+				return nil, nil, errors.Wrap(err, "reading http response body")
+			}
+			logrus.Debug("Response body: " + string(body))
+			return io.NopCloser(bytes.NewReader(body)), nil, nil
+		}
 		return h.Res.Body, nil, nil
 	}
 
