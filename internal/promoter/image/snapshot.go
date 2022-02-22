@@ -149,11 +149,12 @@ func (di *DefaultPromoterImplementation) GetRegistryImageInventory(
 		)
 
 		if opts.MinimalSnapshot {
-			sc.ReadRegistries(
+			if err := sc.ReadRegistriesGGCR(
 				[]reg.RegistryContext{*srcRegistry},
 				true,
-				reg.MkReadRepositoryCmdReal,
-			)
+			); err != nil {
+				return nil, errors.Wrap(err, "reading registry for minimal snapshot")
+			}
 
 			sc.ReadGCRManifestLists(reg.MkReadManifestListCmdReal)
 			rii = sc.RemoveChildDigestEntries(rii)
@@ -162,13 +163,11 @@ func (di *DefaultPromoterImplementation) GetRegistryImageInventory(
 		return rii, nil
 	}
 
-	sc.ReadRegistries(
-		[]reg.RegistryContext{*srcRegistry},
-		// Read all registries recursively, because we want to produce a
-		// complete snapshot.
-		true,
-		reg.MkReadRepositoryCmdReal,
-	)
+	if err := sc.ReadRegistriesGGCR(
+		[]reg.RegistryContext{*srcRegistry}, true,
+	); err != nil {
+		return nil, errors.Wrap(err, "reading registries")
+	}
 
 	rii := sc.Inv[mfests[0].Registries[0].Name]
 	if opts.SnapshotTag != "" {

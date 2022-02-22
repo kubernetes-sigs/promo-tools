@@ -35,9 +35,12 @@ import (
 
 	"github.com/cenkalti/backoff/v4"
 	"github.com/google/go-containerregistry/pkg/crane"
+	"github.com/google/go-containerregistry/pkg/gcrane"
+	"github.com/google/go-containerregistry/pkg/name"
 	ggcrV1 "github.com/google/go-containerregistry/pkg/v1"
 	ggcrV1Google "github.com/google/go-containerregistry/pkg/v1/google"
 	ggcrV1Types "github.com/google/go-containerregistry/pkg/v1/types"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	yaml "gopkg.in/yaml.v2"
 
@@ -1135,6 +1138,78 @@ func GetTokenKeyDomainRepoPath(registryName RegistryName) (key, domain, repoPath
 	return key, s[:i], s[i+1:]
 }
 
+func (sc *SyncContext) ReadRegistriesGGCR(
+	toRead []RegistryContext, recurse bool,
+) error {
+	logrus.Infof("Reading %d registries:", len(sc.RegistryContexts))
+
+	if !recurse {
+		return errors.New("Not iplemented")
+	}
+
+	mutex := sync.Mutex{}
+
+	// TODO(puerco): Paralelize this
+	for _, r := range sc.RegistryContexts {
+		logrus.Debugf(" > %s", r.Name)
+		opts := []ggcrV1Google.Option{
+			ggcrV1Google.WithAuthFromKeychain(gcrane.Keychain),
+		}
+		repo, err := name.NewRepository(string(r.Name))
+		if err != nil {
+			return errors.Wrap(err, "parsing repo name")
+		}
+		if err := ggcrV1Google.Walk(repo,
+			func(repo name.Repository, tags *ggcrV1Google.Tags, err error) error {
+				if err != nil {
+					return errors.Wrap(err, "before attempting to walk the registry")
+				}
+				regName, imageName, err := SplitByKnownRegistries(
+					RegistryName(repo.Name()), sc.RegistryContexts,
+				)
+				if err != nil {
+					return errors.Wrap(err, "splitting repo and image name")
+				}
+				logrus.Infof("Registry: %s Image: %s Got: %s", regName, imageName, repo.Name())
+				digestTags := make(DigestTags)
+				if tags != nil && tags.Manifests != nil {
+					for digest, manifest := range tags.Manifests {
+						tagSlice := TagSlice{}
+						for _, tag := range manifest.Tags {
+							tagSlice = append(tagSlice, Tag(tag))
+						}
+						digestTags[Digest(digest)] = tagSlice
+
+						mediaType, err := supportedMediaType(manifest.MediaType)
+						if err != nil {
+							logrus.Error(errors.Wrapf(err, "processing digest %s", digest))
+						}
+
+						sc.DigestMediaType[Digest(digest)] = mediaType
+						sc.DigestImageSize[Digest(digest)] = int(manifest.Size)
+					}
+				}
+
+				logrus.Debugf("%d tags found", len(digestTags))
+
+				mutex.Lock()
+				if _, ok := sc.Inv[regName]; !ok {
+					sc.Inv[regName] = make(RegInvImage)
+				}
+
+				if len(digestTags) > 0 {
+					sc.Inv[regName][imageName] = digestTags
+				}
+				mutex.Unlock()
+
+				return nil
+			}, opts...); err != nil {
+			return errors.Wrap(err, "walking repo")
+		}
+	}
+	return nil
+}
+
 // ReadRegistries reads all images in all registries in the SyncContext Each
 // registry is composed of a image repositories, which can be recursive.
 //
@@ -1862,15 +1937,15 @@ func SplitRegistryImagePath(
 // ValidatesEdges runs ValidateEdge for each given edge, collecting all errors
 // found.
 func (sc *SyncContext) ValidateEdges(edges map[PromotionEdge]interface{}) error {
-	errors := []error{}
+	errs := []error{}
 	for edge := range edges {
 		if err := sc.ValidateEdge(&edge); err != nil {
-			errors = append(errors, err)
+			errs = append(errs, err)
 		}
 	}
 
-	if len(errors) > 0 {
-		return fmt.Errorf("%v", errors)
+	if len(errs) > 0 {
+		return fmt.Errorf("%v", errs)
 	}
 
 	return nil
