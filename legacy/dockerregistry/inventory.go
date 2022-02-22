@@ -1147,6 +1147,8 @@ func (sc *SyncContext) ReadRegistriesGGCR(
 		return errors.New("Not iplemented")
 	}
 
+	mutex := sync.Mutex{}
+
 	// TODO(puerco): Paralelize this
 	for _, r := range sc.RegistryContexts {
 		logrus.Debugf(" > %s", r.Name)
@@ -1179,7 +1181,7 @@ func (sc *SyncContext) ReadRegistriesGGCR(
 				}
 				imageName := ImageName(repo.String())
 
-				// mutex.Lock()
+				mutex.Lock()
 				if _, ok := sc.Inv[r.Name]; !ok {
 					sc.Inv[r.Name] = make(RegInvImage)
 				}
@@ -1187,7 +1189,7 @@ func (sc *SyncContext) ReadRegistriesGGCR(
 				if len(digestTags) > 0 {
 					sc.Inv[r.Name][imageName] = digestTags
 				}
-				// mutex.Unlock()
+				mutex.Unlock()
 
 				return nil
 			}, opts...); err != nil {
