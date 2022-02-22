@@ -1161,6 +1161,16 @@ func (sc *SyncContext) ReadRegistriesGGCR(
 		}
 		if err := ggcrV1Google.Walk(repo,
 			func(repo name.Repository, tags *ggcrV1Google.Tags, err error) error {
+				if err != nil {
+					return errors.Wrap(err, "before attempting to walk the registry")
+				}
+				regName, imageName, err := SplitByKnownRegistries(
+					RegistryName(repo.Name()), sc.RegistryContexts,
+				)
+				if err != nil {
+					return errors.Wrap(err, "splitting repo and image name")
+				}
+				logrus.Infof("Registry: %s Image: %s Got: %s", regName, imageName, repo.Name())
 				digestTags := make(DigestTags)
 				if tags != nil && tags.Manifests != nil {
 					for digest, manifest := range tags.Manifests {
@@ -1179,15 +1189,16 @@ func (sc *SyncContext) ReadRegistriesGGCR(
 						sc.DigestImageSize[Digest(digest)] = int(manifest.Size)
 					}
 				}
-				imageName := ImageName(repo.String())
+
+				logrus.Debugf("%d tags found", len(digestTags))
 
 				mutex.Lock()
-				if _, ok := sc.Inv[r.Name]; !ok {
-					sc.Inv[r.Name] = make(RegInvImage)
+				if _, ok := sc.Inv[regName]; !ok {
+					sc.Inv[regName] = make(RegInvImage)
 				}
 
 				if len(digestTags) > 0 {
-					sc.Inv[r.Name][imageName] = digestTags
+					sc.Inv[regName][imageName] = digestTags
 				}
 				mutex.Unlock()
 
