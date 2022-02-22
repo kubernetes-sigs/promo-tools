@@ -195,6 +195,19 @@ type FakePromoterImplementation struct {
 	scanEdgesReturnsOnCall map[int]struct {
 		result1 error
 	}
+	SignImagesStub        func(*imagepromotera.Options, *inventory.SyncContext, map[inventory.PromotionEdge]interface{}) error
+	signImagesMutex       sync.RWMutex
+	signImagesArgsForCall []struct {
+		arg1 *imagepromotera.Options
+		arg2 *inventory.SyncContext
+		arg3 map[inventory.PromotionEdge]interface{}
+	}
+	signImagesReturns struct {
+		result1 error
+	}
+	signImagesReturnsOnCall map[int]struct {
+		result1 error
+	}
 	SnapshotStub        func(*imagepromotera.Options, inventory.RegInvImage) error
 	snapshotMutex       sync.RWMutex
 	snapshotArgsForCall []struct {
@@ -227,6 +240,30 @@ type FakePromoterImplementation struct {
 		result1 error
 	}
 	validateOptionsReturnsOnCall map[int]struct {
+		result1 error
+	}
+	ValidateStagingSignaturesStub        func(map[inventory.PromotionEdge]interface{}) error
+	validateStagingSignaturesMutex       sync.RWMutex
+	validateStagingSignaturesArgsForCall []struct {
+		arg1 map[inventory.PromotionEdge]interface{}
+	}
+	validateStagingSignaturesReturns struct {
+		result1 error
+	}
+	validateStagingSignaturesReturnsOnCall map[int]struct {
+		result1 error
+	}
+	WriteSBOMsStub        func(*imagepromotera.Options, *inventory.SyncContext, map[inventory.PromotionEdge]interface{}) error
+	writeSBOMsMutex       sync.RWMutex
+	writeSBOMsArgsForCall []struct {
+		arg1 *imagepromotera.Options
+		arg2 *inventory.SyncContext
+		arg3 map[inventory.PromotionEdge]interface{}
+	}
+	writeSBOMsReturns struct {
+		result1 error
+	}
+	writeSBOMsReturnsOnCall map[int]struct {
 		result1 error
 	}
 	invocations      map[string][][]interface{}
@@ -1101,6 +1138,69 @@ func (fake *FakePromoterImplementation) ScanEdgesReturnsOnCall(i int, result1 er
 	}{result1}
 }
 
+func (fake *FakePromoterImplementation) SignImages(arg1 *imagepromotera.Options, arg2 *inventory.SyncContext, arg3 map[inventory.PromotionEdge]interface{}) error {
+	fake.signImagesMutex.Lock()
+	ret, specificReturn := fake.signImagesReturnsOnCall[len(fake.signImagesArgsForCall)]
+	fake.signImagesArgsForCall = append(fake.signImagesArgsForCall, struct {
+		arg1 *imagepromotera.Options
+		arg2 *inventory.SyncContext
+		arg3 map[inventory.PromotionEdge]interface{}
+	}{arg1, arg2, arg3})
+	stub := fake.SignImagesStub
+	fakeReturns := fake.signImagesReturns
+	fake.recordInvocation("SignImages", []interface{}{arg1, arg2, arg3})
+	fake.signImagesMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2, arg3)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakePromoterImplementation) SignImagesCallCount() int {
+	fake.signImagesMutex.RLock()
+	defer fake.signImagesMutex.RUnlock()
+	return len(fake.signImagesArgsForCall)
+}
+
+func (fake *FakePromoterImplementation) SignImagesCalls(stub func(*imagepromotera.Options, *inventory.SyncContext, map[inventory.PromotionEdge]interface{}) error) {
+	fake.signImagesMutex.Lock()
+	defer fake.signImagesMutex.Unlock()
+	fake.SignImagesStub = stub
+}
+
+func (fake *FakePromoterImplementation) SignImagesArgsForCall(i int) (*imagepromotera.Options, *inventory.SyncContext, map[inventory.PromotionEdge]interface{}) {
+	fake.signImagesMutex.RLock()
+	defer fake.signImagesMutex.RUnlock()
+	argsForCall := fake.signImagesArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
+}
+
+func (fake *FakePromoterImplementation) SignImagesReturns(result1 error) {
+	fake.signImagesMutex.Lock()
+	defer fake.signImagesMutex.Unlock()
+	fake.SignImagesStub = nil
+	fake.signImagesReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakePromoterImplementation) SignImagesReturnsOnCall(i int, result1 error) {
+	fake.signImagesMutex.Lock()
+	defer fake.signImagesMutex.Unlock()
+	fake.SignImagesStub = nil
+	if fake.signImagesReturnsOnCall == nil {
+		fake.signImagesReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.signImagesReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
+}
+
 func (fake *FakePromoterImplementation) Snapshot(arg1 *imagepromotera.Options, arg2 inventory.RegInvImage) error {
 	fake.snapshotMutex.Lock()
 	ret, specificReturn := fake.snapshotReturnsOnCall[len(fake.snapshotArgsForCall)]
@@ -1285,6 +1385,130 @@ func (fake *FakePromoterImplementation) ValidateOptionsReturnsOnCall(i int, resu
 	}{result1}
 }
 
+func (fake *FakePromoterImplementation) ValidateStagingSignatures(arg1 map[inventory.PromotionEdge]interface{}) error {
+	fake.validateStagingSignaturesMutex.Lock()
+	ret, specificReturn := fake.validateStagingSignaturesReturnsOnCall[len(fake.validateStagingSignaturesArgsForCall)]
+	fake.validateStagingSignaturesArgsForCall = append(fake.validateStagingSignaturesArgsForCall, struct {
+		arg1 map[inventory.PromotionEdge]interface{}
+	}{arg1})
+	stub := fake.ValidateStagingSignaturesStub
+	fakeReturns := fake.validateStagingSignaturesReturns
+	fake.recordInvocation("ValidateStagingSignatures", []interface{}{arg1})
+	fake.validateStagingSignaturesMutex.Unlock()
+	if stub != nil {
+		return stub(arg1)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakePromoterImplementation) ValidateStagingSignaturesCallCount() int {
+	fake.validateStagingSignaturesMutex.RLock()
+	defer fake.validateStagingSignaturesMutex.RUnlock()
+	return len(fake.validateStagingSignaturesArgsForCall)
+}
+
+func (fake *FakePromoterImplementation) ValidateStagingSignaturesCalls(stub func(map[inventory.PromotionEdge]interface{}) error) {
+	fake.validateStagingSignaturesMutex.Lock()
+	defer fake.validateStagingSignaturesMutex.Unlock()
+	fake.ValidateStagingSignaturesStub = stub
+}
+
+func (fake *FakePromoterImplementation) ValidateStagingSignaturesArgsForCall(i int) map[inventory.PromotionEdge]interface{} {
+	fake.validateStagingSignaturesMutex.RLock()
+	defer fake.validateStagingSignaturesMutex.RUnlock()
+	argsForCall := fake.validateStagingSignaturesArgsForCall[i]
+	return argsForCall.arg1
+}
+
+func (fake *FakePromoterImplementation) ValidateStagingSignaturesReturns(result1 error) {
+	fake.validateStagingSignaturesMutex.Lock()
+	defer fake.validateStagingSignaturesMutex.Unlock()
+	fake.ValidateStagingSignaturesStub = nil
+	fake.validateStagingSignaturesReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakePromoterImplementation) ValidateStagingSignaturesReturnsOnCall(i int, result1 error) {
+	fake.validateStagingSignaturesMutex.Lock()
+	defer fake.validateStagingSignaturesMutex.Unlock()
+	fake.ValidateStagingSignaturesStub = nil
+	if fake.validateStagingSignaturesReturnsOnCall == nil {
+		fake.validateStagingSignaturesReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.validateStagingSignaturesReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakePromoterImplementation) WriteSBOMs(arg1 *imagepromotera.Options, arg2 *inventory.SyncContext, arg3 map[inventory.PromotionEdge]interface{}) error {
+	fake.writeSBOMsMutex.Lock()
+	ret, specificReturn := fake.writeSBOMsReturnsOnCall[len(fake.writeSBOMsArgsForCall)]
+	fake.writeSBOMsArgsForCall = append(fake.writeSBOMsArgsForCall, struct {
+		arg1 *imagepromotera.Options
+		arg2 *inventory.SyncContext
+		arg3 map[inventory.PromotionEdge]interface{}
+	}{arg1, arg2, arg3})
+	stub := fake.WriteSBOMsStub
+	fakeReturns := fake.writeSBOMsReturns
+	fake.recordInvocation("WriteSBOMs", []interface{}{arg1, arg2, arg3})
+	fake.writeSBOMsMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2, arg3)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakePromoterImplementation) WriteSBOMsCallCount() int {
+	fake.writeSBOMsMutex.RLock()
+	defer fake.writeSBOMsMutex.RUnlock()
+	return len(fake.writeSBOMsArgsForCall)
+}
+
+func (fake *FakePromoterImplementation) WriteSBOMsCalls(stub func(*imagepromotera.Options, *inventory.SyncContext, map[inventory.PromotionEdge]interface{}) error) {
+	fake.writeSBOMsMutex.Lock()
+	defer fake.writeSBOMsMutex.Unlock()
+	fake.WriteSBOMsStub = stub
+}
+
+func (fake *FakePromoterImplementation) WriteSBOMsArgsForCall(i int) (*imagepromotera.Options, *inventory.SyncContext, map[inventory.PromotionEdge]interface{}) {
+	fake.writeSBOMsMutex.RLock()
+	defer fake.writeSBOMsMutex.RUnlock()
+	argsForCall := fake.writeSBOMsArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
+}
+
+func (fake *FakePromoterImplementation) WriteSBOMsReturns(result1 error) {
+	fake.writeSBOMsMutex.Lock()
+	defer fake.writeSBOMsMutex.Unlock()
+	fake.WriteSBOMsStub = nil
+	fake.writeSBOMsReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakePromoterImplementation) WriteSBOMsReturnsOnCall(i int, result1 error) {
+	fake.writeSBOMsMutex.Lock()
+	defer fake.writeSBOMsMutex.Unlock()
+	fake.WriteSBOMsStub = nil
+	if fake.writeSBOMsReturnsOnCall == nil {
+		fake.writeSBOMsReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.writeSBOMsReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
+}
+
 func (fake *FakePromoterImplementation) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
@@ -1318,12 +1542,18 @@ func (fake *FakePromoterImplementation) Invocations() map[string][][]interface{}
 	defer fake.promoteImagesMutex.RUnlock()
 	fake.scanEdgesMutex.RLock()
 	defer fake.scanEdgesMutex.RUnlock()
+	fake.signImagesMutex.RLock()
+	defer fake.signImagesMutex.RUnlock()
 	fake.snapshotMutex.RLock()
 	defer fake.snapshotMutex.RUnlock()
 	fake.validateManifestListsMutex.RLock()
 	defer fake.validateManifestListsMutex.RUnlock()
 	fake.validateOptionsMutex.RLock()
 	defer fake.validateOptionsMutex.RUnlock()
+	fake.validateStagingSignaturesMutex.RLock()
+	defer fake.validateStagingSignaturesMutex.RUnlock()
+	fake.writeSBOMsMutex.RLock()
+	defer fake.writeSBOMsMutex.RUnlock()
 	copiedInvocations := map[string][][]interface{}{}
 	for key, value := range fake.invocations {
 		copiedInvocations[key] = value
