@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package inventory
+package manifest
 
 import (
 	"context"
@@ -24,6 +24,8 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"golang.org/x/xerrors"
+
+	reg "sigs.k8s.io/promo-tools/v3/legacy/dockerregistry"
 )
 
 const (
@@ -38,13 +40,13 @@ type GrowManifestOptions struct {
 	// StagingRepo is the staging subproject repo to read from. If no filters
 	// are provided, all images are attempted to be promoted as-is without any
 	// modifications.
-	StagingRepo RegistryName
+	StagingRepo reg.RegistryName
 	// FilterImage is the image (name) to filter by. Optional.
-	FilterImage ImageName
+	FilterImage reg.ImageName
 	// FilterDigest is the image digest to filter by. Optional.
-	FilterDigest Digest
+	FilterDigest reg.Digest
 	// FilterTag is the image tag to filter by. Optional.
-	FilterTag Tag
+	FilterTag reg.Tag
 }
 
 // Populate sets the values for GrowManifestOptions.
@@ -62,10 +64,10 @@ func (o *GrowManifestOptions) Populate(
 	}
 
 	o.BaseDir = baseDirAbsPath
-	o.StagingRepo = RegistryName(stagingRepo)
-	o.FilterImage = ImageName(filterImage)
-	o.FilterDigest = Digest(filterDigest)
-	o.FilterTag = Tag(filterTag)
+	o.StagingRepo = reg.RegistryName(stagingRepo)
+	o.FilterImage = reg.ImageName(filterImage)
+	o.FilterDigest = reg.Digest(filterDigest)
+	o.FilterTag = reg.Tag(filterTag)
 
 	return nil
 }
@@ -93,7 +95,7 @@ func GrowManifest(
 	o *GrowManifestOptions,
 ) error {
 	var err error
-	var riiCombined RegInvImage
+	var riiCombined reg.RegInvImage
 
 	// (1) Scan the BaseDir and find the promoter manifest to modify.
 	manifest, err := FindManifest(o)
@@ -126,7 +128,7 @@ func GrowManifest(
 
 // WriteImages writes images as YAML out to the expected path of the given
 // (thin) manifest.
-func WriteImages(manifest Manifest, rii RegInvImage) error {
+func WriteImages(manifest reg.Manifest, rii reg.RegInvImage) error {
 	// Chop off trailing "promoter-manifest.yaml".
 	p := path.Dir(manifest.Filepath)
 	// Get staging repo directory name as it is laid out in the thin manifest
@@ -139,17 +141,17 @@ func WriteImages(manifest Manifest, rii RegInvImage) error {
 
 	// Write the file.
 	err := ioutil.WriteFile(
-		imagesPath, []byte(rii.ToYAML(YamlMarshalingOpts{})), 0o644)
+		imagesPath, []byte(rii.ToYAML(reg.YamlMarshalingOpts{})), 0o644)
 	return err
 }
 
 // FindManifest finds the manifest to modify.
-func FindManifest(o *GrowManifestOptions) (Manifest, error) {
+func FindManifest(o *GrowManifestOptions) (reg.Manifest, error) {
 	var err error
-	var manifests []Manifest
-	manifests, err = ParseThinManifestsFromDir(o.BaseDir)
+	var manifests []reg.Manifest
+	manifests, err = reg.ParseThinManifestsFromDir(o.BaseDir)
 	if err != nil {
-		return Manifest{}, err
+		return reg.Manifest{}, err
 	}
 
 	logrus.Infof("%d manifests parsed", len(manifests))
@@ -158,7 +160,7 @@ func FindManifest(o *GrowManifestOptions) (Manifest, error) {
 			return manifest, nil
 		}
 	}
-	return Manifest{},
+	return reg.Manifest{},
 		xerrors.Errorf("could not find Manifest for %q", o.StagingRepo)
 }
 
@@ -167,41 +169,41 @@ func FindManifest(o *GrowManifestOptions) (Manifest, error) {
 // inject into the "images.yaml" of a thin manifest.
 func ReadStagingRepo(
 	o *GrowManifestOptions,
-) (RegInvImage, error) {
-	stagingRepoRC := RegistryContext{
+) (reg.RegInvImage, error) {
+	stagingRepoRC := reg.RegistryContext{
 		Name: o.StagingRepo,
 	}
 
-	manifests := []Manifest{
+	manifests := []reg.Manifest{
 		{
-			Registries: []RegistryContext{
+			Registries: []reg.RegistryContext{
 				stagingRepoRC,
 			},
-			Images: []Image{},
+			Images: []reg.Image{},
 		},
 	}
 
-	sc, err := MakeSyncContext(
+	sc, err := reg.MakeSyncContext(
 		manifests,
 		10,
 		true,
 		false)
 	if err != nil {
-		return RegInvImage{}, err
+		return reg.RegInvImage{}, err
 	}
 	sc.ReadRegistries(
-		[]RegistryContext{stagingRepoRC},
+		[]reg.RegistryContext{stagingRepoRC},
 		// Read all registries recursively, because we want to produce a
 		// complete snapshot.
 		true,
-		MkReadRepositoryCmdReal)
+		reg.MkReadRepositoryCmdReal)
 
 	return sc.Inv[manifests[0].Registries[0].Name], nil
 }
 
 // ApplyFilters applies the filters in the options to whittle down the given
 // rii.
-func ApplyFilters(o *GrowManifestOptions, rii RegInvImage) (RegInvImage, error) {
+func ApplyFilters(o *GrowManifestOptions, rii reg.RegInvImage) (reg.RegInvImage, error) {
 	// If nothing to filter, short-circuit.
 	if len(rii) == 0 {
 		return rii, nil
@@ -213,7 +215,7 @@ func ApplyFilters(o *GrowManifestOptions, rii RegInvImage) (RegInvImage, error) 
 	}
 
 	if len(o.FilterTag) > 0 {
-		rii = FilterByTag(rii, string(o.FilterTag))
+		rii = reg.FilterByTag(rii, string(o.FilterTag))
 	}
 
 	if len(o.FilterDigest) > 0 {
@@ -221,11 +223,11 @@ func ApplyFilters(o *GrowManifestOptions, rii RegInvImage) (RegInvImage, error) 
 	}
 
 	// Remove any other tags that should still be filtered.
-	excludeTags := map[Tag]bool{latestTag: true}
+	excludeTags := map[reg.Tag]bool{latestTag: true}
 	rii = ExcludeTags(rii, excludeTags)
 
 	if len(rii) == 0 {
-		return RegInvImage{}, xerrors.New(
+		return reg.RegInvImage{}, xerrors.New(
 			"no images survived filtering; double-check your --filter_* flag(s) for typos",
 		)
 	}
@@ -235,8 +237,8 @@ func ApplyFilters(o *GrowManifestOptions, rii RegInvImage) (RegInvImage, error) 
 
 // FilterByImage removes all images in RegInvImage that do not match the
 // filterImage.
-func FilterByImage(rii RegInvImage, filterImage ImageName) RegInvImage {
-	filtered := make(RegInvImage)
+func FilterByImage(rii reg.RegInvImage, filterImage reg.ImageName) reg.RegInvImage {
+	filtered := make(reg.RegInvImage)
 	for imageName, digestTags := range rii {
 		if imageName == filterImage {
 			filtered[imageName] = digestTags
@@ -247,13 +249,13 @@ func FilterByImage(rii RegInvImage, filterImage ImageName) RegInvImage {
 
 // FilterByDigest removes all images in RegInvImage that do not match the
 // filterDigest.
-func FilterByDigest(rii RegInvImage, filterDigest Digest) RegInvImage {
-	filtered := make(RegInvImage)
+func FilterByDigest(rii reg.RegInvImage, filterDigest reg.Digest) reg.RegInvImage {
+	filtered := make(reg.RegInvImage)
 	for imageName, digestTags := range rii {
 		for digest, tags := range digestTags {
 			if digest == filterDigest {
 				if filtered[imageName] == nil {
-					filtered[imageName] = make(DigestTags)
+					filtered[imageName] = make(reg.DigestTags)
 				}
 				filtered[imageName][digest] = tags
 			}
@@ -263,8 +265,8 @@ func FilterByDigest(rii RegInvImage, filterDigest Digest) RegInvImage {
 }
 
 // ExcludeTags removes tags in rii that match excludedTags.
-func ExcludeTags(rii RegInvImage, excludedTags map[Tag]bool) RegInvImage {
-	filtered := make(RegInvImage)
+func ExcludeTags(rii reg.RegInvImage, excludedTags map[reg.Tag]bool) reg.RegInvImage {
+	filtered := make(reg.RegInvImage)
 	for imageName, digestTags := range rii {
 		for digest, tags := range digestTags {
 			for _, tag := range tags {
@@ -272,7 +274,7 @@ func ExcludeTags(rii RegInvImage, excludedTags map[Tag]bool) RegInvImage {
 					continue
 				}
 				if filtered[imageName] == nil {
-					filtered[imageName] = make(DigestTags)
+					filtered[imageName] = make(reg.DigestTags)
 				}
 				filtered[imageName][digest] = append(
 					filtered[imageName][digest],
@@ -284,7 +286,7 @@ func ExcludeTags(rii RegInvImage, excludedTags map[Tag]bool) RegInvImage {
 }
 
 // Union inject b's contents into a. However, it does so in a special way.
-func Union(a, b RegInvImage) RegInvImage {
+func Union(a, b reg.RegInvImage) reg.RegInvImage {
 	for imageName, digestTags := range b {
 		// If a does not have this image at all, then it's a simple
 		// injection.
@@ -301,7 +303,7 @@ func Union(a, b RegInvImage) RegInvImage {
 			}
 			// If c has the digest already, try to inject those tags in b that
 			// are not already in a.
-			tagSlice := TagSlice{}
+			tagSlice := reg.TagSlice{}
 			for tag := range tags.Union(a[imageName][digest]) {
 				if tag == "latest" {
 					continue
@@ -313,13 +315,4 @@ func Union(a, b RegInvImage) RegInvImage {
 	}
 
 	return a
-}
-
-// ToRegInvImage converts a Manifest into a RegInvImage.
-func (manifest *Manifest) ToRegInvImage() RegInvImage {
-	rii := make(RegInvImage)
-	for _, image := range manifest.Images {
-		rii[image.ImageName] = image.Dmap
-	}
-	return rii
 }

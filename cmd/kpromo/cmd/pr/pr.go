@@ -28,11 +28,12 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
-	"sigs.k8s.io/promo-tools/v3/image"
-	reg "sigs.k8s.io/promo-tools/v3/legacy/dockerregistry"
 	"sigs.k8s.io/release-sdk/git"
 	"sigs.k8s.io/release-sdk/github"
 	"sigs.k8s.io/release-utils/util"
+
+	"sigs.k8s.io/promo-tools/v3/image"
+	"sigs.k8s.io/promo-tools/v3/manifest"
 )
 
 const (
@@ -218,7 +219,7 @@ func runPromote(opts *promoteOptions) error {
 
 		for _, tag := range opts.tags {
 			for _, filterImage := range opts.images {
-				opt := reg.GrowManifestOptions{}
+				opt := manifest.GrowManifestOptions{}
 				if err := opt.Populate(
 					filepath.Join(repo.Dir(), image.ProdRegistry),
 					image.StagingRepoPrefix+opts.project, filterImage, "", tag); err != nil {
@@ -230,7 +231,7 @@ func runPromote(opts *promoteOptions) error {
 				}
 
 				logrus.Infof("Growing manifests for images matching filter %s and matching tag %s", filterImage, tag)
-				if err := reg.GrowManifest(ctx, &opt); err != nil {
+				if err := manifest.GrowManifest(ctx, &opt); err != nil {
 					return errors.Wrapf(err, "Growing manifest with image filter %s and tag %s", filterImage, tag)
 				}
 			}

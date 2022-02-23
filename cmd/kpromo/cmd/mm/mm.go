@@ -21,7 +21,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	reg "sigs.k8s.io/promo-tools/v3/legacy/dockerregistry"
+	"sigs.k8s.io/promo-tools/v3/manifest"
 )
 
 // TODO(cip-mm): Remove in the next minor release.
@@ -85,7 +85,7 @@ func init() {
 }
 
 func run() error {
-	opt := reg.GrowManifestOptions{}
+	opt := manifest.GrowManifestOptions{}
 	if err := opt.Populate(
 		modifyOpts.baseDir, modifyOpts.stagingRepo,
 		modifyOpts.filterImage, modifyOpts.filterDigest,
@@ -98,5 +98,5 @@ func run() error {
 	}
 
 	ctx := context.Background()
-	return reg.GrowManifest(ctx, &opt)
+	return manifest.GrowManifest(ctx, &opt)
 }
