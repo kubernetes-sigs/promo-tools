@@ -7,6 +7,9 @@ Please feel free to propose PRs to adjust the language as needed.
 - [Preparing Environment](#preparing-environment)
 - [Promoting Images](#promoting-images)
 - [Completing the Image Promotion](#completing-the-image-promotion)
+- [Deprecated](#deprecated)
+  - [`cip-mm`](#cip-mm)
+    - [Examples](#examples)
 
 When cutting a new Kubernetes release, we need to publish images to the `k8s-staging-kubernetes` GCS Bucket and then promote them to the production.
 
@@ -92,3 +95,52 @@ Once the `kpromo pr` command is done take the following steps to complete image 
   - If you're cutting Alpha, Beta, or RC release, lift the hold and proceed with the release process
   - If you're cutting a stable release, ensure that a [Build Admin](https://kubernetes.io/releases/release-managers/#build-admins) is available to cut the packages before lifting the hold and proceeding with the release
 - After the Pull Request is merged and **before** starting the `Official Release` step, we need to watch the following [Prow Job](https://prow.k8s.io/?job=post-k8sio-image-promo) to succeed. When the latest master ran without errors, then we can continue with `Official Release`.
+
+## Deprecated
+
+### `cip-mm`
+
+`cip-mm` is deprecated and will be removed in a future release.
+
+These instructions will temporarily remain for existing consumers
+(as `kpromo mm`), but please begin to use `kpromo pr` (which is described in
+more detail above) instead.
+
+This tool **m**odifies promoter **m**anifests. For now it dumps some filtered
+subset of a staging GCR and merges those contents back into a given promoter
+manifest.
+
+#### Examples
+
+- Add all images with a matching digest from staging repo
+  `gcr.io/k8s-staging-artifact-promoter` to a manifest, using the name and tags
+  already existing in the staging repo:
+
+  ```console
+  kpromo mm \
+    --base_dir=$HOME/go/src/github.com/kubernetes/k8s.io/k8s.gcr.io  \
+    --staging_repo=gcr.io/k8s-staging-artifact-promoter \
+    --filter_digest=sha256:7594278deaf6eeaa35caedec81796d103e3c83a26d7beab091a5d25a9ba6aa16
+  ```
+
+- Add a single image named "foo" and tagged "1.0" from staging repo
+  `gcr.io/k8s-staging-artifact-promoter` to a manifest:
+
+  ```console
+  kpromo mm \
+    --base_dir=$HOME/go/src/github.com/kubernetes/k8s.io/k8s.gcr.io  \
+    --staging_repo=gcr.io/k8s-staging-artifact-promoter \
+    --filter_image=cip \
+    --filter_tag=1.0
+  ```
+
+- Add all images tagged `1.0` from staging repo
+  `gcr.io/k8s-staging-artifact-promoter` to a manifest:
+
+  ```console
+  kpromo mm \
+    --base_dir=$HOME/go/src/github.com/kubernetes/k8s.io/k8s.gcr.io  \
+    --staging_repo=gcr.io/k8s-staging-artifact-promoter \
+    --filter_image=cip \
+    --filter_tag=1.0
+  ```
