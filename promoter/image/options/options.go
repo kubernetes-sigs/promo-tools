@@ -83,6 +83,15 @@ type Options struct {
 
 	// MaxImageSize is the maximum size of an image accepted for promotion
 	MaxImageSize int
+
+	// SignerCredentials is a credentials json file to initialize the identity
+	// of the signer before running. If specified, the promoter will
+	// initialize its API client with the identity in the file and use it
+	// to request tokens of the signer account.
+	//
+	// If this credentials file is not set, the promoter will attempt to generate
+	// the OIDC tokens getting its identity from the default application credentials.
+	SignerInitCredentials string
 }
 
 var DefaultOptions = &Options{

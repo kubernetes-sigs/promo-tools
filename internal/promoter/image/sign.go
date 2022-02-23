@@ -23,15 +23,16 @@ import (
 	credentials "cloud.google.com/go/iam/credentials/apiv1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	gopts "google.golang.org/api/option"
 	credentialspb "google.golang.org/genproto/googleapis/iam/credentials/v1"
-
-	"sigs.k8s.io/release-sdk/sign"
 
 	reg "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
 	options "sigs.k8s.io/promo-tools/v3/promoter/image/options"
+	"sigs.k8s.io/release-sdk/sign"
 )
 
 const (
+	oidcTokenAudience  = "sigstore"
 	TestSigningAccount = "test-signer@ulabs-cloud-tests.iam.gserviceaccount.com"
 )
 
@@ -116,15 +117,26 @@ func (di *DefaultPromoterImplementation) WriteSBOMs(
 func (di *DefaultPromoterImplementation) GetIdentityToken(
 	opts *options.Options, serviceAccount string,
 ) (tok string, err error) {
+	credOptions := []gopts.ClientOption{}
+	// If SignerInitCredentials, initialize the iam client using
+	// the identityu in that file instead of Default Application Credentials
+	if opts.SignerInitCredentials != "" {
+		logrus.Infof("Using credentials from %s", opts.SignerInitCredentials)
+		credOptions = []gopts.ClientOption{
+			gopts.WithCredentialsFile(opts.SignerInitCredentials),
+		}
+	}
 	ctx := context.Background()
-	c, err := credentials.NewIamCredentialsClient(ctx)
+	c, err := credentials.NewIamCredentialsClient(
+		ctx, credOptions...,
+	)
 	if err != nil {
 		return tok, errors.Wrap(err, "creating credentials token")
 	}
 	defer c.Close()
 	req := &credentialspb.GenerateIdTokenRequest{
 		Name:         fmt.Sprintf("projects/-/serviceAccounts/%s", serviceAccount),
-		Audience:     "sigstore",
+		Audience:     oidcTokenAudience, // Should be set to "sigstore"
 		IncludeEmail: true,
 	}
 
@@ -132,6 +144,8 @@ func (di *DefaultPromoterImplementation) GetIdentityToken(
 	if err != nil {
 		return tok, errors.Wrap(err, "getting error account")
 	}
+
+	logrus.Info(resp.Token)
 
 	return resp.Token, nil
 }

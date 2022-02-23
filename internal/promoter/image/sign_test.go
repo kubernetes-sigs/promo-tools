@@ -17,6 +17,7 @@ limitations under the License.
 package imagepromoter
 
 import (
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -26,14 +27,27 @@ import (
 
 // TestGetIdentityToken tests the identity token generation logic. By default
 // it will test using the testSigningAccount defined in sign.go. For local testing
-// purposes you can override the target account with another one you have access
-// to setting TEST_SERVICE_ACCOUNT to the service account's address.
+// purposes you can override the target account with another one setting
+// TEST_SERVICE_ACCOUNT and accessing it with an identity set in a credentials
+// file in CIP_E2E_KEY_FILE
 func TestGetIdentityToken(t *testing.T) {
+	// This unit needs a valid credentials to run
+	if os.Getenv("CIP_E2E_KEY_FILE") == "" {
+		return
+	}
+
+	opts := &options.Options{
+		SignerInitCredentials: os.Getenv("CIP_E2E_KEY_FILE"),
+	}
+
 	di := DefaultPromoterImplementation{}
-	_, err := di.GetIdentityToken(&options.Options{}, "fakeAccount@iam.project..")
+	_, err := di.GetIdentityToken(opts, "fakeAccount@iam.project..")
 	require.Error(t, err)
 
-	tok, err := di.GetIdentityToken(&options.Options{}, env.Default("TEST_SERVICE_ACCOUNT", TestSigningAccount))
+	tok, err := di.GetIdentityToken(
+		opts, env.Default("TEST_SERVICE_ACCOUNT", TestSigningAccount),
+	)
+
 	require.NoError(t, err)
 	require.NotEmpty(t, tok)
 }
