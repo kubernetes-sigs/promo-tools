@@ -36,11 +36,12 @@ require (
 	sigs.k8s.io/yaml v1.3.0
 )
 
+require cloud.google.com/go/iam v0.2.0
+
 require (
 	bitbucket.org/creachadair/shell v0.0.6 // indirect
 	cloud.google.com/go v0.100.2 // indirect
 	cloud.google.com/go/compute v1.5.0 // indirect
-	cloud.google.com/go/iam v0.2.0 // indirect
 	cloud.google.com/go/kms v1.3.0 // indirect
 	cuelang.org/go v0.4.2 // indirect
 	github.com/Azure/azure-sdk-for-go v61.3.0+incompatible // indirect

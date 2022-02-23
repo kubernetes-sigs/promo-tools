@@ -17,15 +17,22 @@ limitations under the License.
 package imagepromoter
 
 import (
+	"context"
 	"fmt"
 
+	credentials "cloud.google.com/go/iam/credentials/apiv1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	credentialspb "google.golang.org/genproto/googleapis/iam/credentials/v1"
 
 	"sigs.k8s.io/release-sdk/sign"
 
 	reg "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
 	options "sigs.k8s.io/promo-tools/v3/promoter/image/options"
+)
+
+const (
+	TestSigningAccount = ""
 )
 
 // ValidateStagingSignatures checks if edges (images) have a signature
@@ -94,4 +101,30 @@ func (di *DefaultPromoterImplementation) WriteSBOMs(
 	opts *options.Options, sc *reg.SyncContext, edges map[reg.PromotionEdge]interface{},
 ) error {
 	return nil
+}
+
+// GetIdentityToken returns an identity token for the selected service account
+// in order for this function to work, an account has to be already logged. This
+// can be achieved using the
+func (di *DefaultPromoterImplementation) GetIdentityToken(
+	opts *options.Options, serviceAccount string,
+) (tok string, err error) {
+	ctx := context.Background()
+	c, err := credentials.NewIamCredentialsClient(ctx)
+	if err != nil {
+		return tok, errors.Wrap(err, "creating credentials token")
+	}
+	defer c.Close()
+	req := &credentialspb.GenerateIdTokenRequest{
+		Name:         fmt.Sprintf("projects/-/serviceAccounts/%s", serviceAccount),
+		Audience:     "sigstore",
+		IncludeEmail: true,
+	}
+
+	resp, err := c.GenerateIdToken(ctx, req)
+	if err != nil {
+		return tok, errors.Wrap(err, "getting error account")
+	}
+
+	return resp.Token, nil
 }
