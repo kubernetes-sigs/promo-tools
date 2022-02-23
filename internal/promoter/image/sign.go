@@ -32,7 +32,7 @@ import (
 )
 
 const (
-	TestSigningAccount = ""
+	TestSigningAccount = "test-signer@ulabs-cloud-tests.iam.gserviceaccount.com"
 )
 
 // ValidateStagingSignatures checks if edges (images) have a signature
@@ -79,7 +79,14 @@ func (di *DefaultPromoterImplementation) ValidateStagingSignatures(
 func (di *DefaultPromoterImplementation) SignImages(
 	opts *options.Options, sc *reg.SyncContext, edges map[reg.PromotionEdge]interface{},
 ) error {
-	signer := sign.New(sign.Default())
+	token, err := di.GetIdentityToken(opts, TestSigningAccount)
+	if err != nil {
+		return errors.Wrap(err, "generating identity token")
+	}
+	signOpts := sign.Default()
+	signOpts.IdentityToken = token
+	signer := sign.New(signOpts)
+
 	for edge := range edges {
 		imageRef := fmt.Sprintf(
 			"%s/%s@%s",
