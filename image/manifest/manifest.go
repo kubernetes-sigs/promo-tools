@@ -33,8 +33,8 @@ const (
 	latestTag = "latest"
 )
 
-// GrowManifestOptions holds the  parameters for modifying manifests.
-type GrowManifestOptions struct {
+// GrowOptions holds the  parameters for modifying manifests.
+type GrowOptions struct {
 	// BaseDir is the directory containing the thin promoter manifests.
 	BaseDir string
 	// StagingRepo is the staging subproject repo to read from. If no filters
@@ -49,8 +49,8 @@ type GrowManifestOptions struct {
 	FilterTag reg.Tag
 }
 
-// Populate sets the values for GrowManifestOptions.
-func (o *GrowManifestOptions) Populate(
+// Populate sets the values for GrowOptions.
+func (o *GrowOptions) Populate(
 	baseDir,
 	stagingRepo,
 	filterImage,
@@ -73,7 +73,7 @@ func (o *GrowManifestOptions) Populate(
 }
 
 // Validate validates the options.
-func (o *GrowManifestOptions) Validate() error {
+func (o *GrowOptions) Validate() error {
 	if o.BaseDir == "" {
 		return xerrors.New("must specify --base_dir")
 	}
@@ -89,22 +89,22 @@ func (o *GrowManifestOptions) Validate() error {
 	return nil
 }
 
-// GrowManifest modifies a manifest by adding images into it.
-func GrowManifest(
+// Grow modifies a manifest by adding images into it.
+func Grow(
 	ctx context.Context,
-	o *GrowManifestOptions,
+	o *GrowOptions,
 ) error {
 	var err error
 	var riiCombined reg.RegInvImage
 
 	// (1) Scan the BaseDir and find the promoter manifest to modify.
-	manifest, err := FindManifest(o)
+	manifest, err := Find(o)
 	if err != nil {
 		return err
 	}
 
 	// (2) Scan the StagingRepo, and whittle the read results down with some
-	// filters (Filter* fields in GrowManifestOptions).
+	// filters (Filter* fields in GrowOptions).
 	riiUnfiltered, err := ReadStagingRepo(o)
 	if err != nil {
 		return err
@@ -121,14 +121,14 @@ func GrowManifest(
 	riiCombined = Union(manifest.ToRegInvImage(), riiFiltered)
 
 	// (5) Write back RegInvImage as Manifest ([]Image field}) back onto disk.
-	err = WriteImages(manifest, riiCombined)
+	err = Write(manifest, riiCombined)
 
 	return err
 }
 
-// WriteImages writes images as YAML out to the expected path of the given
+// Write writes images as YAML out to the expected path of the given
 // (thin) manifest.
-func WriteImages(manifest reg.Manifest, rii reg.RegInvImage) error {
+func Write(manifest reg.Manifest, rii reg.RegInvImage) error {
 	// Chop off trailing "promoter-manifest.yaml".
 	p := path.Dir(manifest.Filepath)
 	// Get staging repo directory name as it is laid out in the thin manifest
@@ -145,8 +145,8 @@ func WriteImages(manifest reg.Manifest, rii reg.RegInvImage) error {
 	return err
 }
 
-// FindManifest finds the manifest to modify.
-func FindManifest(o *GrowManifestOptions) (reg.Manifest, error) {
+// Find finds the manifest to modify.
+func Find(o *GrowOptions) (reg.Manifest, error) {
 	var err error
 	var manifests []reg.Manifest
 	manifests, err = reg.ParseThinManifestsFromDir(o.BaseDir)
@@ -168,7 +168,7 @@ func FindManifest(o *GrowManifestOptions) (reg.Manifest, error) {
 // available to the resulting RegInvImage. This RegInvImage is what we want to
 // inject into the "images.yaml" of a thin manifest.
 func ReadStagingRepo(
-	o *GrowManifestOptions,
+	o *GrowOptions,
 ) (reg.RegInvImage, error) {
 	stagingRepoRC := reg.RegistryContext{
 		Name: o.StagingRepo,
@@ -203,7 +203,7 @@ func ReadStagingRepo(
 
 // ApplyFilters applies the filters in the options to whittle down the given
 // rii.
-func ApplyFilters(o *GrowManifestOptions, rii reg.RegInvImage) (reg.RegInvImage, error) {
+func ApplyFilters(o *GrowOptions, rii reg.RegInvImage) (reg.RegInvImage, error) {
 	// If nothing to filter, short-circuit.
 	if len(rii) == 0 {
 		return rii, nil

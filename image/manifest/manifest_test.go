@@ -25,8 +25,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/xerrors"
 
+	"sigs.k8s.io/promo-tools/v3/image/manifest"
 	reg "sigs.k8s.io/promo-tools/v3/legacy/dockerregistry"
-	"sigs.k8s.io/promo-tools/v3/manifest"
 )
 
 // TODO: Consider merging this with bazelTestPath() from inventory
@@ -40,8 +40,8 @@ func testPath(testName string, paths ...string) string {
 	return filepath.Join(append(prefix, paths...)...)
 }
 
-func TestFindManifest(t *testing.T) {
-	pwd := testPath("TestFindManifest")
+func TestFind(t *testing.T) {
+	pwd := testPath("TestFind")
 	srcRC := reg.RegistryContext{
 		Name:           "gcr.io/foo-staging",
 		ServiceAccount: "sa@robot.com",
@@ -51,13 +51,13 @@ func TestFindManifest(t *testing.T) {
 	tests := []struct {
 		// name is folder name
 		name             string
-		input            manifest.GrowManifestOptions
+		input            manifest.GrowOptions
 		expectedManifest reg.Manifest
 		expectedErr      error
 	}{
 		{
 			"empty",
-			manifest.GrowManifestOptions{
+			manifest.GrowOptions{
 				BaseDir:     filepath.Join(pwd, "empty"),
 				StagingRepo: "gcr.io/foo",
 			},
@@ -70,7 +70,7 @@ func TestFindManifest(t *testing.T) {
 		},
 		{
 			"singleton",
-			manifest.GrowManifestOptions{
+			manifest.GrowOptions{
 				BaseDir:     filepath.Join(pwd, "singleton"),
 				StagingRepo: "gcr.io/foo-staging",
 			},
@@ -104,7 +104,7 @@ func TestFindManifest(t *testing.T) {
 		},
 		{
 			"singleton (unrecognized staging repo)",
-			manifest.GrowManifestOptions{
+			manifest.GrowOptions{
 				BaseDir:     filepath.Join(pwd, "singleton"),
 				StagingRepo: "gcr.io/nonsense-staging",
 			},
@@ -114,7 +114,7 @@ func TestFindManifest(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		gotManifest, gotErr := manifest.FindManifest(&test.input)
+		gotManifest, gotErr := manifest.Find(&test.input)
 
 		// Clean up gotManifest for purposes of comparing against expected
 		// results. Namely, clear out the SrcRegistry pointer because this will
@@ -140,21 +140,21 @@ func TestApplyFilters(t *testing.T) {
 	tests := []struct {
 		// name is folder name
 		name         string
-		inputOptions manifest.GrowManifestOptions
+		inputOptions manifest.GrowOptions
 		inputRii     reg.RegInvImage
 		expectedRii  reg.RegInvImage
 		expectedErr  error
 	}{
 		{
 			"empty rii",
-			manifest.GrowManifestOptions{},
+			manifest.GrowOptions{},
 			reg.RegInvImage{},
 			reg.RegInvImage{},
 			nil,
 		},
 		{
 			"no filters --- same as input",
-			manifest.GrowManifestOptions{},
+			manifest.GrowOptions{},
 			reg.RegInvImage{
 				"foo": {
 					"sha256:000": {"2.0"},
@@ -169,7 +169,7 @@ func TestApplyFilters(t *testing.T) {
 		},
 		{
 			"remove 'latest' tag by default, even if no filters",
-			manifest.GrowManifestOptions{},
+			manifest.GrowOptions{},
 			reg.RegInvImage{
 				"foo": {
 					"sha256:000": {"latest", "2.0"},
@@ -184,7 +184,7 @@ func TestApplyFilters(t *testing.T) {
 		},
 		{
 			"filter on image name only",
-			manifest.GrowManifestOptions{
+			manifest.GrowOptions{
 				FilterImage: "bar",
 			},
 			reg.RegInvImage{
@@ -204,7 +204,7 @@ func TestApplyFilters(t *testing.T) {
 		},
 		{
 			"filter on tag only",
-			manifest.GrowManifestOptions{
+			manifest.GrowOptions{
 				FilterTag: "1.0",
 			},
 			reg.RegInvImage{
@@ -224,7 +224,7 @@ func TestApplyFilters(t *testing.T) {
 		},
 		{
 			"filter on 'latest' tag",
-			manifest.GrowManifestOptions{
+			manifest.GrowOptions{
 				FilterTag: "latest",
 			},
 			reg.RegInvImage{
@@ -240,7 +240,7 @@ func TestApplyFilters(t *testing.T) {
 		},
 		{
 			"filter on digest",
-			manifest.GrowManifestOptions{
+			manifest.GrowOptions{
 				FilterDigest: "sha256:222",
 			},
 			reg.RegInvImage{
@@ -261,7 +261,7 @@ func TestApplyFilters(t *testing.T) {
 		},
 		{
 			"filter on shared tag (multiple images share same tag)",
-			manifest.GrowManifestOptions{
+			manifest.GrowOptions{
 				FilterTag: "1.2.3",
 			},
 			reg.RegInvImage{
@@ -285,7 +285,7 @@ func TestApplyFilters(t *testing.T) {
 		},
 		{
 			"filter on shared tag and image name (multiple images share same tag)",
-			manifest.GrowManifestOptions{
+			manifest.GrowOptions{
 				FilterImage: "foo",
 				FilterTag:   "1.2.3",
 			},

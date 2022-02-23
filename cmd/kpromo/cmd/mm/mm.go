@@ -21,7 +21,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"sigs.k8s.io/promo-tools/v3/manifest"
+	"sigs.k8s.io/promo-tools/v3/image/manifest"
 )
 
 // TODO(cip-mm): Remove in the next minor release.
@@ -85,7 +85,7 @@ func init() {
 }
 
 func run() error {
-	opt := manifest.GrowManifestOptions{}
+	opt := manifest.GrowOptions{}
 	if err := opt.Populate(
 		modifyOpts.baseDir, modifyOpts.stagingRepo,
 		modifyOpts.filterImage, modifyOpts.filterDigest,
@@ -98,5 +98,5 @@ func run() error {
 	}
 
 	ctx := context.Background()
-	return manifest.GrowManifest(ctx, &opt)
+	return manifest.Grow(ctx, &opt)
 }
