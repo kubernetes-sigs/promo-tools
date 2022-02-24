@@ -25,6 +25,7 @@ import (
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/stream"
 	"sigs.k8s.io/promo-tools/v3/internal/version"
 	options "sigs.k8s.io/promo-tools/v3/promoter/image/options"
+	"sigs.k8s.io/promo-tools/v3/types/image"
 )
 
 const vulnerabilityDiscalimer = `DISCLAIMER: Vulnerabilities are found as issues with package
@@ -36,9 +37,9 @@ necessarily mean that a new version of the image layer is available.`
 // streamProducerFunc is a function that gets the required fields to
 // construct a promotion stream producer
 type StreamProducerFunc func(
-	srcRegistry reg.RegistryName, srcImageName reg.ImageName,
-	destRC reg.RegistryContext, imageName reg.ImageName,
-	digest reg.Digest, tag reg.Tag, tp reg.TagOp,
+	srcRegistry image.Registry, srcImageName image.Name,
+	destRC reg.RegistryContext, imageName image.Name,
+	digest image.Digest, tag image.Tag, tp reg.TagOp,
 ) stream.Producer
 
 type DefaultPromoterImplementation struct{}
@@ -46,7 +47,7 @@ type DefaultPromoterImplementation struct{}
 // ValidateManifestLists implements one of the run modes of the promoter
 // where it parses the manifests, checks the images and exits
 func (di *DefaultPromoterImplementation) ValidateManifestLists(opts *options.Options) error {
-	registry := reg.RegistryName(opts.Repository)
+	registry := image.Registry(opts.Repository)
 	images := make([]reg.ImageWithDigestSlice, 0)
 
 	if err := reg.ParseSnapshot(opts.CheckManifestLists, &images); err != nil {

@@ -48,6 +48,7 @@ import (
 	cipJson "sigs.k8s.io/promo-tools/v3/internal/legacy/json"
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/reqcounter"
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/stream"
+	"sigs.k8s.io/promo-tools/v3/types/image"
 )
 
 // GetSrcRegistry gets the source registry.
@@ -73,7 +74,7 @@ func MakeSyncContext(
 		Confirm:           confirm,
 		UseServiceAccount: useSvcAcc,
 		Inv:               make(MasterInventory),
-		InvIgnore:         []ImageName{},
+		InvIgnore:         []image.Name{},
 		Tokens:            make(map[RootRepo]gcloud.Token),
 		RegistryContexts:  make([]RegistryContext, 0),
 		DigestMediaType:   make(DigestMediaType),
@@ -436,9 +437,9 @@ func ToPromotionEdges(mfests []Manifest) (map[PromotionEdge]interface{}, error) 
 
 func mkPromotionEdge(
 	srcRC, dstRC RegistryContext,
-	srcImageName ImageName,
-	digest Digest,
-	tag Tag,
+	srcImageName image.Name,
+	digest image.Digest,
+	tag image.Tag,
 ) PromotionEdge {
 	edge := PromotionEdge{
 		SrcRegistry: srcRC,
@@ -470,7 +471,7 @@ func (sc *SyncContext) GetPromotionCandidates(edges map[PromotionEdge]interface{
 	clean := true
 
 	// Create lookup-optimized structure for images to ignore.
-	ignoreMap := make(map[ImageName]interface{})
+	ignoreMap := make(map[image.Name]interface{})
 	for _, ignoreMe := range sc.InvIgnore {
 		ignoreMap[ignoreMe] = nil
 	}
@@ -551,7 +552,7 @@ func (sc *SyncContext) GetPromotionCandidates(edges map[PromotionEdge]interface{
 	return toPromote, clean
 }
 
-func (sc *SyncContext) getDigestForTag(inputTag Tag) *Digest {
+func (sc *SyncContext) getDigestForTag(inputTag image.Tag) *image.Digest {
 	for _, rii := range sc.Inv {
 		for _, digestTags := range rii {
 			for digest, tagSlice := range digestTags {
@@ -580,7 +581,7 @@ func (sc *SyncContext) getDigestForTag(inputTag Tag) *Digest {
 func CheckOverlappingEdges(
 	edges map[PromotionEdge]interface{}) (map[PromotionEdge]interface{}, error) {
 	// Build up a "promotionIntent". This will be checked below.
-	promotionIntent := make(map[string]map[Digest][]PromotionEdge)
+	promotionIntent := make(map[string]map[image.Digest][]PromotionEdge)
 	checked := make(map[PromotionEdge]interface{})
 	for edge := range edges {
 		// Skip overlap checks for edges that are tagless, because by definition
@@ -603,7 +604,7 @@ func CheckOverlappingEdges(
 			// Make this edge lay claim to this destination vertex.
 			edgeList := make([]PromotionEdge, 0)
 			edgeList = append(edgeList, edge)
-			digestToEdges := make(map[Digest][]PromotionEdge)
+			digestToEdges := make(map[image.Digest][]PromotionEdge)
 			digestToEdges[edge.Digest] = edgeList
 			promotionIntent[dstPQIN] = digestToEdges
 		}
@@ -771,7 +772,7 @@ func validateImages(images []Image) error {
 }
 
 // ValidateDigest validates the digest.
-func ValidateDigest(digest Digest) error {
+func ValidateDigest(digest image.Digest) error {
 	validDigest := regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
 	if !validDigest.Match([]byte(digest)) {
 		return fmt.Errorf("invalid digest: %v", digest)
@@ -781,7 +782,7 @@ func ValidateDigest(digest Digest) error {
 }
 
 // ValidateTag validates the tag.
-func ValidateTag(tag Tag) error {
+func ValidateTag(tag image.Tag) error {
 	validTag := regexp.MustCompile(`^[\w][\w.-]{0,127}$`)
 	if !validTag.Match([]byte(tag)) {
 		return fmt.Errorf("invalid tag: %v", tag)
@@ -813,20 +814,20 @@ func (m Manifest) srcRegistryCount() int {
 	return count
 }
 
-func (m Manifest) srcRegistryName() RegistryName {
+func (m Manifest) srcRegistryName() image.Registry {
 	for _, registry := range m.Registries {
 		if registry.Src {
 			return registry.Name
 		}
 	}
 
-	return RegistryName("")
+	return image.Registry("")
 }
 
 func validateRequiredComponents(m Manifest) error {
 	// TODO: Should we return []error here instead?
 	errs := make([]string, 0)
-	srcRegistryName := RegistryName("")
+	srcRegistryName := image.Registry("")
 
 	if len(m.Registries) > 0 {
 		if m.srcRegistryCount() > 1 {
@@ -839,7 +840,7 @@ func validateRequiredComponents(m Manifest) error {
 		}
 	}
 
-	knownRegistries := make([]RegistryName, 0)
+	knownRegistries := make([]image.Registry, 0)
 	if len(m.Registries) == 0 {
 		errs = append(errs, "'registries' field cannot be empty")
 	}
@@ -1046,7 +1047,7 @@ func getJSONSFromProcess(req stream.ExternalRequest) (cipJson.Objects, Errors) {
 // IgnoreFromPromotion works by building up a new Inv type of those images that
 // should NOT be bothered to be Promoted; these get ignored in the Promote()
 // step later down the pipeline.
-func (sc *SyncContext) IgnoreFromPromotion(regName RegistryName) {
+func (sc *SyncContext) IgnoreFromPromotion(regName image.Registry) {
 	// regName will look like gcr.io/foo/bar/baz. We then look for the key
 	// "foo/bar/baz".
 	_, imgName, err := ParseContainerParts(string(regName))
@@ -1056,7 +1057,7 @@ func (sc *SyncContext) IgnoreFromPromotion(regName RegistryName) {
 	}
 
 	logrus.Infof("ignoring from promotion: %s\n", imgName)
-	sc.InvIgnore = append(sc.InvIgnore, ImageName(imgName))
+	sc.InvIgnore = append(sc.InvIgnore, image.Name(imgName))
 }
 
 // ParseContainerParts splits up a registry name into its component pieces.
@@ -1125,7 +1126,7 @@ func (sc *SyncContext) PopulateTokens() error {
 // GetTokenKeyDomainRepoPath splits a string by '/'. It's OK to do this because
 // the RegistryName is already parsed against a Regex. (Maybe we should store
 // the repo path separately when we do the initial parse...).
-func GetTokenKeyDomainRepoPath(registryName RegistryName) (key, domain, repoPath string) {
+func GetTokenKeyDomainRepoPath(registryName image.Registry) (key, domain, repoPath string) {
 	s := string(registryName)
 	i := strings.IndexByte(s, '/')
 	if strings.Count(s, "/") < 2 {
@@ -1165,7 +1166,7 @@ func (sc *SyncContext) ReadRegistriesGGCR(
 					return errors.Wrap(err, "before attempting to walk the registry")
 				}
 				regName, imageName, err := SplitByKnownRegistries(
-					RegistryName(repo.Name()), sc.RegistryContexts,
+					image.Registry(repo.Name()), sc.RegistryContexts,
 				)
 				if err != nil {
 					return errors.Wrap(err, "splitting repo and image name")
@@ -1176,17 +1177,17 @@ func (sc *SyncContext) ReadRegistriesGGCR(
 					for digest, manifest := range tags.Manifests {
 						tagSlice := TagSlice{}
 						for _, tag := range manifest.Tags {
-							tagSlice = append(tagSlice, Tag(tag))
+							tagSlice = append(tagSlice, image.Tag(tag))
 						}
-						digestTags[Digest(digest)] = tagSlice
+						digestTags[image.Digest(digest)] = tagSlice
 
 						mediaType, err := supportedMediaType(manifest.MediaType)
 						if err != nil {
 							logrus.Error(errors.Wrapf(err, "processing digest %s", digest))
 						}
 
-						sc.DigestMediaType[Digest(digest)] = mediaType
-						sc.DigestImageSize[Digest(digest)] = int(manifest.Size)
+						sc.DigestMediaType[image.Digest(digest)] = mediaType
+						sc.DigestImageSize[image.Digest(digest)] = int(manifest.Size)
 					}
 				}
 
@@ -1303,9 +1304,9 @@ func (sc *SyncContext) ReadRegistries(
 			for digest, mfestInfo := range tagsStruct.Manifests {
 				tagSlice := TagSlice{}
 				for _, tag := range mfestInfo.Tags {
-					tagSlice = append(tagSlice, Tag(tag))
+					tagSlice = append(tagSlice, image.Tag(tag))
 				}
-				digestTags[Digest(digest)] = tagSlice
+				digestTags[image.Digest(digest)] = tagSlice
 
 				// Store MediaType.
 				mutex.Lock()
@@ -1313,10 +1314,10 @@ func (sc *SyncContext) ReadRegistries(
 				if err != nil {
 					fmt.Printf("digest %s: %s\n", digest, err)
 				}
-				sc.DigestMediaType[Digest(digest)] = mediaType
+				sc.DigestMediaType[image.Digest(digest)] = mediaType
 
 				// Store ImageSize
-				sc.DigestImageSize[Digest(digest)] = int(mfestInfo.Size)
+				sc.DigestImageSize[image.Digest(digest)] = int(mfestInfo.Size)
 				mutex.Unlock()
 			}
 
@@ -1352,7 +1353,7 @@ func (sc *SyncContext) ReadRegistries(
 					parentRC, _ := req.RequestParams.(RegistryContext)
 
 					childRc := RegistryContext{
-						Name: RegistryName(
+						Name: image.Registry(
 							string(parentRC.Name) + "/" + childRepoName),
 						// Inherit the service account used at the parent
 						// (cascades down from toplevel to all subrepos). In the
@@ -1422,7 +1423,7 @@ func (sc *SyncContext) ReadGCRManifestLists(
 
 					// Create the request.
 					var req stream.ExternalRequest
-					var tag Tag
+					var tag image.Tag
 					if len(tagSlice) > 0 {
 						// It could be that this ManifestList has been
 						// tagged multiple times. Just grab the first tag.
@@ -1477,7 +1478,7 @@ func (sc *SyncContext) ReadGCRManifestLists(
 
 			for _, gManifest := range gcrManifestList.Manifests {
 				mutex.Lock()
-				sc.ParentDigest[Digest((gManifest.Digest.Algorithm)+":"+(gManifest.Digest.Hex))] = gmlc.Digest
+				sc.ParentDigest[image.Digest((gManifest.Digest.Algorithm)+":"+(gManifest.Digest.Hex))] = gmlc.Digest
 				mutex.Unlock()
 			}
 
@@ -1546,9 +1547,9 @@ func (sc *SyncContext) RemoveChildDigestEntries(rii RegInvImage) RegInvImage {
 // pieces --- the repository and the image name. We can't just split by the last
 // "/" all the time, because some manifests have an image with a "/" in it.
 func SplitByKnownRegistries(
-	r RegistryName,
+	r image.Registry,
 	rcs []RegistryContext,
-) (RegistryName, ImageName, error) {
+) (image.Registry, image.Name, error) {
 	for _, rc := range rcs {
 		if strings.HasPrefix(string(r), string(rc.Name)) {
 			trimmed := strings.TrimPrefix(string(r), string(rc.Name))
@@ -1558,11 +1559,11 @@ func SplitByKnownRegistries(
 				// get everything past the last '/' seen in `r` to get the image
 				// name.
 				i := strings.LastIndex(string(r), "/")
-				return rc.Name[:i], ImageName(string(r)[i+1:]), nil
+				return rc.Name[:i], image.Name(string(r)[i+1:]), nil
 			} else if trimmed[0] == '/' {
 				// Remove leading "/" character. This denotes a clean split
 				// along directory boundaries.
-				return rc.Name, ImageName(trimmed[1:]), nil
+				return rc.Name, image.Name(trimmed[1:]), nil
 			} else {
 				// This is an unclean split where we cut the string in the
 				// middle of a path name. E.g., if we have
@@ -1786,14 +1787,14 @@ func extractGCRManifestList(reader io.Reader) (*ggcrV1.IndexManifest, error) {
 
 // ToFQIN combines a RegistryName, ImageName, and Digest to form a
 // fully-qualified image name (FQIN).
-func ToFQIN(registryName RegistryName, imageName ImageName, digest Digest) string {
+func ToFQIN(registryName image.Registry, imageName image.Name, digest image.Digest) string {
 	return string(registryName) + "/" + string(imageName) + "@" + string(digest)
 }
 
 // ToPQIN converts a RegistryName, ImageName, and Tag to form a
 // partially-qualified image name (PQIN). It's less exact than a FQIN because
 // the digest information is not used.
-func ToPQIN(registryName RegistryName, imageName ImageName, tag Tag) string {
+func ToPQIN(registryName image.Registry, imageName image.Name, tag image.Tag) string {
 	return string(registryName) + "/" + string(imageName) + ":" + string(tag)
 }
 
@@ -1907,10 +1908,10 @@ func (rii *RegInvImage) ToCSV() string {
 	return b.String()
 }
 
-// ToLQIN converts a RegistryName and ImangeName to form a loosely-qualified
+// ToLQIN converts a RegistryName and ImageName to form a loosely-qualified
 // image name (LQIN). Notice that it is missing tag information --- hence
 // "loosely-qualified".
-func ToLQIN(registryName RegistryName, imageName ImageName) string {
+func ToLQIN(registryName image.Registry, imageName image.Name) string {
 	return string(registryName) + "/" + string(imageName)
 }
 
@@ -1921,16 +1922,16 @@ func ToLQIN(registryName RegistryName, imageName ImageName) string {
 // were given "gcr.io/foo/a", we would split it into "gcr.io/foo/a" and "b/c".
 func SplitRegistryImagePath(
 	registryImagePath RegistryImagePath,
-	knownRegistries []RegistryName,
-) (RegistryName, ImageName, error) {
+	knownRegistries []image.Registry,
+) (image.Registry, image.Name, error) {
 	for _, rName := range knownRegistries {
 		if strings.HasPrefix(string(registryImagePath), string(rName)) {
-			return rName, ImageName(registryImagePath[len(rName)+1:]), nil
+			return rName, image.Name(registryImagePath[len(rName)+1:]), nil
 		}
 	}
 
-	return RegistryName(""),
-		ImageName(""),
+	return image.Registry(""),
+		image.Name(""),
 		fmt.Errorf("could not determine registry name for '%v'", registryImagePath)
 }
 
@@ -1994,7 +1995,7 @@ func MKPopulateRequestsForPromotionEdges(
 
 		for promoteMe := range toPromote {
 			var req stream.ExternalRequest
-			oldDigest := Digest("")
+			oldDigest := image.Digest("")
 
 			// Technically speaking none of the edges at this point should be
 			// invalid (such as trying to do tag moves), because we run
@@ -2105,11 +2106,11 @@ func EdgesToRegInvImage(
 			continue
 		}
 
-		if rii[ImageName(imgName)] == nil {
-			rii[ImageName(imgName)] = make(DigestTags)
+		if rii[image.Name(imgName)] == nil {
+			rii[image.Name(imgName)] = make(DigestTags)
 		}
 
-		digestTags := rii[ImageName(imgName)]
+		digestTags := rii[image.Name(imgName)]
 		if len(edge.DstImageTag.Tag) > 0 {
 			digestTags[edge.Digest] = append(
 				digestTags[edge.Digest],
@@ -2135,14 +2136,14 @@ func getRegistriesToRead(edges map[PromotionEdge]interface{}) []RegistryContext 
 		srcReg := edge.SrcRegistry
 		srcReg.Name = srcReg.Name +
 			"/" +
-			RegistryName(edge.SrcImageTag.ImageName)
+			image.Registry(edge.SrcImageTag.ImageName)
 
 		rcs[srcReg] = nil
 
 		dstReg := edge.DstRegistry
 		dstReg.Name = dstReg.Name +
 			"/" +
-			RegistryName(edge.DstImageTag.ImageName)
+			image.Registry(edge.DstImageTag.ImageName)
 
 		rcs[dstReg] = nil
 	}
@@ -2160,12 +2161,12 @@ func getRegistriesToRead(edges map[PromotionEdge]interface{}) []RegistryContext 
 func (sc *SyncContext) Promote(
 	edges map[PromotionEdge]interface{},
 	mkProducer func(
-		RegistryName,
-		ImageName,
+		image.Registry,
+		image.Name,
 		RegistryContext,
-		ImageName,
-		Digest,
-		Tag,
+		image.Name,
+		image.Digest,
+		image.Tag,
 		TagOp,
 	) stream.Producer,
 	customProcessRequest *ProcessRequest,
@@ -2374,7 +2375,7 @@ func MkRequestCapturer(captured *CapturedRequests) ProcessRequest {
 // GarbageCollect deletes all images that are not referenced by Docker tags.
 func (sc *SyncContext) GarbageCollect(
 	mfest Manifest,
-	mkProducer func(RegistryContext, ImageName, Digest) stream.Producer,
+	mkProducer func(RegistryContext, image.Name, image.Digest) stream.Producer,
 	customProcessRequest *ProcessRequest,
 ) {
 	var populateRequests PopulateRequests = func(
@@ -2407,7 +2408,7 @@ func (sc *SyncContext) GarbageCollect(
 						// No source image name, because tag deletions
 						// should only delete the what's in the
 						// destination registry
-						ImageName(""),
+						image.Name(""),
 
 						imageName,
 						digest,
@@ -2487,8 +2488,8 @@ func supportedMediaType(v string) (ggcrV1Types.MediaType, error) {
 // TODO: Maybe split this into 2 parts, so that each part can be unit-tested
 // separately (deletion of manifest lists vs deletion of other media types).
 func (sc *SyncContext) ClearRepository(
-	regName RegistryName,
-	mkProducer func(RegistryContext, ImageName, Digest) stream.Producer,
+	regName image.Registry,
+	mkProducer func(RegistryContext, image.Name, image.Digest) stream.Producer,
 	customProcessRequest *ProcessRequest,
 ) {
 	// deleteRequestsPopulator returns a PopulateRequests that
@@ -2532,7 +2533,7 @@ func (sc *SyncContext) ClearRepository(
 							// No source image name, because tag deletions
 							// should only delete the what's in the
 							// destination registry
-							ImageName(""),
+							image.Name(""),
 
 							imageName,
 							digest,
@@ -2617,11 +2618,11 @@ func (sc *SyncContext) ClearRepository(
 func GetWriteCmd(
 	dest RegistryContext,
 	useServiceAccount bool,
-	srcRegistry RegistryName,
-	srcImageName ImageName,
-	destImageName ImageName,
-	digest Digest,
-	tag Tag,
+	srcRegistry image.Registry,
+	srcImageName image.Name,
+	destImageName image.Name,
+	digest image.Digest,
+	tag image.Tag,
 	tp TagOp,
 ) []string {
 	var cmd []string
@@ -2653,8 +2654,8 @@ func GetWriteCmd(
 func GetDeleteCmd(
 	rc RegistryContext,
 	useServiceAccount bool,
-	img ImageName,
-	digest Digest,
+	img image.Name,
+	digest image.Digest,
 	force bool,
 ) []string {
 	fqin := ToFQIN(rc.Name, img, digest)
@@ -2805,7 +2806,7 @@ func (payload *GCRPubSubPayload) PopulateExtraFields() error {
 		if len(parsed) != 2 {
 			return fmt.Errorf("invalid FQIN: %v", payload.FQIN)
 		}
-		payload.Digest = Digest(parsed[1])
+		payload.Digest = image.Digest(parsed[1])
 		payload.Path = parsed[0]
 	}
 
@@ -2815,7 +2816,7 @@ func (payload *GCRPubSubPayload) PopulateExtraFields() error {
 		if len(parsed) != 2 {
 			return fmt.Errorf("invalid PQIN: %v", payload.PQIN)
 		}
-		payload.Tag = Tag(parsed[1])
+		payload.Tag = image.Tag(parsed[1])
 		payload.Path = parsed[0]
 	}
 
@@ -2897,7 +2898,7 @@ func ParseSnapshot(pathToSnapshot string, images *[]ImageWithDigestSlice) error 
 // "mediaType" of every image manifest in the registry.
 //
 // TODO: Review/optimize/de-dupe (https://github.com/kubernetes-sigs/promo-tools/pull/351)
-func FilterParentImages(registry RegistryName, images *[]ImageWithDigestSlice) ([]ImageWithParentDigestSlice, error) {
+func FilterParentImages(registry image.Registry, images *[]ImageWithDigestSlice) ([]ImageWithParentDigestSlice, error) {
 	// If an image is found to have this specific media type, it is a parent, and will be saved.
 	// All other images are not of interest.
 	mediaType := `"mediaType": "application/vnd.docker.distribution.manifest.list.v2+json"`
@@ -3014,7 +3015,7 @@ func FilterParentImages(registry RegistryName, images *[]ImageWithDigestSlice) (
 }
 
 // TODO: Review/optimize/de-dupe (https://github.com/kubernetes-sigs/promo-tools/pull/351)
-func ValidateParentImages(registry RegistryName, images []ImageWithParentDigestSlice) {
+func ValidateParentImages(registry image.Registry, images []ImageWithParentDigestSlice) {
 	numWorkers := runtime.NumCPU() * 2
 	wg := new(sync.WaitGroup)
 	signal := make(chan string, 500)
@@ -3075,7 +3076,7 @@ func ValidateParentImages(registry RegistryName, images []ImageWithParentDigestS
 // 		INVALID parent=gcr.io/foo/bar child=gcr.io/foo/bar/foo
 //
 // TODO: Review/optimize/de-dupe (https://github.com/kubernetes-sigs/promo-tools/pull/351)
-func IsParentImageValid(registry RegistryName, image ImageWithParentDigestSlice) bool {
+func IsParentImageValid(registry image.Registry, image ImageWithParentDigestSlice) bool {
 	// Split the registry into prefix and postfix
 	// For example: "us.gcr.io/k8s-artifacts-prod/addon-builder"
 	// prefix: "us.gcr.io"

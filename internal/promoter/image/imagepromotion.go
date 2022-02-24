@@ -22,6 +22,7 @@ import (
 	reg "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/stream"
 	options "sigs.k8s.io/promo-tools/v3/promoter/image/options"
+	"sigs.k8s.io/promo-tools/v3/types/image"
 )
 
 // This file has all the promoter implementation functions
@@ -90,11 +91,11 @@ func (di *DefaultPromoterImplementation) GetPromotionEdges(
 // during promotion to get the producer streams
 func (di *DefaultPromoterImplementation) MakeProducerFunction(useServiceAccount bool) StreamProducerFunc {
 	return func(
-		srcRegistry reg.RegistryName,
-		srcImageName reg.ImageName,
+		srcRegistry image.Registry,
+		srcImageName image.Name,
 		destRC reg.RegistryContext,
-		imageName reg.ImageName,
-		digest reg.Digest, tag reg.Tag, tp reg.TagOp,
+		imageName image.Name,
+		digest image.Digest, tag image.Tag, tp reg.TagOp,
 	) stream.Producer {
 		var sp stream.Subprocess
 		sp.CmdInvocation = reg.GetWriteCmd(

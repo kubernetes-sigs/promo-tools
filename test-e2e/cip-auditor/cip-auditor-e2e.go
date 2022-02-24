@@ -35,6 +35,7 @@ import (
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/gcloud"
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/stream"
 	"sigs.k8s.io/promo-tools/v3/internal/version"
+	"sigs.k8s.io/promo-tools/v3/types/image"
 )
 
 func main() {
@@ -881,11 +882,11 @@ func checkCommand(cmd []string) error {
 		allowedCommands)
 }
 
-func clearRepository(regName reg.RegistryName, sc *reg.SyncContext) {
+func clearRepository(regName image.Registry, sc *reg.SyncContext) {
 	mkDeletionCmd := func(
 		dest reg.RegistryContext,
-		imageName reg.ImageName,
-		digest reg.Digest,
+		imageName image.Name,
+		digest image.Digest,
 	) stream.Producer {
 		var sp stream.Subprocess
 		sp.CmdInvocation = reg.GetDeleteCmd(

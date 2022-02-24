@@ -25,6 +25,7 @@ import (
 
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/gcloud"
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/stream"
+	"sigs.k8s.io/promo-tools/v3/types/image"
 )
 
 // RequestResult contains information about the result of running a request
@@ -54,8 +55,8 @@ type ImageSizeError struct {
 // ImageVulnError contains ImageVulnCheck information on images that contain a
 // vulnerability with a severity level at or above the defined threshold.
 type ImageVulnError struct {
-	ImageName      ImageName
-	Digest         Digest
+	ImageName      image.Name
+	Digest         image.Digest
 	OccurrenceName string
 	Vulnerability  *grafeaspb.VulnerabilityOccurrence
 }
@@ -81,7 +82,7 @@ type SyncContext struct {
 	Confirm           bool
 	UseServiceAccount bool
 	Inv               MasterInventory
-	InvIgnore         []ImageName
+	InvIgnore         []image.Name
 	RegistryContexts  []RegistryContext
 	SrcRegistry       *RegistryContext
 	Tokens            map[RootRepo]gcloud.Token
@@ -133,7 +134,7 @@ type PromotionEdge struct {
 	SrcRegistry RegistryContext
 	SrcImageTag ImageTag
 
-	Digest Digest
+	Digest image.Digest
 
 	DstRegistry RegistryContext
 	DstImageTag ImageTag
@@ -147,7 +148,7 @@ type VertexProperty struct {
 	PqinExists      bool
 	DigestExists    bool
 	PqinDigestMatch bool
-	BadDigest       Digest
+	BadDigest       image.Digest
 	OtherTags       TagSlice
 }
 
@@ -156,22 +157,22 @@ type VertexProperty struct {
 type RootRepo string
 
 // MasterInventory stores multiple RegInvImage elements, keyed by RegistryName.
-type MasterInventory map[RegistryName]RegInvImage
+type MasterInventory map[image.Registry]RegInvImage
 
 // A RegInvImage is a map containing all of the image names, and their
 // associated digest-to-tags mappings. It is the simplest view of a Docker
-// Registry, because the keys are just the ImageNames (where each ImageName does
+// Registry, because the keys are just the image.Names (where each image.Name does
 // *not* include the registry name, because we already key this by the
 // RegistryName in MasterInventory).
 //
-// The ImageName is actually a path name, because it can be "foo/bar/baz", where
+// The image.Name is actually a path name, because it can be "foo/bar/baz", where
 // the image name is the string after the last slash (in this case, "baz").
-type RegInvImage map[ImageName]DigestTags
+type RegInvImage map[image.Name]DigestTags
 
-// ImageTag is a combination of the ImageName and Tag.
+// ImageTag is a combination of the image.Name and Tag.
 type ImageTag struct {
-	ImageName ImageName
-	Tag       Tag
+	ImageName image.Name
+	Tag       image.Tag
 }
 
 // TagOp is an enum that describes the various types of tag-modifying
@@ -210,14 +211,14 @@ const (
 // promotion (or demotion!) (involving any TagOp).
 type PromotionRequest struct {
 	TagOp          TagOp
-	RegistrySrc    RegistryName
-	RegistryDest   RegistryName
+	RegistrySrc    image.Registry
+	RegistryDest   image.Registry
 	ServiceAccount string
-	ImageNameSrc   ImageName
-	ImageNameDest  ImageName
-	Digest         Digest
-	DigestOld      Digest // Only for tag moves.
-	Tag            Tag
+	ImageNameSrc   image.Name
+	ImageNameDest  image.Name
+	Digest         image.Digest
+	DigestOld      image.Digest // Only for tag moves.
+	Tag            image.Tag
 }
 
 // Manifest stores the information in a manifest file (describing the
@@ -291,7 +292,7 @@ type ThinManifest struct {
 // sense, and holds all the information relating to a particular image that we
 // care about.
 type Image struct {
-	ImageName ImageName  `yaml:"name"`
+	ImageName image.Name `yaml:"name"`
 	Dmap      DigestTags `yaml:"dmap,omitempty"`
 }
 
@@ -306,57 +307,41 @@ type RegistryImagePath string
 // associated with a TagSlice because an image digest can have more than 1 tag
 // pointing to it, even within the same image name's namespace (tags are
 // namespaced by the image name).
-type DigestTags map[Digest]TagSlice
+type DigestTags map[image.Digest]TagSlice
 
 // RegistryContext holds information about a registry, to be written in a
 // manifest file.
 type RegistryContext struct {
-	Name           RegistryName `yaml:"name,omitempty"`
-	ServiceAccount string       `yaml:"service-account,omitempty"`
-	Token          gcloud.Token `yaml:"-"`
-	Src            bool         `yaml:"src,omitempty"`
+	Name           image.Registry `yaml:"name,omitempty"`
+	ServiceAccount string         `yaml:"service-account,omitempty"`
+	Token          gcloud.Token   `yaml:"-"`
+	Src            bool           `yaml:"src,omitempty"`
 }
 
 // GCRManifestListContext is used only for reading GCRManifestList information
 // from GCR, in the function ReadGCRManifestLists.
 type GCRManifestListContext struct {
 	RegistryContext RegistryContext
-	ImageName       ImageName
-	Tag             Tag
-	Digest          Digest
+	ImageName       image.Name
+	Tag             image.Tag
+	Digest          image.Digest
 }
 
-// RegistryName is the leading part of an image name that includes the domain;
-// it is everything that is not the actual image name itself. E.g.,
-// "gcr.io/google-containers".
-type RegistryName string
-
-// The ImageName can be just the bare name itself (e.g., "addon-builder" in
-// "gcr.io/k8s-image-staging/addon-builder") or the prefix + name
-// ("foo/bar/baz/quux" in "gcr.io/hello/foo/bar/baz/quux").
-type ImageName string
-
 // DigestMediaType holds media information about a Digest.
-type DigestMediaType map[Digest]cr.MediaType
+type DigestMediaType map[image.Digest]cr.MediaType
 
 // DigestImageSize holds information about the size of an image in bytes.
-type DigestImageSize map[Digest]int
+type DigestImageSize map[image.Digest]int
 
 // ParentDigest holds a map of the digests of children to parent digests. It is
 // a reverse mapping of ManifestLists, which point to all the child manifests.
-type ParentDigest map[Digest]Digest
-
-// Digest is a string that contains the SHA256 hash of a Docker container image.
-type Digest string
-
-// Tag is a Docker tag.
-type Tag string
+type ParentDigest map[image.Digest]image.Digest
 
 // TagSlice is a slice of Tags.
-type TagSlice []Tag
+type TagSlice []image.Tag
 
 // TagSet is a set of Tags.
-type TagSet map[Tag]interface{}
+type TagSet map[image.Tag]interface{}
 
 // PopulateRequests is a function that can generate requests used to fetch
 // information about a Docker Registry, or to promote images. It basically
@@ -382,13 +367,14 @@ type ProcessRequest func(
 // PromotionContext holds all info required to create a stream that would
 // produce a stream.Producer, as it relates to an intent to promote an image.
 type PromotionContext func(
-	RegistryName, // srcRegisttry
-	ImageName, // srcImage
+	image.Registry, // srcRegistry
+	image.Name, // srcImage
 	RegistryContext, // destRegistryContext (need service acc)
-	ImageName, // destImage
-	Digest,
-	Tag,
-	TagOp) stream.Producer
+	image.Name, // destImage
+	image.Digest,
+	image.Tag,
+	TagOp,
+) stream.Producer
 
 // ImageWithDigestSlice uses a slice of digests instead of a map, allowing its
 // contents to be sorted.
@@ -437,10 +423,10 @@ type GCRPubSubPayload struct {
 	Path string
 
 	// Image digest, if any.
-	Digest Digest
+	Digest image.Digest
 
 	// Tag, if any.
-	Tag Tag
+	Tag image.Tag
 }
 
 // YamlMarshalingOpts holds options for tweaking the YAML output.

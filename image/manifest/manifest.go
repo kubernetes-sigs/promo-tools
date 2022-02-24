@@ -26,6 +26,7 @@ import (
 	"golang.org/x/xerrors"
 
 	reg "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
+	"sigs.k8s.io/promo-tools/v3/types/image"
 )
 
 const (
@@ -40,13 +41,13 @@ type GrowOptions struct {
 	// StagingRepo is the staging subproject repo to read from. If no filters
 	// are provided, all images are attempted to be promoted as-is without any
 	// modifications.
-	StagingRepo reg.RegistryName
+	StagingRepo image.Registry
 	// FilterImage is the image (name) to filter by. Optional.
-	FilterImages []reg.ImageName
+	FilterImages []image.Name
 	// FilterDigest is the image digest to filter by. Optional.
-	FilterDigests []reg.Digest
+	FilterDigests []image.Digest
 	// FilterTags is the image tag to filter by. Optional.
-	FilterTags []reg.Tag
+	FilterTags []image.Tag
 }
 
 // Populate sets the values for GrowOptions.
@@ -64,7 +65,7 @@ func (o *GrowOptions) Populate(
 	}
 
 	o.BaseDir = baseDirAbsPath
-	o.StagingRepo = reg.RegistryName(stagingRepo)
+	o.StagingRepo = image.Registry(stagingRepo)
 	o.FilterImages = toImageNames(filterImages)
 	o.FilterDigests = toDigests(filterDigests)
 	o.FilterTags = toTags(filterTags)
@@ -72,30 +73,30 @@ func (o *GrowOptions) Populate(
 	return nil
 }
 
-func toImageNames(imageStrings []string) []reg.ImageName {
-	imgNames := []reg.ImageName{}
+func toImageNames(imageStrings []string) []image.Name {
+	imgNames := []image.Name{}
 	for _, imgString := range imageStrings {
-		imgName := reg.ImageName(imgString)
+		imgName := image.Name(imgString)
 		imgNames = append(imgNames, imgName)
 	}
 
 	return imgNames
 }
 
-func toTags(tagStrings []string) []reg.Tag {
-	tags := []reg.Tag{}
+func toTags(tagStrings []string) []image.Tag {
+	tags := []image.Tag{}
 	for _, tagString := range tagStrings {
-		tag := reg.Tag(tagString)
+		tag := image.Tag(tagString)
 		tags = append(tags, tag)
 	}
 
 	return tags
 }
 
-func toDigests(digestStrings []string) []reg.Digest {
-	digests := []reg.Digest{}
+func toDigests(digestStrings []string) []image.Digest {
+	digests := []image.Digest{}
 	for _, digestString := range digestStrings {
-		digest := reg.Digest(digestString)
+		digest := image.Digest(digestString)
 		digests = append(digests, digest)
 	}
 
@@ -120,9 +121,9 @@ func (o *GrowOptions) Validate() error {
 	return nil
 }
 
-func containsTag(tags []reg.Tag, check string) bool {
+func containsTag(tags []image.Tag, check string) bool {
 	for _, tag := range tags {
-		if tag == reg.Tag(check) {
+		if tag == image.Tag(check) {
 			return true
 		}
 	}
@@ -265,7 +266,7 @@ func ApplyFilters(o *GrowOptions, rii reg.RegInvImage) (reg.RegInvImage, error) 
 	}
 
 	// Remove any other tags that should still be filtered.
-	excludeTags := map[reg.Tag]bool{latestTag: true}
+	excludeTags := map[image.Tag]bool{latestTag: true}
 	rii = ExcludeTags(rii, excludeTags)
 
 	if len(rii) == 0 {
@@ -279,7 +280,7 @@ func ApplyFilters(o *GrowOptions, rii reg.RegInvImage) (reg.RegInvImage, error) 
 
 // FilterByImages removes all images in RegInvImage that do not match the
 // filterImage.
-func FilterByImages(rii reg.RegInvImage, filterImages []reg.ImageName) reg.RegInvImage {
+func FilterByImages(rii reg.RegInvImage, filterImages []image.Name) reg.RegInvImage {
 	filtered := make(reg.RegInvImage)
 	for imageName, digestTags := range rii {
 		for _, filterImage := range filterImages {
@@ -294,7 +295,7 @@ func FilterByImages(rii reg.RegInvImage, filterImages []reg.ImageName) reg.RegIn
 // FilterByTags removes all images in RegInvImage that do not match the
 // filterTag.
 // TODO(manifest): Dedupe with `FilterByTag` in legacy/dockerregistry/inventory.go
-func FilterByTags(rii reg.RegInvImage, filterTags []reg.Tag) reg.RegInvImage {
+func FilterByTags(rii reg.RegInvImage, filterTags []image.Tag) reg.RegInvImage {
 	filtered := make(reg.RegInvImage)
 
 	for imageName, digestTags := range rii {
@@ -321,7 +322,7 @@ func FilterByTags(rii reg.RegInvImage, filterTags []reg.Tag) reg.RegInvImage {
 
 // FilterByDigests removes all images in RegInvImage that do not match the
 // filterDigest.
-func FilterByDigests(rii reg.RegInvImage, filterDigests []reg.Digest) reg.RegInvImage {
+func FilterByDigests(rii reg.RegInvImage, filterDigests []image.Digest) reg.RegInvImage {
 	filtered := make(reg.RegInvImage)
 	for imageName, digestTags := range rii {
 		for digest, tags := range digestTags {
@@ -340,7 +341,7 @@ func FilterByDigests(rii reg.RegInvImage, filterDigests []reg.Digest) reg.RegInv
 }
 
 // ExcludeTags removes tags in rii that match excludedTags.
-func ExcludeTags(rii reg.RegInvImage, excludedTags map[reg.Tag]bool) reg.RegInvImage {
+func ExcludeTags(rii reg.RegInvImage, excludedTags map[image.Tag]bool) reg.RegInvImage {
 	filtered := make(reg.RegInvImage)
 	for imageName, digestTags := range rii {
 		for digest, tags := range digestTags {
