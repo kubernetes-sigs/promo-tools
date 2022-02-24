@@ -236,6 +236,15 @@ type Manifest struct {
 	Filepath    string
 }
 
+// ToRegInvImage converts a Manifest into a RegInvImage.
+func (manifest *Manifest) ToRegInvImage() RegInvImage {
+	rii := make(RegInvImage)
+	for _, image := range manifest.Images {
+		rii[image.ImageName] = image.Dmap
+	}
+	return rii
+}
+
 // ThinManifest is a more secure Manifest because it does not define the
 // Images[] directly, but moves it to a separate location. The idea is to define
 // a ThinManifest type as a YAML in one folder, and to define the []Image in
