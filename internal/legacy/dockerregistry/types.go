@@ -23,6 +23,7 @@ import (
 	grafeaspb "google.golang.org/genproto/googleapis/grafeas/v1"
 	"gopkg.in/src-d/go-git.v4/plumbing"
 
+	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/registry"
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/gcloud"
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/stream"
 	"sigs.k8s.io/promo-tools/v3/types/image"
@@ -149,7 +150,7 @@ type VertexProperty struct {
 	DigestExists    bool
 	PqinDigestMatch bool
 	BadDigest       image.Digest
-	OtherTags       TagSlice
+	OtherTags       registry.TagSlice
 }
 
 // RootRepo is the toplevel Docker repository (e.g., gcr.io/foo (GCR domain name
@@ -157,17 +158,7 @@ type VertexProperty struct {
 type RootRepo string
 
 // MasterInventory stores multiple RegInvImage elements, keyed by RegistryName.
-type MasterInventory map[image.Registry]RegInvImage
-
-// A RegInvImage is a map containing all of the image names, and their
-// associated digest-to-tags mappings. It is the simplest view of a Docker
-// Registry, because the keys are just the image.Names (where each image.Name does
-// *not* include the registry name, because we already key this by the
-// RegistryName in MasterInventory).
-//
-// The image.Name is actually a path name, because it can be "foo/bar/baz", where
-// the image name is the string after the last slash (in this case, "baz").
-type RegInvImage map[image.Name]DigestTags
+type MasterInventory map[image.Registry]registry.RegInvImage
 
 // ImageTag is a combination of the image.Name and Tag.
 type ImageTag struct {
@@ -238,8 +229,8 @@ type Manifest struct {
 }
 
 // ToRegInvImage converts a Manifest into a RegInvImage.
-func (manifest *Manifest) ToRegInvImage() RegInvImage {
-	rii := make(RegInvImage)
+func (manifest *Manifest) ToRegInvImage() registry.RegInvImage {
+	rii := make(registry.RegInvImage)
 	for _, img := range manifest.Images {
 		rii[img.Name] = img.Dmap
 	}
@@ -292,8 +283,8 @@ type ThinManifest struct {
 // sense, and holds all the information relating to a particular image that we
 // care about.
 type Image struct {
-	Name image.Name `yaml:"name"`
-	Dmap DigestTags `yaml:"dmap,omitempty"`
+	Name image.Name          `yaml:"name"`
+	Dmap registry.DigestTags `yaml:"dmap,omitempty"`
 }
 
 // Images is a slice of Image types.
@@ -302,12 +293,6 @@ type Images []Image
 // RegistryImagePath is the registry name and image name, without the tag. E.g.
 // "gcr.io/foo/bar/baz/image".
 type RegistryImagePath string
-
-// DigestTags is a map where each digest is associated with a TagSlice. It is
-// associated with a TagSlice because an image digest can have more than 1 tag
-// pointing to it, even within the same image name's namespace (tags are
-// namespaced by the image name).
-type DigestTags map[image.Digest]TagSlice
 
 // RegistryContext holds information about a registry, to be written in a
 // manifest file.
@@ -336,12 +321,6 @@ type DigestImageSize map[image.Digest]int
 // ParentDigest holds a map of the digests of children to parent digests. It is
 // a reverse mapping of ManifestLists, which point to all the child manifests.
 type ParentDigest map[image.Digest]image.Digest
-
-// TagSlice is a slice of Tags.
-type TagSlice []image.Tag
-
-// TagSet is a set of Tags.
-type TagSet map[image.Tag]interface{}
 
 // PopulateRequests is a function that can generate requests used to fetch
 // information about a Docker Registry, or to promote images. It basically
@@ -375,18 +354,6 @@ type PromotionContext func(
 	image.Tag,
 	TagOp,
 ) stream.Producer
-
-// ImageWithDigestSlice uses a slice of digests instead of a map, allowing its
-// contents to be sorted.
-type ImageWithDigestSlice struct {
-	name    string
-	digests []digest
-}
-
-type digest struct {
-	hash string
-	tags []string
-}
 
 // TODO: Review/optimize/de-dupe (https://github.com/kubernetes-sigs/promo-tools/pull/351)
 type ImageWithParentDigestSlice struct {
@@ -428,33 +395,3 @@ type GCRPubSubPayload struct {
 	// Tag, if any.
 	Tag image.Tag
 }
-
-// YamlMarshalingOpts holds options for tweaking the YAML output.
-type YamlMarshalingOpts struct {
-	// Render multiple tags on separate lines. I.e.,
-	// prefer
-	//
-	//    sha256:abc...:
-	//    - one
-	//    - two
-	//
-	// over
-	//
-	//    sha256:abc...: ["one", "two"]
-	//
-	// If there is only 1 tag, it will be on one line in brackets (e.g.,
-	// '["one"]').
-	SplitTagsOverMultipleLines bool
-
-	// Do not quote the digest. I.e., prefer
-	//
-	//    sha256:...:
-	//
-	// over
-	//
-	//    "sha256:...":
-	//
-	BareDigest bool
-}
-
-// Various conversion functions.
