@@ -24,19 +24,21 @@ import (
 	"github.com/sirupsen/logrus"
 
 	reg "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
+	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/manifest"
+	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/registry"
 	options "sigs.k8s.io/promo-tools/v3/promoter/image/options"
 	"sigs.k8s.io/promo-tools/v3/types/image"
 )
 
 // Run a snapshot
-func (di *DefaultPromoterImplementation) Snapshot(opts *options.Options, rii reg.RegInvImage) error {
+func (di *DefaultPromoterImplementation) Snapshot(opts *options.Options, rii registry.RegInvImage) error {
 	// Run the snapshot
 	var snapshot string
 	switch strings.ToLower(opts.OutputFormat) {
 	case "csv":
 		snapshot = rii.ToCSV()
 	case "yaml":
-		snapshot = rii.ToYAML(reg.YamlMarshalingOpts{})
+		snapshot = rii.ToYAML(registry.YamlMarshalingOpts{})
 	default:
 		// In the previous cli/run it took any malformed format string. Now we err.
 		return errors.Errorf("invalid snapshot output format: %s", opts.OutputFormat)
@@ -50,9 +52,9 @@ func (di *DefaultPromoterImplementation) Snapshot(opts *options.Options, rii reg
 
 func (di *DefaultPromoterImplementation) GetSnapshotSourceRegistry(
 	opts *options.Options,
-) (*reg.RegistryContext, error) {
+) (*registry.RegistryContext, error) {
 	// Build the source registry:
-	srcRegistry := &reg.RegistryContext{
+	srcRegistry := &registry.RegistryContext{
 		ServiceAccount: opts.SnapshotSvcAcct,
 		Src:            true,
 	}
@@ -77,7 +79,7 @@ func (di *DefaultPromoterImplementation) GetSnapshotSourceRegistry(
 // specified snapshot source
 func (di *DefaultPromoterImplementation) GetSnapshotManifests(
 	opts *options.Options,
-) ([]reg.Manifest, error) {
+) ([]manifest.Manifest, error) {
 	// Build the source registry:
 	srcRegistry, err := di.GetSnapshotSourceRegistry(opts)
 	if err != nil {
@@ -85,12 +87,12 @@ func (di *DefaultPromoterImplementation) GetSnapshotManifests(
 	}
 
 	// Add it to a new manifest and return it:
-	return []reg.Manifest{
+	return []manifest.Manifest{
 		{
-			Registries: []reg.RegistryContext{
+			Registries: []registry.RegistryContext{
 				*srcRegistry,
 			},
-			Images: []reg.Image{},
+			Images: []registry.Image{},
 		},
 	}, nil
 }
@@ -100,8 +102,8 @@ func (di *DefaultPromoterImplementation) GetSnapshotManifests(
 // append it to the list of manifests generated for the snapshot
 // during GetSnapshotManifests()
 func (di *DefaultPromoterImplementation) AppendManifestToSnapshot(
-	opts *options.Options, mfests []reg.Manifest,
-) ([]reg.Manifest, error) {
+	opts *options.Options, mfests []manifest.Manifest,
+) ([]manifest.Manifest, error) {
 	// If no manifest was passed in the options, we return the
 	// same list of manifests unchanged
 	if opts.Manifest == "" {
@@ -110,7 +112,7 @@ func (di *DefaultPromoterImplementation) AppendManifestToSnapshot(
 	}
 
 	// Parse the specified manifest and append it to the list
-	mfest, err := reg.ParseManifestFromFile(opts.Manifest)
+	mfest, err := manifest.ParseManifestFromFile(opts.Manifest)
 	if err != nil {
 		return nil, errors.Wrap(err, "parsing specified manifest")
 	}
@@ -120,8 +122,8 @@ func (di *DefaultPromoterImplementation) AppendManifestToSnapshot(
 
 //
 func (di *DefaultPromoterImplementation) GetRegistryImageInventory(
-	opts *options.Options, mfests []reg.Manifest,
-) (reg.RegInvImage, error) {
+	opts *options.Options, mfests []manifest.Manifest,
+) (registry.RegInvImage, error) {
 	// I'm pretty sure the registry context here can be the same for
 	// both snapshot sources and when running in the original cli/run,
 	// In the 2nd case (Snapshot), it was recreated like we do here.
@@ -151,7 +153,7 @@ func (di *DefaultPromoterImplementation) GetRegistryImageInventory(
 
 		if opts.MinimalSnapshot {
 			if err := sc.ReadRegistriesGGCR(
-				[]reg.RegistryContext{*srcRegistry},
+				[]registry.RegistryContext{*srcRegistry},
 				true,
 			); err != nil {
 				return nil, errors.Wrap(err, "reading registry for minimal snapshot")
@@ -165,7 +167,7 @@ func (di *DefaultPromoterImplementation) GetRegistryImageInventory(
 	}
 
 	if err := sc.ReadRegistriesGGCR(
-		[]reg.RegistryContext{*srcRegistry}, true,
+		[]registry.RegistryContext{*srcRegistry}, true,
 	); err != nil {
 		return nil, errors.Wrap(err, "reading registries")
 	}

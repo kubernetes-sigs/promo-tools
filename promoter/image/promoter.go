@@ -23,6 +23,8 @@ import (
 	"github.com/sirupsen/logrus"
 
 	reg "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
+	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/manifest"
+	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/registry"
 	impl "sigs.k8s.io/promo-tools/v3/internal/promoter/image"
 	options "sigs.k8s.io/promo-tools/v3/promoter/image/options"
 )
@@ -52,21 +54,21 @@ type promoterImplementation interface {
 	// General methods common to all modes of the promoter
 	ValidateOptions(*options.Options) error
 	ActivateServiceAccounts(*options.Options) error
-	PrecheckAndExit(*options.Options, []reg.Manifest) error
+	PrecheckAndExit(*options.Options, []manifest.Manifest) error
 
 	// Methods for promotion mode:
-	ParseManifests(*options.Options) ([]reg.Manifest, error)
-	MakeSyncContext(*options.Options, []reg.Manifest) (*reg.SyncContext, error)
-	GetPromotionEdges(*reg.SyncContext, []reg.Manifest) (map[reg.PromotionEdge]interface{}, error)
+	ParseManifests(*options.Options) ([]manifest.Manifest, error)
+	MakeSyncContext(*options.Options, []manifest.Manifest) (*reg.SyncContext, error)
+	GetPromotionEdges(*reg.SyncContext, []manifest.Manifest) (map[reg.PromotionEdge]interface{}, error)
 	MakeProducerFunction(bool) impl.StreamProducerFunc
 	PromoteImages(*reg.SyncContext, map[reg.PromotionEdge]interface{}, impl.StreamProducerFunc) error
 
 	// Methods for snapshot mode:
-	GetSnapshotSourceRegistry(*options.Options) (*reg.RegistryContext, error)
-	GetSnapshotManifests(*options.Options) ([]reg.Manifest, error)
-	AppendManifestToSnapshot(*options.Options, []reg.Manifest) ([]reg.Manifest, error)
-	GetRegistryImageInventory(*options.Options, []reg.Manifest) (reg.RegInvImage, error)
-	Snapshot(*options.Options, reg.RegInvImage) error
+	GetSnapshotSourceRegistry(*options.Options) (*registry.RegistryContext, error)
+	GetSnapshotManifests(*options.Options) ([]manifest.Manifest, error)
+	AppendManifestToSnapshot(*options.Options, []manifest.Manifest) ([]manifest.Manifest, error)
+	GetRegistryImageInventory(*options.Options, []manifest.Manifest) (registry.RegInvImage, error)
+	Snapshot(*options.Options, registry.RegInvImage) error
 
 	// Methods for image vulnerability scans:
 	ScanEdges(*options.Options, *reg.SyncContext, map[reg.PromotionEdge]interface{}) error

@@ -28,6 +28,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	reg "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
+	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/manifest"
+	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/registry"
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/json"
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/stream"
 	"sigs.k8s.io/promo-tools/v3/types/image"
@@ -118,13 +120,13 @@ func TestParseRegistryManifest(t *testing.T) {
 	tests := []struct {
 		name           string
 		input          string
-		expectedOutput reg.Manifest
+		expectedOutput manifest.Manifest
 		expectedError  error
 	}{
 		{
 			"Empty manifest (invalid)",
 			``,
-			reg.Manifest{},
+			manifest.Manifest{},
 			fmt.Errorf(`'registries' field cannot be empty`),
 		},
 		{
@@ -137,8 +139,8 @@ func TestParseRegistryManifest(t *testing.T) {
   src: true
 images: []
 `,
-			reg.Manifest{
-				Registries: []reg.RegistryContext{
+			manifest.Manifest{
+				Registries: []registry.RegistryContext{
 					{
 						Name:           "gcr.io/bar",
 						ServiceAccount: "foobar@google-containers.iam.gserviceaccount.com",
@@ -150,7 +152,7 @@ images: []
 					},
 				},
 
-				Images: []reg.Image{},
+				Images: []registry.Image{},
 			},
 			nil,
 		},
@@ -170,8 +172,8 @@ images:
   dmap:
     "sha256:07353f7b26327f0d933515a22b1de587b040d3d85c464ea299c1b9f242529326": [ "1.8.3" ]  # Branches: ['master']
 `,
-			reg.Manifest{
-				Registries: []reg.RegistryContext{
+			manifest.Manifest{
+				Registries: []registry.RegistryContext{
 					{
 						Name:           "gcr.io/bar",
 						ServiceAccount: "foobar@google-containers.iam.gserviceaccount.com",
@@ -183,16 +185,16 @@ images:
 					},
 				},
 
-				Images: []reg.Image{
+				Images: []registry.Image{
 					{
 						Name: "agave",
-						Dmap: reg.DigestTags{
+						Dmap: registry.DigestTags{
 							"sha256:aab34c5841987a1b133388fa9f27e7960c4b1307e2f9147dca407ba26af48a54": {"latest"},
 						},
 					},
 					{
 						Name: "banana",
-						Dmap: reg.DigestTags{
+						Dmap: registry.DigestTags{
 							"sha256:07353f7b26327f0d933515a22b1de587b040d3d85c464ea299c1b9f242529326": {"1.8.3"},
 						},
 					},
@@ -215,7 +217,7 @@ images:
   dmap:
     "sha256:07353f7b26327f0d933515a22b1de587b040d3d85c464ea299c1b9f242529326": [ "1.8.3" ]  # Branches: ['master']
 `,
-			reg.Manifest{},
+			manifest.Manifest{},
 			fmt.Errorf("source registry must be set"),
 		},
 	}
@@ -223,7 +225,7 @@ images:
 	// Test only the JSON unmarshalling logic.
 	for _, test := range tests {
 		b := []byte(test.input)
-		imageManifest, err := reg.ParseManifestYAML(b)
+		imageManifest, err := manifest.ParseManifestYAML(b)
 
 		// Check the error as well (at the very least, we can check that the
 		// error was nil).
@@ -247,13 +249,13 @@ func TestParseThinManifestsFromDir(t *testing.T) {
 		name string
 		// "input" is folder name, relative to the location of this source file.
 		input              string
-		expectedOutput     []reg.Manifest
+		expectedOutput     []manifest.Manifest
 		expectedParseError error
 	}{
 		{
 			"No manifests found (invalid)",
 			"empty",
-			[]reg.Manifest{},
+			[]manifest.Manifest{},
 			&os.PathError{
 				Op:   "stat",
 				Path: filepath.Join(pwd, "empty/images"),
@@ -263,9 +265,9 @@ func TestParseThinManifestsFromDir(t *testing.T) {
 		{
 			"Singleton (single manifest)",
 			"singleton",
-			[]reg.Manifest{
+			[]manifest.Manifest{
 				{
-					Registries: []reg.RegistryContext{
+					Registries: []registry.RegistryContext{
 						{
 							Name:           "gcr.io/foo-staging",
 							ServiceAccount: "sa@robot.com",
@@ -284,10 +286,10 @@ func TestParseThinManifestsFromDir(t *testing.T) {
 							ServiceAccount: "sa@robot.com",
 						},
 					},
-					Images: []reg.Image{
+					Images: []registry.Image{
 						{
 							Name: "foo-controller",
-							Dmap: reg.DigestTags{
+							Dmap: registry.DigestTags{
 								"sha256:c3d310f4741b3642497da8826e0986db5e02afc9777a2b8e668c8e41034128c1": {"1.0"},
 							},
 						},
@@ -300,9 +302,9 @@ func TestParseThinManifestsFromDir(t *testing.T) {
 		{
 			"Multiple (with 'rebase')",
 			"multiple-rebases",
-			[]reg.Manifest{
+			[]manifest.Manifest{
 				{
-					Registries: []reg.RegistryContext{
+					Registries: []registry.RegistryContext{
 						{
 							Name:           "gcr.io/foo-staging",
 							ServiceAccount: "sa@robot.com",
@@ -321,10 +323,10 @@ func TestParseThinManifestsFromDir(t *testing.T) {
 							ServiceAccount: "sa@robot.com",
 						},
 					},
-					Images: []reg.Image{
+					Images: []registry.Image{
 						{
 							Name: "foo-controller",
-							Dmap: reg.DigestTags{
+							Dmap: registry.DigestTags{
 								"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": {"1.0"},
 							},
 						},
@@ -332,7 +334,7 @@ func TestParseThinManifestsFromDir(t *testing.T) {
 					Filepath: "manifests/a/promoter-manifest.yaml",
 				},
 				{
-					Registries: []reg.RegistryContext{
+					Registries: []registry.RegistryContext{
 						{
 							Name:           "gcr.io/bar-staging",
 							ServiceAccount: "sa@robot.com",
@@ -351,10 +353,10 @@ func TestParseThinManifestsFromDir(t *testing.T) {
 							ServiceAccount: "sa@robot.com",
 						},
 					},
-					Images: []reg.Image{
+					Images: []registry.Image{
 						{
 							Name: "bar-controller",
-							Dmap: reg.DigestTags{
+							Dmap: registry.DigestTags{
 								"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": {"1.0"},
 							},
 						},
@@ -367,9 +369,9 @@ func TestParseThinManifestsFromDir(t *testing.T) {
 		{
 			"Basic (multiple thin manifests)",
 			"basic-thin",
-			[]reg.Manifest{
+			[]manifest.Manifest{
 				{
-					Registries: []reg.RegistryContext{
+					Registries: []registry.RegistryContext{
 						{
 							Name:           "gcr.io/foo-staging",
 							ServiceAccount: "sa@robot.com",
@@ -388,10 +390,10 @@ func TestParseThinManifestsFromDir(t *testing.T) {
 							ServiceAccount: "sa@robot.com",
 						},
 					},
-					Images: []reg.Image{
+					Images: []registry.Image{
 						{
 							Name: "foo-controller",
-							Dmap: reg.DigestTags{
+							Dmap: registry.DigestTags{
 								"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": {"1.0"},
 							},
 						},
@@ -399,7 +401,7 @@ func TestParseThinManifestsFromDir(t *testing.T) {
 					Filepath: "manifests/a/promoter-manifest.yaml",
 				},
 				{
-					Registries: []reg.RegistryContext{
+					Registries: []registry.RegistryContext{
 						{
 							Name:           "gcr.io/bar-staging",
 							ServiceAccount: "sa@robot.com",
@@ -418,10 +420,10 @@ func TestParseThinManifestsFromDir(t *testing.T) {
 							ServiceAccount: "sa@robot.com",
 						},
 					},
-					Images: []reg.Image{
+					Images: []registry.Image{
 						{
 							Name: "bar-controller",
-							Dmap: reg.DigestTags{
+							Dmap: registry.DigestTags{
 								"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": {"1.0"},
 							},
 						},
@@ -429,7 +431,7 @@ func TestParseThinManifestsFromDir(t *testing.T) {
 					Filepath: "manifests/b/promoter-manifest.yaml",
 				},
 				{
-					Registries: []reg.RegistryContext{
+					Registries: []registry.RegistryContext{
 						{
 							Name:           "gcr.io/cat-staging",
 							ServiceAccount: "sa@robot.com",
@@ -448,10 +450,10 @@ func TestParseThinManifestsFromDir(t *testing.T) {
 							ServiceAccount: "sa@robot.com",
 						},
 					},
-					Images: []reg.Image{
+					Images: []registry.Image{
 						{
 							Name: "cat-controller",
-							Dmap: reg.DigestTags{
+							Dmap: registry.DigestTags{
 								"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc": {"1.0"},
 							},
 						},
@@ -459,7 +461,7 @@ func TestParseThinManifestsFromDir(t *testing.T) {
 					Filepath: "manifests/c/promoter-manifest.yaml",
 				},
 				{
-					Registries: []reg.RegistryContext{
+					Registries: []registry.RegistryContext{
 						{
 							Name:           "gcr.io/qux-staging",
 							ServiceAccount: "sa@robot.com",
@@ -478,10 +480,10 @@ func TestParseThinManifestsFromDir(t *testing.T) {
 							ServiceAccount: "sa@robot.com",
 						},
 					},
-					Images: []reg.Image{
+					Images: []registry.Image{
 						{
 							Name: "qux-controller",
-							Dmap: reg.DigestTags{
+							Dmap: registry.DigestTags{
 								"sha256:0000000000000000000000000000000000000000000000000000000000000000": {"1.0"},
 							},
 						},
@@ -503,7 +505,7 @@ func TestParseThinManifestsFromDir(t *testing.T) {
 			expectedModified = append(expectedModified, mfest)
 		}
 
-		got, errParse := reg.ParseThinManifestsFromDir(fixtureDir)
+		got, errParse := manifest.ParseThinManifestsFromDir(fixtureDir)
 
 		// Clear private fields (redundant data) that are calculated on-the-fly
 		// (it's too verbose to include them here; besides, it's not what we're
@@ -549,7 +551,7 @@ func TestValidateThinManifestsFromDir(t *testing.T) {
 	for _, testInput := range shouldBeValid {
 		fixtureDir := filepath.Join(pwd, "valid", testInput)
 
-		mfests, errParse := reg.ParseThinManifestsFromDir(fixtureDir)
+		mfests, errParse := manifest.ParseThinManifestsFromDir(fixtureDir)
 		require.Nil(t, errParse)
 
 		_, edgeErr := reg.ToPromotionEdges(mfests)
@@ -599,7 +601,7 @@ func TestValidateThinManifestsFromDir(t *testing.T) {
 		// It could be that a manifest, taken individually, failed on its own,
 		// before we even get to ValidateThinManifestsFromDir(). So handle these
 		// cases as well.
-		mfests, errParse := reg.ParseThinManifestsFromDir(fixtureDir)
+		mfests, errParse := manifest.ParseThinManifestsFromDir(fixtureDir)
 
 		var errParseStr string
 		var expectedParseErrorStr string
@@ -628,7 +630,7 @@ func TestParseImageDigest(t *testing.T) {
 
 	for _, testInput := range shouldBeValid {
 		d := image.Digest(testInput)
-		got := reg.ValidateDigest(d)
+		got := manifest.ValidateDigest(d)
 		require.Nil(t, got)
 	}
 
@@ -647,7 +649,7 @@ func TestParseImageDigest(t *testing.T) {
 
 	for _, testInput := range shouldBeInvalid {
 		d := image.Digest(testInput)
-		got := reg.ValidateDigest(d)
+		got := manifest.ValidateDigest(d)
 		require.Equal(t, fmt.Errorf("invalid digest: %v", d), got)
 	}
 }
@@ -666,7 +668,7 @@ func TestParseImageTag(t *testing.T) {
 
 	for _, testInput := range shouldBeValid {
 		tag := image.Tag(testInput)
-		got := reg.ValidateTag(tag)
+		got := manifest.ValidateTag(tag)
 		require.Nil(t, got)
 	}
 
@@ -687,7 +689,7 @@ func TestParseImageTag(t *testing.T) {
 
 	for _, testInput := range shouldBeInvalid {
 		tag := image.Tag(testInput)
-		got := reg.ValidateTag(tag)
+		got := manifest.ValidateTag(tag)
 		require.Equal(t, fmt.Errorf("invalid tag: %v", tag), got)
 	}
 }
@@ -796,9 +798,9 @@ func TestSplitByKnownRegistries(t *testing.T) {
 		`us.gcr.io/k8s-artifacts-prod/metrics-server`,
 		`us.gcr.io/k8s-artifacts-prod`,
 	}
-	knownRegistryContexts := make([]reg.RegistryContext, 0)
+	knownRegistryContexts := make([]registry.RegistryContext, 0)
 	for _, knownRegistryName := range knownRegistryNames {
-		rc := reg.RegistryContext{}
+		rc := registry.RegistryContext{}
 		rc.Name = knownRegistryName
 		knownRegistryContexts = append(knownRegistryContexts, rc)
 	}
@@ -834,7 +836,7 @@ func TestSplitByKnownRegistries(t *testing.T) {
 }
 
 func TestCommandGeneration(t *testing.T) {
-	destRC := reg.RegistryContext{
+	destRC := registry.RegistryContext{
 		Name:           "gcr.io/foo",
 		ServiceAccount: "robot",
 	}
@@ -941,7 +943,7 @@ func TestReadRegistries(t *testing.T) {
 	tests := []struct {
 		name           string
 		input          map[string]string
-		expectedOutput reg.RegInvImage
+		expectedOutput registry.RegInvImage
 	}{
 		{
 			"Only toplevel repos (no child repos)",
@@ -1005,7 +1007,7 @@ func TestReadRegistries(t *testing.T) {
   ]
 }`,
 			},
-			reg.RegInvImage{
+			registry.RegInvImage{
 				"addon-resizer": {
 					"sha256:b5b2d91319f049143806baeacc886f82f621e9a2550df856b11b5c22db4570a7": {"latest"},
 					"sha256:0519a83e8f217e33dd06fe7a7347444cfda5e2e29cf52aaa24755999cb104a4d": {"1.0"},
@@ -1119,7 +1121,7 @@ func TestReadRegistries(t *testing.T) {
   ]
 }`,
 			},
-			reg.RegInvImage{
+			registry.RegInvImage{
 				"addon-resizer": {
 					"sha256:b5b2d91319f049143806baeacc886f82f621e9a2550df856b11b5c22db4570a7": {"latest"},
 					"sha256:0519a83e8f217e33dd06fe7a7347444cfda5e2e29cf52aaa24755999cb104a4d": {"1.0"},
@@ -1130,7 +1132,7 @@ func TestReadRegistries(t *testing.T) {
 				"pause/childLevel1": {
 					"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": {"aaa"},
 				},
-				"pause/childLevel1/childLevel2": reg.DigestTags{
+				"pause/childLevel1/childLevel2": registry.DigestTags{
 					"sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff": {"fff"},
 				},
 			},
@@ -1139,7 +1141,7 @@ func TestReadRegistries(t *testing.T) {
 	for _, test := range tests {
 		// Destination registry is a placeholder, because ReadImageNames acts on
 		// 2 registries (src and dest) at once.
-		rcs := []reg.RegistryContext{
+		rcs := []registry.RegistryContext{
 			{
 				Name:           fakeRegName,
 				ServiceAccount: "robot",
@@ -1148,7 +1150,7 @@ func TestReadRegistries(t *testing.T) {
 
 		sc := reg.SyncContext{
 			RegistryContexts: rcs,
-			Inv:              map[image.Registry]reg.RegInvImage{fakeRegName: nil},
+			Inv:              map[image.Registry]registry.RegInvImage{fakeRegName: nil},
 			DigestMediaType:  make(reg.DigestMediaType),
 			DigestImageSize:  make(reg.DigestImageSize),
 		}
@@ -1156,7 +1158,7 @@ func TestReadRegistries(t *testing.T) {
 		// test is used to pin the "test" variable from the outer "range"
 		// scope (see scopelint).
 		test := test
-		mkFakeStream1 := func(sc *reg.SyncContext, rc reg.RegistryContext) stream.Producer {
+		mkFakeStream1 := func(sc *reg.SyncContext, rc registry.RegistryContext) stream.Producer {
 			var sr stream.Fake
 
 			_, domain, repoPath := reg.GetTokenKeyDomainRepoPath(rc.Name)
@@ -1221,7 +1223,7 @@ func TestReadGManifestLists(t *testing.T) {
 	for _, test := range tests {
 		// Destination registry is a placeholder, because ReadImageNames acts on
 		// 2 registries (src and dest) at once.
-		rcs := []reg.RegistryContext{
+		rcs := []registry.RegistryContext{
 			{
 				Name:           fakeRegName,
 				ServiceAccount: "robot",
@@ -1229,9 +1231,9 @@ func TestReadGManifestLists(t *testing.T) {
 		}
 		sc := reg.SyncContext{
 			RegistryContexts: rcs,
-			Inv: map[image.Registry]reg.RegInvImage{
+			Inv: map[image.Registry]registry.RegInvImage{
 				"gcr.io/foo": {
-					"someImage": reg.DigestTags{
+					"someImage": registry.DigestTags{
 						"sha256:0000000000000000000000000000000000000000000000000000000000000000": {"1.0"},
 					},
 				},
@@ -1299,14 +1301,14 @@ func TestGetTokenKeyDomainRepoPath(t *testing.T) {
 func TestSetManipulationsRegistryInventories(t *testing.T) {
 	tests := []struct {
 		name           string
-		input1         reg.RegInvImage
-		input2         reg.RegInvImage
-		op             func(a, b reg.RegInvImage) reg.RegInvImage
-		expectedOutput reg.RegInvImage
+		input1         registry.RegInvImage
+		input2         registry.RegInvImage
+		op             func(a, b registry.RegInvImage) registry.RegInvImage
+		expectedOutput registry.RegInvImage
 	}{
 		{
 			"Set Minus",
-			reg.RegInvImage{
+			registry.RegInvImage{
 				"foo": {
 					"sha256:abc": {"1.0", "latest"},
 				},
@@ -1314,7 +1316,7 @@ func TestSetManipulationsRegistryInventories(t *testing.T) {
 					"sha256:def": {"0.9"},
 				},
 			},
-			reg.RegInvImage{
+			registry.RegInvImage{
 				"foo": {
 					"sha256:abc": {"1.0", "latest"},
 				},
@@ -1322,12 +1324,12 @@ func TestSetManipulationsRegistryInventories(t *testing.T) {
 					"sha256:def": {"0.9"},
 				},
 			},
-			reg.RegInvImage.Minus,
-			reg.RegInvImage{},
+			registry.RegInvImage.Minus,
+			registry.RegInvImage{},
 		},
 		{
 			"Set Union",
-			reg.RegInvImage{
+			registry.RegInvImage{
 				"foo": {
 					"sha256:abc": {"1.0", "latest"},
 				},
@@ -1335,7 +1337,7 @@ func TestSetManipulationsRegistryInventories(t *testing.T) {
 					"sha256:def": {"0.9"},
 				},
 			},
-			reg.RegInvImage{
+			registry.RegInvImage{
 				"apple": {
 					"sha256:abc": {"1.0", "latest"},
 				},
@@ -1343,8 +1345,8 @@ func TestSetManipulationsRegistryInventories(t *testing.T) {
 					"sha256:def": {"0.9"},
 				},
 			},
-			reg.RegInvImage.Union,
-			reg.RegInvImage{
+			registry.RegInvImage.Union,
+			registry.RegInvImage{
 				"foo": {
 					"sha256:abc": {"1.0", "latest"},
 				},
@@ -1371,80 +1373,80 @@ func TestSetManipulationsRegistryInventories(t *testing.T) {
 func TestSetManipulationsTags(t *testing.T) {
 	tests := []struct {
 		name           string
-		input1         reg.TagSlice
-		input2         reg.TagSlice
-		op             func(a, b reg.TagSlice) reg.TagSet
-		expectedOutput reg.TagSet
+		input1         registry.TagSlice
+		input2         registry.TagSlice
+		op             func(a, b registry.TagSlice) registry.TagSet
+		expectedOutput registry.TagSet
 	}{
 		{
 			"Set Minus (both blank)",
-			reg.TagSlice{},
-			reg.TagSlice{},
-			reg.TagSlice.Minus,
-			reg.TagSet{},
+			registry.TagSlice{},
+			registry.TagSlice{},
+			registry.TagSlice.Minus,
+			registry.TagSet{},
 		},
 		{
 			"Set Minus (first blank)",
-			reg.TagSlice{},
-			reg.TagSlice{"a"},
-			reg.TagSlice.Minus,
-			reg.TagSet{},
+			registry.TagSlice{},
+			registry.TagSlice{"a"},
+			registry.TagSlice.Minus,
+			registry.TagSet{},
 		},
 		{
 			"Set Minus (second blank)",
-			reg.TagSlice{"a", "b"},
-			reg.TagSlice{},
-			reg.TagSlice.Minus,
-			reg.TagSet{"a": nil, "b": nil},
+			registry.TagSlice{"a", "b"},
+			registry.TagSlice{},
+			registry.TagSlice.Minus,
+			registry.TagSet{"a": nil, "b": nil},
 		},
 		{
 			"Set Minus",
-			reg.TagSlice{"a", "b"},
-			reg.TagSlice{"b"},
-			reg.TagSlice.Minus,
-			reg.TagSet{"a": nil},
+			registry.TagSlice{"a", "b"},
+			registry.TagSlice{"b"},
+			registry.TagSlice.Minus,
+			registry.TagSet{"a": nil},
 		},
 		{
 			"Set Union (both blank)",
-			reg.TagSlice{},
-			reg.TagSlice{},
-			reg.TagSlice.Union,
-			reg.TagSet{},
+			registry.TagSlice{},
+			registry.TagSlice{},
+			registry.TagSlice.Union,
+			registry.TagSet{},
 		},
 		{
 			"Set Union (first blank)",
-			reg.TagSlice{},
-			reg.TagSlice{"a"},
-			reg.TagSlice.Union,
-			reg.TagSet{"a": nil},
+			registry.TagSlice{},
+			registry.TagSlice{"a"},
+			registry.TagSlice.Union,
+			registry.TagSet{"a": nil},
 		},
 		{
 			"Set Union (second blank)",
-			reg.TagSlice{"a"},
-			reg.TagSlice{},
-			reg.TagSlice.Union,
-			reg.TagSet{"a": nil},
+			registry.TagSlice{"a"},
+			registry.TagSlice{},
+			registry.TagSlice.Union,
+			registry.TagSet{"a": nil},
 		},
 		{
 			"Set Union",
-			reg.TagSlice{"a", "c"},
-			reg.TagSlice{"b", "d"},
-			reg.TagSlice.Union,
-			reg.TagSet{"a": nil, "b": nil, "c": nil, "d": nil},
+			registry.TagSlice{"a", "c"},
+			registry.TagSlice{"b", "d"},
+			registry.TagSlice.Union,
+			registry.TagSet{"a": nil, "b": nil, "c": nil, "d": nil},
 		},
 		{
 			"Set Intersection (no intersection)",
-			reg.TagSlice{"a"},
-			reg.TagSlice{"b"},
-			reg.TagSlice.Intersection,
-			reg.TagSet{},
+			registry.TagSlice{"a"},
+			registry.TagSlice{"b"},
+			registry.TagSlice.Intersection,
+			registry.TagSet{},
 		},
 		{
 			"Set Intersection (some intersection)",
-			reg.TagSlice{"a", "b"},
-			reg.TagSlice{"b", "c"},
-			reg.TagSlice.Intersection,
-			reg.TagSet{"b": nil},
+			registry.TagSlice{"a", "b"},
+			registry.TagSlice{"b", "c"},
+			registry.TagSlice.Intersection,
+			registry.TagSet{"b": nil},
 		},
 	}
 
@@ -1459,25 +1461,25 @@ func TestToPromotionEdges(t *testing.T) {
 	srcRegName := image.Registry("gcr.io/foo")
 	destRegName := image.Registry("gcr.io/bar")
 	destRegName2 := image.Registry("gcr.io/cat")
-	destRC := reg.RegistryContext{
+	destRC := registry.RegistryContext{
 		Name:           destRegName,
 		ServiceAccount: "robot",
 	}
-	destRC2 := reg.RegistryContext{
+	destRC2 := registry.RegistryContext{
 		Name:           destRegName2,
 		ServiceAccount: "robot",
 	}
-	srcRC := reg.RegistryContext{
+	srcRC := registry.RegistryContext{
 		Name:           srcRegName,
 		ServiceAccount: "robot",
 		Src:            true,
 	}
-	registries1 := []reg.RegistryContext{destRC, srcRC}
-	registries2 := []reg.RegistryContext{destRC, srcRC, destRC2}
+	registries1 := []registry.RegistryContext{destRC, srcRC}
+	registries2 := []registry.RegistryContext{destRC, srcRC, destRC2}
 
 	sc := reg.SyncContext{
 		Inv: reg.MasterInventory{
-			"gcr.io/foo": reg.RegInvImage{
+			"gcr.io/foo": registry.RegInvImage{
 				"a": {
 					"sha256:000": {"0.9"},
 				},
@@ -1512,7 +1514,7 @@ func TestToPromotionEdges(t *testing.T) {
 
 	tests := []struct {
 		name                  string
-		input                 []reg.Manifest
+		input                 []manifest.Manifest
 		expectedInitial       map[reg.PromotionEdge]interface{}
 		expectedInitialErr    error
 		expectedFiltered      map[reg.PromotionEdge]interface{}
@@ -1520,13 +1522,13 @@ func TestToPromotionEdges(t *testing.T) {
 	}{
 		{
 			"Basic case (1 new edge; already promoted)",
-			[]reg.Manifest{
+			[]manifest.Manifest{
 				{
 					Registries: registries1,
-					Images: []reg.Image{
+					Images: []registry.Image{
 						{
 							Name: "a",
-							Dmap: reg.DigestTags{
+							Dmap: registry.DigestTags{
 								"sha256:000": {"0.9"},
 							},
 						},
@@ -1555,13 +1557,13 @@ func TestToPromotionEdges(t *testing.T) {
 		},
 		{
 			"Basic case (2 new edges; already promoted)",
-			[]reg.Manifest{
+			[]manifest.Manifest{
 				{
 					Registries: registries2,
-					Images: []reg.Image{
+					Images: []registry.Image{
 						{
 							Name: "a",
-							Dmap: reg.DigestTags{
+							Dmap: registry.DigestTags{
 								"sha256:000": {"0.9"},
 							},
 						},
@@ -1603,13 +1605,13 @@ func TestToPromotionEdges(t *testing.T) {
 		},
 		{
 			"Tag move (tag swap image c:2.0 and c:3.0)",
-			[]reg.Manifest{
+			[]manifest.Manifest{
 				{
 					Registries: registries2,
-					Images: []reg.Image{
+					Images: []registry.Image{
 						{
 							Name: "c",
-							Dmap: reg.DigestTags{
+							Dmap: registry.DigestTags{
 								"sha256:222": {"3.0"},
 								"sha256:333": {"2.0"},
 							},
@@ -1698,11 +1700,11 @@ func TestToPromotionEdges(t *testing.T) {
 func TestCheckOverlappingEdges(t *testing.T) {
 	srcRegName := image.Registry("gcr.io/foo")
 	destRegName := image.Registry("gcr.io/bar")
-	destRC := reg.RegistryContext{
+	destRC := registry.RegistryContext{
 		Name:           destRegName,
 		ServiceAccount: "robot",
 	}
-	srcRC := reg.RegistryContext{
+	srcRC := registry.RegistryContext{
 		Name:           srcRegName,
 		ServiceAccount: "robot",
 		Src:            true,
@@ -1981,22 +1983,22 @@ func TestPromotion(t *testing.T) {
 	srcRegName := image.Registry("gcr.io/foo")
 	destRegName := image.Registry("gcr.io/bar")
 	destRegName2 := image.Registry("gcr.io/cat")
-	destRC := reg.RegistryContext{
+	destRC := registry.RegistryContext{
 		Name:           destRegName,
 		ServiceAccount: "robot",
 	}
-	destRC2 := reg.RegistryContext{
+	destRC2 := registry.RegistryContext{
 		Name:           destRegName2,
 		ServiceAccount: "robot",
 	}
-	srcRC := reg.RegistryContext{
+	srcRC := registry.RegistryContext{
 		Name:           srcRegName,
 		ServiceAccount: "robot",
 		Src:            true,
 	}
-	registries := []reg.RegistryContext{destRC, srcRC, destRC2}
+	registries := []registry.RegistryContext{destRC, srcRC, destRC2}
 
-	registriesRebase := []reg.RegistryContext{
+	registriesRebase := []registry.RegistryContext{
 		{
 			Name:           image.Registry("us.gcr.io/dog/some/subdir/path/foo"),
 			ServiceAccount: "robot",
@@ -2006,7 +2008,7 @@ func TestPromotion(t *testing.T) {
 
 	tests := []struct {
 		name                  string
-		inputM                reg.Manifest
+		inputM                manifest.Manifest
 		inputSc               reg.SyncContext
 		badReads              []image.Registry
 		expectedReqs          reg.CapturedRequests
@@ -2015,7 +2017,7 @@ func TestPromotion(t *testing.T) {
 		{
 			// TODO: Use quickcheck to ensure certain properties.
 			"No promotion",
-			reg.Manifest{},
+			manifest.Manifest{},
 			reg.SyncContext{},
 			nil,
 			reg.CapturedRequests{},
@@ -2023,12 +2025,12 @@ func TestPromotion(t *testing.T) {
 		},
 		{
 			"No promotion; tag is already promoted",
-			reg.Manifest{
+			manifest.Manifest{
 				Registries: registries,
-				Images: []reg.Image{
+				Images: []registry.Image{
 					{
 						Name: "a",
-						Dmap: reg.DigestTags{
+						Dmap: registry.DigestTags{
 							"sha256:000": {"0.9"},
 						},
 					},
@@ -2063,18 +2065,18 @@ func TestPromotion(t *testing.T) {
 		},
 		{
 			"No promotion; network errors reading from src registry for all images",
-			reg.Manifest{
+			manifest.Manifest{
 				Registries: registries,
-				Images: []reg.Image{
+				Images: []registry.Image{
 					{
 						Name: "a",
-						Dmap: reg.DigestTags{
+						Dmap: registry.DigestTags{
 							"sha256:000": {"0.9"},
 						},
 					},
 					{
 						Name: "b",
-						Dmap: reg.DigestTags{
+						Dmap: registry.DigestTags{
 							"sha256:111": {"0.9"},
 						},
 					},
@@ -2100,12 +2102,12 @@ func TestPromotion(t *testing.T) {
 		},
 		{
 			"Promote 1 tag; image digest does not exist in dest",
-			reg.Manifest{
+			manifest.Manifest{
 				Registries: registries,
-				Images: []reg.Image{
+				Images: []registry.Image{
 					{
 						Name: "a",
-						Dmap: reg.DigestTags{
+						Dmap: registry.DigestTags{
 							"sha256:000": {"0.9"},
 						},
 					},
@@ -2148,12 +2150,12 @@ func TestPromotion(t *testing.T) {
 		},
 		{
 			"Promote 1 tag; image already exists in dest, but digest does not",
-			reg.Manifest{
+			manifest.Manifest{
 				Registries: registries,
-				Images: []reg.Image{
+				Images: []registry.Image{
 					{
 						Name: "a",
-						Dmap: reg.DigestTags{
+						Dmap: registry.DigestTags{
 							"sha256:000": {"0.9"},
 						},
 					},
@@ -2196,12 +2198,12 @@ func TestPromotion(t *testing.T) {
 		},
 		{
 			"Promote 1 tag; tag already exists in dest but is pointing to a different digest (move tag)",
-			reg.Manifest{
+			manifest.Manifest{
 				Registries: registries,
-				Images: []reg.Image{
+				Images: []registry.Image{
 					{
 						Name: "a",
-						Dmap: reg.DigestTags{
+						Dmap: registry.DigestTags{
 							// sha256:bad is a bad image uploaded by a
 							// compromised account. "good" is a good tag that is
 							// already known and used for this image "a" (and in
@@ -2241,12 +2243,12 @@ func TestPromotion(t *testing.T) {
 		},
 		{
 			"Promote 1 tag as a 'rebase'",
-			reg.Manifest{
+			manifest.Manifest{
 				Registries: registriesRebase,
-				Images: []reg.Image{
+				Images: []registry.Image{
 					{
 						Name: "a",
-						Dmap: reg.DigestTags{
+						Dmap: registry.DigestTags{
 							"sha256:000": {"0.9"},
 						},
 					},
@@ -2284,12 +2286,12 @@ func TestPromotion(t *testing.T) {
 		},
 		{
 			"Promote 1 digest (tagless promotion)",
-			reg.Manifest{
+			manifest.Manifest{
 				Registries: registries,
-				Images: []reg.Image{
+				Images: []registry.Image{
 					{
 						Name: "a",
-						Dmap: reg.DigestTags{
+						Dmap: registry.DigestTags{
 							"sha256:000": {},
 						},
 					},
@@ -2333,12 +2335,12 @@ func TestPromotion(t *testing.T) {
 		},
 		{
 			"NOP; dest has extra tag, but NOP because -delete-extra-tags NOT specified",
-			reg.Manifest{
+			manifest.Manifest{
 				Registries: registries,
-				Images: []reg.Image{
+				Images: []registry.Image{
 					{
 						Name: "a",
-						Dmap: reg.DigestTags{
+						Dmap: registry.DigestTags{
 							"sha256:000": {"0.9"},
 						},
 					},
@@ -2370,19 +2372,19 @@ func TestPromotion(t *testing.T) {
 		},
 		{
 			"NOP (src registry does not have any of the images we want to promote)",
-			reg.Manifest{
+			manifest.Manifest{
 				Registries: registries,
-				Images: []reg.Image{
+				Images: []registry.Image{
 					{
 						Name: "a",
-						Dmap: reg.DigestTags{
+						Dmap: registry.DigestTags{
 							"sha256:000": {"missing-from-src"},
 							"sha256:333": {"0.8"},
 						},
 					},
 					{
 						Name: "b",
-						Dmap: reg.DigestTags{
+						Dmap: registry.DigestTags{
 							"sha256:bbb": {"also-missing"},
 						},
 					},
@@ -2412,12 +2414,12 @@ func TestPromotion(t *testing.T) {
 		},
 		{
 			"Add 1 tag for 2 registries",
-			reg.Manifest{
+			manifest.Manifest{
 				Registries: registries,
-				Images: []reg.Image{
+				Images: []registry.Image{
 					{
 						Name: "a",
-						Dmap: reg.DigestTags{
+						Dmap: registry.DigestTags{
 							"sha256:000": {"0.9", "1.0"},
 						},
 					},
@@ -2470,12 +2472,12 @@ func TestPromotion(t *testing.T) {
 		},
 		{
 			"Add 1 tag for 1 registry",
-			reg.Manifest{
+			manifest.Manifest{
 				Registries: registries,
-				Images: []reg.Image{
+				Images: []registry.Image{
 					{
 						Name: "a",
-						Dmap: reg.DigestTags{
+						Dmap: registry.DigestTags{
 							"sha256:000": {"0.9", "1.0"},
 						},
 					},
@@ -2528,7 +2530,7 @@ func TestPromotion(t *testing.T) {
 	nopStream := func(
 		srcRegistry image.Registry,
 		srcImageName image.Name,
-		rc reg.RegistryContext,
+		rc registry.RegistryContext,
 		destImageName image.Name,
 		digest image.Digest,
 		tag image.Tag,
@@ -2543,7 +2545,7 @@ func TestPromotion(t *testing.T) {
 	for _, test := range tests {
 		// Reset captured for each test.
 		captured = make(reg.CapturedRequests)
-		srcReg, err := reg.GetSrcRegistry(registries)
+		srcReg, err := registry.GetSrcRegistry(registries)
 
 		require.Nil(t, err)
 
@@ -2556,7 +2558,7 @@ func TestPromotion(t *testing.T) {
 			}
 		}
 
-		edges, err := reg.ToPromotionEdges([]reg.Manifest{test.inputM})
+		edges, err := reg.ToPromotionEdges([]manifest.Manifest{test.inputM})
 		require.Nil(t, err)
 
 		filteredEdges, gotClean := test.inputSc.FilterPromotionEdges(
@@ -2577,28 +2579,28 @@ func TestPromotion(t *testing.T) {
 func TestExecRequests(t *testing.T) {
 	sc := reg.SyncContext{}
 
-	destRC := reg.RegistryContext{
+	destRC := registry.RegistryContext{
 		Name:           image.Registry("gcr.io/bar"),
 		ServiceAccount: "robot",
 	}
 
-	destRC2 := reg.RegistryContext{
+	destRC2 := registry.RegistryContext{
 		Name:           image.Registry("gcr.io/cat"),
 		ServiceAccount: "robot",
 	}
 
-	srcRC := reg.RegistryContext{
+	srcRC := registry.RegistryContext{
 		Name:           image.Registry("gcr.io/foo"),
 		ServiceAccount: "robot",
 		Src:            true,
 	}
 
-	registries := []reg.RegistryContext{destRC, srcRC, destRC2}
+	registries := []registry.RegistryContext{destRC, srcRC, destRC2}
 
 	nopStream := func(
 		srcRegistry image.Registry,
 		srcImageName image.Name,
-		rc reg.RegistryContext,
+		rc registry.RegistryContext,
 		destImageName image.Name,
 		digest image.Digest,
 		tag image.Tag,
@@ -2608,13 +2610,13 @@ func TestExecRequests(t *testing.T) {
 	}
 
 	edges, err := reg.ToPromotionEdges(
-		[]reg.Manifest{
+		[]manifest.Manifest{
 			{
 				Registries: registries,
-				Images: []reg.Image{
+				Images: []registry.Image{
 					{
 						Name: "a",
-						Dmap: reg.DigestTags{
+						Dmap: registry.DigestTags{
 							"sha256:000": {"0.9"},
 						},
 					},
@@ -2688,36 +2690,36 @@ func TestExecRequests(t *testing.T) {
 func TestValidateEdges(t *testing.T) {
 	srcRegName := image.Registry("gcr.io/src")
 	dstRegName := image.Registry("gcr.io/dst")
-	srcRegistry := reg.RegistryContext{
+	srcRegistry := registry.RegistryContext{
 		Name:           srcRegName,
 		ServiceAccount: "robot",
 		Src:            true,
 	}
-	dstRegistry := reg.RegistryContext{
+	dstRegistry := registry.RegistryContext{
 		Name:           dstRegName,
 		ServiceAccount: "robot",
 	}
 
-	registries := []reg.RegistryContext{
+	registries := []registry.RegistryContext{
 		srcRegistry,
 		dstRegistry,
 	}
 
 	tests := []struct {
 		name     string
-		inputM   reg.Manifest
+		inputM   manifest.Manifest
 		inputSc  reg.SyncContext
 		expected error
 	}{
 		{
 			"No problems (nothing to promote)",
-			reg.Manifest{
+			manifest.Manifest{
 				SrcRegistry: &srcRegistry,
 				Registries:  registries,
-				Images: []reg.Image{
+				Images: []registry.Image{
 					{
 						Name: "a",
-						Dmap: reg.DigestTags{
+						Dmap: registry.DigestTags{
 							"sha256:000": {"0.0"},
 						},
 					},
@@ -2741,13 +2743,13 @@ func TestValidateEdges(t *testing.T) {
 		},
 		{
 			"Promotion edges OK",
-			reg.Manifest{
+			manifest.Manifest{
 				SrcRegistry: &srcRegistry,
 				Registries:  registries,
-				Images: []reg.Image{
+				Images: []registry.Image{
 					{
 						Name: "a",
-						Dmap: reg.DigestTags{
+						Dmap: registry.DigestTags{
 							"sha256:000": {"0.0"},
 							// This is an image we want to promote. There are no
 							// tag moves involved here, so it's OK.
@@ -2775,13 +2777,13 @@ func TestValidateEdges(t *testing.T) {
 		},
 		{
 			"Tag move detected in promotion edge",
-			reg.Manifest{
+			manifest.Manifest{
 				SrcRegistry: &srcRegistry,
 				Registries:  registries,
-				Images: []reg.Image{
+				Images: []registry.Image{
 					{
 						Name: "a",
-						Dmap: reg.DigestTags{
+						Dmap: registry.DigestTags{
 							// The idea here is that we've already promoted
 							// sha256:111 as tag 1.0, but we want to try to
 							// retag 1.0 to the sha256:222 image instead. This
@@ -2812,7 +2814,7 @@ func TestValidateEdges(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		edges, err := reg.ToPromotionEdges([]reg.Manifest{test.inputM})
+		edges, err := reg.ToPromotionEdges([]manifest.Manifest{test.inputM})
 		require.Nil(t, err)
 		got := test.inputSc.ValidateEdges(edges)
 		require.Equal(t, test.expected, got)
@@ -2823,7 +2825,7 @@ func TestGarbageCollection(t *testing.T) {
 	srcRegName := image.Registry("gcr.io/foo")
 	destRegName := image.Registry("gcr.io/bar")
 	destRegName2 := image.Registry("gcr.io/cat")
-	registries := []reg.RegistryContext{
+	registries := []registry.RegistryContext{
 		{
 			Name:           srcRegName,
 			ServiceAccount: "robot",
@@ -2841,25 +2843,25 @@ func TestGarbageCollection(t *testing.T) {
 
 	tests := []struct {
 		name         string
-		inputM       reg.Manifest
+		inputM       manifest.Manifest
 		inputSc      reg.SyncContext
 		expectedReqs reg.CapturedRequests
 	}{
 		{
 			"No garbage collection (no empty digests)",
-			reg.Manifest{
+			manifest.Manifest{
 				Registries: registries,
-				Images: []reg.Image{
+				Images: []registry.Image{
 					{
 						Name: "a",
-						Dmap: reg.DigestTags{
+						Dmap: registry.DigestTags{
 							"sha256:000": {"missing-from-src"},
 							"sha256:333": {"0.8"},
 						},
 					},
 					{
 						Name: "b",
-						Dmap: reg.DigestTags{
+						Dmap: registry.DigestTags{
 							"sha256:bbb": {"also-missing"},
 						},
 					},
@@ -2886,19 +2888,19 @@ func TestGarbageCollection(t *testing.T) {
 		},
 		{
 			"Simple garbage collection (delete ALL images in dest that are untagged))",
-			reg.Manifest{
+			manifest.Manifest{
 				Registries: registries,
-				Images: []reg.Image{
+				Images: []registry.Image{
 					{
 						Name: "a",
-						Dmap: reg.DigestTags{
+						Dmap: registry.DigestTags{
 							"sha256:000": {"missing-from-src"},
 							"sha256:333": {"0.8"},
 						},
 					},
 					{
 						Name: "b",
-						Dmap: reg.DigestTags{
+						Dmap: registry.DigestTags{
 							"sha256:bbb": {"also-missing"},
 						},
 					},
@@ -2974,12 +2976,12 @@ func TestGarbageCollection(t *testing.T) {
 		// Reset captured for each test.
 		captured = make(reg.CapturedRequests)
 		nopStream := func(
-			destRC reg.RegistryContext,
+			destRC registry.RegistryContext,
 			imageName image.Name,
 			digest image.Digest) stream.Producer {
 			return nil
 		}
-		srcReg, err := reg.GetSrcRegistry(registries)
+		srcReg, err := registry.GetSrcRegistry(registries)
 		require.Nil(t, err)
 
 		test.inputSc.SrcRegistry = srcReg
@@ -2994,44 +2996,44 @@ func TestGarbageCollectionMulti(t *testing.T) {
 	destRegName1 := image.Registry("gcr.io/dest1")
 	destRegName2 := image.Registry("gcr.io/dest2")
 
-	destRC := reg.RegistryContext{
+	destRC := registry.RegistryContext{
 		Name:           destRegName1,
 		ServiceAccount: "robotDest1",
 	}
 
-	destRC2 := reg.RegistryContext{
+	destRC2 := registry.RegistryContext{
 		Name:           destRegName2,
 		ServiceAccount: "robotDest2",
 	}
 
-	srcRC := reg.RegistryContext{
+	srcRC := registry.RegistryContext{
 		Name:           srcRegName,
 		ServiceAccount: "robotSrc",
 		Src:            true,
 	}
 
-	registries := []reg.RegistryContext{srcRC, destRC, destRC2}
+	registries := []registry.RegistryContext{srcRC, destRC, destRC2}
 	tests := []struct {
 		name         string
-		inputM       reg.Manifest
+		inputM       manifest.Manifest
 		inputSc      reg.SyncContext
 		expectedReqs reg.CapturedRequests
 	}{
 		{
 			"Simple garbage collection (delete ALL images in all dests that are untagged))",
-			reg.Manifest{
+			manifest.Manifest{
 				Registries: registries,
-				Images: []reg.Image{
+				Images: []registry.Image{
 					{
 						Name: "a",
-						Dmap: reg.DigestTags{
+						Dmap: registry.DigestTags{
 							"sha256:000": {"missing-from-src"},
 							"sha256:333": {"0.8"},
 						},
 					},
 					{
 						Name: "b",
-						Dmap: reg.DigestTags{
+						Dmap: registry.DigestTags{
 							"sha256:bbb": {"also-missing"},
 						},
 					},
@@ -3133,14 +3135,14 @@ func TestGarbageCollectionMulti(t *testing.T) {
 		// Reset captured for each test.
 		captured = make(reg.CapturedRequests)
 		nopStream := func(
-			destRC reg.RegistryContext,
+			destRC registry.RegistryContext,
 			imageName image.Name,
 			digest image.Digest,
 		) stream.Producer {
 			return nil
 		}
 
-		srcReg, err := reg.GetSrcRegistry(registries)
+		srcReg, err := registry.GetSrcRegistry(registries)
 		require.Nil(t, err)
 
 		test.inputSc.SrcRegistry = srcReg
@@ -3153,12 +3155,12 @@ func TestGarbageCollectionMulti(t *testing.T) {
 func TestSnapshot(t *testing.T) {
 	tests := []struct {
 		name     string
-		input    reg.RegInvImage
+		input    registry.RegInvImage
 		expected string
 	}{
 		{
 			"Basic",
-			reg.RegInvImage{
+			registry.RegInvImage{
 				"foo": {
 					"sha256:111": {"one"},
 					"sha256:fff": {"0.9", "0.5"},
@@ -3181,7 +3183,7 @@ func TestSnapshot(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		got := test.input.ToYAML(reg.YamlMarshalingOpts{})
+		got := test.input.ToYAML(registry.YamlMarshalingOpts{})
 		require.Equal(t, test.expected, got)
 	}
 }
@@ -3315,8 +3317,8 @@ func TestParseContainerParts(t *testing.T) {
 }
 
 func TestMatch(t *testing.T) {
-	inputMfest := reg.Manifest{
-		Registries: []reg.RegistryContext{
+	inputMfest := manifest.Manifest{
+		Registries: []registry.RegistryContext{
 			{
 				Name:           "gcr.io/foo-staging",
 				ServiceAccount: "sa@robot.com",
@@ -3335,10 +3337,10 @@ func TestMatch(t *testing.T) {
 				ServiceAccount: "sa@robot.com",
 			},
 		},
-		Images: []reg.Image{
+		Images: []registry.Image{
 			{
 				Name: "foo-controller",
-				Dmap: reg.DigestTags{
+				Dmap: registry.DigestTags{
 					"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": {"1.0"},
 				},
 			},
@@ -3348,7 +3350,7 @@ func TestMatch(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		mfest         reg.Manifest
+		mfest         manifest.Manifest
 		gcrPayload    reg.GCRPubSubPayload
 		expectedMatch reg.GcrPayloadMatch
 	}{

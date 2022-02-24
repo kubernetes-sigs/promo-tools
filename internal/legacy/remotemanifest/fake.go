@@ -17,22 +17,22 @@ limitations under the License.
 package remotemanifest
 
 import (
-	reg "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
+	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/manifest"
 )
 
 // Fake is a fake remote manifest. It is fake in the sense that it
 // will never fetch anything from any remote.
 type Fake struct {
-	manifests []reg.Manifest
+	manifests []manifest.Manifest
 }
 
 // Fetch just returns the manifests that were set in NewFakeRemoteManifest.
-func (remote *Fake) Fetch() ([]reg.Manifest, error) {
+func (remote *Fake) Fetch() ([]manifest.Manifest, error) {
 	return remote.manifests, nil
 }
 
 // NewFake creates a new Fake.
-func NewFake(manifests []reg.Manifest) *Fake {
+func NewFake(manifests []manifest.Manifest) *Fake {
 	remote := Fake{}
 
 	remote.manifests = manifests

@@ -27,7 +27,7 @@ import (
 	gogit "gopkg.in/src-d/go-git.v4"
 	"gopkg.in/src-d/go-git.v4/plumbing"
 
-	reg "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
+	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/manifest"
 )
 
 const (
@@ -47,10 +47,10 @@ type Git struct {
 // disk (in the case of e2e tests where we do not have a full-fledged online
 // repository for the manifests we want to audit) --- in such cases, we have to
 // use the local path instead of freshly cloning a remote repo.
-func (remote *Git) Fetch() ([]reg.Manifest, error) {
+func (remote *Git) Fetch() ([]manifest.Manifest, error) {
 	// There is no remote; use the local path directly.
 	if remote.repoURL.String() == "" {
-		manifests, err := reg.ParseThinManifestsFromDir(
+		manifests, err := manifest.ParseThinManifestsFromDir(
 			remote.thinManifestDirPath)
 		if err != nil {
 			return nil, err
@@ -65,7 +65,7 @@ func (remote *Git) Fetch() ([]reg.Manifest, error) {
 		return nil, err
 	}
 
-	manifests, err := reg.ParseThinManifestsFromDir(
+	manifests, err := manifest.ParseThinManifestsFromDir(
 		filepath.Join(repoPath, remote.thinManifestDirPath))
 	if err != nil {
 		return nil, err

@@ -32,6 +32,8 @@ import (
 
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/audit"
 	reg "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
+	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/manifest"
+	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/registry"
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/gcloud"
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/stream"
 	"sigs.k8s.io/promo-tools/v3/internal/version"
@@ -326,7 +328,7 @@ func (t *E2ETest) clearRepositories() error {
 	// We need a SyncContext to clear the repos. That's it. The actual
 	// promotions will be done by the cip binary, not this tool.
 	sc, err := reg.MakeSyncContext(
-		[]reg.Manifest{
+		[]manifest.Manifest{
 			{Registries: t.Registries},
 		},
 		10,
@@ -884,7 +886,7 @@ func checkCommand(cmd []string) error {
 
 func clearRepository(regName image.Registry, sc *reg.SyncContext) {
 	mkDeletionCmd := func(
-		dest reg.RegistryContext,
+		dest registry.RegistryContext,
 		imageName image.Name,
 		digest image.Digest,
 	) stream.Producer {
@@ -957,13 +959,13 @@ func checkLogs(projectID, uuid string, patterns []string) error {
 // auditor running in Cloud Run (whether the state change is VERIFIED or
 // REJECTED).
 type E2ETest struct {
-	Name        string                `yaml:"name,omitempty"`
-	Registries  []reg.RegistryContext `yaml:"registries,omitempty"`
-	ManifestDir string                `yaml:"manifestDir,omitempty"`
-	SetupCip    []string              `yaml:"setupCip,omitempty"`
-	SetupExtra  [][]string            `yaml:"setupExtra,omitempty"`
-	Mutations   [][]string            `yaml:"mutations,omitempty"`
-	LogMatch    []string              `yaml:"logMatch,omitempty"`
+	Name        string                     `yaml:"name,omitempty"`
+	Registries  []registry.RegistryContext `yaml:"registries,omitempty"`
+	ManifestDir string                     `yaml:"manifestDir,omitempty"`
+	SetupCip    []string                   `yaml:"setupCip,omitempty"`
+	SetupExtra  [][]string                 `yaml:"setupExtra,omitempty"`
+	Mutations   [][]string                 `yaml:"mutations,omitempty"`
+	LogMatch    []string                   `yaml:"logMatch,omitempty"`
 }
 
 // E2ETests is an array of E2ETest.

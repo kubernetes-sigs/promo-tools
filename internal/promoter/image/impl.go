@@ -21,6 +21,8 @@ import (
 	"github.com/sirupsen/logrus"
 
 	reg "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
+	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/manifest"
+	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/registry"
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/gcloud"
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/stream"
 	"sigs.k8s.io/promo-tools/v3/internal/version"
@@ -38,7 +40,7 @@ necessarily mean that a new version of the image layer is available.`
 // construct a promotion stream producer
 type StreamProducerFunc func(
 	srcRegistry image.Registry, srcImageName image.Name,
-	destRC reg.RegistryContext, imageName image.Name,
+	destRC registry.RegistryContext, imageName image.Name,
 	digest image.Digest, tag image.Tag, tp reg.TagOp,
 ) stream.Producer
 
@@ -47,19 +49,19 @@ type DefaultPromoterImplementation struct{}
 // ValidateManifestLists implements one of the run modes of the promoter
 // where it parses the manifests, checks the images and exits
 func (di *DefaultPromoterImplementation) ValidateManifestLists(opts *options.Options) error {
-	registry := image.Registry(opts.Repository)
-	images := make([]reg.ImageWithDigestSlice, 0)
+	r := image.Registry(opts.Repository)
+	images := make([]registry.ImageWithDigestSlice, 0)
 
 	if err := reg.ParseSnapshot(opts.CheckManifestLists, &images); err != nil {
 		return errors.Wrap(err, "parsing snapshot")
 	}
 
-	imgs, err := reg.FilterParentImages(registry, &images)
+	imgs, err := registry.FilterParentImages(r, &images)
 	if err != nil {
 		return errors.Wrap(err, "filtering parent images")
 	}
 
-	reg.ValidateParentImages(registry, imgs)
+	registry.ValidateParentImages(r, imgs)
 	di.PrintSection("FINISHED (CHECKING MANIFESTS)", true)
 	return nil
 }
@@ -89,7 +91,7 @@ func (di *DefaultPromoterImplementation) ActivateServiceAccounts(opts *options.O
 // PrecheckAndExit run simple prechecks to exit before promotions
 // or security scans
 func (di *DefaultPromoterImplementation) PrecheckAndExit(
-	opts *options.Options, mfests []reg.Manifest,
+	opts *options.Options, mfests []manifest.Manifest,
 ) error {
 	// Make the sync context tu run the prechecks:
 	sc, err := di.MakeSyncContext(opts, mfests)

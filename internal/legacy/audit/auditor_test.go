@@ -29,6 +29,8 @@ import (
 
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/audit"
 	reg "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
+	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/manifest"
+	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/registry"
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/logclient"
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/remotemanifest"
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/report"
@@ -178,9 +180,9 @@ func TestValidatePayload(t *testing.T) {
 func TestAudit(t *testing.T) {
 	// Regression test case for
 	// https://github.com/kubernetes-sigs/promo-tools/issues/191.
-	manifests1 := []reg.Manifest{
+	manifests1 := []manifest.Manifest{
 		{
-			Registries: []reg.RegistryContext{
+			Registries: []registry.RegistryContext{
 				{
 					Name: "gcr.io/k8s-staging-kas-network-proxy",
 					Src:  true,
@@ -191,10 +193,10 @@ func TestAudit(t *testing.T) {
 				},
 			},
 
-			Images: []reg.Image{
+			Images: []registry.Image{
 				{
 					Name: "proxy-agent",
-					Dmap: reg.DigestTags{
+					Dmap: registry.DigestTags{
 						"sha256:c419394f3fa40c32352be5a6ec5865270376d4351a3756bb1893be3f28fcba32": {"v0.0.8"},
 					},
 				},
@@ -335,9 +337,9 @@ func TestAudit(t *testing.T) {
 	// "us.gcr.io/k8s-artifacts-prod" (because both manifests below promote to
 	// that same destination, but only one of them have the child images of
 	// 3.4.7-2).
-	manifests2 := []reg.Manifest{
+	manifests2 := []manifest.Manifest{
 		{
-			Registries: []reg.RegistryContext{
+			Registries: []registry.RegistryContext{
 				{
 					Name: "gcr.io/google-containers",
 					Src:  true,
@@ -349,17 +351,17 @@ func TestAudit(t *testing.T) {
 				},
 			},
 
-			Images: []reg.Image{
+			Images: []registry.Image{
 				{
 					Name: "etcd",
-					Dmap: reg.DigestTags{
+					Dmap: registry.DigestTags{
 						"sha256:12f377200949c25fde1e54bba639d34d119edd7cfcfb1d117526dba677c03c85": {"3.4.7", "3.4.7-0"},
 					},
 				},
 			},
 		},
 		{
-			Registries: []reg.RegistryContext{
+			Registries: []registry.RegistryContext{
 				{
 					Name: "gcr.io/k8s-staging-etcd",
 					Src:  true,
@@ -376,10 +378,10 @@ func TestAudit(t *testing.T) {
 				},
 			},
 
-			Images: []reg.Image{
+			Images: []registry.Image{
 				{
 					Name: "etcd",
-					Dmap: reg.DigestTags{
+					Dmap: registry.DigestTags{
 						"sha256:bcdd5657b1edc1a2eb27356f33dd66b9400d4a084209c33461c7a7da0a32ebb3": {"3.4.7-2"},
 					},
 				},
@@ -640,7 +642,7 @@ func TestAudit(t *testing.T) {
 
 	shouldBeValid := []struct {
 		name             string
-		manifests        []reg.Manifest
+		manifests        []manifest.Manifest
 		payload          reg.GCRPubSubPayload
 		readRepo         map[string]string
 		readManifestList map[string]string
@@ -846,7 +848,7 @@ func TestAudit(t *testing.T) {
 		// fakeReadRepo closes over "test" in the outer scope, as a closure
 		// should).
 		test := test
-		fakeReadRepo := func(sc *reg.SyncContext, rc reg.RegistryContext) stream.Producer {
+		fakeReadRepo := func(sc *reg.SyncContext, rc registry.RegistryContext) stream.Producer {
 			var sr stream.Fake
 
 			_, domain, repoPath := reg.GetTokenKeyDomainRepoPath(rc.Name)
@@ -938,10 +940,10 @@ func TestAudit(t *testing.T) {
 }
 
 func initFakeServerContext(
-	manifests []reg.Manifest,
+	manifests []manifest.Manifest,
 	reportingFacility report.ReportingFacility,
 	loggingFacility logclient.LoggingFacility,
-	fakeReadRepo func(*reg.SyncContext, reg.RegistryContext) stream.Producer,
+	fakeReadRepo func(*reg.SyncContext, registry.RegistryContext) stream.Producer,
 	fakeReadManifestList func(*reg.SyncContext, *reg.GCRManifestListContext) stream.Producer,
 ) audit.ServerContext {
 	remoteManifestFacility := remotemanifest.NewFake(manifests)

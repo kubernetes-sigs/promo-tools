@@ -26,7 +26,8 @@ import (
 	"golang.org/x/xerrors"
 
 	"sigs.k8s.io/promo-tools/v3/image/manifest"
-	reg "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
+	regmanifest "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/manifest"
+	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/registry"
 	"sigs.k8s.io/promo-tools/v3/types/image"
 )
 
@@ -42,7 +43,7 @@ func testPath(paths ...string) string {
 
 func TestFind(t *testing.T) {
 	pwd := testPath()
-	srcRC := reg.RegistryContext{
+	srcRC := registry.RegistryContext{
 		Name:           "gcr.io/foo-staging",
 		ServiceAccount: "sa@robot.com",
 		Src:            true,
@@ -52,7 +53,7 @@ func TestFind(t *testing.T) {
 		// name is folder name
 		name             string
 		input            manifest.GrowOptions
-		expectedManifest reg.Manifest
+		expectedManifest regmanifest.Manifest
 		expectedErr      error
 	}{
 		{
@@ -61,7 +62,7 @@ func TestFind(t *testing.T) {
 				BaseDir:     filepath.Join(pwd, "empty"),
 				StagingRepo: "gcr.io/foo",
 			},
-			reg.Manifest{},
+			regmanifest.Manifest{},
 			&os.PathError{
 				Op:   "stat",
 				Path: filepath.Join(pwd, "empty/images"),
@@ -74,8 +75,8 @@ func TestFind(t *testing.T) {
 				BaseDir:     filepath.Join(pwd, "singleton"),
 				StagingRepo: "gcr.io/foo-staging",
 			},
-			reg.Manifest{
-				Registries: []reg.RegistryContext{
+			regmanifest.Manifest{
+				Registries: []registry.RegistryContext{
 					srcRC,
 					{
 						Name:           "us.gcr.io/some-prod",
@@ -90,10 +91,10 @@ func TestFind(t *testing.T) {
 						ServiceAccount: "sa@robot.com",
 					},
 				},
-				Images: []reg.Image{
+				Images: []registry.Image{
 					{
 						Name: "foo-controller",
-						Dmap: reg.DigestTags{
+						Dmap: registry.DigestTags{
 							"sha256:c3d310f4741b3642497da8826e0986db5e02afc9777a2b8e668c8e41034128c1": {"1.0"},
 						},
 					},
@@ -108,7 +109,7 @@ func TestFind(t *testing.T) {
 				BaseDir:     filepath.Join(pwd, "singleton"),
 				StagingRepo: "gcr.io/nonsense-staging",
 			},
-			reg.Manifest{},
+			regmanifest.Manifest{},
 			fmt.Errorf("could not find Manifest for %q", "gcr.io/nonsense-staging"),
 		},
 	}
@@ -141,26 +142,26 @@ func TestApplyFilters(t *testing.T) {
 		// name is folder name
 		name         string
 		inputOptions manifest.GrowOptions
-		inputRii     reg.RegInvImage
-		expectedRii  reg.RegInvImage
+		inputRii     registry.RegInvImage
+		expectedRii  registry.RegInvImage
 		expectedErr  error
 	}{
 		{
 			"empty rii",
 			manifest.GrowOptions{},
-			reg.RegInvImage{},
-			reg.RegInvImage{},
+			registry.RegInvImage{},
+			registry.RegInvImage{},
 			nil,
 		},
 		{
 			"no filters --- same as input",
 			manifest.GrowOptions{},
-			reg.RegInvImage{
+			registry.RegInvImage{
 				"foo": {
 					"sha256:000": {"2.0"},
 				},
 			},
-			reg.RegInvImage{
+			registry.RegInvImage{
 				"foo": {
 					"sha256:000": {"2.0"},
 				},
@@ -170,12 +171,12 @@ func TestApplyFilters(t *testing.T) {
 		{
 			"remove 'latest' tag by default, even if no filters",
 			manifest.GrowOptions{},
-			reg.RegInvImage{
+			registry.RegInvImage{
 				"foo": {
 					"sha256:000": {"latest", "2.0"},
 				},
 			},
-			reg.RegInvImage{
+			registry.RegInvImage{
 				"foo": {
 					"sha256:000": {"2.0"},
 				},
@@ -187,7 +188,7 @@ func TestApplyFilters(t *testing.T) {
 			manifest.GrowOptions{
 				FilterImages: []image.Name{"bar"},
 			},
-			reg.RegInvImage{
+			registry.RegInvImage{
 				"foo": {
 					"sha256:000": {"latest", "2.0"},
 				},
@@ -195,7 +196,7 @@ func TestApplyFilters(t *testing.T) {
 					"sha256:111": {"latest", "1.0"},
 				},
 			},
-			reg.RegInvImage{
+			registry.RegInvImage{
 				"bar": {
 					"sha256:111": {"1.0"},
 				},
@@ -207,7 +208,7 @@ func TestApplyFilters(t *testing.T) {
 			manifest.GrowOptions{
 				FilterTags: []image.Tag{"1.0"},
 			},
-			reg.RegInvImage{
+			registry.RegInvImage{
 				"foo": {
 					"sha256:000": {"latest", "2.0"},
 				},
@@ -215,7 +216,7 @@ func TestApplyFilters(t *testing.T) {
 					"sha256:111": {"latest", "1.0"},
 				},
 			},
-			reg.RegInvImage{
+			registry.RegInvImage{
 				"bar": {
 					"sha256:111": {"1.0"},
 				},
@@ -227,7 +228,7 @@ func TestApplyFilters(t *testing.T) {
 			manifest.GrowOptions{
 				FilterTags: []image.Tag{"latest"},
 			},
-			reg.RegInvImage{
+			registry.RegInvImage{
 				"foo": {
 					"sha256:000": {"latest", "2.0"},
 				},
@@ -235,7 +236,7 @@ func TestApplyFilters(t *testing.T) {
 					"sha256:111": {"latest", "1.0"},
 				},
 			},
-			reg.RegInvImage{},
+			registry.RegInvImage{},
 			xerrors.New("no images survived filtering; double-check your --filter_* flag(s) for typos"),
 		},
 		{
@@ -243,7 +244,7 @@ func TestApplyFilters(t *testing.T) {
 			manifest.GrowOptions{
 				FilterDigests: []image.Digest{"sha256:222"},
 			},
-			reg.RegInvImage{
+			registry.RegInvImage{
 				"foo": {
 					"sha256:000": {"latest", "2.0"},
 					"sha256:222": {"3.0"},
@@ -252,7 +253,7 @@ func TestApplyFilters(t *testing.T) {
 					"sha256:111": {"latest", "1.0"},
 				},
 			},
-			reg.RegInvImage{
+			registry.RegInvImage{
 				"foo": {
 					"sha256:222": {"3.0"},
 				},
@@ -264,7 +265,7 @@ func TestApplyFilters(t *testing.T) {
 			manifest.GrowOptions{
 				FilterTags: []image.Tag{"1.2.3"},
 			},
-			reg.RegInvImage{
+			registry.RegInvImage{
 				"foo": {
 					"sha256:000": {"latest", "1.2.3"},
 					"sha256:222": {"3.0"},
@@ -273,7 +274,7 @@ func TestApplyFilters(t *testing.T) {
 					"sha256:111": {"latest", "1.2.3"},
 				},
 			},
-			reg.RegInvImage{
+			registry.RegInvImage{
 				"foo": {
 					"sha256:000": {"1.2.3"},
 				},
@@ -289,7 +290,7 @@ func TestApplyFilters(t *testing.T) {
 				FilterImages: []image.Name{"foo"},
 				FilterTags:   []image.Tag{"1.2.3"},
 			},
-			reg.RegInvImage{
+			registry.RegInvImage{
 				"foo": {
 					"sha256:000": {"latest", "1.2.3"},
 					"sha256:222": {"3.0"},
@@ -298,7 +299,7 @@ func TestApplyFilters(t *testing.T) {
 					"sha256:111": {"latest", "1.2.3"},
 				},
 			},
-			reg.RegInvImage{
+			registry.RegInvImage{
 				"foo": {
 					"sha256:000": {"1.2.3"},
 				},

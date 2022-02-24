@@ -18,6 +18,7 @@ package audit
 
 import (
 	reg "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
+	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/registry"
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/logclient"
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/remotemanifest"
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/report"
@@ -27,7 +28,7 @@ import (
 // GcrReadingFacility holds functions used to create streams for reading the
 // repository and manifest list.
 type GcrReadingFacility struct {
-	ReadRepo         func(*reg.SyncContext, reg.RegistryContext) stream.Producer
+	ReadRepo         func(*reg.SyncContext, registry.RegistryContext) stream.Producer
 	ReadManifestList func(*reg.SyncContext, *reg.GCRManifestListContext) stream.Producer
 }
 
