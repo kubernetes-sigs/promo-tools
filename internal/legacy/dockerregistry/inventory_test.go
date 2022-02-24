@@ -28,8 +28,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	reg "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
-	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/manifest"
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/registry"
+	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/schema"
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/json"
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/stream"
 	"sigs.k8s.io/promo-tools/v3/types/image"
@@ -120,13 +120,13 @@ func TestParseRegistryManifest(t *testing.T) {
 	tests := []struct {
 		name           string
 		input          string
-		expectedOutput manifest.Manifest
+		expectedOutput schema.Manifest
 		expectedError  error
 	}{
 		{
 			"Empty manifest (invalid)",
 			``,
-			manifest.Manifest{},
+			schema.Manifest{},
 			fmt.Errorf(`'registries' field cannot be empty`),
 		},
 		{
@@ -139,7 +139,7 @@ func TestParseRegistryManifest(t *testing.T) {
   src: true
 images: []
 `,
-			manifest.Manifest{
+			schema.Manifest{
 				Registries: []registry.Context{
 					{
 						Name:           "gcr.io/bar",
@@ -172,7 +172,7 @@ images:
   dmap:
     "sha256:07353f7b26327f0d933515a22b1de587b040d3d85c464ea299c1b9f242529326": [ "1.8.3" ]  # Branches: ['master']
 `,
-			manifest.Manifest{
+			schema.Manifest{
 				Registries: []registry.Context{
 					{
 						Name:           "gcr.io/bar",
@@ -217,7 +217,7 @@ images:
   dmap:
     "sha256:07353f7b26327f0d933515a22b1de587b040d3d85c464ea299c1b9f242529326": [ "1.8.3" ]  # Branches: ['master']
 `,
-			manifest.Manifest{},
+			schema.Manifest{},
 			fmt.Errorf("source registry must be set"),
 		},
 	}
@@ -225,7 +225,7 @@ images:
 	// Test only the JSON unmarshalling logic.
 	for _, test := range tests {
 		b := []byte(test.input)
-		imageManifest, err := manifest.ParseManifestYAML(b)
+		imageManifest, err := schema.ParseManifestYAML(b)
 
 		// Check the error as well (at the very least, we can check that the
 		// error was nil).
@@ -249,13 +249,13 @@ func TestParseThinManifestsFromDir(t *testing.T) {
 		name string
 		// "input" is folder name, relative to the location of this source file.
 		input              string
-		expectedOutput     []manifest.Manifest
+		expectedOutput     []schema.Manifest
 		expectedParseError error
 	}{
 		{
 			"No manifests found (invalid)",
 			"empty",
-			[]manifest.Manifest{},
+			[]schema.Manifest{},
 			&os.PathError{
 				Op:   "stat",
 				Path: filepath.Join(pwd, "empty/images"),
@@ -265,7 +265,7 @@ func TestParseThinManifestsFromDir(t *testing.T) {
 		{
 			"Singleton (single manifest)",
 			"singleton",
-			[]manifest.Manifest{
+			[]schema.Manifest{
 				{
 					Registries: []registry.Context{
 						{
@@ -302,7 +302,7 @@ func TestParseThinManifestsFromDir(t *testing.T) {
 		{
 			"Multiple (with 'rebase')",
 			"multiple-rebases",
-			[]manifest.Manifest{
+			[]schema.Manifest{
 				{
 					Registries: []registry.Context{
 						{
@@ -369,7 +369,7 @@ func TestParseThinManifestsFromDir(t *testing.T) {
 		{
 			"Basic (multiple thin manifests)",
 			"basic-thin",
-			[]manifest.Manifest{
+			[]schema.Manifest{
 				{
 					Registries: []registry.Context{
 						{
@@ -505,7 +505,7 @@ func TestParseThinManifestsFromDir(t *testing.T) {
 			expectedModified = append(expectedModified, mfest)
 		}
 
-		got, errParse := manifest.ParseThinManifestsFromDir(fixtureDir)
+		got, errParse := schema.ParseThinManifestsFromDir(fixtureDir)
 
 		// Clear private fields (redundant data) that are calculated on-the-fly
 		// (it's too verbose to include them here; besides, it's not what we're
@@ -551,7 +551,7 @@ func TestValidateThinManifestsFromDir(t *testing.T) {
 	for _, testInput := range shouldBeValid {
 		fixtureDir := filepath.Join(pwd, "valid", testInput)
 
-		mfests, errParse := manifest.ParseThinManifestsFromDir(fixtureDir)
+		mfests, errParse := schema.ParseThinManifestsFromDir(fixtureDir)
 		require.Nil(t, errParse)
 
 		_, edgeErr := reg.ToPromotionEdges(mfests)
@@ -601,7 +601,7 @@ func TestValidateThinManifestsFromDir(t *testing.T) {
 		// It could be that a manifest, taken individually, failed on its own,
 		// before we even get to ValidateThinManifestsFromDir(). So handle these
 		// cases as well.
-		mfests, errParse := manifest.ParseThinManifestsFromDir(fixtureDir)
+		mfests, errParse := schema.ParseThinManifestsFromDir(fixtureDir)
 
 		var errParseStr string
 		var expectedParseErrorStr string
@@ -630,7 +630,7 @@ func TestParseImageDigest(t *testing.T) {
 
 	for _, testInput := range shouldBeValid {
 		d := image.Digest(testInput)
-		got := manifest.ValidateDigest(d)
+		got := schema.ValidateDigest(d)
 		require.Nil(t, got)
 	}
 
@@ -649,7 +649,7 @@ func TestParseImageDigest(t *testing.T) {
 
 	for _, testInput := range shouldBeInvalid {
 		d := image.Digest(testInput)
-		got := manifest.ValidateDigest(d)
+		got := schema.ValidateDigest(d)
 		require.Equal(t, fmt.Errorf("invalid digest: %v", d), got)
 	}
 }
@@ -668,7 +668,7 @@ func TestParseImageTag(t *testing.T) {
 
 	for _, testInput := range shouldBeValid {
 		tag := image.Tag(testInput)
-		got := manifest.ValidateTag(tag)
+		got := schema.ValidateTag(tag)
 		require.Nil(t, got)
 	}
 
@@ -689,7 +689,7 @@ func TestParseImageTag(t *testing.T) {
 
 	for _, testInput := range shouldBeInvalid {
 		tag := image.Tag(testInput)
-		got := manifest.ValidateTag(tag)
+		got := schema.ValidateTag(tag)
 		require.Equal(t, fmt.Errorf("invalid tag: %v", tag), got)
 	}
 }
@@ -963,7 +963,7 @@ func TestReadRegistries(t *testing.T) {
     "sha256:b5b2d91319f049143806baeacc886f82f621e9a2550df856b11b5c22db4570a7": {
       "imageSizeBytes": "12875324",
       "layerId": "",
-      "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+      "mediaType": "application/vnd.docker.distribution.schema.v2+json",
       "tag": [
         "latest"
       ],
@@ -973,7 +973,7 @@ func TestReadRegistries(t *testing.T) {
     "sha256:0519a83e8f217e33dd06fe7a7347444cfda5e2e29cf52aaa24755999cb104a4d": {
       "imageSizeBytes": "12875324",
       "layerId": "",
-      "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+      "mediaType": "application/vnd.docker.distribution.schema.v2+json",
       "tag": [
         "1.0"
       ],
@@ -993,7 +993,7 @@ func TestReadRegistries(t *testing.T) {
     "sha256:06fdf10aae2eeeac5a82c213e4693f82ab05b3b09b820fce95a7cac0bbdad534": {
       "imageSizeBytes": "12875324",
       "layerId": "",
-      "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+      "mediaType": "application/vnd.docker.distribution.schema.v2+json",
       "tag": [
         "v1.2.3"
       ],
@@ -1035,7 +1035,7 @@ func TestReadRegistries(t *testing.T) {
     "sha256:b5b2d91319f049143806baeacc886f82f621e9a2550df856b11b5c22db4570a7": {
       "imageSizeBytes": "12875324",
       "layerId": "",
-      "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+      "mediaType": "application/vnd.docker.distribution.schema.v2+json",
       "tag": [
         "latest"
       ],
@@ -1045,7 +1045,7 @@ func TestReadRegistries(t *testing.T) {
     "sha256:0519a83e8f217e33dd06fe7a7347444cfda5e2e29cf52aaa24755999cb104a4d": {
       "imageSizeBytes": "12875324",
       "layerId": "",
-      "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+      "mediaType": "application/vnd.docker.distribution.schema.v2+json",
       "tag": [
         "1.0"
       ],
@@ -1067,7 +1067,7 @@ func TestReadRegistries(t *testing.T) {
     "sha256:06fdf10aae2eeeac5a82c213e4693f82ab05b3b09b820fce95a7cac0bbdad534": {
       "imageSizeBytes": "12875324",
       "layerId": "",
-      "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+      "mediaType": "application/vnd.docker.distribution.schema.v2+json",
       "tag": [
         "v1.2.3"
       ],
@@ -1088,7 +1088,7 @@ func TestReadRegistries(t *testing.T) {
     "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": {
       "imageSizeBytes": "12875324",
       "layerId": "",
-      "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+      "mediaType": "application/vnd.docker.distribution.schema.v2+json",
       "tag": [
         "aaa"
       ],
@@ -1107,7 +1107,7 @@ func TestReadRegistries(t *testing.T) {
     "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff": {
       "imageSizeBytes": "12875324",
       "layerId": "",
-      "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+      "mediaType": "application/vnd.docker.distribution.schema.v2+json",
       "tag": [
         "fff"
       ],
@@ -1190,10 +1190,10 @@ func TestReadGManifestLists(t *testing.T) {
 			map[string]string{
 				"gcr.io/foo/someImage": `{
    "schemaVersion": 2,
-   "mediaType": "application/vnd.docker.distribution.manifest.list.v2+json",
+   "mediaType": "application/vnd.docker.distribution.schema.list.v2+json",
    "manifests": [
       {
-         "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+         "mediaType": "application/vnd.docker.distribution.schema.v2+json",
          "size": 739,
          "digest": "sha256:0bd88bcba94f800715fca33ffc4bde430646a7c797237313cbccdcdef9f80f2d",
          "platform": {
@@ -1202,7 +1202,7 @@ func TestReadGManifestLists(t *testing.T) {
          }
       },
       {
-         "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+         "mediaType": "application/vnd.docker.distribution.schema.v2+json",
          "size": 739,
          "digest": "sha256:0ad4f92011b2fa5de88a6e6a2d8b97f38371246021c974760e5fc54b9b7069e5",
          "platform": {
@@ -1514,7 +1514,7 @@ func TestToPromotionEdges(t *testing.T) {
 
 	tests := []struct {
 		name                  string
-		input                 []manifest.Manifest
+		input                 []schema.Manifest
 		expectedInitial       map[reg.PromotionEdge]interface{}
 		expectedInitialErr    error
 		expectedFiltered      map[reg.PromotionEdge]interface{}
@@ -1522,7 +1522,7 @@ func TestToPromotionEdges(t *testing.T) {
 	}{
 		{
 			"Basic case (1 new edge; already promoted)",
-			[]manifest.Manifest{
+			[]schema.Manifest{
 				{
 					Registries: registries1,
 					Images: []registry.Image{
@@ -1557,7 +1557,7 @@ func TestToPromotionEdges(t *testing.T) {
 		},
 		{
 			"Basic case (2 new edges; already promoted)",
-			[]manifest.Manifest{
+			[]schema.Manifest{
 				{
 					Registries: registries2,
 					Images: []registry.Image{
@@ -1605,7 +1605,7 @@ func TestToPromotionEdges(t *testing.T) {
 		},
 		{
 			"Tag move (tag swap image c:2.0 and c:3.0)",
-			[]manifest.Manifest{
+			[]schema.Manifest{
 				{
 					Registries: registries2,
 					Images: []registry.Image{
@@ -2008,7 +2008,7 @@ func TestPromotion(t *testing.T) {
 
 	tests := []struct {
 		name                  string
-		inputM                manifest.Manifest
+		inputM                schema.Manifest
 		inputSc               reg.SyncContext
 		badReads              []image.Registry
 		expectedReqs          reg.CapturedRequests
@@ -2017,7 +2017,7 @@ func TestPromotion(t *testing.T) {
 		{
 			// TODO: Use quickcheck to ensure certain properties.
 			"No promotion",
-			manifest.Manifest{},
+			schema.Manifest{},
 			reg.SyncContext{},
 			nil,
 			reg.CapturedRequests{},
@@ -2025,7 +2025,7 @@ func TestPromotion(t *testing.T) {
 		},
 		{
 			"No promotion; tag is already promoted",
-			manifest.Manifest{
+			schema.Manifest{
 				Registries: registries,
 				Images: []registry.Image{
 					{
@@ -2065,7 +2065,7 @@ func TestPromotion(t *testing.T) {
 		},
 		{
 			"No promotion; network errors reading from src registry for all images",
-			manifest.Manifest{
+			schema.Manifest{
 				Registries: registries,
 				Images: []registry.Image{
 					{
@@ -2102,7 +2102,7 @@ func TestPromotion(t *testing.T) {
 		},
 		{
 			"Promote 1 tag; image digest does not exist in dest",
-			manifest.Manifest{
+			schema.Manifest{
 				Registries: registries,
 				Images: []registry.Image{
 					{
@@ -2150,7 +2150,7 @@ func TestPromotion(t *testing.T) {
 		},
 		{
 			"Promote 1 tag; image already exists in dest, but digest does not",
-			manifest.Manifest{
+			schema.Manifest{
 				Registries: registries,
 				Images: []registry.Image{
 					{
@@ -2198,7 +2198,7 @@ func TestPromotion(t *testing.T) {
 		},
 		{
 			"Promote 1 tag; tag already exists in dest but is pointing to a different digest (move tag)",
-			manifest.Manifest{
+			schema.Manifest{
 				Registries: registries,
 				Images: []registry.Image{
 					{
@@ -2243,7 +2243,7 @@ func TestPromotion(t *testing.T) {
 		},
 		{
 			"Promote 1 tag as a 'rebase'",
-			manifest.Manifest{
+			schema.Manifest{
 				Registries: registriesRebase,
 				Images: []registry.Image{
 					{
@@ -2286,7 +2286,7 @@ func TestPromotion(t *testing.T) {
 		},
 		{
 			"Promote 1 digest (tagless promotion)",
-			manifest.Manifest{
+			schema.Manifest{
 				Registries: registries,
 				Images: []registry.Image{
 					{
@@ -2335,7 +2335,7 @@ func TestPromotion(t *testing.T) {
 		},
 		{
 			"NOP; dest has extra tag, but NOP because -delete-extra-tags NOT specified",
-			manifest.Manifest{
+			schema.Manifest{
 				Registries: registries,
 				Images: []registry.Image{
 					{
@@ -2372,7 +2372,7 @@ func TestPromotion(t *testing.T) {
 		},
 		{
 			"NOP (src registry does not have any of the images we want to promote)",
-			manifest.Manifest{
+			schema.Manifest{
 				Registries: registries,
 				Images: []registry.Image{
 					{
@@ -2414,7 +2414,7 @@ func TestPromotion(t *testing.T) {
 		},
 		{
 			"Add 1 tag for 2 registries",
-			manifest.Manifest{
+			schema.Manifest{
 				Registries: registries,
 				Images: []registry.Image{
 					{
@@ -2472,7 +2472,7 @@ func TestPromotion(t *testing.T) {
 		},
 		{
 			"Add 1 tag for 1 registry",
-			manifest.Manifest{
+			schema.Manifest{
 				Registries: registries,
 				Images: []registry.Image{
 					{
@@ -2558,7 +2558,7 @@ func TestPromotion(t *testing.T) {
 			}
 		}
 
-		edges, err := reg.ToPromotionEdges([]manifest.Manifest{test.inputM})
+		edges, err := reg.ToPromotionEdges([]schema.Manifest{test.inputM})
 		require.Nil(t, err)
 
 		filteredEdges, gotClean := test.inputSc.FilterPromotionEdges(
@@ -2610,7 +2610,7 @@ func TestExecRequests(t *testing.T) {
 	}
 
 	edges, err := reg.ToPromotionEdges(
-		[]manifest.Manifest{
+		[]schema.Manifest{
 			{
 				Registries: registries,
 				Images: []registry.Image{
@@ -2707,13 +2707,13 @@ func TestValidateEdges(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		inputM   manifest.Manifest
+		inputM   schema.Manifest
 		inputSc  reg.SyncContext
 		expected error
 	}{
 		{
 			"No problems (nothing to promote)",
-			manifest.Manifest{
+			schema.Manifest{
 				SrcRegistry: &srcRegistry,
 				Registries:  registries,
 				Images: []registry.Image{
@@ -2743,7 +2743,7 @@ func TestValidateEdges(t *testing.T) {
 		},
 		{
 			"Promotion edges OK",
-			manifest.Manifest{
+			schema.Manifest{
 				SrcRegistry: &srcRegistry,
 				Registries:  registries,
 				Images: []registry.Image{
@@ -2777,7 +2777,7 @@ func TestValidateEdges(t *testing.T) {
 		},
 		{
 			"Tag move detected in promotion edge",
-			manifest.Manifest{
+			schema.Manifest{
 				SrcRegistry: &srcRegistry,
 				Registries:  registries,
 				Images: []registry.Image{
@@ -2814,7 +2814,7 @@ func TestValidateEdges(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		edges, err := reg.ToPromotionEdges([]manifest.Manifest{test.inputM})
+		edges, err := reg.ToPromotionEdges([]schema.Manifest{test.inputM})
 		require.Nil(t, err)
 		got := test.inputSc.ValidateEdges(edges)
 		require.Equal(t, test.expected, got)
@@ -2843,13 +2843,13 @@ func TestGarbageCollection(t *testing.T) {
 
 	tests := []struct {
 		name         string
-		inputM       manifest.Manifest
+		inputM       schema.Manifest
 		inputSc      reg.SyncContext
 		expectedReqs reg.CapturedRequests
 	}{
 		{
 			"No garbage collection (no empty digests)",
-			manifest.Manifest{
+			schema.Manifest{
 				Registries: registries,
 				Images: []registry.Image{
 					{
@@ -2888,7 +2888,7 @@ func TestGarbageCollection(t *testing.T) {
 		},
 		{
 			"Simple garbage collection (delete ALL images in dest that are untagged))",
-			manifest.Manifest{
+			schema.Manifest{
 				Registries: registries,
 				Images: []registry.Image{
 					{
@@ -3015,13 +3015,13 @@ func TestGarbageCollectionMulti(t *testing.T) {
 	registries := []registry.Context{srcRC, destRC, destRC2}
 	tests := []struct {
 		name         string
-		inputM       manifest.Manifest
+		inputM       schema.Manifest
 		inputSc      reg.SyncContext
 		expectedReqs reg.CapturedRequests
 	}{
 		{
 			"Simple garbage collection (delete ALL images in all dests that are untagged))",
-			manifest.Manifest{
+			schema.Manifest{
 				Registries: registries,
 				Images: []registry.Image{
 					{
@@ -3317,7 +3317,7 @@ func TestParseContainerParts(t *testing.T) {
 }
 
 func TestMatch(t *testing.T) {
-	inputMfest := manifest.Manifest{
+	inputMfest := schema.Manifest{
 		Registries: []registry.Context{
 			{
 				Name:           "gcr.io/foo-staging",
@@ -3350,7 +3350,7 @@ func TestMatch(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		mfest         manifest.Manifest
+		mfest         schema.Manifest
 		gcrPayload    reg.GCRPubSubPayload
 		expectedMatch reg.GcrPayloadMatch
 	}{

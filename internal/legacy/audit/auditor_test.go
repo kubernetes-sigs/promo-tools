@@ -29,8 +29,8 @@ import (
 
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/audit"
 	reg "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
-	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/manifest"
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/registry"
+	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/schema"
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/logclient"
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/remotemanifest"
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/report"
@@ -180,7 +180,7 @@ func TestValidatePayload(t *testing.T) {
 func TestAudit(t *testing.T) {
 	// Regression test case for
 	// https://github.com/kubernetes-sigs/promo-tools/issues/191.
-	manifests1 := []manifest.Manifest{
+	manifests1 := []schema.Manifest{
 		{
 			Registries: []registry.Context{
 				{
@@ -337,7 +337,7 @@ func TestAudit(t *testing.T) {
 	// "us.gcr.io/k8s-artifacts-prod" (because both manifests below promote to
 	// that same destination, but only one of them have the child images of
 	// 3.4.7-2).
-	manifests2 := []manifest.Manifest{
+	manifests2 := []schema.Manifest{
 		{
 			Registries: []registry.Context{
 				{
@@ -642,7 +642,7 @@ func TestAudit(t *testing.T) {
 
 	shouldBeValid := []struct {
 		name             string
-		manifests        []manifest.Manifest
+		manifests        []schema.Manifest
 		payload          reg.GCRPubSubPayload
 		readRepo         map[string]string
 		readManifestList map[string]string
@@ -940,7 +940,7 @@ func TestAudit(t *testing.T) {
 }
 
 func initFakeServerContext(
-	manifests []manifest.Manifest,
+	manifests []schema.Manifest,
 	reportingFacility report.ReportingFacility,
 	loggingFacility logclient.LoggingFacility,
 	fakeReadRepo func(*reg.SyncContext, registry.Context) stream.Producer,

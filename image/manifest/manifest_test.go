@@ -26,8 +26,8 @@ import (
 	"golang.org/x/xerrors"
 
 	"sigs.k8s.io/promo-tools/v3/image/manifest"
-	regmanifest "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/manifest"
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/registry"
+	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/schema"
 	"sigs.k8s.io/promo-tools/v3/types/image"
 )
 
@@ -53,7 +53,7 @@ func TestFind(t *testing.T) {
 		// name is folder name
 		name             string
 		input            manifest.GrowOptions
-		expectedManifest regmanifest.Manifest
+		expectedManifest schema.Manifest
 		expectedErr      error
 	}{
 		{
@@ -62,7 +62,7 @@ func TestFind(t *testing.T) {
 				BaseDir:     filepath.Join(pwd, "empty"),
 				StagingRepo: "gcr.io/foo",
 			},
-			regmanifest.Manifest{},
+			schema.Manifest{},
 			&os.PathError{
 				Op:   "stat",
 				Path: filepath.Join(pwd, "empty/images"),
@@ -75,7 +75,7 @@ func TestFind(t *testing.T) {
 				BaseDir:     filepath.Join(pwd, "singleton"),
 				StagingRepo: "gcr.io/foo-staging",
 			},
-			regmanifest.Manifest{
+			schema.Manifest{
 				Registries: []registry.Context{
 					srcRC,
 					{
@@ -109,7 +109,7 @@ func TestFind(t *testing.T) {
 				BaseDir:     filepath.Join(pwd, "singleton"),
 				StagingRepo: "gcr.io/nonsense-staging",
 			},
-			regmanifest.Manifest{},
+			schema.Manifest{},
 			fmt.Errorf("could not find Manifest for %q", "gcr.io/nonsense-staging"),
 		},
 	}

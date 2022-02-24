@@ -40,8 +40,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
-	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/manifest"
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/registry"
+	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/schema"
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/gcloud"
 	cipJson "sigs.k8s.io/promo-tools/v3/internal/legacy/json"
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/reqcounter"
@@ -51,7 +51,7 @@ import (
 
 // MakeSyncContext creates a SyncContext.
 func MakeSyncContext(
-	mfests []manifest.Manifest,
+	mfests []schema.Manifest,
 	threads int,
 	confirm, useSvcAcc bool,
 ) (SyncContext, error) {
@@ -123,7 +123,7 @@ func (sc *SyncContext) LogJSONSummary() {
 
 // ToPromotionEdges converts a list of manifests to a set of edges we want to
 // try promoting.
-func ToPromotionEdges(mfests []manifest.Manifest) (map[PromotionEdge]interface{}, error) {
+func ToPromotionEdges(mfests []schema.Manifest) (map[PromotionEdge]interface{}, error) {
 	edges := make(map[PromotionEdge]interface{})
 	for _, mfest := range mfests {
 		for _, img := range mfest.Images {
@@ -1840,7 +1840,7 @@ func MkRequestCapturer(captured *CapturedRequests) ProcessRequest {
 
 // GarbageCollect deletes all images that are not referenced by Docker tags.
 func (sc *SyncContext) GarbageCollect(
-	mfest manifest.Manifest,
+	mfest schema.Manifest,
 	mkProducer func(registry.Context, image.Name, image.Digest) stream.Producer,
 	customProcessRequest *ProcessRequest,
 ) {
@@ -2171,7 +2171,7 @@ type GcrPayloadMatch struct {
 
 // Match checks whether a GCRPubSubPayload is mentioned in a Manifest. The
 // degree of the match is reflected in the GcrPayloadMatch result.
-func (payload *GCRPubSubPayload) Match(mfest *manifest.Manifest) GcrPayloadMatch {
+func (payload *GCRPubSubPayload) Match(mfest *schema.Manifest) GcrPayloadMatch {
 	var m GcrPayloadMatch
 	for _, rc := range mfest.Registries {
 		m = payload.matchImages(&rc, mfest.Images)

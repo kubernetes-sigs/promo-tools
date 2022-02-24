@@ -24,8 +24,8 @@ import (
 	"github.com/sirupsen/logrus"
 
 	reg "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
-	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/manifest"
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/registry"
+	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/schema"
 	options "sigs.k8s.io/promo-tools/v3/promoter/image/options"
 	"sigs.k8s.io/promo-tools/v3/types/image"
 )
@@ -79,7 +79,7 @@ func (di *DefaultPromoterImplementation) GetSnapshotSourceRegistry(
 // specified snapshot source
 func (di *DefaultPromoterImplementation) GetSnapshotManifests(
 	opts *options.Options,
-) ([]manifest.Manifest, error) {
+) ([]schema.Manifest, error) {
 	// Build the source registry:
 	srcRegistry, err := di.GetSnapshotSourceRegistry(opts)
 	if err != nil {
@@ -87,7 +87,7 @@ func (di *DefaultPromoterImplementation) GetSnapshotManifests(
 	}
 
 	// Add it to a new manifest and return it:
-	return []manifest.Manifest{
+	return []schema.Manifest{
 		{
 			Registries: []registry.Context{
 				*srcRegistry,
@@ -102,8 +102,8 @@ func (di *DefaultPromoterImplementation) GetSnapshotManifests(
 // append it to the list of manifests generated for the snapshot
 // during GetSnapshotManifests()
 func (di *DefaultPromoterImplementation) AppendManifestToSnapshot(
-	opts *options.Options, mfests []manifest.Manifest,
-) ([]manifest.Manifest, error) {
+	opts *options.Options, mfests []schema.Manifest,
+) ([]schema.Manifest, error) {
 	// If no manifest was passed in the options, we return the
 	// same list of manifests unchanged
 	if opts.Manifest == "" {
@@ -112,7 +112,7 @@ func (di *DefaultPromoterImplementation) AppendManifestToSnapshot(
 	}
 
 	// Parse the specified manifest and append it to the list
-	mfest, err := manifest.ParseManifestFromFile(opts.Manifest)
+	mfest, err := schema.ParseManifestFromFile(opts.Manifest)
 	if err != nil {
 		return nil, errors.Wrap(err, "parsing specified manifest")
 	}
@@ -122,7 +122,7 @@ func (di *DefaultPromoterImplementation) AppendManifestToSnapshot(
 
 //
 func (di *DefaultPromoterImplementation) GetRegistryImageInventory(
-	opts *options.Options, mfests []manifest.Manifest,
+	opts *options.Options, mfests []schema.Manifest,
 ) (registry.RegInvImage, error) {
 	// I'm pretty sure the registry context here can be the same for
 	// both snapshot sources and when running in the original cli/run,

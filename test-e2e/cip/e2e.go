@@ -33,8 +33,8 @@ import (
 	"sigs.k8s.io/release-utils/command"
 
 	reg "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
-	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/manifest"
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/registry"
+	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/schema"
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/gcloud"
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/stream"
 	"sigs.k8s.io/promo-tools/v3/internal/version"
@@ -256,7 +256,7 @@ func (t *E2ETest) clearRepositories() error {
 	// We need a SyncContext to clear the repos. That's it. The actual
 	// promotions will be done by the cip binary, not this tool.
 	sc, err := reg.MakeSyncContext(
-		[]manifest.Manifest{
+		[]schema.Manifest{
 			{Registries: t.Registries},
 		},
 		10,

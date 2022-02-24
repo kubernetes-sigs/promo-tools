@@ -26,8 +26,8 @@ import (
 	"golang.org/x/xerrors"
 
 	reg "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
-	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/manifest"
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/registry"
+	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/schema"
 	"sigs.k8s.io/promo-tools/v3/types/image"
 )
 
@@ -171,8 +171,8 @@ func Grow(
 }
 
 // Write writes images as YAML out to the expected path of the given
-// (thin) manifest.
-func Write(m manifest.Manifest, rii registry.RegInvImage) error {
+// (thin) schema.
+func Write(m schema.Manifest, rii registry.RegInvImage) error {
 	// Chop off trailing "promoter-manifest.yaml".
 	p := path.Dir(m.Filepath)
 	// Get staging repo directory name as it is laid out in the thin manifest
@@ -190,12 +190,12 @@ func Write(m manifest.Manifest, rii registry.RegInvImage) error {
 }
 
 // Find finds the manifest to modify.
-func Find(o *GrowOptions) (manifest.Manifest, error) {
+func Find(o *GrowOptions) (schema.Manifest, error) {
 	var err error
-	var manifests []manifest.Manifest
-	manifests, err = manifest.ParseThinManifestsFromDir(o.BaseDir)
+	var manifests []schema.Manifest
+	manifests, err = schema.ParseThinManifestsFromDir(o.BaseDir)
 	if err != nil {
-		return manifest.Manifest{}, err
+		return schema.Manifest{}, err
 	}
 
 	logrus.Infof("%d manifests parsed", len(manifests))
@@ -204,13 +204,13 @@ func Find(o *GrowOptions) (manifest.Manifest, error) {
 			return manifest, nil
 		}
 	}
-	return manifest.Manifest{},
+	return schema.Manifest{},
 		xerrors.Errorf("could not find Manifest for %q", o.StagingRepo)
 }
 
 // ReadStagingRepo reads the StagingRepo, and applies whatever filters are
 // available to the resulting RegInvImage. This RegInvImage is what we want to
-// inject into the "images.yaml" of a thin manifest.
+// inject into the "images.yaml" of a thin schema.
 func ReadStagingRepo(
 	o *GrowOptions,
 ) (registry.RegInvImage, error) {
@@ -218,7 +218,7 @@ func ReadStagingRepo(
 		Name: o.StagingRepo,
 	}
 
-	manifests := []manifest.Manifest{
+	manifests := []schema.Manifest{
 		{
 			Registries: []registry.Context{
 				stagingRepoRC,

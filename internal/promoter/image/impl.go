@@ -21,8 +21,8 @@ import (
 	"github.com/sirupsen/logrus"
 
 	reg "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
-	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/manifest"
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/registry"
+	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/schema"
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/gcloud"
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/stream"
 	"sigs.k8s.io/promo-tools/v3/internal/version"
@@ -91,7 +91,7 @@ func (di *DefaultPromoterImplementation) ActivateServiceAccounts(opts *options.O
 // PrecheckAndExit run simple prechecks to exit before promotions
 // or security scans
 func (di *DefaultPromoterImplementation) PrecheckAndExit(
-	opts *options.Options, mfests []manifest.Manifest,
+	opts *options.Options, mfests []schema.Manifest,
 ) error {
 	// Make the sync context tu run the prechecks:
 	sc, err := di.MakeSyncContext(opts, mfests)
