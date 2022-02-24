@@ -28,12 +28,13 @@ import (
 	"github.com/sirupsen/logrus"
 	yaml "gopkg.in/yaml.v2"
 
-	"sigs.k8s.io/promo-tools/v3/internal/version"
-	"sigs.k8s.io/promo-tools/v3/legacy/audit"
-	reg "sigs.k8s.io/promo-tools/v3/legacy/dockerregistry"
-	"sigs.k8s.io/promo-tools/v3/legacy/gcloud"
-	"sigs.k8s.io/promo-tools/v3/legacy/stream"
 	"sigs.k8s.io/release-utils/command"
+
+	"sigs.k8s.io/promo-tools/v3/internal/legacy/audit"
+	reg "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
+	"sigs.k8s.io/promo-tools/v3/internal/legacy/gcloud"
+	"sigs.k8s.io/promo-tools/v3/internal/legacy/stream"
+	"sigs.k8s.io/promo-tools/v3/internal/version"
 )
 
 func main() {

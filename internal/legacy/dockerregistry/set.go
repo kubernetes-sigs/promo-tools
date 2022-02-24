@@ -17,7 +17,7 @@ limitations under the License.
 package inventory
 
 import (
-	"sigs.k8s.io/promo-tools/v3/legacy/container"
+	"sigs.k8s.io/promo-tools/v3/internal/legacy/container"
 )
 
 // Various set manipulation operations. Some set operations are missing,

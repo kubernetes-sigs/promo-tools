@@ -21,7 +21,7 @@ import (
 	"sync"
 
 	imagepromoterb "sigs.k8s.io/promo-tools/v3/internal/promoter/image"
-	inventory "sigs.k8s.io/promo-tools/v3/legacy/dockerregistry"
+	inventory "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
 	imagepromotera "sigs.k8s.io/promo-tools/v3/promoter/image/options"
 )
 

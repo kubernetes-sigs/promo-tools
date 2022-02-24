@@ -26,7 +26,7 @@ import (
 	"golang.org/x/xerrors"
 
 	"sigs.k8s.io/promo-tools/v3/image/manifest"
-	reg "sigs.k8s.io/promo-tools/v3/legacy/dockerregistry"
+	reg "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
 )
 
 // TODO: Consider merging this with bazelTestPath() from inventory

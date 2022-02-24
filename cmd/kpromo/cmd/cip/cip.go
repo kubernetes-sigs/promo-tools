@@ -22,7 +22,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
-	"sigs.k8s.io/promo-tools/v3/legacy/cli"
+	"sigs.k8s.io/promo-tools/v3/internal/legacy/cli"
 	promoter "sigs.k8s.io/promo-tools/v3/promoter/image"
 	options "sigs.k8s.io/promo-tools/v3/promoter/image/options"
 )

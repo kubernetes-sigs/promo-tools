@@ -20,10 +20,10 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
+	reg "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
+	"sigs.k8s.io/promo-tools/v3/internal/legacy/gcloud"
+	"sigs.k8s.io/promo-tools/v3/internal/legacy/stream"
 	"sigs.k8s.io/promo-tools/v3/internal/version"
-	reg "sigs.k8s.io/promo-tools/v3/legacy/dockerregistry"
-	"sigs.k8s.io/promo-tools/v3/legacy/gcloud"
-	"sigs.k8s.io/promo-tools/v3/legacy/stream"
 	options "sigs.k8s.io/promo-tools/v3/promoter/image/options"
 )
 

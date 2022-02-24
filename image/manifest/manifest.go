@@ -25,7 +25,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/xerrors"
 
-	reg "sigs.k8s.io/promo-tools/v3/legacy/dockerregistry"
+	reg "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
 )
 
 const (

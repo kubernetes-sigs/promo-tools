@@ -31,7 +31,7 @@ import (
 	grafeaspb "google.golang.org/genproto/googleapis/grafeas/v1"
 	gogit "gopkg.in/src-d/go-git.v4"
 
-	"sigs.k8s.io/promo-tools/v3/legacy/stream"
+	"sigs.k8s.io/promo-tools/v3/internal/legacy/stream"
 )
 
 // MBToBytes converts a value from MiB to Bytes.

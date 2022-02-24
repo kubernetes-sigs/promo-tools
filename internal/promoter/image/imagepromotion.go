@@ -19,8 +19,8 @@ package imagepromoter
 import (
 	"github.com/pkg/errors"
 
-	reg "sigs.k8s.io/promo-tools/v3/legacy/dockerregistry"
-	"sigs.k8s.io/promo-tools/v3/legacy/stream"
+	reg "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
+	"sigs.k8s.io/promo-tools/v3/internal/legacy/stream"
 	options "sigs.k8s.io/promo-tools/v3/promoter/image/options"
 )
 

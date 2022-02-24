@@ -23,7 +23,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
-	reg "sigs.k8s.io/promo-tools/v3/legacy/dockerregistry"
+	reg "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
 	options "sigs.k8s.io/promo-tools/v3/promoter/image/options"
 )
 

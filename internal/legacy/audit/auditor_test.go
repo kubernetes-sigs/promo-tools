@@ -27,12 +27,12 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"sigs.k8s.io/promo-tools/v3/legacy/audit"
-	reg "sigs.k8s.io/promo-tools/v3/legacy/dockerregistry"
-	"sigs.k8s.io/promo-tools/v3/legacy/logclient"
-	"sigs.k8s.io/promo-tools/v3/legacy/remotemanifest"
-	"sigs.k8s.io/promo-tools/v3/legacy/report"
-	"sigs.k8s.io/promo-tools/v3/legacy/stream"
+	"sigs.k8s.io/promo-tools/v3/internal/legacy/audit"
+	reg "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
+	"sigs.k8s.io/promo-tools/v3/internal/legacy/logclient"
+	"sigs.k8s.io/promo-tools/v3/internal/legacy/remotemanifest"
+	"sigs.k8s.io/promo-tools/v3/internal/legacy/report"
+	"sigs.k8s.io/promo-tools/v3/internal/legacy/stream"
 )
 
 func TestParsePubSubMessageBody(t *testing.T) {
