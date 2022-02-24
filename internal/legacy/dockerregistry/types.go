@@ -171,8 +171,8 @@ type RegInvImage map[image.Name]DigestTags
 
 // ImageTag is a combination of the image.Name and Tag.
 type ImageTag struct {
-	ImageName image.Name
-	Tag       image.Tag
+	Name image.Name
+	Tag  image.Tag
 }
 
 // TagOp is an enum that describes the various types of tag-modifying
@@ -240,8 +240,8 @@ type Manifest struct {
 // ToRegInvImage converts a Manifest into a RegInvImage.
 func (manifest *Manifest) ToRegInvImage() RegInvImage {
 	rii := make(RegInvImage)
-	for _, image := range manifest.Images {
-		rii[image.ImageName] = image.Dmap
+	for _, img := range manifest.Images {
+		rii[img.Name] = img.Dmap
 	}
 	return rii
 }
@@ -292,8 +292,8 @@ type ThinManifest struct {
 // sense, and holds all the information relating to a particular image that we
 // care about.
 type Image struct {
-	ImageName image.Name `yaml:"name"`
-	Dmap      DigestTags `yaml:"dmap,omitempty"`
+	Name image.Name `yaml:"name"`
+	Dmap DigestTags `yaml:"dmap,omitempty"`
 }
 
 // Images is a slice of Image types.

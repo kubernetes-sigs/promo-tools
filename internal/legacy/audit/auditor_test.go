@@ -193,7 +193,7 @@ func TestAudit(t *testing.T) {
 
 			Images: []reg.Image{
 				{
-					ImageName: "proxy-agent",
+					Name: "proxy-agent",
 					Dmap: reg.DigestTags{
 						"sha256:c419394f3fa40c32352be5a6ec5865270376d4351a3756bb1893be3f28fcba32": {"v0.0.8"},
 					},
@@ -351,7 +351,7 @@ func TestAudit(t *testing.T) {
 
 			Images: []reg.Image{
 				{
-					ImageName: "etcd",
+					Name: "etcd",
 					Dmap: reg.DigestTags{
 						"sha256:12f377200949c25fde1e54bba639d34d119edd7cfcfb1d117526dba677c03c85": {"3.4.7", "3.4.7-0"},
 					},
@@ -378,7 +378,7 @@ func TestAudit(t *testing.T) {
 
 			Images: []reg.Image{
 				{
-					ImageName: "etcd",
+					Name: "etcd",
 					Dmap: reg.DigestTags{
 						"sha256:bcdd5657b1edc1a2eb27356f33dd66b9400d4a084209c33461c7a7da0a32ebb3": {"3.4.7-2"},
 					},

@@ -397,8 +397,8 @@ func validateIsDirectory(dir string) error {
 func ToPromotionEdges(mfests []Manifest) (map[PromotionEdge]interface{}, error) {
 	edges := make(map[PromotionEdge]interface{})
 	for _, mfest := range mfests {
-		for _, image := range mfest.Images {
-			for digest, tagArray := range image.Dmap {
+		for _, img := range mfest.Images {
+			for digest, tagArray := range img.Dmap {
 				for _, destRC := range mfest.Registries {
 					if destRC == *mfest.SrcRegistry {
 						continue
@@ -409,7 +409,7 @@ func ToPromotionEdges(mfests []Manifest) (map[PromotionEdge]interface{}, error) 
 							edge := mkPromotionEdge(
 								*mfest.SrcRegistry,
 								destRC,
-								image.ImageName,
+								img.Name,
 								digest,
 								tag)
 							edges[edge] = nil
@@ -420,7 +420,7 @@ func ToPromotionEdges(mfests []Manifest) (map[PromotionEdge]interface{}, error) 
 						edge := mkPromotionEdge(
 							*mfest.SrcRegistry,
 							destRC,
-							image.ImageName,
+							img.Name,
 							digest,
 							"",
 						)
@@ -444,8 +444,8 @@ func mkPromotionEdge(
 	edge := PromotionEdge{
 		SrcRegistry: srcRC,
 		SrcImageTag: ImageTag{
-			ImageName: srcImageName,
-			Tag:       tag,
+			Name: srcImageName,
+			Tag:  tag,
 		},
 
 		Digest:      digest,
@@ -454,8 +454,8 @@ func mkPromotionEdge(
 
 	// The name in the destination is the same as the name in the source.
 	edge.DstImageTag = ImageTag{
-		ImageName: srcImageName,
-		Tag:       tag,
+		Name: srcImageName,
+		Tag:  tag,
 	}
 
 	return edge
@@ -480,7 +480,7 @@ func (sc *SyncContext) GetPromotionCandidates(edges map[PromotionEdge]interface{
 	for edge := range edges {
 		// If the edge should be ignored because of a bad read in sc.Inv,
 		// drop it.
-		if img, ok := ignoreMap[edge.SrcImageTag.ImageName]; ok {
+		if img, ok := ignoreMap[edge.SrcImageTag.Name]; ok {
 			logrus.Warnf(
 				"edge %v: ignoring because src image could not be read: %s\n",
 				edge,
@@ -503,7 +503,7 @@ func (sc *SyncContext) GetPromotionCandidates(edges map[PromotionEdge]interface{
 		if edge.DstImageTag.Tag == "" && dp.DigestExists {
 			// Still, log a warning if the source is missing the image.
 			if !sp.DigestExists {
-				logrus.Errorf("edge %v: skipping %s/%s@%s because it was already promoted, but it is still _LOST_ (can't find it in src registry! please backfill it!)\n", edge, edge.SrcRegistry.Name, edge.SrcImageTag.ImageName, edge.Digest)
+				logrus.Errorf("edge %v: skipping %s/%s@%s because it was already promoted, but it is still _LOST_ (can't find it in src registry! please backfill it!)\n", edge, edge.SrcRegistry.Name, edge.SrcImageTag.Name, edge.Digest)
 			}
 			continue
 		}
@@ -511,7 +511,7 @@ func (sc *SyncContext) GetPromotionCandidates(edges map[PromotionEdge]interface{
 		// If src vertex missing, LOST && NOP. We just need the digest to exist
 		// in src (we don't care if it points to the wrong tag).
 		if !sp.DigestExists {
-			logrus.Errorf("edge %v: skipping %s/%s@%s because it is _LOST_ (can't find it in src registry!)\n", edge, edge.SrcRegistry.Name, edge.SrcImageTag.ImageName, edge.Digest)
+			logrus.Errorf("edge %v: skipping %s/%s@%s because it is _LOST_ (can't find it in src registry!)\n", edge, edge.SrcRegistry.Name, edge.SrcImageTag.Name, edge.Digest)
 			continue
 		}
 
@@ -592,8 +592,9 @@ func CheckOverlappingEdges(
 		}
 
 		dstPQIN := ToPQIN(edge.DstRegistry.Name,
-			edge.DstImageTag.ImageName,
-			edge.DstImageTag.Tag)
+			edge.DstImageTag.Name,
+			edge.DstImageTag.Tag,
+		)
 
 		digestToEdges, ok := promotionIntent[dstPQIN]
 		if ok {
@@ -682,7 +683,7 @@ func (edge *PromotionEdge) VertexPropsFor(
 	if !ok {
 		return p
 	}
-	digestTags, ok := rii[imageTag.ImageName]
+	digestTags, ok := rii[imageTag.Name]
 	if !ok {
 		return p
 	}
@@ -858,15 +859,15 @@ func validateRequiredComponents(m Manifest) error {
 		knownRegistries = append(knownRegistries, registry.Name)
 	}
 
-	for _, image := range m.Images {
-		if len(image.ImageName) == 0 {
+	for _, img := range m.Images {
+		if len(img.Name) == 0 {
 			errs = append(
 				errs,
 				"images: 'name' field cannot be empty",
 			)
 		}
 
-		if len(image.Dmap) == 0 {
+		if len(img.Dmap) == 0 {
 			errs = append(
 				errs,
 				"images: 'dmap' field cannot be empty",
@@ -2022,8 +2023,8 @@ func MKPopulateRequestsForPromotionEdges(
 				promoteMe.SrcRegistry.Name,
 				promoteMe.DstRegistry.Name,
 				promoteMe.DstRegistry.ServiceAccount,
-				promoteMe.SrcImageTag.ImageName,
-				promoteMe.DstImageTag.ImageName,
+				promoteMe.SrcImageTag.Name,
+				promoteMe.DstImageTag.Name,
 				promoteMe.Digest,
 				oldDigest,
 				promoteMe.DstImageTag.Tag,
@@ -2096,9 +2097,9 @@ func EdgesToRegInvImage(
 				destRegistry)
 
 			if len(prefix) > 0 {
-				imgName = prefix + "/" + string(edge.DstImageTag.ImageName)
+				imgName = prefix + "/" + string(edge.DstImageTag.Name)
 			} else {
-				imgName = string(edge.DstImageTag.ImageName)
+				imgName = string(edge.DstImageTag.Name)
 			}
 
 			imgName = strings.TrimLeft(imgName, "/")
@@ -2136,14 +2137,14 @@ func getRegistriesToRead(edges map[PromotionEdge]interface{}) []RegistryContext 
 		srcReg := edge.SrcRegistry
 		srcReg.Name = srcReg.Name +
 			"/" +
-			image.Registry(edge.SrcImageTag.ImageName)
+			image.Registry(edge.SrcImageTag.Name)
 
 		rcs[srcReg] = nil
 
 		dstReg := edge.DstRegistry
 		dstReg.Name = dstReg.Name +
 			"/" +
-			image.Registry(edge.DstImageTag.ImageName)
+			image.Registry(edge.DstImageTag.Name)
 
 		rcs[dstReg] = nil
 	}
@@ -2182,11 +2183,11 @@ func (sc *SyncContext) Promote(
 		logrus.Infof(
 			"%s/%s:%s (%s) to %s/%s",
 			edge.SrcRegistry.Name,
-			edge.SrcImageTag.ImageName,
+			edge.SrcImageTag.Name,
 			edge.SrcImageTag.Tag,
 			edge.Digest,
 			edge.DstRegistry.Name,
-			edge.DstImageTag.ImageName,
+			edge.DstImageTag.Name,
 		)
 	}
 
@@ -2747,18 +2748,18 @@ func (payload *GCRPubSubPayload) matchImages(
 
 func (payload *GCRPubSubPayload) matchImage(
 	rc *RegistryContext,
-	image Image,
+	img Image,
 ) GcrPayloadMatch {
 	var m GcrPayloadMatch
 
 	constructedPath := strings.Join(
-		[]string{string(rc.Name), string(image.ImageName)}, "/")
+		[]string{string(rc.Name), string(img.Name)}, "/")
 	if payload.Path != constructedPath {
 		return m
 	}
 	m.PathMatch = true
 
-	tags, ok := image.Dmap[payload.Digest]
+	tags, ok := img.Dmap[payload.Digest]
 	if !ok {
 		return m
 	}
@@ -3076,7 +3077,7 @@ func ValidateParentImages(registry image.Registry, images []ImageWithParentDiges
 // 		INVALID parent=gcr.io/foo/bar child=gcr.io/foo/bar/foo
 //
 // TODO: Review/optimize/de-dupe (https://github.com/kubernetes-sigs/promo-tools/pull/351)
-func IsParentImageValid(registry image.Registry, image ImageWithParentDigestSlice) bool {
+func IsParentImageValid(registry image.Registry, img ImageWithParentDigestSlice) bool {
 	// Split the registry into prefix and postfix
 	// For example: "us.gcr.io/k8s-artifacts-prod/addon-builder"
 	// prefix: "us.gcr.io"
@@ -3085,9 +3086,9 @@ func IsParentImageValid(registry image.Registry, image ImageWithParentDigestSlic
 	registryPrefix := registry[:firstSlash]
 	registryPostfix := registry[firstSlash:]
 
-	imageLocation := fmt.Sprintf("%s/%s", registryPostfix, image.Name)
+	imageLocation := fmt.Sprintf("%s/%s", registryPostfix, img.Name)
 	manifestEndpoint := fmt.Sprintf("https://%s/v2%s/manifests/", registryPrefix, imageLocation)
-	for _, parent := range image.parentDigests {
+	for _, parent := range img.parentDigests {
 		for _, childHash := range parent.children {
 			var response string
 

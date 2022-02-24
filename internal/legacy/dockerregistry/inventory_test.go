@@ -185,13 +185,13 @@ images:
 
 				Images: []reg.Image{
 					{
-						ImageName: "agave",
+						Name: "agave",
 						Dmap: reg.DigestTags{
 							"sha256:aab34c5841987a1b133388fa9f27e7960c4b1307e2f9147dca407ba26af48a54": {"latest"},
 						},
 					},
 					{
-						ImageName: "banana",
+						Name: "banana",
 						Dmap: reg.DigestTags{
 							"sha256:07353f7b26327f0d933515a22b1de587b040d3d85c464ea299c1b9f242529326": {"1.8.3"},
 						},
@@ -286,7 +286,7 @@ func TestParseThinManifestsFromDir(t *testing.T) {
 					},
 					Images: []reg.Image{
 						{
-							ImageName: "foo-controller",
+							Name: "foo-controller",
 							Dmap: reg.DigestTags{
 								"sha256:c3d310f4741b3642497da8826e0986db5e02afc9777a2b8e668c8e41034128c1": {"1.0"},
 							},
@@ -323,7 +323,7 @@ func TestParseThinManifestsFromDir(t *testing.T) {
 					},
 					Images: []reg.Image{
 						{
-							ImageName: "foo-controller",
+							Name: "foo-controller",
 							Dmap: reg.DigestTags{
 								"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": {"1.0"},
 							},
@@ -353,7 +353,7 @@ func TestParseThinManifestsFromDir(t *testing.T) {
 					},
 					Images: []reg.Image{
 						{
-							ImageName: "bar-controller",
+							Name: "bar-controller",
 							Dmap: reg.DigestTags{
 								"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": {"1.0"},
 							},
@@ -390,7 +390,7 @@ func TestParseThinManifestsFromDir(t *testing.T) {
 					},
 					Images: []reg.Image{
 						{
-							ImageName: "foo-controller",
+							Name: "foo-controller",
 							Dmap: reg.DigestTags{
 								"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": {"1.0"},
 							},
@@ -420,7 +420,7 @@ func TestParseThinManifestsFromDir(t *testing.T) {
 					},
 					Images: []reg.Image{
 						{
-							ImageName: "bar-controller",
+							Name: "bar-controller",
 							Dmap: reg.DigestTags{
 								"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": {"1.0"},
 							},
@@ -450,7 +450,7 @@ func TestParseThinManifestsFromDir(t *testing.T) {
 					},
 					Images: []reg.Image{
 						{
-							ImageName: "cat-controller",
+							Name: "cat-controller",
 							Dmap: reg.DigestTags{
 								"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc": {"1.0"},
 							},
@@ -480,7 +480,7 @@ func TestParseThinManifestsFromDir(t *testing.T) {
 					},
 					Images: []reg.Image{
 						{
-							ImageName: "qux-controller",
+							Name: "qux-controller",
 							Dmap: reg.DigestTags{
 								"sha256:0000000000000000000000000000000000000000000000000000000000000000": {"1.0"},
 							},
@@ -1525,7 +1525,7 @@ func TestToPromotionEdges(t *testing.T) {
 					Registries: registries1,
 					Images: []reg.Image{
 						{
-							ImageName: "a",
+							Name: "a",
 							Dmap: reg.DigestTags{
 								"sha256:000": {"0.9"},
 							},
@@ -1538,14 +1538,14 @@ func TestToPromotionEdges(t *testing.T) {
 				{
 					SrcRegistry: srcRC,
 					SrcImageTag: reg.ImageTag{
-						ImageName: "a",
-						Tag:       "0.9",
+						Name: "a",
+						Tag:  "0.9",
 					},
 					Digest:      "sha256:000",
 					DstRegistry: destRC,
 					DstImageTag: reg.ImageTag{
-						ImageName: "a",
-						Tag:       "0.9",
+						Name: "a",
+						Tag:  "0.9",
 					},
 				}: nil,
 			},
@@ -1560,7 +1560,7 @@ func TestToPromotionEdges(t *testing.T) {
 					Registries: registries2,
 					Images: []reg.Image{
 						{
-							ImageName: "a",
+							Name: "a",
 							Dmap: reg.DigestTags{
 								"sha256:000": {"0.9"},
 							},
@@ -1573,27 +1573,27 @@ func TestToPromotionEdges(t *testing.T) {
 				{
 					SrcRegistry: srcRC,
 					SrcImageTag: reg.ImageTag{
-						ImageName: "a",
-						Tag:       "0.9",
+						Name: "a",
+						Tag:  "0.9",
 					},
 					Digest:      "sha256:000",
 					DstRegistry: destRC,
 					DstImageTag: reg.ImageTag{
-						ImageName: "a",
-						Tag:       "0.9",
+						Name: "a",
+						Tag:  "0.9",
 					},
 				}: nil,
 				{
 					SrcRegistry: srcRC,
 					SrcImageTag: reg.ImageTag{
-						ImageName: "a",
-						Tag:       "0.9",
+						Name: "a",
+						Tag:  "0.9",
 					},
 					Digest:      "sha256:000",
 					DstRegistry: destRC2,
 					DstImageTag: reg.ImageTag{
-						ImageName: "a",
-						Tag:       "0.9",
+						Name: "a",
+						Tag:  "0.9",
 					},
 				}: nil,
 			},
@@ -1608,7 +1608,7 @@ func TestToPromotionEdges(t *testing.T) {
 					Registries: registries2,
 					Images: []reg.Image{
 						{
-							ImageName: "c",
+							Name: "c",
 							Dmap: reg.DigestTags{
 								"sha256:222": {"3.0"},
 								"sha256:333": {"2.0"},
@@ -1622,53 +1622,53 @@ func TestToPromotionEdges(t *testing.T) {
 				{
 					SrcRegistry: srcRC,
 					SrcImageTag: reg.ImageTag{
-						ImageName: "c",
-						Tag:       "2.0",
+						Name: "c",
+						Tag:  "2.0",
 					},
 					Digest:      "sha256:333",
 					DstRegistry: destRC,
 					DstImageTag: reg.ImageTag{
-						ImageName: "c",
-						Tag:       "2.0",
+						Name: "c",
+						Tag:  "2.0",
 					},
 				}: nil,
 				{
 					SrcRegistry: srcRC,
 					SrcImageTag: reg.ImageTag{
-						ImageName: "c",
-						Tag:       "3.0",
+						Name: "c",
+						Tag:  "3.0",
 					},
 					Digest:      "sha256:222",
 					DstRegistry: destRC,
 					DstImageTag: reg.ImageTag{
-						ImageName: "c",
-						Tag:       "3.0",
+						Name: "c",
+						Tag:  "3.0",
 					},
 				}: nil,
 				{
 					SrcRegistry: srcRC,
 					SrcImageTag: reg.ImageTag{
-						ImageName: "c",
-						Tag:       "2.0",
+						Name: "c",
+						Tag:  "2.0",
 					},
 					Digest:      "sha256:333",
 					DstRegistry: destRC2,
 					DstImageTag: reg.ImageTag{
-						ImageName: "c",
-						Tag:       "2.0",
+						Name: "c",
+						Tag:  "2.0",
 					},
 				}: nil,
 				{
 					SrcRegistry: srcRC,
 					SrcImageTag: reg.ImageTag{
-						ImageName: "c",
-						Tag:       "3.0",
+						Name: "c",
+						Tag:  "3.0",
 					},
 					Digest:      "sha256:222",
 					DstRegistry: destRC2,
 					DstImageTag: reg.ImageTag{
-						ImageName: "c",
-						Tag:       "3.0",
+						Name: "c",
+						Tag:  "3.0",
 					},
 				}: nil,
 			},
@@ -1726,14 +1726,14 @@ func TestCheckOverlappingEdges(t *testing.T) {
 				{
 					SrcRegistry: srcRC,
 					SrcImageTag: reg.ImageTag{
-						ImageName: "a",
-						Tag:       "0.9",
+						Name: "a",
+						Tag:  "0.9",
 					},
 					Digest:      "sha256:000",
 					DstRegistry: destRC,
 					DstImageTag: reg.ImageTag{
-						ImageName: "a",
-						Tag:       "0.9",
+						Name: "a",
+						Tag:  "0.9",
 					},
 				}: nil,
 			},
@@ -1741,14 +1741,14 @@ func TestCheckOverlappingEdges(t *testing.T) {
 				{
 					SrcRegistry: srcRC,
 					SrcImageTag: reg.ImageTag{
-						ImageName: "a",
-						Tag:       "0.9",
+						Name: "a",
+						Tag:  "0.9",
 					},
 					Digest:      "sha256:000",
 					DstRegistry: destRC,
 					DstImageTag: reg.ImageTag{
-						ImageName: "a",
-						Tag:       "0.9",
+						Name: "a",
+						Tag:  "0.9",
 					},
 				}: nil,
 			},
@@ -1760,27 +1760,27 @@ func TestCheckOverlappingEdges(t *testing.T) {
 				{
 					SrcRegistry: srcRC,
 					SrcImageTag: reg.ImageTag{
-						ImageName: "a",
-						Tag:       "0.9",
+						Name: "a",
+						Tag:  "0.9",
 					},
 					Digest:      "sha256:000",
 					DstRegistry: destRC,
 					DstImageTag: reg.ImageTag{
-						ImageName: "a",
-						Tag:       "0.9",
+						Name: "a",
+						Tag:  "0.9",
 					},
 				}: nil,
 				{
 					SrcRegistry: srcRC,
 					SrcImageTag: reg.ImageTag{
-						ImageName: "b",
-						Tag:       "0.9",
+						Name: "b",
+						Tag:  "0.9",
 					},
 					Digest:      "sha256:111",
 					DstRegistry: destRC,
 					DstImageTag: reg.ImageTag{
-						ImageName: "b",
-						Tag:       "0.9",
+						Name: "b",
+						Tag:  "0.9",
 					},
 				}: nil,
 			},
@@ -1788,27 +1788,27 @@ func TestCheckOverlappingEdges(t *testing.T) {
 				{
 					SrcRegistry: srcRC,
 					SrcImageTag: reg.ImageTag{
-						ImageName: "a",
-						Tag:       "0.9",
+						Name: "a",
+						Tag:  "0.9",
 					},
 					Digest:      "sha256:000",
 					DstRegistry: destRC,
 					DstImageTag: reg.ImageTag{
-						ImageName: "a",
-						Tag:       "0.9",
+						Name: "a",
+						Tag:  "0.9",
 					},
 				}: nil,
 				{
 					SrcRegistry: srcRC,
 					SrcImageTag: reg.ImageTag{
-						ImageName: "b",
-						Tag:       "0.9",
+						Name: "b",
+						Tag:  "0.9",
 					},
 					Digest:      "sha256:111",
 					DstRegistry: destRC,
 					DstImageTag: reg.ImageTag{
-						ImageName: "b",
-						Tag:       "0.9",
+						Name: "b",
+						Tag:  "0.9",
 					},
 				}: nil,
 			},
@@ -1820,27 +1820,27 @@ func TestCheckOverlappingEdges(t *testing.T) {
 				{
 					SrcRegistry: srcRC,
 					SrcImageTag: reg.ImageTag{
-						ImageName: "a",
-						Tag:       "0.9",
+						Name: "a",
+						Tag:  "0.9",
 					},
 					Digest:      "sha256:000",
 					DstRegistry: destRC,
 					DstImageTag: reg.ImageTag{
-						ImageName: "a",
-						Tag:       "0.9",
+						Name: "a",
+						Tag:  "0.9",
 					},
 				}: nil,
 				{
 					SrcRegistry: srcRC,
 					SrcImageTag: reg.ImageTag{
-						ImageName: "b",
-						Tag:       "0.9",
+						Name: "b",
+						Tag:  "0.9",
 					},
 					Digest:      "sha256:111",
 					DstRegistry: destRC,
 					DstImageTag: reg.ImageTag{
-						ImageName: "a",
-						Tag:       "0.9",
+						Name: "a",
+						Tag:  "0.9",
 					},
 				}: nil,
 			},
@@ -1853,27 +1853,27 @@ func TestCheckOverlappingEdges(t *testing.T) {
 				{
 					SrcRegistry: srcRC,
 					SrcImageTag: reg.ImageTag{
-						ImageName: "a",
-						Tag:       "0.9",
+						Name: "a",
+						Tag:  "0.9",
 					},
 					Digest:      "sha256:000",
 					DstRegistry: destRC,
 					DstImageTag: reg.ImageTag{
-						ImageName: "a",
-						Tag:       "",
+						Name: "a",
+						Tag:  "",
 					},
 				}: nil,
 				{
 					SrcRegistry: srcRC,
 					SrcImageTag: reg.ImageTag{
-						ImageName: "b",
-						Tag:       "0.9",
+						Name: "b",
+						Tag:  "0.9",
 					},
 					Digest:      "sha256:111",
 					DstRegistry: destRC,
 					DstImageTag: reg.ImageTag{
-						ImageName: "a",
-						Tag:       "",
+						Name: "a",
+						Tag:  "",
 					},
 				}: nil,
 			},
@@ -1881,27 +1881,27 @@ func TestCheckOverlappingEdges(t *testing.T) {
 				{
 					SrcRegistry: srcRC,
 					SrcImageTag: reg.ImageTag{
-						ImageName: "a",
-						Tag:       "0.9",
+						Name: "a",
+						Tag:  "0.9",
 					},
 					Digest:      "sha256:000",
 					DstRegistry: destRC,
 					DstImageTag: reg.ImageTag{
-						ImageName: "a",
-						Tag:       "",
+						Name: "a",
+						Tag:  "",
 					},
 				}: nil,
 				{
 					SrcRegistry: srcRC,
 					SrcImageTag: reg.ImageTag{
-						ImageName: "b",
-						Tag:       "0.9",
+						Name: "b",
+						Tag:  "0.9",
 					},
 					Digest:      "sha256:111",
 					DstRegistry: destRC,
 					DstImageTag: reg.ImageTag{
-						ImageName: "a",
-						Tag:       "",
+						Name: "a",
+						Tag:  "",
 					},
 				}: nil,
 			},
@@ -2027,7 +2027,7 @@ func TestPromotion(t *testing.T) {
 				Registries: registries,
 				Images: []reg.Image{
 					{
-						ImageName: "a",
+						Name: "a",
 						Dmap: reg.DigestTags{
 							"sha256:000": {"0.9"},
 						},
@@ -2067,13 +2067,13 @@ func TestPromotion(t *testing.T) {
 				Registries: registries,
 				Images: []reg.Image{
 					{
-						ImageName: "a",
+						Name: "a",
 						Dmap: reg.DigestTags{
 							"sha256:000": {"0.9"},
 						},
 					},
 					{
-						ImageName: "b",
+						Name: "b",
 						Dmap: reg.DigestTags{
 							"sha256:111": {"0.9"},
 						},
@@ -2104,7 +2104,7 @@ func TestPromotion(t *testing.T) {
 				Registries: registries,
 				Images: []reg.Image{
 					{
-						ImageName: "a",
+						Name: "a",
 						Dmap: reg.DigestTags{
 							"sha256:000": {"0.9"},
 						},
@@ -2152,7 +2152,7 @@ func TestPromotion(t *testing.T) {
 				Registries: registries,
 				Images: []reg.Image{
 					{
-						ImageName: "a",
+						Name: "a",
 						Dmap: reg.DigestTags{
 							"sha256:000": {"0.9"},
 						},
@@ -2200,7 +2200,7 @@ func TestPromotion(t *testing.T) {
 				Registries: registries,
 				Images: []reg.Image{
 					{
-						ImageName: "a",
+						Name: "a",
 						Dmap: reg.DigestTags{
 							// sha256:bad is a bad image uploaded by a
 							// compromised account. "good" is a good tag that is
@@ -2245,7 +2245,7 @@ func TestPromotion(t *testing.T) {
 				Registries: registriesRebase,
 				Images: []reg.Image{
 					{
-						ImageName: "a",
+						Name: "a",
 						Dmap: reg.DigestTags{
 							"sha256:000": {"0.9"},
 						},
@@ -2288,7 +2288,7 @@ func TestPromotion(t *testing.T) {
 				Registries: registries,
 				Images: []reg.Image{
 					{
-						ImageName: "a",
+						Name: "a",
 						Dmap: reg.DigestTags{
 							"sha256:000": {},
 						},
@@ -2337,7 +2337,7 @@ func TestPromotion(t *testing.T) {
 				Registries: registries,
 				Images: []reg.Image{
 					{
-						ImageName: "a",
+						Name: "a",
 						Dmap: reg.DigestTags{
 							"sha256:000": {"0.9"},
 						},
@@ -2374,14 +2374,14 @@ func TestPromotion(t *testing.T) {
 				Registries: registries,
 				Images: []reg.Image{
 					{
-						ImageName: "a",
+						Name: "a",
 						Dmap: reg.DigestTags{
 							"sha256:000": {"missing-from-src"},
 							"sha256:333": {"0.8"},
 						},
 					},
 					{
-						ImageName: "b",
+						Name: "b",
 						Dmap: reg.DigestTags{
 							"sha256:bbb": {"also-missing"},
 						},
@@ -2416,7 +2416,7 @@ func TestPromotion(t *testing.T) {
 				Registries: registries,
 				Images: []reg.Image{
 					{
-						ImageName: "a",
+						Name: "a",
 						Dmap: reg.DigestTags{
 							"sha256:000": {"0.9", "1.0"},
 						},
@@ -2474,7 +2474,7 @@ func TestPromotion(t *testing.T) {
 				Registries: registries,
 				Images: []reg.Image{
 					{
-						ImageName: "a",
+						Name: "a",
 						Dmap: reg.DigestTags{
 							"sha256:000": {"0.9", "1.0"},
 						},
@@ -2613,7 +2613,7 @@ func TestExecRequests(t *testing.T) {
 				Registries: registries,
 				Images: []reg.Image{
 					{
-						ImageName: "a",
+						Name: "a",
 						Dmap: reg.DigestTags{
 							"sha256:000": {"0.9"},
 						},
@@ -2716,7 +2716,7 @@ func TestValidateEdges(t *testing.T) {
 				Registries:  registries,
 				Images: []reg.Image{
 					{
-						ImageName: "a",
+						Name: "a",
 						Dmap: reg.DigestTags{
 							"sha256:000": {"0.0"},
 						},
@@ -2746,7 +2746,7 @@ func TestValidateEdges(t *testing.T) {
 				Registries:  registries,
 				Images: []reg.Image{
 					{
-						ImageName: "a",
+						Name: "a",
 						Dmap: reg.DigestTags{
 							"sha256:000": {"0.0"},
 							// This is an image we want to promote. There are no
@@ -2780,7 +2780,7 @@ func TestValidateEdges(t *testing.T) {
 				Registries:  registries,
 				Images: []reg.Image{
 					{
-						ImageName: "a",
+						Name: "a",
 						Dmap: reg.DigestTags{
 							// The idea here is that we've already promoted
 							// sha256:111 as tag 1.0, but we want to try to
@@ -2851,14 +2851,14 @@ func TestGarbageCollection(t *testing.T) {
 				Registries: registries,
 				Images: []reg.Image{
 					{
-						ImageName: "a",
+						Name: "a",
 						Dmap: reg.DigestTags{
 							"sha256:000": {"missing-from-src"},
 							"sha256:333": {"0.8"},
 						},
 					},
 					{
-						ImageName: "b",
+						Name: "b",
 						Dmap: reg.DigestTags{
 							"sha256:bbb": {"also-missing"},
 						},
@@ -2890,14 +2890,14 @@ func TestGarbageCollection(t *testing.T) {
 				Registries: registries,
 				Images: []reg.Image{
 					{
-						ImageName: "a",
+						Name: "a",
 						Dmap: reg.DigestTags{
 							"sha256:000": {"missing-from-src"},
 							"sha256:333": {"0.8"},
 						},
 					},
 					{
-						ImageName: "b",
+						Name: "b",
 						Dmap: reg.DigestTags{
 							"sha256:bbb": {"also-missing"},
 						},
@@ -3023,14 +3023,14 @@ func TestGarbageCollectionMulti(t *testing.T) {
 				Registries: registries,
 				Images: []reg.Image{
 					{
-						ImageName: "a",
+						Name: "a",
 						Dmap: reg.DigestTags{
 							"sha256:000": {"missing-from-src"},
 							"sha256:333": {"0.8"},
 						},
 					},
 					{
-						ImageName: "b",
+						Name: "b",
 						Dmap: reg.DigestTags{
 							"sha256:bbb": {"also-missing"},
 						},
@@ -3337,7 +3337,7 @@ func TestMatch(t *testing.T) {
 		},
 		Images: []reg.Image{
 			{
-				ImageName: "foo-controller",
+				Name: "foo-controller",
 				Dmap: reg.DigestTags{
 					"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": {"1.0"},
 				},

@@ -49,21 +49,21 @@ func TestImageRemovalCheck(t *testing.T) {
 	registries2 := []reg.RegistryContext{destRC, srcRC, srcRC2}
 
 	imageA := reg.Image{
-		ImageName: "a",
+		Name: "a",
 		Dmap: reg.DigestTags{
 			"sha256:000": {"0.9"},
 		},
 	}
 
 	imageA2 := reg.Image{
-		ImageName: "a",
+		Name: "a",
 		Dmap: reg.DigestTags{
 			"sha256:111": {"0.9"},
 		},
 	}
 
 	imageB := reg.Image{
-		ImageName: "b",
+		Name: "b",
 		Dmap: reg.DigestTags{
 			"sha256:000": {"0.9"},
 		},
@@ -211,13 +211,13 @@ func TestImageSizeCheck(t *testing.T) {
 	registries := []reg.RegistryContext{destRC, srcRC}
 
 	image1 := reg.Image{
-		ImageName: "foo",
+		Name: "foo",
 		Dmap: reg.DigestTags{
 			"sha256:000": {"0.9"},
 		},
 	}
 	image2 := reg.Image{
-		ImageName: "bar",
+		Name: "bar",
 		Dmap: reg.DigestTags{
 			"sha256:111": {"0.9"},
 		},
@@ -343,8 +343,7 @@ func TestImageSizeCheck(t *testing.T) {
 		require.Equal(t, len(test.imageSizes), len(test.check.PullEdges))
 
 		for edge := range test.check.PullEdges {
-			test.check.DigestImageSize[edge.Digest] =
-				test.imageSizes[edge.Digest]
+			test.check.DigestImageSize[edge.Digest] = test.imageSizes[edge.Digest]
 		}
 
 		got := test.check.Run()
@@ -360,29 +359,29 @@ func TestImageSizeCheck(t *testing.T) {
 func TestImageVulnCheck(t *testing.T) {
 	edge1 := reg.PromotionEdge{
 		SrcImageTag: reg.ImageTag{
-			ImageName: "foo",
+			Name: "foo",
 		},
 		Digest: "sha256:000",
 		DstImageTag: reg.ImageTag{
-			ImageName: "foo",
+			Name: "foo",
 		},
 	}
 	edge2 := reg.PromotionEdge{
 		SrcImageTag: reg.ImageTag{
-			ImageName: "bar",
+			Name: "bar",
 		},
 		Digest: "sha256:111",
 		DstImageTag: reg.ImageTag{
-			ImageName: "bar/1",
+			Name: "bar/1",
 		},
 	}
 	edge3 := reg.PromotionEdge{
 		SrcImageTag: reg.ImageTag{
-			ImageName: "bar",
+			Name: "bar",
 		},
 		Digest: "sha256:111",
 		DstImageTag: reg.ImageTag{
-			ImageName: "bar/2",
+			Name: "bar/2",
 		},
 	}
 

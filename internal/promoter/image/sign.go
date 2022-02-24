@@ -40,7 +40,7 @@ func (di *DefaultPromoterImplementation) ValidateStagingSignatures(
 		imageRef := fmt.Sprintf(
 			"%s/%s@%s",
 			edge.SrcRegistry.Name,
-			edge.SrcImageTag.ImageName,
+			edge.SrcImageTag.Name,
 			edge.Digest,
 		)
 		logrus.Infof("Verifying signatures of image %s", imageRef)

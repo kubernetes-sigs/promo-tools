@@ -92,7 +92,7 @@ func TestFind(t *testing.T) {
 				},
 				Images: []reg.Image{
 					{
-						ImageName: "foo-controller",
+						Name: "foo-controller",
 						Dmap: reg.DigestTags{
 							"sha256:c3d310f4741b3642497da8826e0986db5e02afc9777a2b8e668c8e41034128c1": {"1.0"},
 						},
