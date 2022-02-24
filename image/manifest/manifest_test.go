@@ -185,7 +185,7 @@ func TestApplyFilters(t *testing.T) {
 		{
 			"filter on image name only",
 			manifest.GrowOptions{
-				FilterImage: "bar",
+				FilterImages: []reg.ImageName{"bar"},
 			},
 			reg.RegInvImage{
 				"foo": {
@@ -205,7 +205,7 @@ func TestApplyFilters(t *testing.T) {
 		{
 			"filter on tag only",
 			manifest.GrowOptions{
-				FilterTag: "1.0",
+				FilterTags: []reg.Tag{"1.0"},
 			},
 			reg.RegInvImage{
 				"foo": {
@@ -225,7 +225,7 @@ func TestApplyFilters(t *testing.T) {
 		{
 			"filter on 'latest' tag",
 			manifest.GrowOptions{
-				FilterTag: "latest",
+				FilterTags: []reg.Tag{"latest"},
 			},
 			reg.RegInvImage{
 				"foo": {
@@ -241,7 +241,7 @@ func TestApplyFilters(t *testing.T) {
 		{
 			"filter on digest",
 			manifest.GrowOptions{
-				FilterDigest: "sha256:222",
+				FilterDigests: []reg.Digest{"sha256:222"},
 			},
 			reg.RegInvImage{
 				"foo": {
@@ -262,7 +262,7 @@ func TestApplyFilters(t *testing.T) {
 		{
 			"filter on shared tag (multiple images share same tag)",
 			manifest.GrowOptions{
-				FilterTag: "1.2.3",
+				FilterTags: []reg.Tag{"1.2.3"},
 			},
 			reg.RegInvImage{
 				"foo": {
@@ -286,8 +286,8 @@ func TestApplyFilters(t *testing.T) {
 		{
 			"filter on shared tag and image name (multiple images share same tag)",
 			manifest.GrowOptions{
-				FilterImage: "foo",
-				FilterTag:   "1.2.3",
+				FilterImages: []reg.ImageName{"foo"},
+				FilterTags:   []reg.Tag{"1.2.3"},
 			},
 			reg.RegInvImage{
 				"foo": {

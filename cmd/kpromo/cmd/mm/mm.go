@@ -87,9 +87,12 @@ func init() {
 func run() error {
 	opt := manifest.GrowOptions{}
 	if err := opt.Populate(
-		modifyOpts.baseDir, modifyOpts.stagingRepo,
-		modifyOpts.filterImage, modifyOpts.filterDigest,
-		modifyOpts.filterTag); err != nil {
+		modifyOpts.baseDir,
+		modifyOpts.stagingRepo,
+		[]string{modifyOpts.filterImage},
+		[]string{modifyOpts.filterDigest},
+		[]string{modifyOpts.filterTag},
+	); err != nil {
 		return err
 	}
 

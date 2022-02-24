@@ -42,20 +42,20 @@ type GrowOptions struct {
 	// modifications.
 	StagingRepo reg.RegistryName
 	// FilterImage is the image (name) to filter by. Optional.
-	FilterImage reg.ImageName
+	FilterImages []reg.ImageName
 	// FilterDigest is the image digest to filter by. Optional.
-	FilterDigest reg.Digest
-	// FilterTag is the image tag to filter by. Optional.
-	FilterTag reg.Tag
+	FilterDigests []reg.Digest
+	// FilterTags is the image tag to filter by. Optional.
+	FilterTags []reg.Tag
 }
 
 // Populate sets the values for GrowOptions.
 func (o *GrowOptions) Populate(
 	baseDir,
-	stagingRepo,
-	filterImage,
-	filterDigest,
-	filterTag string,
+	stagingRepo string,
+	filterImages,
+	filterDigests,
+	filterTags []string,
 ) error {
 	baseDirAbsPath, err := filepath.Abs(baseDir)
 	if err != nil {
@@ -65,11 +65,41 @@ func (o *GrowOptions) Populate(
 
 	o.BaseDir = baseDirAbsPath
 	o.StagingRepo = reg.RegistryName(stagingRepo)
-	o.FilterImage = reg.ImageName(filterImage)
-	o.FilterDigest = reg.Digest(filterDigest)
-	o.FilterTag = reg.Tag(filterTag)
+	o.FilterImages = toImageNames(filterImages)
+	o.FilterDigests = toDigests(filterDigests)
+	o.FilterTags = toTags(filterTags)
 
 	return nil
+}
+
+func toImageNames(imageStrings []string) []reg.ImageName {
+	imgNames := []reg.ImageName{}
+	for _, imgString := range imageStrings {
+		imgName := reg.ImageName(imgString)
+		imgNames = append(imgNames, imgName)
+	}
+
+	return imgNames
+}
+
+func toTags(tagStrings []string) []reg.Tag {
+	tags := []reg.Tag{}
+	for _, tagString := range tagStrings {
+		tag := reg.Tag(tagString)
+		tags = append(tags, tag)
+	}
+
+	return tags
+}
+
+func toDigests(digestStrings []string) []reg.Digest {
+	digests := []reg.Digest{}
+	for _, digestString := range digestStrings {
+		digest := reg.Digest(digestString)
+		digests = append(digests, digest)
+	}
+
+	return digests
 }
 
 // Validate validates the options.
@@ -82,11 +112,22 @@ func (o *GrowOptions) Validate() error {
 		return xerrors.New("must specify --staging_repo")
 	}
 
-	if o.FilterTag == latestTag {
+	if containsTag(o.FilterTags, latestTag) {
 		return xerrors.Errorf(
 			"--filter_tag cannot be %q (anti-pattern)", latestTag)
 	}
+
 	return nil
+}
+
+func containsTag(tags []reg.Tag, check string) bool {
+	for _, tag := range tags {
+		if tag == reg.Tag(check) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // Grow modifies a manifest by adding images into it.
@@ -210,16 +251,17 @@ func ApplyFilters(o *GrowOptions, rii reg.RegInvImage) (reg.RegInvImage, error) 
 	}
 
 	// Now perform some filtering, if any.
-	if len(o.FilterImage) > 0 {
-		rii = FilterByImage(rii, o.FilterImage)
+	if len(o.FilterImages) > 0 {
+		rii = FilterByImages(rii, o.FilterImages)
 	}
 
-	if len(o.FilterTag) > 0 {
-		rii = reg.FilterByTag(rii, string(o.FilterTag))
+	if len(o.FilterTags) > 0 {
+		// TODO(manifest): Should func be pulled into this package?
+		rii = FilterByTags(rii, o.FilterTags)
 	}
 
-	if len(o.FilterDigest) > 0 {
-		rii = FilterByDigest(rii, o.FilterDigest)
+	if len(o.FilterDigests) > 0 {
+		rii = FilterByDigests(rii, o.FilterDigests)
 	}
 
 	// Remove any other tags that should still be filtered.
@@ -235,32 +277,65 @@ func ApplyFilters(o *GrowOptions, rii reg.RegInvImage) (reg.RegInvImage, error) 
 	return rii, nil
 }
 
-// FilterByImage removes all images in RegInvImage that do not match the
+// FilterByImages removes all images in RegInvImage that do not match the
 // filterImage.
-func FilterByImage(rii reg.RegInvImage, filterImage reg.ImageName) reg.RegInvImage {
+func FilterByImages(rii reg.RegInvImage, filterImages []reg.ImageName) reg.RegInvImage {
 	filtered := make(reg.RegInvImage)
 	for imageName, digestTags := range rii {
-		if imageName == filterImage {
-			filtered[imageName] = digestTags
+		for _, filterImage := range filterImages {
+			if imageName == filterImage {
+				filtered[imageName] = digestTags
+			}
 		}
 	}
 	return filtered
 }
 
-// FilterByDigest removes all images in RegInvImage that do not match the
-// filterDigest.
-func FilterByDigest(rii reg.RegInvImage, filterDigest reg.Digest) reg.RegInvImage {
+// FilterByTags removes all images in RegInvImage that do not match the
+// filterTag.
+// TODO(manifest): Dedupe with `FilterByTag` in legacy/dockerregistry/inventory.go
+func FilterByTags(rii reg.RegInvImage, filterTags []reg.Tag) reg.RegInvImage {
 	filtered := make(reg.RegInvImage)
+
 	for imageName, digestTags := range rii {
 		for digest, tags := range digestTags {
-			if digest == filterDigest {
-				if filtered[imageName] == nil {
-					filtered[imageName] = make(reg.DigestTags)
+			for _, tag := range tags {
+				for _, filterTag := range filterTags {
+					if tag == filterTag {
+						if filtered[imageName] == nil {
+							filtered[imageName] = make(reg.DigestTags)
+						}
+
+						filtered[imageName][digest] = append(
+							filtered[imageName][digest],
+							tag,
+						)
+					}
 				}
-				filtered[imageName][digest] = tags
 			}
 		}
 	}
+
+	return filtered
+}
+
+// FilterByDigests removes all images in RegInvImage that do not match the
+// filterDigest.
+func FilterByDigests(rii reg.RegInvImage, filterDigests []reg.Digest) reg.RegInvImage {
+	filtered := make(reg.RegInvImage)
+	for imageName, digestTags := range rii {
+		for digest, tags := range digestTags {
+			for _, filterDigest := range filterDigests {
+				if digest == filterDigest {
+					if filtered[imageName] == nil {
+						filtered[imageName] = make(reg.DigestTags)
+					}
+					filtered[imageName][digest] = tags
+				}
+			}
+		}
+	}
+
 	return filtered
 }
 

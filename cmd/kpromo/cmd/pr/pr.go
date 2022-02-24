@@ -67,6 +67,7 @@ type promoteOptions struct {
 	reviewers       string
 	interactiveMode bool
 	images          []string
+	digests         []string
 }
 
 func (o *promoteOptions) Validate() error {
@@ -111,6 +112,7 @@ func init() {
 		&promoteOpts.tags,
 		"tag",
 		"t",
+		// TODO: Parameterize
 		[]string{},
 		"version tag of the images we will promote",
 	)
@@ -141,8 +143,18 @@ func init() {
 		&promoteOpts.images,
 		"image",
 		"",
-		[]string{""}, // default to a single empty string image filter which will promote all images matching the tag.
+		// TODO: Parameterize
+		[]string{""},
 		"image to promote. If not specified, all images matching the tag will be promoted",
+	)
+
+	PRCmd.PersistentFlags().StringSliceVarP(
+		&promoteOpts.digests,
+		"digests",
+		"",
+		// TODO: Parameterize
+		[]string{""},
+		"digests to promote. If not specified, all images matching the tag will be promoted",
 	)
 
 	for _, flagName := range []string{"tag", "fork"} {
@@ -217,24 +229,20 @@ func runPromote(opts *promoteOptions) error {
 			}
 		}
 
-		for _, tag := range opts.tags {
-			for _, filterImage := range opts.images {
-				opt := manifest.GrowOptions{}
-				if err := opt.Populate(
-					filepath.Join(repo.Dir(), image.ProdRegistry),
-					image.StagingRepoPrefix+opts.project, filterImage, "", tag); err != nil {
-					return errors.Wrapf(err, "populating image promoter options for tag %s with image filter %s", tag, filterImage)
-				}
+		opt := manifest.GrowOptions{}
+		if err := opt.Populate(
+			filepath.Join(repo.Dir(), image.ProdRegistry),
+			image.StagingRepoPrefix+opts.project, opts.images, opts.digests, opts.tags); err != nil {
+			return errors.Wrapf(err, "populating image promoter options for tag %s with image filter %s", opts.tags, opts.images)
+		}
 
-				if err := opt.Validate(); err != nil {
-					return errors.Wrapf(err, "validate promoter options tag %s with image filter %s", tag, filterImage)
-				}
+		if err := opt.Validate(); err != nil {
+			return errors.Wrapf(err, "validate promoter options tag %s with image filter %s", opts.tags, opts.images)
+		}
 
-				logrus.Infof("Growing manifests for images matching filter %s and matching tag %s", filterImage, tag)
-				if err := manifest.Grow(ctx, &opt); err != nil {
-					return errors.Wrapf(err, "Growing manifest with image filter %s and tag %s", filterImage, tag)
-				}
-			}
+		logrus.Infof("Growing manifests for images matching filter %s and matching tag %s", opts.images, opts.tags)
+		if err := manifest.Grow(ctx, &opt); err != nil {
+			return errors.Wrapf(err, "Growing manifest with image filter %s and tag %s", opts.images, opts.tags)
 		}
 	}
 
@@ -383,11 +391,7 @@ func generatePRBody(opts *promoteOptions) string {
 //                 - stage changes, but don't commit or push?
 //                 - stage changes and commit, but don't push?
 //                 - point at local directory instead of virtual repo?
-// - TODO(cip-mm): Support filtering by image name
-// - TODO(cip-mm): Support filtering by digest
-// - TODO(cip-mm): Support filtering by tag
 // - TODO(cip-mm): Fix spacing in tag list
 //                 ref: https://github.com/kubernetes/k8s.io/pull/3212/files#r771604521
 // - TODO(cip-mm): Confirm options are validated
-// - TODO(cip-mm): Ensure filtering options support multiple values
 // - TODO(cip-mm): Support non-SemVer image tags
