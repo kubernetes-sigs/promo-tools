@@ -30,18 +30,17 @@ import (
 )
 
 // TODO: Consider merging this with bazelTestPath() from inventory
-func testPath(testName string, paths ...string) string {
+func testPath(paths ...string) string {
 	prefix := []string{
 		os.Getenv("PWD"),
-		"inventory_test",
-		testName,
+		"testdata",
 	}
 
 	return filepath.Join(append(prefix, paths...)...)
 }
 
 func TestFind(t *testing.T) {
-	pwd := testPath("TestFind")
+	pwd := testPath()
 	srcRC := reg.RegistryContext{
 		Name:           "gcr.io/foo-staging",
 		ServiceAccount: "sa@robot.com",
