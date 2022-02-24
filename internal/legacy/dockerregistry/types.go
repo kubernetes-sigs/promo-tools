@@ -84,8 +84,8 @@ type SyncContext struct {
 	UseServiceAccount bool
 	Inv               MasterInventory
 	InvIgnore         []image.Name
-	RegistryContexts  []RegistryContext
-	SrcRegistry       *RegistryContext
+	RegistryContexts  []registry.RegistryContext
+	SrcRegistry       *registry.RegistryContext
 	Tokens            map[RootRepo]gcloud.Token
 	DigestMediaType   DigestMediaType
 	DigestImageSize   DigestImageSize
@@ -132,12 +132,12 @@ type ImageRemovalCheck struct {
 // PromotionEdge represents a promotion "link" of an image repository between 2
 // registries.
 type PromotionEdge struct {
-	SrcRegistry RegistryContext
+	SrcRegistry registry.RegistryContext
 	SrcImageTag ImageTag
 
 	Digest image.Digest
 
-	DstRegistry RegistryContext
+	DstRegistry registry.RegistryContext
 	DstImageTag ImageTag
 }
 
@@ -185,19 +185,6 @@ const (
 	Delete = iota
 )
 
-const (
-	// ThinManifestDepth specifies the number of items in a path if we split the
-	// path into its parts, starting from the "topmost" folder given as an
-	// argument to -thin-manifest-dir. E.g., a well-formed path is something
-	// like:
-	//
-	//  ["", "manifests", "foo", "promoter-manifests.yaml"]
-	//
-	// . This is a result of some path handling/parsing logic in
-	// ValidateThinManifestDirectoryStructure().
-	ThinManifestDepth = 4
-)
-
 // PromotionRequest contains all the information required for any type of
 // promotion (or demotion!) (involving any TagOp).
 type PromotionRequest struct {
@@ -212,101 +199,14 @@ type PromotionRequest struct {
 	Tag            image.Tag
 }
 
-// Manifest stores the information in a manifest file (describing the
-// desired state of a Docker Registry).
-type Manifest struct {
-	// Registries contains the source and destination (Src/Dest) registry names.
-	// There must be at least 2 registries: 1 source registry and 1 or more
-	// destination registries.
-	Registries []RegistryContext `yaml:"registries,omitempty"`
-	Images     []Image           `yaml:"images,omitempty"`
-
-	// Hidden fields; these are data structure optimizations that are populated
-	// from the fields above. As they are redundant, there is no point in
-	// storing this information in YAML.
-	SrcRegistry *RegistryContext
-	Filepath    string
-}
-
-// ToRegInvImage converts a Manifest into a RegInvImage.
-func (manifest *Manifest) ToRegInvImage() registry.RegInvImage {
-	rii := make(registry.RegInvImage)
-	for _, img := range manifest.Images {
-		rii[img.Name] = img.Dmap
-	}
-	return rii
-}
-
-// ThinManifest is a more secure Manifest because it does not define the
-// Images[] directly, but moves it to a separate location. The idea is to define
-// a ThinManifest type as a YAML in one folder, and to define the []Image in
-// another folder, and to have far stricter ACLs for the ThinManifest type.
-// Then, PRs modifying just the []Image YAML won't be able to modify the
-// src/destination repos or the credentials tied to them.
-type ThinManifest struct {
-	Registries []RegistryContext `yaml:"registries,omitempty"`
-	// Store actual image data somewhere else.
-	//
-	// NOTE: "ImagesPath" is deprecated. It does nothing and will be
-	// removed in a future release. The images are always stored in a
-	// directory structure as follows:
-	//
-	//       foo
-	//       ├── images
-	//       │   ├── a
-	//       │   │   └── images.yaml
-	//       │   ├── b
-	//       │   │   └── images.yaml
-	//       │   ├── c
-	//       │   │   └── images.yaml
-	//       │   └── d
-	//       │       └── images.yaml
-	//       └── manifests
-	//           ├── a
-	//           │   └── promoter-manifest.yaml
-	//           ├── b
-	//           │   └── promoter-manifest.yaml
-	//           ├── c
-	//           │   └── promoter-manifest.yaml
-	//           └── d
-	//               └── promoter-manifest.yaml
-	//
-	// where "foo" is the toplevel folder holding all thin manifsets.
-	// That is, every manifest must be bifurcated into 2 parts, the
-	// "image" and "manifest" part, and these parts must be stored
-	// separately.
-
-	ImagesPath string `yaml:"imagesPath,omitempty"`
-}
-
-// Image holds information about an image. It's like an "Object" in the OOP
-// sense, and holds all the information relating to a particular image that we
-// care about.
-type Image struct {
-	Name image.Name          `yaml:"name"`
-	Dmap registry.DigestTags `yaml:"dmap,omitempty"`
-}
-
-// Images is a slice of Image types.
-type Images []Image
-
 // RegistryImagePath is the registry name and image name, without the tag. E.g.
 // "gcr.io/foo/bar/baz/image".
 type RegistryImagePath string
 
-// RegistryContext holds information about a registry, to be written in a
-// manifest file.
-type RegistryContext struct {
-	Name           image.Registry `yaml:"name,omitempty"`
-	ServiceAccount string         `yaml:"service-account,omitempty"`
-	Token          gcloud.Token   `yaml:"-"`
-	Src            bool           `yaml:"src,omitempty"`
-}
-
 // GCRManifestListContext is used only for reading GCRManifestList information
 // from GCR, in the function ReadGCRManifestLists.
 type GCRManifestListContext struct {
-	RegistryContext RegistryContext
+	RegistryContext registry.RegistryContext
 	ImageName       image.Name
 	Tag             image.Tag
 	Digest          image.Digest
@@ -348,24 +248,12 @@ type ProcessRequest func(
 type PromotionContext func(
 	image.Registry, // srcRegistry
 	image.Name, // srcImage
-	RegistryContext, // destRegistryContext (need service acc)
+	registry.RegistryContext, // destRegistryContext (need service acc)
 	image.Name, // destImage
 	image.Digest,
 	image.Tag,
 	TagOp,
 ) stream.Producer
-
-// TODO: Review/optimize/de-dupe (https://github.com/kubernetes-sigs/promo-tools/pull/351)
-type ImageWithParentDigestSlice struct {
-	Name          string
-	parentDigests []parentDigest
-}
-
-// TODO: Review/optimize/de-dupe (https://github.com/kubernetes-sigs/promo-tools/pull/351)
-type parentDigest struct {
-	hash     string
-	children []string
-}
 
 // GCRPubSubPayload is the message payload sent to a Pub/Sub topic by a GCR.
 type GCRPubSubPayload struct {

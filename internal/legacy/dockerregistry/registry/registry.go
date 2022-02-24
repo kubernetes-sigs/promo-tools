@@ -27,6 +27,17 @@ import (
 	"sigs.k8s.io/promo-tools/v3/types/image"
 )
 
+// Image holds information about an image. It's like an "Object" in the OOP
+// sense, and holds all the information relating to a particular image that we
+// care about.
+type Image struct {
+	Name image.Name `yaml:"name"`
+	Dmap DigestTags `yaml:"dmap,omitempty"`
+}
+
+// Images is a slice of Image types.
+type Images []Image
+
 // A RegInvImage is a map containing all of the image names, and their
 // associated digest-to-tags mappings. It is the simplest view of a Docker
 // Registry, because the keys are just the image.Names (where each image.Name does

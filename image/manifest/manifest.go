@@ -26,6 +26,7 @@ import (
 	"golang.org/x/xerrors"
 
 	reg "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
+	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/manifest"
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/registry"
 	"sigs.k8s.io/promo-tools/v3/types/image"
 )
@@ -171,7 +172,7 @@ func Grow(
 
 // Write writes images as YAML out to the expected path of the given
 // (thin) manifest.
-func Write(manifest reg.Manifest, rii registry.RegInvImage) error {
+func Write(manifest manifest.Manifest, rii registry.RegInvImage) error {
 	// Chop off trailing "promoter-manifest.yaml".
 	p := path.Dir(manifest.Filepath)
 	// Get staging repo directory name as it is laid out in the thin manifest
@@ -189,12 +190,12 @@ func Write(manifest reg.Manifest, rii registry.RegInvImage) error {
 }
 
 // Find finds the manifest to modify.
-func Find(o *GrowOptions) (reg.Manifest, error) {
+func Find(o *GrowOptions) (manifest.Manifest, error) {
 	var err error
-	var manifests []reg.Manifest
-	manifests, err = reg.ParseThinManifestsFromDir(o.BaseDir)
+	var manifests []manifest.Manifest
+	manifests, err = manifest.ParseThinManifestsFromDir(o.BaseDir)
 	if err != nil {
-		return reg.Manifest{}, err
+		return manifest.Manifest{}, err
 	}
 
 	logrus.Infof("%d manifests parsed", len(manifests))
@@ -203,7 +204,7 @@ func Find(o *GrowOptions) (reg.Manifest, error) {
 			return manifest, nil
 		}
 	}
-	return reg.Manifest{},
+	return manifest.Manifest{},
 		xerrors.Errorf("could not find Manifest for %q", o.StagingRepo)
 }
 
@@ -213,16 +214,16 @@ func Find(o *GrowOptions) (reg.Manifest, error) {
 func ReadStagingRepo(
 	o *GrowOptions,
 ) (registry.RegInvImage, error) {
-	stagingRepoRC := reg.RegistryContext{
+	stagingRepoRC := registry.RegistryContext{
 		Name: o.StagingRepo,
 	}
 
-	manifests := []reg.Manifest{
+	manifests := []manifest.Manifest{
 		{
-			Registries: []reg.RegistryContext{
+			Registries: []registry.RegistryContext{
 				stagingRepoRC,
 			},
-			Images: []reg.Image{},
+			Images: []registry.Image{},
 		},
 	}
 
@@ -235,7 +236,7 @@ func ReadStagingRepo(
 		return registry.RegInvImage{}, err
 	}
 	sc.ReadRegistries(
-		[]reg.RegistryContext{stagingRepoRC},
+		[]registry.RegistryContext{stagingRepoRC},
 		// Read all registries recursively, because we want to produce a
 		// complete snapshot.
 		true,
