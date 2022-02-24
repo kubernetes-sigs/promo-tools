@@ -52,9 +52,9 @@ func (di *DefaultPromoterImplementation) Snapshot(opts *options.Options, rii reg
 
 func (di *DefaultPromoterImplementation) GetSnapshotSourceRegistry(
 	opts *options.Options,
-) (*registry.RegistryContext, error) {
+) (*registry.Context, error) {
 	// Build the source registry:
-	srcRegistry := &registry.RegistryContext{
+	srcRegistry := &registry.Context{
 		ServiceAccount: opts.SnapshotSvcAcct,
 		Src:            true,
 	}
@@ -89,7 +89,7 @@ func (di *DefaultPromoterImplementation) GetSnapshotManifests(
 	// Add it to a new manifest and return it:
 	return []manifest.Manifest{
 		{
-			Registries: []registry.RegistryContext{
+			Registries: []registry.Context{
 				*srcRegistry,
 			},
 			Images: []registry.Image{},
@@ -153,7 +153,7 @@ func (di *DefaultPromoterImplementation) GetRegistryImageInventory(
 
 		if opts.MinimalSnapshot {
 			if err := sc.ReadRegistriesGGCR(
-				[]registry.RegistryContext{*srcRegistry},
+				[]registry.Context{*srcRegistry},
 				true,
 			); err != nil {
 				return nil, errors.Wrap(err, "reading registry for minimal snapshot")
@@ -167,7 +167,7 @@ func (di *DefaultPromoterImplementation) GetRegistryImageInventory(
 	}
 
 	if err := sc.ReadRegistriesGGCR(
-		[]registry.RegistryContext{*srcRegistry}, true,
+		[]registry.Context{*srcRegistry}, true,
 	); err != nil {
 		return nil, errors.Wrap(err, "reading registries")
 	}

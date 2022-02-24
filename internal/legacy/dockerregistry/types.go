@@ -84,8 +84,8 @@ type SyncContext struct {
 	UseServiceAccount bool
 	Inv               MasterInventory
 	InvIgnore         []image.Name
-	RegistryContexts  []registry.RegistryContext
-	SrcRegistry       *registry.RegistryContext
+	RegistryContexts  []registry.Context
+	SrcRegistry       *registry.Context
 	Tokens            map[RootRepo]gcloud.Token
 	DigestMediaType   DigestMediaType
 	DigestImageSize   DigestImageSize
@@ -132,12 +132,12 @@ type ImageRemovalCheck struct {
 // PromotionEdge represents a promotion "link" of an image repository between 2
 // registries.
 type PromotionEdge struct {
-	SrcRegistry registry.RegistryContext
+	SrcRegistry registry.Context
 	SrcImageTag ImageTag
 
 	Digest image.Digest
 
-	DstRegistry registry.RegistryContext
+	DstRegistry registry.Context
 	DstImageTag ImageTag
 }
 
@@ -206,7 +206,7 @@ type RegistryImagePath string
 // GCRManifestListContext is used only for reading GCRManifestList information
 // from GCR, in the function ReadGCRManifestLists.
 type GCRManifestListContext struct {
-	RegistryContext registry.RegistryContext
+	RegistryContext registry.Context
 	ImageName       image.Name
 	Tag             image.Tag
 	Digest          image.Digest
@@ -248,7 +248,7 @@ type ProcessRequest func(
 type PromotionContext func(
 	image.Registry, // srcRegistry
 	image.Name, // srcImage
-	registry.RegistryContext, // destRegistryContext (need service acc)
+	registry.Context, // destRegistryContext (need service acc)
 	image.Name, // destImage
 	image.Digest,
 	image.Tag,

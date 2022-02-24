@@ -62,13 +62,13 @@ func MakeSyncContext(
 		Inv:               make(MasterInventory),
 		InvIgnore:         []image.Name{},
 		Tokens:            make(map[RootRepo]gcloud.Token),
-		RegistryContexts:  make([]registry.RegistryContext, 0),
+		RegistryContexts:  make([]registry.Context, 0),
 		DigestMediaType:   make(DigestMediaType),
 		DigestImageSize:   make(DigestImageSize),
 		ParentDigest:      make(ParentDigest),
 	}
 
-	registriesSeen := make(map[registry.RegistryContext]interface{})
+	registriesSeen := make(map[registry.Context]interface{})
 	for _, mfest := range mfests {
 		for _, r := range mfest.Registries {
 			registriesSeen[r] = nil
@@ -165,7 +165,7 @@ func ToPromotionEdges(mfests []manifest.Manifest) (map[PromotionEdge]interface{}
 }
 
 func mkPromotionEdge(
-	srcRC, dstRC registry.RegistryContext,
+	srcRC, dstRC registry.Context,
 	srcImageName image.Name,
 	digest image.Digest,
 	tag image.Tag,
@@ -402,7 +402,7 @@ func (edge *PromotionEdge) VertexProps(
 // VertexPropsFor examines one of the two vertices (src or dst) of a
 // PromotionEdge.
 func (edge *PromotionEdge) VertexPropsFor(
-	rc *registry.RegistryContext,
+	rc *registry.Context,
 	imageTag *ImageTag,
 	mi *MasterInventory,
 ) VertexProperty {
@@ -642,7 +642,7 @@ func (sc *SyncContext) IgnoreFromPromotion(regName image.Registry) {
 //
 // TODO: Can we simplify this to not use switch/case/goto?
 func ParseContainerParts(s string) (
-	registry string,
+	registryName string,
 	repo string,
 	parseErr error,
 ) {
@@ -660,6 +660,7 @@ func ParseContainerParts(s string) (
 	}
 
 	switch parts[0] {
+	// TODO(gar): Need to support Artifact Registry values here.
 	case "gcr.io", "asia.gcr.io", "eu.gcr.io", "us.gcr.io":
 		if len(parts) == 2 {
 			goto InvalidString
@@ -715,7 +716,7 @@ func GetTokenKeyDomainRepoPath(registryName image.Registry) (key, domain, repoPa
 }
 
 func (sc *SyncContext) ReadRegistriesGGCR(
-	toRead []registry.RegistryContext, recurse bool,
+	toRead []registry.Context, recurse bool,
 ) error {
 	logrus.Infof("Reading %d registries:", len(sc.RegistryContexts))
 
@@ -815,9 +816,9 @@ func (sc *SyncContext) ReadRegistriesGGCR(
 // example above that there are images named gcr.io/google-containers/foo:2.0
 // and gcr.io/google-containers/foo/baz:2.0.
 func (sc *SyncContext) ReadRegistries(
-	toRead []registry.RegistryContext,
+	toRead []registry.Context,
 	recurse bool,
-	mkProducer func(*SyncContext, registry.RegistryContext) stream.Producer,
+	mkProducer func(*SyncContext, registry.Context) stream.Producer,
 ) {
 	// Collect all images in sc.Inv (the src and dest registry names found in
 	// the manifest).
@@ -866,14 +867,14 @@ func (sc *SyncContext) ReadRegistries(
 				// "foo" from a destination registry, do not bother trying to
 				// promote it for all registries
 				mutex.Lock()
-				sc.IgnoreFromPromotion(req.RequestParams.(registry.RegistryContext).Name)
+				sc.IgnoreFromPromotion(req.RequestParams.(registry.Context).Name)
 				mutex.Unlock()
 
 				continue
 			}
 
 			// Process the current repo.
-			rName := req.RequestParams.(registry.RegistryContext).Name
+			rName := req.RequestParams.(registry.Context).Name
 			digestTags := make(registry.DigestTags)
 
 			for digest, mfestInfo := range tagsStruct.Manifests {
@@ -925,9 +926,9 @@ func (sc *SyncContext) ReadRegistries(
 				for _, childRepoName := range tagsStruct.Children {
 					// TODO: Check result of type assertion
 					//nolint:errcheck
-					parentRC, _ := req.RequestParams.(registry.RegistryContext)
+					parentRC, _ := req.RequestParams.(registry.Context)
 
-					childRc := registry.RegistryContext{
+					childRc := registry.Context{
 						Name: image.Registry(
 							string(parentRC.Name) + "/" + childRepoName),
 						// Inherit the service account used at the parent
@@ -984,7 +985,7 @@ func (sc *SyncContext) ReadGCRManifestLists(
 		// Find all images that are of ggcrV1Types.MediaType == DockerManifestList; these
 		// images will be queried.
 		for registryName, rii := range sc.Inv {
-			var rc registry.RegistryContext
+			var rc registry.Context
 			for _, registryContext := range sc.RegistryContexts {
 				if registryContext.Name == registryName {
 					rc = registryContext
@@ -1123,7 +1124,7 @@ func (sc *SyncContext) RemoveChildDigestEntries(rii registry.RegInvImage) regist
 // "/" all the time, because some manifests have an image with a "/" in it.
 func SplitByKnownRegistries(
 	r image.Registry,
-	rcs []registry.RegistryContext,
+	rcs []registry.Context,
 ) (image.Registry, image.Name, error) {
 	for _, rc := range rcs {
 		if strings.HasPrefix(string(r), string(rc.Name)) {
@@ -1161,7 +1162,7 @@ func SplitByKnownRegistries(
 // over the network.
 func MkReadRepositoryCmdReal(
 	sc *SyncContext,
-	rc registry.RegistryContext,
+	rc registry.Context,
 ) stream.Producer {
 	var sh stream.HTTP
 
@@ -1591,8 +1592,8 @@ func EdgesToRegInvImage(
 // getRegistriesToRead collects all unique Docker repositories we want to read
 // from. This way, we don't have to read the entire Docker registry, but only
 // those paths that we are thinking of modifying.
-func getRegistriesToRead(edges map[PromotionEdge]interface{}) []registry.RegistryContext {
-	rcs := make(map[registry.RegistryContext]interface{})
+func getRegistriesToRead(edges map[PromotionEdge]interface{}) []registry.Context {
+	rcs := make(map[registry.Context]interface{})
 
 	// Save the src and dst endpoints as registries. We only care about the
 	// registry and image name, not the tag or digest; this is to collect all
@@ -1613,7 +1614,7 @@ func getRegistriesToRead(edges map[PromotionEdge]interface{}) []registry.Registr
 		rcs[dstReg] = nil
 	}
 
-	rcsFinal := []registry.RegistryContext{}
+	rcsFinal := []registry.Context{}
 	for rc := range rcs {
 		rcsFinal = append(rcsFinal, rc)
 	}
@@ -1628,7 +1629,7 @@ func (sc *SyncContext) Promote(
 	mkProducer func(
 		image.Registry,
 		image.Name,
-		registry.RegistryContext,
+		registry.Context,
 		image.Name,
 		image.Digest,
 		image.Tag,
@@ -1840,7 +1841,7 @@ func MkRequestCapturer(captured *CapturedRequests) ProcessRequest {
 // GarbageCollect deletes all images that are not referenced by Docker tags.
 func (sc *SyncContext) GarbageCollect(
 	mfest manifest.Manifest,
-	mkProducer func(registry.RegistryContext, image.Name, image.Digest) stream.Producer,
+	mkProducer func(registry.Context, image.Name, image.Digest) stream.Producer,
 	customProcessRequest *ProcessRequest,
 ) {
 	var populateRequests PopulateRequests = func(
@@ -1954,7 +1955,7 @@ func supportedMediaType(v string) (ggcrV1Types.MediaType, error) {
 // separately (deletion of manifest lists vs deletion of other media types).
 func (sc *SyncContext) ClearRepository(
 	regName image.Registry,
-	mkProducer func(registry.RegistryContext, image.Name, image.Digest) stream.Producer,
+	mkProducer func(registry.Context, image.Name, image.Digest) stream.Producer,
 	customProcessRequest *ProcessRequest,
 ) {
 	// deleteRequestsPopulator returns a PopulateRequests that
@@ -2081,7 +2082,7 @@ func (sc *SyncContext) ClearRepository(
 // GetWriteCmd generates a gcloud command that is used to make modifications to
 // a Docker Registry.
 func GetWriteCmd(
-	dest registry.RegistryContext,
+	dest registry.Context,
 	useServiceAccount bool,
 	srcRegistry image.Registry,
 	srcImageName image.Name,
@@ -2117,7 +2118,7 @@ func GetWriteCmd(
 // GetDeleteCmd generates the cloud command used to delete images (used for
 // garbage collection).
 func GetDeleteCmd(
-	rc registry.RegistryContext,
+	rc registry.Context,
 	useServiceAccount bool,
 	img image.Name,
 	digest image.Digest,
@@ -2170,10 +2171,10 @@ type GcrPayloadMatch struct {
 
 // Match checks whether a GCRPubSubPayload is mentioned in a Manifest. The
 // degree of the match is reflected in the GcrPayloadMatch result.
-func (payload *GCRPubSubPayload) Match(manifest *manifest.Manifest) GcrPayloadMatch {
+func (payload *GCRPubSubPayload) Match(mfest *manifest.Manifest) GcrPayloadMatch {
 	var m GcrPayloadMatch
-	for _, rc := range manifest.Registries {
-		m = payload.matchImages(&rc, manifest.Images)
+	for _, rc := range mfest.Registries {
+		m = payload.matchImages(&rc, mfest.Images)
 		if m.PathMatch {
 			return m
 		}
@@ -2182,7 +2183,7 @@ func (payload *GCRPubSubPayload) Match(manifest *manifest.Manifest) GcrPayloadMa
 }
 
 func (payload *GCRPubSubPayload) matchImages(
-	rc *registry.RegistryContext,
+	rc *registry.Context,
 	images []registry.Image,
 ) GcrPayloadMatch {
 	var m GcrPayloadMatch
@@ -2211,7 +2212,7 @@ func (payload *GCRPubSubPayload) matchImages(
 }
 
 func (payload *GCRPubSubPayload) matchImage(
-	rc *registry.RegistryContext,
+	rc *registry.Context,
 	img registry.Image,
 ) GcrPayloadMatch {
 	var m GcrPayloadMatch

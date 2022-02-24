@@ -37,13 +37,13 @@ type Manifest struct {
 	// Registries contains the source and destination (Src/Dest) registry names.
 	// There must be at least 2 registries: 1 source registry and 1 or more
 	// destination registries.
-	Registries []registry.RegistryContext `yaml:"registries,omitempty"`
-	Images     []registry.Image           `yaml:"images,omitempty"`
+	Registries []registry.Context `yaml:"registries,omitempty"`
+	Images     []registry.Image   `yaml:"images,omitempty"`
 
 	// Hidden fields; these are data structure optimizations that are populated
 	// from the fields above. As they are redundant, there is no point in
 	// storing this information in YAML.
-	SrcRegistry *registry.RegistryContext
+	SrcRegistry *registry.Context
 	Filepath    string
 }
 
@@ -54,7 +54,7 @@ type Manifest struct {
 // Then, PRs modifying just the []Image YAML won't be able to modify the
 // src/destination repos or the credentials tied to them.
 type ThinManifest struct {
-	Registries []registry.RegistryContext `yaml:"registries,omitempty"`
+	Registries []registry.Context `yaml:"registries,omitempty"`
 	// Store actual image data somewhere else.
 	//
 	// NOTE: "ImagesPath" is deprecated. It does nothing and will be
@@ -227,8 +227,6 @@ func ValidateTag(tag image.Tag) error {
 }
 
 // Finalize finalizes a Manifest by populating extra fields.
-// TODO: ST1016: methods on the same type should have the same receiver name
-// nolint: stylecheck
 func (m *Manifest) Finalize() error {
 	// Perform semantic checks (beyond just YAML validation).
 	srcRegistry, err := registry.GetSrcRegistry(m.Registries)
@@ -241,9 +239,9 @@ func (m *Manifest) Finalize() error {
 }
 
 // ToRegInvImage converts a Manifest into a RegInvImage.
-func (manifest *Manifest) ToRegInvImage() registry.RegInvImage {
+func (m *Manifest) ToRegInvImage() registry.RegInvImage {
 	rii := make(registry.RegInvImage)
-	for _, img := range manifest.Images {
+	for _, img := range m.Images {
 		rii[img.Name] = img.Dmap
 	}
 	return rii

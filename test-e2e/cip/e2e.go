@@ -123,7 +123,7 @@ func checkSnapshot(
 	repo image.Registry,
 	expected []registry.Image,
 	repoRoot string,
-	rcs []registry.RegistryContext,
+	rcs []registry.Context,
 ) error {
 	got, err := getSnapshot(
 		repoRoot,
@@ -193,10 +193,10 @@ func runPromotion(repoRoot string, t *E2ETest) error {
 	return cmd.RunSuccess()
 }
 
-func extractSvcAcc(registry image.Registry, rcs []registry.RegistryContext) string {
-	for _, r := range rcs {
-		if r.Name == registry {
-			return r.ServiceAccount
+func extractSvcAcc(r image.Registry, rcs []registry.Context) string {
+	for _, regCtx := range rcs {
+		if regCtx.Name == r {
+			return regCtx.ServiceAccount
 		}
 	}
 
@@ -205,8 +205,8 @@ func extractSvcAcc(registry image.Registry, rcs []registry.RegistryContext) stri
 
 func getSnapshot(
 	repoRoot string,
-	registry image.Registry,
-	rcs []registry.RegistryContext,
+	registryName image.Registry,
+	rcs []registry.Context,
 ) ([]registry.Image, error) {
 	// TODO: Consider setting flag names in `cip` instead
 	invocation := []string{
@@ -217,10 +217,10 @@ func getSnapshot(
 			kpromoMain,
 		),
 		"cip",
-		"--snapshot=" + string(registry),
+		"--snapshot=" + string(registryName),
 	}
 
-	svcAcc := extractSvcAcc(registry, rcs)
+	svcAcc := extractSvcAcc(registryName, rcs)
 	if len(svcAcc) > 0 {
 		invocation = append(invocation, "--snapshot-service-account="+svcAcc)
 	}
@@ -284,7 +284,7 @@ func (t *E2ETest) clearRepositories() error {
 
 func clearRepository(regName image.Registry, sc *reg.SyncContext) {
 	mkDeletionCmd := func(
-		dest registry.RegistryContext,
+		dest registry.Context,
 		imageName image.Name,
 		digest image.Digest) stream.Producer {
 		var sp stream.Subprocess
@@ -304,10 +304,10 @@ func clearRepository(regName image.Registry, sc *reg.SyncContext) {
 // promoter manifest, and the before/after snapshots of all repositories that it
 // cares about.
 type E2ETest struct {
-	Name       string                     `yaml:"name,omitempty"`
-	Registries []registry.RegistryContext `yaml:"registries,omitempty"`
-	Invocation []string                   `yaml:"invocation,omitempty"`
-	Snapshots  []RegistrySnapshot         `yaml:"snapshots,omitempty"`
+	Name       string             `yaml:"name,omitempty"`
+	Registries []registry.Context `yaml:"registries,omitempty"`
+	Invocation []string           `yaml:"invocation,omitempty"`
+	Snapshots  []RegistrySnapshot `yaml:"snapshots,omitempty"`
 }
 
 // E2ETests is an array of E2ETest.

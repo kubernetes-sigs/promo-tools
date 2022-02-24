@@ -28,7 +28,7 @@ import (
 // GcrReadingFacility holds functions used to create streams for reading the
 // repository and manifest list.
 type GcrReadingFacility struct {
-	ReadRepo         func(*reg.SyncContext, registry.RegistryContext) stream.Producer
+	ReadRepo         func(*reg.SyncContext, registry.Context) stream.Producer
 	ReadManifestList func(*reg.SyncContext, *reg.GCRManifestListContext) stream.Producer
 }
 

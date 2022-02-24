@@ -182,7 +182,7 @@ func TestAudit(t *testing.T) {
 	// https://github.com/kubernetes-sigs/promo-tools/issues/191.
 	manifests1 := []manifest.Manifest{
 		{
-			Registries: []registry.RegistryContext{
+			Registries: []registry.Context{
 				{
 					Name: "gcr.io/k8s-staging-kas-network-proxy",
 					Src:  true,
@@ -339,7 +339,7 @@ func TestAudit(t *testing.T) {
 	// 3.4.7-2).
 	manifests2 := []manifest.Manifest{
 		{
-			Registries: []registry.RegistryContext{
+			Registries: []registry.Context{
 				{
 					Name: "gcr.io/google-containers",
 					Src:  true,
@@ -361,7 +361,7 @@ func TestAudit(t *testing.T) {
 			},
 		},
 		{
-			Registries: []registry.RegistryContext{
+			Registries: []registry.Context{
 				{
 					Name: "gcr.io/k8s-staging-etcd",
 					Src:  true,
@@ -848,7 +848,7 @@ func TestAudit(t *testing.T) {
 		// fakeReadRepo closes over "test" in the outer scope, as a closure
 		// should).
 		test := test
-		fakeReadRepo := func(sc *reg.SyncContext, rc registry.RegistryContext) stream.Producer {
+		fakeReadRepo := func(sc *reg.SyncContext, rc registry.Context) stream.Producer {
 			var sr stream.Fake
 
 			_, domain, repoPath := reg.GetTokenKeyDomainRepoPath(rc.Name)
@@ -943,7 +943,7 @@ func initFakeServerContext(
 	manifests []manifest.Manifest,
 	reportingFacility report.ReportingFacility,
 	loggingFacility logclient.LoggingFacility,
-	fakeReadRepo func(*reg.SyncContext, registry.RegistryContext) stream.Producer,
+	fakeReadRepo func(*reg.SyncContext, registry.Context) stream.Producer,
 	fakeReadManifestList func(*reg.SyncContext, *reg.GCRManifestListContext) stream.Producer,
 ) audit.ServerContext {
 	remoteManifestFacility := remotemanifest.NewFake(manifests)

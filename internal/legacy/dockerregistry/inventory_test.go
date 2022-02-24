@@ -140,7 +140,7 @@ func TestParseRegistryManifest(t *testing.T) {
 images: []
 `,
 			manifest.Manifest{
-				Registries: []registry.RegistryContext{
+				Registries: []registry.Context{
 					{
 						Name:           "gcr.io/bar",
 						ServiceAccount: "foobar@google-containers.iam.gserviceaccount.com",
@@ -173,7 +173,7 @@ images:
     "sha256:07353f7b26327f0d933515a22b1de587b040d3d85c464ea299c1b9f242529326": [ "1.8.3" ]  # Branches: ['master']
 `,
 			manifest.Manifest{
-				Registries: []registry.RegistryContext{
+				Registries: []registry.Context{
 					{
 						Name:           "gcr.io/bar",
 						ServiceAccount: "foobar@google-containers.iam.gserviceaccount.com",
@@ -267,7 +267,7 @@ func TestParseThinManifestsFromDir(t *testing.T) {
 			"singleton",
 			[]manifest.Manifest{
 				{
-					Registries: []registry.RegistryContext{
+					Registries: []registry.Context{
 						{
 							Name:           "gcr.io/foo-staging",
 							ServiceAccount: "sa@robot.com",
@@ -304,7 +304,7 @@ func TestParseThinManifestsFromDir(t *testing.T) {
 			"multiple-rebases",
 			[]manifest.Manifest{
 				{
-					Registries: []registry.RegistryContext{
+					Registries: []registry.Context{
 						{
 							Name:           "gcr.io/foo-staging",
 							ServiceAccount: "sa@robot.com",
@@ -334,7 +334,7 @@ func TestParseThinManifestsFromDir(t *testing.T) {
 					Filepath: "manifests/a/promoter-manifest.yaml",
 				},
 				{
-					Registries: []registry.RegistryContext{
+					Registries: []registry.Context{
 						{
 							Name:           "gcr.io/bar-staging",
 							ServiceAccount: "sa@robot.com",
@@ -371,7 +371,7 @@ func TestParseThinManifestsFromDir(t *testing.T) {
 			"basic-thin",
 			[]manifest.Manifest{
 				{
-					Registries: []registry.RegistryContext{
+					Registries: []registry.Context{
 						{
 							Name:           "gcr.io/foo-staging",
 							ServiceAccount: "sa@robot.com",
@@ -401,7 +401,7 @@ func TestParseThinManifestsFromDir(t *testing.T) {
 					Filepath: "manifests/a/promoter-manifest.yaml",
 				},
 				{
-					Registries: []registry.RegistryContext{
+					Registries: []registry.Context{
 						{
 							Name:           "gcr.io/bar-staging",
 							ServiceAccount: "sa@robot.com",
@@ -431,7 +431,7 @@ func TestParseThinManifestsFromDir(t *testing.T) {
 					Filepath: "manifests/b/promoter-manifest.yaml",
 				},
 				{
-					Registries: []registry.RegistryContext{
+					Registries: []registry.Context{
 						{
 							Name:           "gcr.io/cat-staging",
 							ServiceAccount: "sa@robot.com",
@@ -461,7 +461,7 @@ func TestParseThinManifestsFromDir(t *testing.T) {
 					Filepath: "manifests/c/promoter-manifest.yaml",
 				},
 				{
-					Registries: []registry.RegistryContext{
+					Registries: []registry.Context{
 						{
 							Name:           "gcr.io/qux-staging",
 							ServiceAccount: "sa@robot.com",
@@ -798,9 +798,9 @@ func TestSplitByKnownRegistries(t *testing.T) {
 		`us.gcr.io/k8s-artifacts-prod/metrics-server`,
 		`us.gcr.io/k8s-artifacts-prod`,
 	}
-	knownRegistryContexts := make([]registry.RegistryContext, 0)
+	knownRegistryContexts := make([]registry.Context, 0)
 	for _, knownRegistryName := range knownRegistryNames {
-		rc := registry.RegistryContext{}
+		rc := registry.Context{}
 		rc.Name = knownRegistryName
 		knownRegistryContexts = append(knownRegistryContexts, rc)
 	}
@@ -836,7 +836,7 @@ func TestSplitByKnownRegistries(t *testing.T) {
 }
 
 func TestCommandGeneration(t *testing.T) {
-	destRC := registry.RegistryContext{
+	destRC := registry.Context{
 		Name:           "gcr.io/foo",
 		ServiceAccount: "robot",
 	}
@@ -1141,7 +1141,7 @@ func TestReadRegistries(t *testing.T) {
 	for _, test := range tests {
 		// Destination registry is a placeholder, because ReadImageNames acts on
 		// 2 registries (src and dest) at once.
-		rcs := []registry.RegistryContext{
+		rcs := []registry.Context{
 			{
 				Name:           fakeRegName,
 				ServiceAccount: "robot",
@@ -1158,7 +1158,7 @@ func TestReadRegistries(t *testing.T) {
 		// test is used to pin the "test" variable from the outer "range"
 		// scope (see scopelint).
 		test := test
-		mkFakeStream1 := func(sc *reg.SyncContext, rc registry.RegistryContext) stream.Producer {
+		mkFakeStream1 := func(sc *reg.SyncContext, rc registry.Context) stream.Producer {
 			var sr stream.Fake
 
 			_, domain, repoPath := reg.GetTokenKeyDomainRepoPath(rc.Name)
@@ -1223,7 +1223,7 @@ func TestReadGManifestLists(t *testing.T) {
 	for _, test := range tests {
 		// Destination registry is a placeholder, because ReadImageNames acts on
 		// 2 registries (src and dest) at once.
-		rcs := []registry.RegistryContext{
+		rcs := []registry.Context{
 			{
 				Name:           fakeRegName,
 				ServiceAccount: "robot",
@@ -1461,21 +1461,21 @@ func TestToPromotionEdges(t *testing.T) {
 	srcRegName := image.Registry("gcr.io/foo")
 	destRegName := image.Registry("gcr.io/bar")
 	destRegName2 := image.Registry("gcr.io/cat")
-	destRC := registry.RegistryContext{
+	destRC := registry.Context{
 		Name:           destRegName,
 		ServiceAccount: "robot",
 	}
-	destRC2 := registry.RegistryContext{
+	destRC2 := registry.Context{
 		Name:           destRegName2,
 		ServiceAccount: "robot",
 	}
-	srcRC := registry.RegistryContext{
+	srcRC := registry.Context{
 		Name:           srcRegName,
 		ServiceAccount: "robot",
 		Src:            true,
 	}
-	registries1 := []registry.RegistryContext{destRC, srcRC}
-	registries2 := []registry.RegistryContext{destRC, srcRC, destRC2}
+	registries1 := []registry.Context{destRC, srcRC}
+	registries2 := []registry.Context{destRC, srcRC, destRC2}
 
 	sc := reg.SyncContext{
 		Inv: reg.MasterInventory{
@@ -1700,11 +1700,11 @@ func TestToPromotionEdges(t *testing.T) {
 func TestCheckOverlappingEdges(t *testing.T) {
 	srcRegName := image.Registry("gcr.io/foo")
 	destRegName := image.Registry("gcr.io/bar")
-	destRC := registry.RegistryContext{
+	destRC := registry.Context{
 		Name:           destRegName,
 		ServiceAccount: "robot",
 	}
-	srcRC := registry.RegistryContext{
+	srcRC := registry.Context{
 		Name:           srcRegName,
 		ServiceAccount: "robot",
 		Src:            true,
@@ -1983,22 +1983,22 @@ func TestPromotion(t *testing.T) {
 	srcRegName := image.Registry("gcr.io/foo")
 	destRegName := image.Registry("gcr.io/bar")
 	destRegName2 := image.Registry("gcr.io/cat")
-	destRC := registry.RegistryContext{
+	destRC := registry.Context{
 		Name:           destRegName,
 		ServiceAccount: "robot",
 	}
-	destRC2 := registry.RegistryContext{
+	destRC2 := registry.Context{
 		Name:           destRegName2,
 		ServiceAccount: "robot",
 	}
-	srcRC := registry.RegistryContext{
+	srcRC := registry.Context{
 		Name:           srcRegName,
 		ServiceAccount: "robot",
 		Src:            true,
 	}
-	registries := []registry.RegistryContext{destRC, srcRC, destRC2}
+	registries := []registry.Context{destRC, srcRC, destRC2}
 
-	registriesRebase := []registry.RegistryContext{
+	registriesRebase := []registry.Context{
 		{
 			Name:           image.Registry("us.gcr.io/dog/some/subdir/path/foo"),
 			ServiceAccount: "robot",
@@ -2530,7 +2530,7 @@ func TestPromotion(t *testing.T) {
 	nopStream := func(
 		srcRegistry image.Registry,
 		srcImageName image.Name,
-		rc registry.RegistryContext,
+		rc registry.Context,
 		destImageName image.Name,
 		digest image.Digest,
 		tag image.Tag,
@@ -2579,28 +2579,28 @@ func TestPromotion(t *testing.T) {
 func TestExecRequests(t *testing.T) {
 	sc := reg.SyncContext{}
 
-	destRC := registry.RegistryContext{
+	destRC := registry.Context{
 		Name:           image.Registry("gcr.io/bar"),
 		ServiceAccount: "robot",
 	}
 
-	destRC2 := registry.RegistryContext{
+	destRC2 := registry.Context{
 		Name:           image.Registry("gcr.io/cat"),
 		ServiceAccount: "robot",
 	}
 
-	srcRC := registry.RegistryContext{
+	srcRC := registry.Context{
 		Name:           image.Registry("gcr.io/foo"),
 		ServiceAccount: "robot",
 		Src:            true,
 	}
 
-	registries := []registry.RegistryContext{destRC, srcRC, destRC2}
+	registries := []registry.Context{destRC, srcRC, destRC2}
 
 	nopStream := func(
 		srcRegistry image.Registry,
 		srcImageName image.Name,
-		rc registry.RegistryContext,
+		rc registry.Context,
 		destImageName image.Name,
 		digest image.Digest,
 		tag image.Tag,
@@ -2690,17 +2690,17 @@ func TestExecRequests(t *testing.T) {
 func TestValidateEdges(t *testing.T) {
 	srcRegName := image.Registry("gcr.io/src")
 	dstRegName := image.Registry("gcr.io/dst")
-	srcRegistry := registry.RegistryContext{
+	srcRegistry := registry.Context{
 		Name:           srcRegName,
 		ServiceAccount: "robot",
 		Src:            true,
 	}
-	dstRegistry := registry.RegistryContext{
+	dstRegistry := registry.Context{
 		Name:           dstRegName,
 		ServiceAccount: "robot",
 	}
 
-	registries := []registry.RegistryContext{
+	registries := []registry.Context{
 		srcRegistry,
 		dstRegistry,
 	}
@@ -2825,7 +2825,7 @@ func TestGarbageCollection(t *testing.T) {
 	srcRegName := image.Registry("gcr.io/foo")
 	destRegName := image.Registry("gcr.io/bar")
 	destRegName2 := image.Registry("gcr.io/cat")
-	registries := []registry.RegistryContext{
+	registries := []registry.Context{
 		{
 			Name:           srcRegName,
 			ServiceAccount: "robot",
@@ -2976,7 +2976,7 @@ func TestGarbageCollection(t *testing.T) {
 		// Reset captured for each test.
 		captured = make(reg.CapturedRequests)
 		nopStream := func(
-			destRC registry.RegistryContext,
+			destRC registry.Context,
 			imageName image.Name,
 			digest image.Digest) stream.Producer {
 			return nil
@@ -2996,23 +2996,23 @@ func TestGarbageCollectionMulti(t *testing.T) {
 	destRegName1 := image.Registry("gcr.io/dest1")
 	destRegName2 := image.Registry("gcr.io/dest2")
 
-	destRC := registry.RegistryContext{
+	destRC := registry.Context{
 		Name:           destRegName1,
 		ServiceAccount: "robotDest1",
 	}
 
-	destRC2 := registry.RegistryContext{
+	destRC2 := registry.Context{
 		Name:           destRegName2,
 		ServiceAccount: "robotDest2",
 	}
 
-	srcRC := registry.RegistryContext{
+	srcRC := registry.Context{
 		Name:           srcRegName,
 		ServiceAccount: "robotSrc",
 		Src:            true,
 	}
 
-	registries := []registry.RegistryContext{srcRC, destRC, destRC2}
+	registries := []registry.Context{srcRC, destRC, destRC2}
 	tests := []struct {
 		name         string
 		inputM       manifest.Manifest
@@ -3135,7 +3135,7 @@ func TestGarbageCollectionMulti(t *testing.T) {
 		// Reset captured for each test.
 		captured = make(reg.CapturedRequests)
 		nopStream := func(
-			destRC registry.RegistryContext,
+			destRC registry.Context,
 			imageName image.Name,
 			digest image.Digest,
 		) stream.Producer {
@@ -3234,9 +3234,9 @@ func TestParseContainerParts(t *testing.T) {
 	}
 
 	for _, test := range shouldBeValid {
-		registry, repository, err := reg.ParseContainerParts(test.input)
+		registryName, repository, err := reg.ParseContainerParts(test.input)
 		got := ContainerParts{
-			registry,
+			registryName,
 			repository,
 			err,
 		}
@@ -3305,9 +3305,9 @@ func TestParseContainerParts(t *testing.T) {
 	}
 
 	for _, test := range shouldBeInvalid {
-		registry, repository, err := reg.ParseContainerParts(test.input)
+		registryName, repository, err := reg.ParseContainerParts(test.input)
 		got := ContainerParts{
-			registry,
+			registryName,
 			repository,
 			err,
 		}
@@ -3318,7 +3318,7 @@ func TestParseContainerParts(t *testing.T) {
 
 func TestMatch(t *testing.T) {
 	inputMfest := manifest.Manifest{
-		Registries: []registry.RegistryContext{
+		Registries: []registry.Context{
 			{
 				Name:           "gcr.io/foo-staging",
 				ServiceAccount: "sa@robot.com",

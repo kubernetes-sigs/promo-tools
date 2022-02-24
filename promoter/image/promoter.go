@@ -64,7 +64,7 @@ type promoterImplementation interface {
 	PromoteImages(*reg.SyncContext, map[reg.PromotionEdge]interface{}, impl.StreamProducerFunc) error
 
 	// Methods for snapshot mode:
-	GetSnapshotSourceRegistry(*options.Options) (*registry.RegistryContext, error)
+	GetSnapshotSourceRegistry(*options.Options) (*registry.Context, error)
 	GetSnapshotManifests(*options.Options) ([]manifest.Manifest, error)
 	AppendManifestToSnapshot(*options.Options, []manifest.Manifest) ([]manifest.Manifest, error)
 	GetRegistryImageInventory(*options.Options, []manifest.Manifest) (registry.RegInvImage, error)

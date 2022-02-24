@@ -142,7 +142,7 @@ func Grow(
 	var riiCombined registry.RegInvImage
 
 	// (1) Scan the BaseDir and find the promoter manifest to modify.
-	manifest, err := Find(o)
+	mfest, err := Find(o)
 	if err != nil {
 		return err
 	}
@@ -162,19 +162,19 @@ func Grow(
 
 	// (4) Inject (2)'s output into (1)'s manifest's images to create a larger
 	// RegInvImage.
-	riiCombined = Union(manifest.ToRegInvImage(), riiFiltered)
+	riiCombined = Union(mfest.ToRegInvImage(), riiFiltered)
 
 	// (5) Write back RegInvImage as Manifest ([]Image field}) back onto disk.
-	err = Write(manifest, riiCombined)
+	err = Write(mfest, riiCombined)
 
 	return err
 }
 
 // Write writes images as YAML out to the expected path of the given
 // (thin) manifest.
-func Write(manifest manifest.Manifest, rii registry.RegInvImage) error {
+func Write(m manifest.Manifest, rii registry.RegInvImage) error {
 	// Chop off trailing "promoter-manifest.yaml".
-	p := path.Dir(manifest.Filepath)
+	p := path.Dir(m.Filepath)
 	// Get staging repo directory name as it is laid out in the thin manifest
 	// dir.
 	stagingRepoName := path.Base(p)
@@ -214,13 +214,13 @@ func Find(o *GrowOptions) (manifest.Manifest, error) {
 func ReadStagingRepo(
 	o *GrowOptions,
 ) (registry.RegInvImage, error) {
-	stagingRepoRC := registry.RegistryContext{
+	stagingRepoRC := registry.Context{
 		Name: o.StagingRepo,
 	}
 
 	manifests := []manifest.Manifest{
 		{
-			Registries: []registry.RegistryContext{
+			Registries: []registry.Context{
 				stagingRepoRC,
 			},
 			Images: []registry.Image{},
@@ -236,7 +236,7 @@ func ReadStagingRepo(
 		return registry.RegInvImage{}, err
 	}
 	sc.ReadRegistries(
-		[]registry.RegistryContext{stagingRepoRC},
+		[]registry.Context{stagingRepoRC},
 		// Read all registries recursively, because we want to produce a
 		// complete snapshot.
 		true,

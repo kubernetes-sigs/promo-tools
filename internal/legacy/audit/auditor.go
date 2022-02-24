@@ -369,8 +369,8 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 func GetMatchingSourceRegistries(
 	manifests *[]manifest.Manifest,
 	gcrPayload *reg.GCRPubSubPayload,
-) ([]registry.RegistryContext, error) {
-	rcs := []registry.RegistryContext{}
+) ([]registry.Context, error) {
+	rcs := []registry.Context{}
 
 	for _, manifest := range *manifests {
 		if !gcrPayload.Match(&manifest).PathMatch {

@@ -23,9 +23,9 @@ import (
 	"sigs.k8s.io/promo-tools/v3/types/image"
 )
 
-// RegistryContext holds information about a registry, to be written in a
+// Context holds information about a registry, to be written in a
 // manifest file.
-type RegistryContext struct {
+type Context struct {
 	Name           image.Registry `yaml:"name,omitempty"`
 	ServiceAccount string         `yaml:"service-account,omitempty"`
 	Token          gcloud.Token   `yaml:"-"`
@@ -33,7 +33,7 @@ type RegistryContext struct {
 }
 
 // GetSrcRegistry gets the source registry.
-func GetSrcRegistry(rcs []RegistryContext) (*RegistryContext, error) {
+func GetSrcRegistry(rcs []Context) (*Context, error) {
 	for _, registry := range rcs {
 		registry := registry
 		if registry.Src {

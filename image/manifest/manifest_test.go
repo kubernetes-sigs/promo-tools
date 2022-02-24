@@ -43,7 +43,7 @@ func testPath(paths ...string) string {
 
 func TestFind(t *testing.T) {
 	pwd := testPath()
-	srcRC := registry.RegistryContext{
+	srcRC := registry.Context{
 		Name:           "gcr.io/foo-staging",
 		ServiceAccount: "sa@robot.com",
 		Src:            true,
@@ -76,7 +76,7 @@ func TestFind(t *testing.T) {
 				StagingRepo: "gcr.io/foo-staging",
 			},
 			regmanifest.Manifest{
-				Registries: []registry.RegistryContext{
+				Registries: []registry.Context{
 					srcRC,
 					{
 						Name:           "us.gcr.io/some-prod",

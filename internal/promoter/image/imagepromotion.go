@@ -95,7 +95,7 @@ func (di *DefaultPromoterImplementation) MakeProducerFunction(useServiceAccount 
 	return func(
 		srcRegistry image.Registry,
 		srcImageName image.Name,
-		destRC registry.RegistryContext,
+		destRC registry.Context,
 		imageName image.Name,
 		digest image.Digest, tag image.Tag, tp reg.TagOp,
 	) stream.Producer {

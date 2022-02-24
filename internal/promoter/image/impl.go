@@ -40,7 +40,7 @@ necessarily mean that a new version of the image layer is available.`
 // construct a promotion stream producer
 type StreamProducerFunc func(
 	srcRegistry image.Registry, srcImageName image.Name,
-	destRC registry.RegistryContext, imageName image.Name,
+	destRC registry.Context, imageName image.Name,
 	digest image.Digest, tag image.Tag, tp reg.TagOp,
 ) stream.Producer
 

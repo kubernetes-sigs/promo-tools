@@ -886,7 +886,7 @@ func checkCommand(cmd []string) error {
 
 func clearRepository(regName image.Registry, sc *reg.SyncContext) {
 	mkDeletionCmd := func(
-		dest registry.RegistryContext,
+		dest registry.Context,
 		imageName image.Name,
 		digest image.Digest,
 	) stream.Producer {
@@ -959,13 +959,13 @@ func checkLogs(projectID, uuid string, patterns []string) error {
 // auditor running in Cloud Run (whether the state change is VERIFIED or
 // REJECTED).
 type E2ETest struct {
-	Name        string                     `yaml:"name,omitempty"`
-	Registries  []registry.RegistryContext `yaml:"registries,omitempty"`
-	ManifestDir string                     `yaml:"manifestDir,omitempty"`
-	SetupCip    []string                   `yaml:"setupCip,omitempty"`
-	SetupExtra  [][]string                 `yaml:"setupExtra,omitempty"`
-	Mutations   [][]string                 `yaml:"mutations,omitempty"`
-	LogMatch    []string                   `yaml:"logMatch,omitempty"`
+	Name        string             `yaml:"name,omitempty"`
+	Registries  []registry.Context `yaml:"registries,omitempty"`
+	ManifestDir string             `yaml:"manifestDir,omitempty"`
+	SetupCip    []string           `yaml:"setupCip,omitempty"`
+	SetupExtra  [][]string         `yaml:"setupExtra,omitempty"`
+	Mutations   [][]string         `yaml:"mutations,omitempty"`
+	LogMatch    []string           `yaml:"logMatch,omitempty"`
 }
 
 // E2ETests is an array of E2ETest.

@@ -94,17 +94,17 @@ type FakePromoterImplementation struct {
 		result1 []manifest.Manifest
 		result2 error
 	}
-	GetSnapshotSourceRegistryStub        func(*imagepromotera.Options) (*registry.RegistryContext, error)
+	GetSnapshotSourceRegistryStub        func(*imagepromotera.Options) (*registry.Context, error)
 	getSnapshotSourceRegistryMutex       sync.RWMutex
 	getSnapshotSourceRegistryArgsForCall []struct {
 		arg1 *imagepromotera.Options
 	}
 	getSnapshotSourceRegistryReturns struct {
-		result1 *registry.RegistryContext
+		result1 *registry.Context
 		result2 error
 	}
 	getSnapshotSourceRegistryReturnsOnCall map[int]struct {
-		result1 *registry.RegistryContext
+		result1 *registry.Context
 		result2 error
 	}
 	MakeProducerFunctionStub        func(bool) imagepromoterb.StreamProducerFunc
@@ -607,7 +607,7 @@ func (fake *FakePromoterImplementation) GetSnapshotManifestsReturnsOnCall(i int,
 	}{result1, result2}
 }
 
-func (fake *FakePromoterImplementation) GetSnapshotSourceRegistry(arg1 *imagepromotera.Options) (*registry.RegistryContext, error) {
+func (fake *FakePromoterImplementation) GetSnapshotSourceRegistry(arg1 *imagepromotera.Options) (*registry.Context, error) {
 	fake.getSnapshotSourceRegistryMutex.Lock()
 	ret, specificReturn := fake.getSnapshotSourceRegistryReturnsOnCall[len(fake.getSnapshotSourceRegistryArgsForCall)]
 	fake.getSnapshotSourceRegistryArgsForCall = append(fake.getSnapshotSourceRegistryArgsForCall, struct {
@@ -632,7 +632,7 @@ func (fake *FakePromoterImplementation) GetSnapshotSourceRegistryCallCount() int
 	return len(fake.getSnapshotSourceRegistryArgsForCall)
 }
 
-func (fake *FakePromoterImplementation) GetSnapshotSourceRegistryCalls(stub func(*imagepromotera.Options) (*registry.RegistryContext, error)) {
+func (fake *FakePromoterImplementation) GetSnapshotSourceRegistryCalls(stub func(*imagepromotera.Options) (*registry.Context, error)) {
 	fake.getSnapshotSourceRegistryMutex.Lock()
 	defer fake.getSnapshotSourceRegistryMutex.Unlock()
 	fake.GetSnapshotSourceRegistryStub = stub
@@ -645,28 +645,28 @@ func (fake *FakePromoterImplementation) GetSnapshotSourceRegistryArgsForCall(i i
 	return argsForCall.arg1
 }
 
-func (fake *FakePromoterImplementation) GetSnapshotSourceRegistryReturns(result1 *registry.RegistryContext, result2 error) {
+func (fake *FakePromoterImplementation) GetSnapshotSourceRegistryReturns(result1 *registry.Context, result2 error) {
 	fake.getSnapshotSourceRegistryMutex.Lock()
 	defer fake.getSnapshotSourceRegistryMutex.Unlock()
 	fake.GetSnapshotSourceRegistryStub = nil
 	fake.getSnapshotSourceRegistryReturns = struct {
-		result1 *registry.RegistryContext
+		result1 *registry.Context
 		result2 error
 	}{result1, result2}
 }
 
-func (fake *FakePromoterImplementation) GetSnapshotSourceRegistryReturnsOnCall(i int, result1 *registry.RegistryContext, result2 error) {
+func (fake *FakePromoterImplementation) GetSnapshotSourceRegistryReturnsOnCall(i int, result1 *registry.Context, result2 error) {
 	fake.getSnapshotSourceRegistryMutex.Lock()
 	defer fake.getSnapshotSourceRegistryMutex.Unlock()
 	fake.GetSnapshotSourceRegistryStub = nil
 	if fake.getSnapshotSourceRegistryReturnsOnCall == nil {
 		fake.getSnapshotSourceRegistryReturnsOnCall = make(map[int]struct {
-			result1 *registry.RegistryContext
+			result1 *registry.Context
 			result2 error
 		})
 	}
 	fake.getSnapshotSourceRegistryReturnsOnCall[i] = struct {
-		result1 *registry.RegistryContext
+		result1 *registry.Context
 		result2 error
 	}{result1, result2}
 }

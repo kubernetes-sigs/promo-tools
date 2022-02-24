@@ -33,22 +33,22 @@ func TestImageRemovalCheck(t *testing.T) {
 	srcRegName := image.Registry("gcr.io/foo")
 	srcRegName2 := image.Registry("gcr.io/foo2")
 	destRegName := image.Registry("gcr.io/bar")
-	destRC := registry.RegistryContext{
+	destRC := registry.Context{
 		Name:           destRegName,
 		ServiceAccount: "robot",
 	}
-	srcRC := registry.RegistryContext{
+	srcRC := registry.Context{
 		Name:           srcRegName,
 		ServiceAccount: "robot",
 		Src:            true,
 	}
-	srcRC2 := registry.RegistryContext{
+	srcRC2 := registry.Context{
 		Name:           srcRegName2,
 		ServiceAccount: "robot",
 		Src:            true,
 	}
-	registries := []registry.RegistryContext{destRC, srcRC}
-	registries2 := []registry.RegistryContext{destRC, srcRC, srcRC2}
+	registries := []registry.Context{destRC, srcRC}
+	registries2 := []registry.Context{destRC, srcRC, srcRC2}
 
 	imageA := registry.Image{
 		Name: "a",
@@ -199,18 +199,18 @@ func TestImageSizeCheck(t *testing.T) {
 	srcRegName := image.Registry("gcr.io/foo")
 	destRegName := image.Registry("gcr.io/bar")
 
-	destRC := registry.RegistryContext{
+	destRC := registry.Context{
 		Name:           destRegName,
 		ServiceAccount: "robot",
 	}
 
-	srcRC := registry.RegistryContext{
+	srcRC := registry.Context{
 		Name:           srcRegName,
 		ServiceAccount: "robot",
 		Src:            true,
 	}
 
-	registries := []registry.RegistryContext{destRC, srcRC}
+	registries := []registry.Context{destRC, srcRC}
 
 	image1 := registry.Image{
 		Name: "foo",
