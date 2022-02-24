@@ -24,6 +24,8 @@ import (
 	grafeaspb "google.golang.org/genproto/googleapis/grafeas/v1"
 
 	reg "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
+	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/registry"
+	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/schema"
 	"sigs.k8s.io/promo-tools/v3/types/image"
 )
 
@@ -31,40 +33,40 @@ func TestImageRemovalCheck(t *testing.T) {
 	srcRegName := image.Registry("gcr.io/foo")
 	srcRegName2 := image.Registry("gcr.io/foo2")
 	destRegName := image.Registry("gcr.io/bar")
-	destRC := reg.RegistryContext{
+	destRC := registry.Context{
 		Name:           destRegName,
 		ServiceAccount: "robot",
 	}
-	srcRC := reg.RegistryContext{
+	srcRC := registry.Context{
 		Name:           srcRegName,
 		ServiceAccount: "robot",
 		Src:            true,
 	}
-	srcRC2 := reg.RegistryContext{
+	srcRC2 := registry.Context{
 		Name:           srcRegName2,
 		ServiceAccount: "robot",
 		Src:            true,
 	}
-	registries := []reg.RegistryContext{destRC, srcRC}
-	registries2 := []reg.RegistryContext{destRC, srcRC, srcRC2}
+	registries := []registry.Context{destRC, srcRC}
+	registries2 := []registry.Context{destRC, srcRC, srcRC2}
 
-	imageA := reg.Image{
+	imageA := registry.Image{
 		Name: "a",
-		Dmap: reg.DigestTags{
+		Dmap: registry.DigestTags{
 			"sha256:000": {"0.9"},
 		},
 	}
 
-	imageA2 := reg.Image{
+	imageA2 := registry.Image{
 		Name: "a",
-		Dmap: reg.DigestTags{
+		Dmap: registry.DigestTags{
 			"sha256:111": {"0.9"},
 		},
 	}
 
-	imageB := reg.Image{
+	imageB := registry.Image{
 		Name: "b",
-		Dmap: reg.DigestTags{
+		Dmap: registry.DigestTags{
 			"sha256:000": {"0.9"},
 		},
 	}
@@ -72,33 +74,33 @@ func TestImageRemovalCheck(t *testing.T) {
 	tests := []struct {
 		name            string
 		check           reg.ImageRemovalCheck
-		masterManifests []reg.Manifest
-		pullManifests   []reg.Manifest
+		masterManifests []schema.Manifest
+		pullManifests   []schema.Manifest
 		expected        error
 	}{
 		{
 			"Empty manifests",
 			reg.ImageRemovalCheck{},
-			[]reg.Manifest{},
-			[]reg.Manifest{},
+			[]schema.Manifest{},
+			[]schema.Manifest{},
 			nil,
 		},
 		{
 			"Same manifests",
 			reg.ImageRemovalCheck{},
-			[]reg.Manifest{
+			[]schema.Manifest{
 				{
 					Registries: registries,
-					Images: []reg.Image{
+					Images: []registry.Image{
 						imageA,
 					},
 					SrcRegistry: &srcRC,
 				},
 			},
-			[]reg.Manifest{
+			[]schema.Manifest{
 				{
 					Registries: registries,
-					Images: []reg.Image{
+					Images: []registry.Image{
 						imageA,
 					},
 					SrcRegistry: &srcRC,
@@ -109,19 +111,19 @@ func TestImageRemovalCheck(t *testing.T) {
 		{
 			"Different manifests",
 			reg.ImageRemovalCheck{},
-			[]reg.Manifest{
+			[]schema.Manifest{
 				{
 					Registries: registries,
-					Images: []reg.Image{
+					Images: []registry.Image{
 						imageA,
 					},
 					SrcRegistry: &srcRC,
 				},
 			},
-			[]reg.Manifest{
+			[]schema.Manifest{
 				{
 					Registries: registries,
-					Images: []reg.Image{
+					Images: []registry.Image{
 						imageB,
 					},
 					SrcRegistry: &srcRC,
@@ -134,19 +136,19 @@ func TestImageRemovalCheck(t *testing.T) {
 		{
 			"Promoting same image from different registry",
 			reg.ImageRemovalCheck{},
-			[]reg.Manifest{
+			[]schema.Manifest{
 				{
 					Registries: registries2,
-					Images: []reg.Image{
+					Images: []registry.Image{
 						imageA,
 					},
 					SrcRegistry: &srcRC,
 				},
 			},
-			[]reg.Manifest{
+			[]schema.Manifest{
 				{
 					Registries: registries2,
-					Images: []reg.Image{
+					Images: []registry.Image{
 						imageA,
 					},
 					SrcRegistry: &srcRC2,
@@ -157,19 +159,19 @@ func TestImageRemovalCheck(t *testing.T) {
 		{
 			"Promoting image with same name and different digest",
 			reg.ImageRemovalCheck{},
-			[]reg.Manifest{
+			[]schema.Manifest{
 				{
 					Registries: registries,
-					Images: []reg.Image{
+					Images: []registry.Image{
 						imageA,
 					},
 					SrcRegistry: &srcRC,
 				},
 			},
-			[]reg.Manifest{
+			[]schema.Manifest{
 				{
 					Registries: registries,
-					Images: []reg.Image{
+					Images: []registry.Image{
 						imageA2,
 					},
 					SrcRegistry: &srcRC,
@@ -197,28 +199,28 @@ func TestImageSizeCheck(t *testing.T) {
 	srcRegName := image.Registry("gcr.io/foo")
 	destRegName := image.Registry("gcr.io/bar")
 
-	destRC := reg.RegistryContext{
+	destRC := registry.Context{
 		Name:           destRegName,
 		ServiceAccount: "robot",
 	}
 
-	srcRC := reg.RegistryContext{
+	srcRC := registry.Context{
 		Name:           srcRegName,
 		ServiceAccount: "robot",
 		Src:            true,
 	}
 
-	registries := []reg.RegistryContext{destRC, srcRC}
+	registries := []registry.Context{destRC, srcRC}
 
-	image1 := reg.Image{
+	image1 := registry.Image{
 		Name: "foo",
-		Dmap: reg.DigestTags{
+		Dmap: registry.DigestTags{
 			"sha256:000": {"0.9"},
 		},
 	}
-	image2 := reg.Image{
+	image2 := registry.Image{
 		Name: "bar",
-		Dmap: reg.DigestTags{
+		Dmap: registry.DigestTags{
 			"sha256:111": {"0.9"},
 		},
 	}
@@ -226,7 +228,7 @@ func TestImageSizeCheck(t *testing.T) {
 	tests := []struct {
 		name       string
 		check      reg.ImageSizeCheck
-		manifests  []reg.Manifest
+		manifests  []schema.Manifest
 		imageSizes map[image.Digest]int
 		expected   error
 	}{
@@ -236,10 +238,10 @@ func TestImageSizeCheck(t *testing.T) {
 				MaxImageSize:    1,
 				DigestImageSize: make(reg.DigestImageSize),
 			},
-			[]reg.Manifest{
+			[]schema.Manifest{
 				{
 					Registries: registries,
-					Images: []reg.Image{
+					Images: []registry.Image{
 						image1,
 					},
 					SrcRegistry: &srcRC,
@@ -256,10 +258,10 @@ func TestImageSizeCheck(t *testing.T) {
 				MaxImageSize:    1,
 				DigestImageSize: make(reg.DigestImageSize),
 			},
-			[]reg.Manifest{
+			[]schema.Manifest{
 				{
 					Registries: registries,
-					Images: []reg.Image{
+					Images: []registry.Image{
 						image1,
 					},
 					SrcRegistry: &srcRC,
@@ -282,10 +284,10 @@ func TestImageSizeCheck(t *testing.T) {
 				MaxImageSize:    1,
 				DigestImageSize: make(reg.DigestImageSize),
 			},
-			[]reg.Manifest{
+			[]schema.Manifest{
 				{
 					Registries: registries,
-					Images: []reg.Image{
+					Images: []registry.Image{
 						image1,
 						image2,
 					},
@@ -311,10 +313,10 @@ func TestImageSizeCheck(t *testing.T) {
 				MaxImageSize:    1,
 				DigestImageSize: make(reg.DigestImageSize),
 			},
-			[]reg.Manifest{
+			[]schema.Manifest{
 				{
 					Registries: registries,
-					Images: []reg.Image{
+					Images: []registry.Image{
 						image1,
 						image2,
 					},

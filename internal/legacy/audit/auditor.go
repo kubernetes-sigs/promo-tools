@@ -29,6 +29,8 @@ import (
 	"github.com/sirupsen/logrus"
 
 	reg "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
+	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/registry"
+	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/schema"
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/logclient"
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/remotemanifest"
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/report"
@@ -365,10 +367,10 @@ func (s *ServerContext) Audit(w http.ResponseWriter, r *http.Request) {
 // GetMatchingSourceRegistries gets the first source repository that matches the
 // image information inside a GCRPubSubPayload.
 func GetMatchingSourceRegistries(
-	manifests *[]reg.Manifest,
+	manifests *[]schema.Manifest,
 	gcrPayload *reg.GCRPubSubPayload,
-) ([]reg.RegistryContext, error) {
-	rcs := []reg.RegistryContext{}
+) ([]registry.Context, error) {
+	rcs := []registry.Context{}
 
 	for _, manifest := range *manifests {
 		if !gcrPayload.Match(&manifest).PathMatch {

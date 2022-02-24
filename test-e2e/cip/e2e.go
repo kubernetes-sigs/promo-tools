@@ -33,6 +33,8 @@ import (
 	"sigs.k8s.io/release-utils/command"
 
 	reg "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
+	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/registry"
+	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/schema"
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/gcloud"
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/stream"
 	"sigs.k8s.io/promo-tools/v3/internal/version"
@@ -119,9 +121,9 @@ func main() {
 
 func checkSnapshot(
 	repo image.Registry,
-	expected []reg.Image,
+	expected []registry.Image,
 	repoRoot string,
-	rcs []reg.RegistryContext,
+	rcs []registry.Context,
 ) error {
 	got, err := getSnapshot(
 		repoRoot,
@@ -191,10 +193,10 @@ func runPromotion(repoRoot string, t *E2ETest) error {
 	return cmd.RunSuccess()
 }
 
-func extractSvcAcc(registry image.Registry, rcs []reg.RegistryContext) string {
-	for _, r := range rcs {
-		if r.Name == registry {
-			return r.ServiceAccount
+func extractSvcAcc(r image.Registry, rcs []registry.Context) string {
+	for _, regCtx := range rcs {
+		if regCtx.Name == r {
+			return regCtx.ServiceAccount
 		}
 	}
 
@@ -203,9 +205,9 @@ func extractSvcAcc(registry image.Registry, rcs []reg.RegistryContext) string {
 
 func getSnapshot(
 	repoRoot string,
-	registry image.Registry,
-	rcs []reg.RegistryContext,
-) ([]reg.Image, error) {
+	registryName image.Registry,
+	rcs []registry.Context,
+) ([]registry.Image, error) {
 	// TODO: Consider setting flag names in `cip` instead
 	invocation := []string{
 		"run",
@@ -215,10 +217,10 @@ func getSnapshot(
 			kpromoMain,
 		),
 		"cip",
-		"--snapshot=" + string(registry),
+		"--snapshot=" + string(registryName),
 	}
 
-	svcAcc := extractSvcAcc(registry, rcs)
+	svcAcc := extractSvcAcc(registryName, rcs)
 	if len(svcAcc) > 0 {
 		invocation = append(invocation, "--snapshot-service-account="+svcAcc)
 	}
@@ -242,7 +244,7 @@ func getSnapshot(
 		return nil, err
 	}
 
-	images := make([]reg.Image, 0)
+	images := make(registry.Images, 0)
 	if err := yaml.UnmarshalStrict(stdout.Bytes(), &images); err != nil {
 		return nil, err
 	}
@@ -254,7 +256,7 @@ func (t *E2ETest) clearRepositories() error {
 	// We need a SyncContext to clear the repos. That's it. The actual
 	// promotions will be done by the cip binary, not this tool.
 	sc, err := reg.MakeSyncContext(
-		[]reg.Manifest{
+		[]schema.Manifest{
 			{Registries: t.Registries},
 		},
 		10,
@@ -282,7 +284,7 @@ func (t *E2ETest) clearRepositories() error {
 
 func clearRepository(regName image.Registry, sc *reg.SyncContext) {
 	mkDeletionCmd := func(
-		dest reg.RegistryContext,
+		dest registry.Context,
 		imageName image.Name,
 		digest image.Digest) stream.Producer {
 		var sp stream.Subprocess
@@ -302,10 +304,10 @@ func clearRepository(regName image.Registry, sc *reg.SyncContext) {
 // promoter manifest, and the before/after snapshots of all repositories that it
 // cares about.
 type E2ETest struct {
-	Name       string                `yaml:"name,omitempty"`
-	Registries []reg.RegistryContext `yaml:"registries,omitempty"`
-	Invocation []string              `yaml:"invocation,omitempty"`
-	Snapshots  []RegistrySnapshot    `yaml:"snapshots,omitempty"`
+	Name       string             `yaml:"name,omitempty"`
+	Registries []registry.Context `yaml:"registries,omitempty"`
+	Invocation []string           `yaml:"invocation,omitempty"`
+	Snapshots  []RegistrySnapshot `yaml:"snapshots,omitempty"`
 }
 
 // E2ETests is an array of E2ETest.
@@ -314,9 +316,9 @@ type E2ETests []E2ETest
 // RegistrySnapshot is the snapshot of a registry. It is basically the key/value
 // pair out of the reg.MasterInventory type (RegistryName + []Image).
 type RegistrySnapshot struct {
-	Name   image.Registry `yaml:"name,omitempty"`
-	Before []reg.Image    `yaml:"before,omitempty"`
-	After  []reg.Image    `yaml:"after,omitempty"`
+	Name   image.Registry  `yaml:"name,omitempty"`
+	Before registry.Images `yaml:"before,omitempty"`
+	After  registry.Images `yaml:"after,omitempty"`
 }
 
 func readE2ETests(filePath string) (E2ETests, error) {

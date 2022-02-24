@@ -24,10 +24,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
-	"os/exec"
-	"path/filepath"
 	"regexp"
-	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -42,8 +39,9 @@ import (
 	ggcrV1Types "github.com/google/go-containerregistry/pkg/v1/types"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	yaml "gopkg.in/yaml.v2"
 
+	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/registry"
+	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/schema"
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/gcloud"
 	cipJson "sigs.k8s.io/promo-tools/v3/internal/legacy/json"
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/reqcounter"
@@ -51,21 +49,9 @@ import (
 	"sigs.k8s.io/promo-tools/v3/types/image"
 )
 
-// GetSrcRegistry gets the source registry.
-func GetSrcRegistry(rcs []RegistryContext) (*RegistryContext, error) {
-	for _, registry := range rcs {
-		registry := registry
-		if registry.Src {
-			return &registry, nil
-		}
-	}
-
-	return nil, fmt.Errorf("could not find source registry")
-}
-
 // MakeSyncContext creates a SyncContext.
 func MakeSyncContext(
-	mfests []Manifest,
+	mfests []schema.Manifest,
 	threads int,
 	confirm, useSvcAcc bool,
 ) (SyncContext, error) {
@@ -76,13 +62,13 @@ func MakeSyncContext(
 		Inv:               make(MasterInventory),
 		InvIgnore:         []image.Name{},
 		Tokens:            make(map[RootRepo]gcloud.Token),
-		RegistryContexts:  make([]RegistryContext, 0),
+		RegistryContexts:  make([]registry.Context, 0),
 		DigestMediaType:   make(DigestMediaType),
 		DigestImageSize:   make(DigestImageSize),
 		ParentDigest:      make(ParentDigest),
 	}
 
-	registriesSeen := make(map[RegistryContext]interface{})
+	registriesSeen := make(map[registry.Context]interface{})
 	for _, mfest := range mfests {
 		for _, r := range mfest.Registries {
 			registriesSeen[r] = nil
@@ -135,266 +121,9 @@ func (sc *SyncContext) LogJSONSummary() {
 	}
 }
 
-// ParseManifestFromFile parses a Manifest from a filepath.
-func ParseManifestFromFile(filePath string) (Manifest, error) {
-	var mfest Manifest
-	var empty Manifest
-
-	b, err := ioutil.ReadFile(filePath)
-	if err != nil {
-		return empty, err
-	}
-
-	mfest, err = ParseManifestYAML(b)
-	if err != nil {
-		return empty, err
-	}
-
-	mfest.Filepath = filePath
-
-	err = mfest.Finalize()
-	if err != nil {
-		return empty, err
-	}
-
-	return mfest, nil
-}
-
-// ParseThinManifestFromFile parses a ThinManifest from a filepath and generates
-// a Manifest.
-func ParseThinManifestFromFile(filePath string) (Manifest, error) {
-	var thinManifest ThinManifest
-	var mfest Manifest
-	var empty Manifest
-
-	b, err := ioutil.ReadFile(filePath)
-	if err != nil {
-		return empty, err
-	}
-
-	thinManifest, err = ParseThinManifestYAML(b)
-	if err != nil {
-		return empty, err
-	}
-
-	// Get directory name holding this thin manifest.
-	subProject := filepath.Base(filepath.Dir(filePath))
-	imagesPath := filepath.Join(filepath.Dir(filePath),
-		"../../images",
-		subProject,
-		"images.yaml")
-	images, err := ParseImagesFromFile(imagesPath)
-	if err != nil {
-		return empty, err
-	}
-
-	mfest.Filepath = filePath
-	mfest.Images = images
-	mfest.Registries = thinManifest.Registries
-
-	err = mfest.Finalize()
-	if err != nil {
-		return empty, err
-	}
-
-	return mfest, nil
-}
-
-// ParseImagesFromFile parses an Images type from a file.
-func ParseImagesFromFile(filePath string) (Images, error) {
-	var images Images
-	var empty Images
-
-	b, err := ioutil.ReadFile(filePath)
-	if err != nil {
-		return empty, err
-	}
-
-	images, err = ParseImagesYAML(b)
-	if err != nil {
-		return empty, err
-	}
-
-	return images, nil
-}
-
-// Finalize finalizes a Manifest by populating extra fields.
-// TODO: ST1016: methods on the same type should have the same receiver name
-// nolint: stylecheck
-func (m *Manifest) Finalize() error {
-	// Perform semantic checks (beyond just YAML validation).
-	srcRegistry, err := GetSrcRegistry(m.Registries)
-	if err != nil {
-		return err
-	}
-	m.SrcRegistry = srcRegistry
-
-	return nil
-}
-
-// ParseThinManifestsFromDir parses all thin Manifest files within a directory.
-// We effectively have to create a map of manifests, keyed by the source
-// registry (there can only be 1 source registry).
-func ParseThinManifestsFromDir(
-	dir string,
-) ([]Manifest, error) {
-	mfests := make([]Manifest, 0)
-
-	// Check that the thin manifests dir follows a regular, predefined format.
-	// This is to ensure that there isn't any funny business going on around
-	// paths.
-	if err := ValidateThinManifestDirectoryStructure(dir); err != nil {
-		return mfests, err
-	}
-
-	var parseAsManifest filepath.WalkFunc = func(
-		path string,
-		info os.FileInfo,
-		err error,
-	) error {
-		if err != nil {
-			// Prevent panic in case of incoming errors accessing this path.
-			logrus.Errorf("failure accessing a path %q: %v\n", path, err)
-		}
-
-		// Skip directories (because they are not YAML files).
-		if info.IsDir() {
-			return nil
-		}
-
-		// First try to parse the path as a manifest file, which must be named
-		// "promoter-manifest.yaml". This restriction is in place to limit the
-		// scope of what is read in as a promoter manifest.
-		if filepath.Base(path) != "promoter-manifest.yaml" {
-			return nil
-		}
-
-		// If there are any files named "promoter-manifest.yaml", they must be
-		// inside a subfolder within "manifests/<dir>" --- any other paths are
-		// forbidden.
-		shortened := strings.TrimPrefix(path, dir)
-		shortenedList := strings.Split(shortened, "/")
-		if len(shortenedList) != ThinManifestDepth {
-			return fmt.Errorf("unexpected manifest path %q",
-				path)
-		}
-
-		mfest, errParse := ParseThinManifestFromFile(path)
-		if errParse != nil {
-			logrus.Errorf("could not parse manifest file '%s'\n", path)
-			return errParse
-		}
-
-		// Save successful parse result.
-		mfests = append(mfests, mfest)
-
-		return nil
-	}
-
-	// Only look at manifests starting with the "manifests" subfolder (no need
-	// to walk any other toplevel subfolder).
-	if err := filepath.Walk(filepath.Join(dir, "manifests"), parseAsManifest); err != nil {
-		return mfests, err
-	}
-
-	if len(mfests) == 0 {
-		return nil, fmt.Errorf("no manifests found in dir: %s", dir)
-	}
-
-	return mfests, nil
-}
-
-// ValidateThinManifestDirectoryStructure enforces a particular directory
-// structure for thin manifests. Most importantly, it requires that if a file
-// named "foo/manifests/bar/promoter-manifest.yaml" exists, that a corresponding
-// file named "foo/images/bar/promoter-manifest.yaml" must also exist.
-func ValidateThinManifestDirectoryStructure(
-	dir string,
-) error {
-	// First, enforce that there are directories named "images" and "manifests".
-	if err := validateIsDirectory(filepath.Join(dir, "images")); err != nil {
-		return err
-	}
-
-	manifestDir := filepath.Join(dir, "manifests")
-	if err := validateIsDirectory(manifestDir); err != nil {
-		return err
-	}
-
-	// For every subfolder in <dir>/manifests, ensure that a
-	// "promoter-manifest.yaml" file exists, and also that a corresponding file
-	// exists in the "images" folder.
-	files, err := ioutil.ReadDir(manifestDir)
-	if err != nil {
-		return err
-	}
-
-	logrus.Infof("*looking at %q", dir)
-	for _, file := range files {
-		p, err := os.Stat(filepath.Join(manifestDir, file.Name()))
-		if err != nil {
-			return err
-		}
-
-		// Skip non-directory sub-paths.
-		if !p.IsDir() {
-			continue
-		}
-
-		// Search for a "promoter-manifest.yaml" file under this directory.
-		manifestInfo, err := os.Stat(
-			filepath.Join(manifestDir,
-				file.Name(),
-				"promoter-manifest.yaml"))
-		if err != nil {
-			logrus.Warningln(err)
-			continue
-		}
-		if !manifestInfo.Mode().IsRegular() {
-			logrus.Warnf("ignoring irregular file %q", manifestInfo)
-			continue
-		}
-
-		// "promoter-manifest.yaml" exists, so check for corresponding images
-		// file, which MUST exist. This is why we fail early if we detect an
-		// error here.
-		imagesPath := filepath.Join(dir,
-			"images",
-			file.Name(),
-			"images.yaml")
-		imagesInfo, err := os.Stat(imagesPath)
-		if err != nil {
-			if os.IsNotExist(err) {
-				return fmt.Errorf("corresponding file %q does not exist",
-					imagesPath)
-			}
-			return err
-		}
-
-		if !imagesInfo.Mode().IsRegular() {
-			return fmt.Errorf("corresponding file %q is not a regular file",
-				imagesPath)
-		}
-	}
-
-	return nil
-}
-
-// validateIsDirectory returns nil if it does exist, otherwise a non-nil error.
-func validateIsDirectory(dir string) error {
-	p, err := os.Stat(filepath.Join(dir))
-	if err != nil {
-		return err
-	}
-	if !p.IsDir() {
-		return fmt.Errorf("%q is not a directory", dir)
-	}
-	return nil
-}
-
 // ToPromotionEdges converts a list of manifests to a set of edges we want to
 // try promoting.
-func ToPromotionEdges(mfests []Manifest) (map[PromotionEdge]interface{}, error) {
+func ToPromotionEdges(mfests []schema.Manifest) (map[PromotionEdge]interface{}, error) {
 	edges := make(map[PromotionEdge]interface{})
 	for _, mfest := range mfests {
 		for _, img := range mfest.Images {
@@ -436,7 +165,7 @@ func ToPromotionEdges(mfests []Manifest) (map[PromotionEdge]interface{}, error) 
 }
 
 func mkPromotionEdge(
-	srcRC, dstRC RegistryContext,
+	srcRC, dstRC registry.Context,
 	srcImageName image.Name,
 	digest image.Digest,
 	tag image.Tag,
@@ -673,7 +402,7 @@ func (edge *PromotionEdge) VertexProps(
 // VertexPropsFor examines one of the two vertices (src or dst) of a
 // PromotionEdge.
 func (edge *PromotionEdge) VertexPropsFor(
-	rc *RegistryContext,
+	rc *registry.Context,
 	imageTag *ImageTag,
 	mi *MasterInventory,
 ) VertexProperty {
@@ -704,7 +433,7 @@ func (edge *PromotionEdge) VertexPropsFor(
 					p.PqinDigestMatch = true
 					// Both the digest and tag match what we wanted in the
 					// imageTag, so there are no extraneous tags to bother with.
-					p.OtherTags = TagSlice{}
+					p.OtherTags = registry.TagSlice{}
 				} else {
 					p.BadDigest = digest
 				}
@@ -713,83 +442,6 @@ func (edge *PromotionEdge) VertexPropsFor(
 	}
 
 	return p
-}
-
-// ParseManifestYAML parses a Manifest from a byteslice. This function is
-// separate from ParseManifestFromFile() so that it can be tested independently.
-func ParseManifestYAML(b []byte) (Manifest, error) {
-	var m Manifest
-	if err := yaml.UnmarshalStrict(b, &m); err != nil {
-		return m, err
-	}
-
-	return m, m.Validate()
-}
-
-// ParseThinManifestYAML parses a ThinManifest from a byteslice.
-func ParseThinManifestYAML(b []byte) (ThinManifest, error) {
-	var m ThinManifest
-	if err := yaml.UnmarshalStrict(b, &m); err != nil {
-		return m, err
-	}
-
-	return m, nil
-}
-
-// ParseImagesYAML parses Images from a byteslice.
-func ParseImagesYAML(b []byte) (Images, error) {
-	var images Images
-	if err := yaml.UnmarshalStrict(b, &images); err != nil {
-		return images, err
-	}
-
-	return images, nil
-}
-
-// Validate checks for semantic errors in the yaml fields (the structure of the
-// yaml is checked during unmarshaling).
-func (m Manifest) Validate() error {
-	if err := validateRequiredComponents(m); err != nil {
-		return err
-	}
-	return validateImages(m.Images)
-}
-
-func validateImages(images []Image) error {
-	for _, image := range images {
-		for digest, tagSlice := range image.Dmap {
-			if err := ValidateDigest(digest); err != nil {
-				return err
-			}
-
-			for _, tag := range tagSlice {
-				if err := ValidateTag(tag); err != nil {
-					return err
-				}
-			}
-		}
-	}
-	return nil
-}
-
-// ValidateDigest validates the digest.
-func ValidateDigest(digest image.Digest) error {
-	validDigest := regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
-	if !validDigest.Match([]byte(digest)) {
-		return fmt.Errorf("invalid digest: %v", digest)
-	}
-
-	return nil
-}
-
-// ValidateTag validates the tag.
-func ValidateTag(tag image.Tag) error {
-	validTag := regexp.MustCompile(`^[\w][\w.-]{0,127}$`)
-	if !validTag.Match([]byte(tag)) {
-		return fmt.Errorf("invalid tag: %v", tag)
-	}
-
-	return nil
 }
 
 // ValidateRegistryImagePath validates the RegistryImagePath.
@@ -802,84 +454,6 @@ func ValidateRegistryImagePath(rip RegistryImagePath) error {
 	}
 
 	return nil
-}
-
-func (m Manifest) srcRegistryCount() int {
-	var count int
-	for _, registry := range m.Registries {
-		if registry.Src {
-			count++
-		}
-	}
-
-	return count
-}
-
-func (m Manifest) srcRegistryName() image.Registry {
-	for _, registry := range m.Registries {
-		if registry.Src {
-			return registry.Name
-		}
-	}
-
-	return image.Registry("")
-}
-
-func validateRequiredComponents(m Manifest) error {
-	// TODO: Should we return []error here instead?
-	errs := make([]string, 0)
-	srcRegistryName := image.Registry("")
-
-	if len(m.Registries) > 0 {
-		if m.srcRegistryCount() > 1 {
-			errs = append(errs, "cannot have more than 1 source registry")
-		}
-
-		srcRegistryName = m.srcRegistryName()
-		if len(srcRegistryName) == 0 {
-			errs = append(errs, "source registry must be set")
-		}
-	}
-
-	knownRegistries := make([]image.Registry, 0)
-	if len(m.Registries) == 0 {
-		errs = append(errs, "'registries' field cannot be empty")
-	}
-
-	for _, registry := range m.Registries {
-		if len(registry.Name) == 0 {
-			errs = append(
-				errs,
-				"registries: 'name' field cannot be empty",
-			)
-		}
-
-		// TODO(lint): SA4010: this result of append is never used, except maybe in other appends
-		//nolint:staticcheck
-		knownRegistries = append(knownRegistries, registry.Name)
-	}
-
-	for _, img := range m.Images {
-		if len(img.Name) == 0 {
-			errs = append(
-				errs,
-				"images: 'name' field cannot be empty",
-			)
-		}
-
-		if len(img.Dmap) == 0 {
-			errs = append(
-				errs,
-				"images: 'dmap' field cannot be empty",
-			)
-		}
-	}
-
-	if len(errs) == 0 {
-		return nil
-	}
-
-	return fmt.Errorf(strings.Join(errs, "\n"))
 }
 
 func getRegistryTagsWrapper(
@@ -1068,7 +642,7 @@ func (sc *SyncContext) IgnoreFromPromotion(regName image.Registry) {
 //
 // TODO: Can we simplify this to not use switch/case/goto?
 func ParseContainerParts(s string) (
-	registry string,
+	registryName string,
 	repo string,
 	parseErr error,
 ) {
@@ -1086,6 +660,7 @@ func ParseContainerParts(s string) (
 	}
 
 	switch parts[0] {
+	// TODO(gar): Need to support Artifact Registry values here.
 	case "gcr.io", "asia.gcr.io", "eu.gcr.io", "us.gcr.io":
 		if len(parts) == 2 {
 			goto InvalidString
@@ -1141,7 +716,7 @@ func GetTokenKeyDomainRepoPath(registryName image.Registry) (key, domain, repoPa
 }
 
 func (sc *SyncContext) ReadRegistriesGGCR(
-	toRead []RegistryContext, recurse bool,
+	toRead []registry.Context, recurse bool,
 ) error {
 	logrus.Infof("Reading %d registries:", len(sc.RegistryContexts))
 
@@ -1173,10 +748,10 @@ func (sc *SyncContext) ReadRegistriesGGCR(
 					return errors.Wrap(err, "splitting repo and image name")
 				}
 				logrus.Infof("Registry: %s Image: %s Got: %s", regName, imageName, repo.Name())
-				digestTags := make(DigestTags)
+				digestTags := make(registry.DigestTags)
 				if tags != nil && tags.Manifests != nil {
 					for digest, manifest := range tags.Manifests {
-						tagSlice := TagSlice{}
+						tagSlice := registry.TagSlice{}
 						for _, tag := range manifest.Tags {
 							tagSlice = append(tagSlice, image.Tag(tag))
 						}
@@ -1196,7 +771,7 @@ func (sc *SyncContext) ReadRegistriesGGCR(
 
 				mutex.Lock()
 				if _, ok := sc.Inv[regName]; !ok {
-					sc.Inv[regName] = make(RegInvImage)
+					sc.Inv[regName] = make(registry.RegInvImage)
 				}
 
 				if len(digestTags) > 0 {
@@ -1241,9 +816,9 @@ func (sc *SyncContext) ReadRegistriesGGCR(
 // example above that there are images named gcr.io/google-containers/foo:2.0
 // and gcr.io/google-containers/foo/baz:2.0.
 func (sc *SyncContext) ReadRegistries(
-	toRead []RegistryContext,
+	toRead []registry.Context,
 	recurse bool,
-	mkProducer func(*SyncContext, RegistryContext) stream.Producer,
+	mkProducer func(*SyncContext, registry.Context) stream.Producer,
 ) {
 	// Collect all images in sc.Inv (the src and dest registry names found in
 	// the manifest).
@@ -1292,18 +867,18 @@ func (sc *SyncContext) ReadRegistries(
 				// "foo" from a destination registry, do not bother trying to
 				// promote it for all registries
 				mutex.Lock()
-				sc.IgnoreFromPromotion(req.RequestParams.(RegistryContext).Name)
+				sc.IgnoreFromPromotion(req.RequestParams.(registry.Context).Name)
 				mutex.Unlock()
 
 				continue
 			}
 
 			// Process the current repo.
-			rName := req.RequestParams.(RegistryContext).Name
-			digestTags := make(DigestTags)
+			rName := req.RequestParams.(registry.Context).Name
+			digestTags := make(registry.DigestTags)
 
 			for digest, mfestInfo := range tagsStruct.Manifests {
-				tagSlice := TagSlice{}
+				tagSlice := registry.TagSlice{}
 				for _, tag := range mfestInfo.Tags {
 					tagSlice = append(tagSlice, image.Tag(tag))
 				}
@@ -1333,7 +908,7 @@ func (sc *SyncContext) ReadRegistries(
 					logrus.Fatal(err)
 				}
 
-				currentRepo := make(RegInvImage)
+				currentRepo := make(registry.RegInvImage)
 				currentRepo[imageName] = digestTags
 
 				mutex.Lock()
@@ -1351,9 +926,9 @@ func (sc *SyncContext) ReadRegistries(
 				for _, childRepoName := range tagsStruct.Children {
 					// TODO: Check result of type assertion
 					//nolint:errcheck
-					parentRC, _ := req.RequestParams.(RegistryContext)
+					parentRC, _ := req.RequestParams.(registry.Context)
 
-					childRc := RegistryContext{
+					childRc := registry.Context{
 						Name: image.Registry(
 							string(parentRC.Name) + "/" + childRepoName),
 						// Inherit the service account used at the parent
@@ -1410,7 +985,7 @@ func (sc *SyncContext) ReadGCRManifestLists(
 		// Find all images that are of ggcrV1Types.MediaType == DockerManifestList; these
 		// images will be queried.
 		for registryName, rii := range sc.Inv {
-			var rc RegistryContext
+			var rc registry.Context
 			for _, registryContext := range sc.RegistryContexts {
 				if registryContext.Name == registryName {
 					rc = registryContext
@@ -1495,15 +1070,15 @@ func (sc *SyncContext) ReadGCRManifestLists(
 
 // FilterByTag removes all images in RegInvImage that do not match the
 // filterTag.
-func FilterByTag(rii RegInvImage, filterTag string) RegInvImage {
-	filtered := make(RegInvImage)
+func FilterByTag(rii registry.RegInvImage, filterTag string) registry.RegInvImage {
+	filtered := make(registry.RegInvImage)
 
 	for imageName, digestTags := range rii {
 		for digest, tags := range digestTags {
 			for _, tag := range tags {
 				if string(tag) == filterTag {
 					if filtered[imageName] == nil {
-						filtered[imageName] = make(DigestTags)
+						filtered[imageName] = make(registry.DigestTags)
 					}
 
 					filtered[imageName][digest] = append(
@@ -1520,8 +1095,8 @@ func FilterByTag(rii RegInvImage, filterTag string) RegInvImage {
 
 // RemoveChildDigestEntries removes all tagless images in RegInvImage that are
 // referenced by ManifestLists in the Registries.
-func (sc *SyncContext) RemoveChildDigestEntries(rii RegInvImage) RegInvImage {
-	filtered := make(RegInvImage)
+func (sc *SyncContext) RemoveChildDigestEntries(rii registry.RegInvImage) registry.RegInvImage {
+	filtered := make(registry.RegInvImage)
 	for imageName, digestTags := range rii {
 		for digest, tagSlice := range digestTags {
 			_, hasParent := sc.ParentDigest[digest]
@@ -1533,7 +1108,7 @@ func (sc *SyncContext) RemoveChildDigestEntries(rii RegInvImage) RegInvImage {
 			}
 
 			if filtered[imageName] == nil {
-				filtered[imageName] = make(DigestTags)
+				filtered[imageName] = make(registry.DigestTags)
 			}
 
 			filtered[imageName][digest] = tagSlice
@@ -1549,7 +1124,7 @@ func (sc *SyncContext) RemoveChildDigestEntries(rii RegInvImage) RegInvImage {
 // "/" all the time, because some manifests have an image with a "/" in it.
 func SplitByKnownRegistries(
 	r image.Registry,
-	rcs []RegistryContext,
+	rcs []registry.Context,
 ) (image.Registry, image.Name, error) {
 	for _, rc := range rcs {
 		if strings.HasPrefix(string(r), string(rc.Name)) {
@@ -1587,7 +1162,7 @@ func SplitByKnownRegistries(
 // over the network.
 func MkReadRepositoryCmdReal(
 	sc *SyncContext,
-	rc RegistryContext,
+	rc registry.Context,
 ) stream.Producer {
 	var sh stream.HTTP
 
@@ -1799,116 +1374,6 @@ func ToPQIN(registryName image.Registry, imageName image.Name, tag image.Tag) st
 	return string(registryName) + "/" + string(imageName) + ":" + string(tag)
 }
 
-// ToSorted converts a RegInvImage type to a sorted structure.
-func (rii *RegInvImage) ToSorted() []ImageWithDigestSlice {
-	images := make([]ImageWithDigestSlice, 0)
-
-	for name, dmap := range *rii {
-		var digests []digest
-		for k, v := range dmap {
-			var tags []string
-			for _, tag := range v {
-				tags = append(tags, string(tag))
-			}
-
-			sort.Strings(tags)
-
-			digests = append(digests, digest{
-				hash: string(k),
-				tags: tags,
-			})
-		}
-		sort.Slice(digests, func(i, j int) bool {
-			return digests[i].hash < digests[j].hash
-		})
-
-		images = append(images, ImageWithDigestSlice{
-			name:    string(name),
-			digests: digests,
-		})
-	}
-
-	sort.Slice(images, func(i, j int) bool {
-		return images[i].name < images[j].name
-	})
-
-	return images
-}
-
-// ToYAML displays a RegInvImage as YAML, but with the map items sorted
-// alphabetically.
-func (rii *RegInvImage) ToYAML(o YamlMarshalingOpts) string {
-	images := rii.ToSorted()
-
-	var b strings.Builder
-	for _, image := range images {
-		fmt.Fprintf(&b, "- name: %s\n", image.name)
-		fmt.Fprintf(&b, "  dmap:\n")
-		for _, digestEntry := range image.digests {
-			if o.BareDigest {
-				fmt.Fprintf(&b, "    %s:", digestEntry.hash)
-			} else {
-				fmt.Fprintf(&b, "    %q:", digestEntry.hash)
-			}
-
-			switch len(digestEntry.tags) {
-			case 0:
-				fmt.Fprintf(&b, " []\n")
-			default:
-				if o.SplitTagsOverMultipleLines {
-					fmt.Fprintf(&b, "\n")
-					for _, tag := range digestEntry.tags {
-						fmt.Fprintf(&b, "    - %s\n", tag)
-					}
-				} else {
-					fmt.Fprintf(&b, " [")
-					for i, tag := range digestEntry.tags {
-						if i == len(digestEntry.tags)-1 {
-							fmt.Fprintf(&b, "%q", tag)
-						} else {
-							fmt.Fprintf(&b, "%q, ", tag)
-						}
-					}
-					fmt.Fprintf(&b, "]\n")
-				}
-			}
-		}
-	}
-
-	return b.String()
-}
-
-// ToCSV is like ToYAML, but instead of printing things in an indented
-// format, it prints one image on each line as a CSV. If there is a tag pointing
-// to the image, then it is printed next to the image on the same line.
-//
-// Example:
-// a@sha256:0000000000000000000000000000000000000000000000000000000000000000,a:1.0
-// a@sha256:0000000000000000000000000000000000000000000000000000000000000000,a:latest
-// b@sha256:1111111111111111111111111111111111111111111111111111111111111111,-
-func (rii *RegInvImage) ToCSV() string {
-	images := rii.ToSorted()
-
-	var b strings.Builder
-	for _, image := range images {
-		for _, digestEntry := range image.digests {
-			if len(digestEntry.tags) > 0 {
-				for _, tag := range digestEntry.tags {
-					fmt.Fprintf(&b, "%s@%s,%s:%s\n",
-						image.name,
-						digestEntry.hash,
-						image.name,
-						tag)
-				}
-			} else {
-				fmt.Fprintf(&b, "%s@%s,-\n", image.name, digestEntry.hash)
-			}
-		}
-	}
-
-	return b.String()
-}
-
 // ToLQIN converts a RegistryName and ImageName to form a loosely-qualified
 // image name (LQIN). Notice that it is missing tag information --- hence
 // "loosely-qualified".
@@ -2082,8 +1547,8 @@ func (sc *SyncContext) FilterPromotionEdges(
 func EdgesToRegInvImage(
 	edges map[PromotionEdge]interface{},
 	destRegistry string,
-) RegInvImage {
-	rii := make(RegInvImage)
+) registry.RegInvImage {
+	rii := make(registry.RegInvImage)
 
 	destRegistry = strings.TrimRight(destRegistry, "/")
 
@@ -2108,7 +1573,7 @@ func EdgesToRegInvImage(
 		}
 
 		if rii[image.Name(imgName)] == nil {
-			rii[image.Name(imgName)] = make(DigestTags)
+			rii[image.Name(imgName)] = make(registry.DigestTags)
 		}
 
 		digestTags := rii[image.Name(imgName)]
@@ -2117,7 +1582,7 @@ func EdgesToRegInvImage(
 				digestTags[edge.Digest],
 				edge.DstImageTag.Tag)
 		} else {
-			digestTags[edge.Digest] = TagSlice{}
+			digestTags[edge.Digest] = registry.TagSlice{}
 		}
 	}
 
@@ -2127,8 +1592,8 @@ func EdgesToRegInvImage(
 // getRegistriesToRead collects all unique Docker repositories we want to read
 // from. This way, we don't have to read the entire Docker registry, but only
 // those paths that we are thinking of modifying.
-func getRegistriesToRead(edges map[PromotionEdge]interface{}) []RegistryContext {
-	rcs := make(map[RegistryContext]interface{})
+func getRegistriesToRead(edges map[PromotionEdge]interface{}) []registry.Context {
+	rcs := make(map[registry.Context]interface{})
 
 	// Save the src and dst endpoints as registries. We only care about the
 	// registry and image name, not the tag or digest; this is to collect all
@@ -2149,7 +1614,7 @@ func getRegistriesToRead(edges map[PromotionEdge]interface{}) []RegistryContext 
 		rcs[dstReg] = nil
 	}
 
-	rcsFinal := []RegistryContext{}
+	rcsFinal := []registry.Context{}
 	for rc := range rcs {
 		rcsFinal = append(rcsFinal, rc)
 	}
@@ -2164,7 +1629,7 @@ func (sc *SyncContext) Promote(
 	mkProducer func(
 		image.Registry,
 		image.Name,
-		RegistryContext,
+		registry.Context,
 		image.Name,
 		image.Digest,
 		image.Tag,
@@ -2375,8 +1840,8 @@ func MkRequestCapturer(captured *CapturedRequests) ProcessRequest {
 
 // GarbageCollect deletes all images that are not referenced by Docker tags.
 func (sc *SyncContext) GarbageCollect(
-	mfest Manifest,
-	mkProducer func(RegistryContext, image.Name, image.Digest) stream.Producer,
+	mfest schema.Manifest,
+	mkProducer func(registry.Context, image.Name, image.Digest) stream.Producer,
 	customProcessRequest *ProcessRequest,
 ) {
 	var populateRequests PopulateRequests = func(
@@ -2490,7 +1955,7 @@ func supportedMediaType(v string) (ggcrV1Types.MediaType, error) {
 // separately (deletion of manifest lists vs deletion of other media types).
 func (sc *SyncContext) ClearRepository(
 	regName image.Registry,
-	mkProducer func(RegistryContext, image.Name, image.Digest) stream.Producer,
+	mkProducer func(registry.Context, image.Name, image.Digest) stream.Producer,
 	customProcessRequest *ProcessRequest,
 ) {
 	// deleteRequestsPopulator returns a PopulateRequests that
@@ -2617,7 +2082,7 @@ func (sc *SyncContext) ClearRepository(
 // GetWriteCmd generates a gcloud command that is used to make modifications to
 // a Docker Registry.
 func GetWriteCmd(
-	dest RegistryContext,
+	dest registry.Context,
 	useServiceAccount bool,
 	srcRegistry image.Registry,
 	srcImageName image.Name,
@@ -2653,7 +2118,7 @@ func GetWriteCmd(
 // GetDeleteCmd generates the cloud command used to delete images (used for
 // garbage collection).
 func GetDeleteCmd(
-	rc RegistryContext,
+	rc registry.Context,
 	useServiceAccount bool,
 	img image.Name,
 	digest image.Digest,
@@ -2706,10 +2171,10 @@ type GcrPayloadMatch struct {
 
 // Match checks whether a GCRPubSubPayload is mentioned in a Manifest. The
 // degree of the match is reflected in the GcrPayloadMatch result.
-func (payload *GCRPubSubPayload) Match(manifest *Manifest) GcrPayloadMatch {
+func (payload *GCRPubSubPayload) Match(mfest *schema.Manifest) GcrPayloadMatch {
 	var m GcrPayloadMatch
-	for _, rc := range manifest.Registries {
-		m = payload.matchImages(&rc, manifest.Images)
+	for _, rc := range mfest.Registries {
+		m = payload.matchImages(&rc, mfest.Images)
 		if m.PathMatch {
 			return m
 		}
@@ -2718,8 +2183,8 @@ func (payload *GCRPubSubPayload) Match(manifest *Manifest) GcrPayloadMatch {
 }
 
 func (payload *GCRPubSubPayload) matchImages(
-	rc *RegistryContext,
-	images []Image,
+	rc *registry.Context,
+	images []registry.Image,
 ) GcrPayloadMatch {
 	var m GcrPayloadMatch
 	// We do not look at source registries, because the payload will only
@@ -2747,8 +2212,8 @@ func (payload *GCRPubSubPayload) matchImages(
 }
 
 func (payload *GCRPubSubPayload) matchImage(
-	rc *RegistryContext,
-	img Image,
+	rc *registry.Context,
+	img registry.Image,
 ) GcrPayloadMatch {
 	var m GcrPayloadMatch
 
@@ -2840,7 +2305,7 @@ func (payload *GCRPubSubPayload) String() string {
 
 // ParseSnapshot reads a given YAML snapshot from file.
 // TODO: Review/optimize/de-dupe (https://github.com/kubernetes-sigs/promo-tools/pull/351)
-func ParseSnapshot(pathToSnapshot string, images *[]ImageWithDigestSlice) error {
+func ParseSnapshot(pathToSnapshot string, images *[]registry.ImageWithDigestSlice) error {
 	f, err := os.Open(pathToSnapshot)
 	if err != nil {
 		return err
@@ -2849,7 +2314,7 @@ func ParseSnapshot(pathToSnapshot string, images *[]ImageWithDigestSlice) error 
 	defer f.Close()
 
 	reader := bufio.NewReader(f)
-	img := ImageWithDigestSlice{}
+	img := registry.ImageWithDigestSlice{}
 
 	// Converts output like `["v1.7.12", "v1.7.13-beta.0"]` into golang string array.
 	getTags := func(s string) []string {
@@ -2865,25 +2330,25 @@ func ParseSnapshot(pathToSnapshot string, images *[]ImageWithDigestSlice) error 
 	for output, _, err := reader.ReadLine(); err == nil; output, _, err = reader.ReadLine() {
 		line := string(output)
 		if strings.Contains(line, "- name:") {
-			if len(img.name) > 0 {
+			if len(img.Name) > 0 {
 				*images = append(*images, img)
 			}
 
 			imageName := line[8:]
-			img = ImageWithDigestSlice{
-				name:    imageName,
-				digests: make([]digest, 0),
+			img = registry.ImageWithDigestSlice{
+				Name:    imageName,
+				Digests: make([]registry.Digest, 0),
 			}
 		} else if strings.Contains(line, "sha256:") {
 			// Parse the line for sha256 and tags. The length and format of these
 			// lines are consistent, therefore it's safe to use fixed indices.
 			imageSha256 := line[5:76]
 			imageTags := getTags(line[79:])
-			img.digests = append(
-				img.digests,
-				digest{
-					hash: imageSha256,
-					tags: imageTags,
+			img.Digests = append(
+				img.Digests,
+				registry.Digest{
+					Hash: imageSha256,
+					Tags: imageTags,
 				},
 			)
 		}
@@ -2892,238 +2357,4 @@ func ParseSnapshot(pathToSnapshot string, images *[]ImageWithDigestSlice) error 
 	// Add the last image to the slice.
 	*images = append(*images, img)
 	return nil
-}
-
-// FilterParentImages filters the given ImageWithDigestSlice and only returns the images of
-// who contain manifest lists (aka: fat-manifests). This is determined by inspecting the
-// "mediaType" of every image manifest in the registry.
-//
-// TODO: Review/optimize/de-dupe (https://github.com/kubernetes-sigs/promo-tools/pull/351)
-func FilterParentImages(registry image.Registry, images *[]ImageWithDigestSlice) ([]ImageWithParentDigestSlice, error) {
-	// If an image is found to have this specific media type, it is a parent, and will be saved.
-	// All other images are not of interest.
-	mediaType := `"mediaType": "application/vnd.docker.distribution.manifest.list.v2+json"`
-	results := make([]ImageWithParentDigestSlice, 0)
-
-	// Split the registry into prefix and postfix
-	// For example: "us.gcr.io/k8s-artifacts-prod/addon-builder"
-	// prefix: "us.gcr.io"
-	// postfix: "/k8s-artifacts-prod/addon-builder"
-	firstSlash := strings.IndexByte(string(registry), '/')
-	registryPrefix := registry[:firstSlash]
-	registryPostfix := registry[firstSlash:]
-
-	// This is the number of goroutines that will be making curl requests over every image digest.
-	numWorkers := runtime.NumCPU() * 2
-	wg := new(sync.WaitGroup)
-	signal := make(chan ImageWithParentDigestSlice, 500)
-
-	filterImage := func(img ImageWithDigestSlice, c chan ImageWithParentDigestSlice) {
-		defer wg.Done()
-		imageLocation := fmt.Sprintf("%s/%s", registryPostfix, img.name)
-
-		// This is a standard endpoint all container registries must adopt. This will reveal
-		// information about the manifest for the particular image. The output is in JSON form,
-		// with a field "mediaType" that reveals if the given image is a parent image.
-		manifestEndpoint := fmt.Sprintf("https://%s/v2%s/manifests/", registryPrefix, imageLocation)
-		result := ImageWithParentDigestSlice{img.name, []parentDigest{}}
-		for _, digest := range img.digests {
-			var response string
-			numRetries := 8
-			imgEndpoint := manifestEndpoint + digest.hash
-			for numRetries > 0 {
-				out, err := exec.Command("curl", imgEndpoint).Output()
-				if err == nil {
-					response = string(out)
-					break
-				}
-				fmt.Println("something went wrong...")
-				fmt.Println("curl response:", err)
-				fmt.Println("retrying,", imgEndpoint)
-				numRetries--
-			}
-
-			if response == "" {
-				fmt.Println("Could not reach endpoint:", imgEndpoint)
-				continue
-			}
-
-			if !strings.Contains(response, mediaType) {
-				continue
-			}
-
-			// A new parent has been found.
-			parent := parentDigest{
-				hash:     digest.hash,
-				children: []string{},
-			}
-
-			// Parse all children by looking for digest fields within response.
-			children := strings.Split(response, "},")
-			for _, child := range children {
-				digestIdx := strings.LastIndex(child, `"digest":`)
-				if digestIdx != -1 {
-					childHash := child[digestIdx+11 : digestIdx+82]
-					parent.children = append(parent.children, childHash)
-				}
-			}
-
-			result.parentDigests = append(result.parentDigests, parent)
-		}
-
-		c <- result
-	}
-
-	fmt.Printf("Searching for parent images with %d workers...\n", numWorkers)
-	received := 0
-
-	// Engage all workers.
-	for i := 0; i < numWorkers; i++ {
-		img := (*images)[i]
-		go filterImage(img, signal)
-		wg.Add(1)
-	}
-
-	// When a worker finishes, create another.
-	for i := numWorkers; i < len(*images); i++ {
-		found := <-signal
-		received++
-		if len(found.parentDigests) > 0 {
-			results = append(results, found)
-			fmt.Println("FOUND parent:", found.Name)
-		}
-
-		img := (*images)[i]
-		go filterImage(img, signal)
-		wg.Add(1)
-	}
-
-	// Gather all results.
-	wg.Wait()
-	for found := range signal {
-		received++
-		if len(found.parentDigests) > 0 {
-			results = append(results, found)
-			fmt.Println("FOUND parent:", found.Name)
-		}
-
-		if received == len(*images) {
-			break
-		}
-	}
-
-	return results, nil
-}
-
-// TODO: Review/optimize/de-dupe (https://github.com/kubernetes-sigs/promo-tools/pull/351)
-func ValidateParentImages(registry image.Registry, images []ImageWithParentDigestSlice) {
-	numWorkers := runtime.NumCPU() * 2
-	wg := new(sync.WaitGroup)
-	signal := make(chan string, 500)
-
-	validateImg := func(image ImageWithParentDigestSlice, c chan string) {
-		defer wg.Done()
-		if IsParentImageValid(registry, image) {
-			fmt.Println("PASSED - ", image.Name)
-			c <- ""
-			return
-		}
-
-		fmt.Println("FAILED - ", image.Name)
-		c <- image.Name
-	}
-
-	fmt.Printf("Inspecting children of %d parents...\n", len(images))
-	received := 0
-
-	// Engage all workers.
-	for i := 0; i < numWorkers; i++ {
-		img := images[i]
-		go validateImg(img, signal)
-		wg.Add(1)
-	}
-
-	// When a worker finishes, create another.
-	for i := numWorkers; i < len(images); i++ {
-		found := <-signal
-		received++
-		if len(found) > 0 {
-			fmt.Println("FAILED ", found)
-		}
-
-		img := images[i]
-		go validateImg(img, signal)
-		wg.Add(1)
-	}
-
-	// Gather all results.
-	wg.Wait()
-	for found := range signal {
-		received++
-		if len(found) > 0 {
-			fmt.Println("FAILED ", found)
-		}
-
-		if received == len(images) {
-			break
-		}
-	}
-}
-
-// IsParentImageValid only returns true if all child images, from the parent's
-// manifest list, are from the same image location.
-// Example:
-//		VALID 	parent=gcr.io/foo/bar child=gcr.io/foo/bar
-// 		INVALID parent=gcr.io/foo/bar child=gcr.io/foo/bar/foo
-//
-// TODO: Review/optimize/de-dupe (https://github.com/kubernetes-sigs/promo-tools/pull/351)
-func IsParentImageValid(registry image.Registry, img ImageWithParentDigestSlice) bool {
-	// Split the registry into prefix and postfix
-	// For example: "us.gcr.io/k8s-artifacts-prod/addon-builder"
-	// prefix: "us.gcr.io"
-	// postfix: "/k8s-artifacts-prod/addon-builder"
-	firstSlash := strings.IndexByte(string(registry), '/')
-	registryPrefix := registry[:firstSlash]
-	registryPostfix := registry[firstSlash:]
-
-	imageLocation := fmt.Sprintf("%s/%s", registryPostfix, img.Name)
-	manifestEndpoint := fmt.Sprintf("https://%s/v2%s/manifests/", registryPrefix, imageLocation)
-	for _, parent := range img.parentDigests {
-		for _, childHash := range parent.children {
-			var response string
-
-			// This is a standard endpoint all container registries must adopt. This will reveal
-			// information about the manifest for the particular image. The output is in JSON form,
-			// with a field "mediaType" that reveals if the given image is a parent image.
-			imgEndpoint := manifestEndpoint + childHash
-			retries := 8
-
-			// Inspect the image. If it doesn't exist, we know the parent child relationship
-			// can't be assumed.
-			for retries > 0 {
-				out, err := exec.Command("curl", imgEndpoint).Output()
-				if err == nil {
-					response = string(out)
-					break
-				}
-
-				fmt.Println("trouble obtaining child manifest...")
-				fmt.Println("curl response:", err)
-				fmt.Println("retrying ", imgEndpoint)
-				retries--
-			}
-
-			if retries == 0 {
-				fmt.Println("Failed to reach ", imgEndpoint)
-				fmt.Println("skipping...")
-				continue
-			}
-
-			if !strings.Contains(response, "mediaType") {
-				return false
-			}
-		}
-	}
-
-	return true
 }

@@ -16,12 +16,10 @@ limitations under the License.
 
 package remotemanifest
 
-import (
-	reg "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
-)
+import "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/schema"
 
 // Facility requires a single method, called Fetch(), which corresponds to
 // fetching a set of promoter manifests.
 type Facility interface {
-	Fetch() ([]reg.Manifest, error)
+	Fetch() ([]schema.Manifest, error)
 }

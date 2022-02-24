@@ -20,6 +20,8 @@ import (
 	"github.com/pkg/errors"
 
 	reg "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
+	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/registry"
+	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/schema"
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/stream"
 	options "sigs.k8s.io/promo-tools/v3/promoter/image/options"
 	"sigs.k8s.io/promo-tools/v3/types/image"
@@ -30,18 +32,18 @@ import (
 
 // ParseManifests reads the manifest file or manifest directory
 // and parses them to return a slice of Manifest objects.
-func (di *DefaultPromoterImplementation) ParseManifests(opts *options.Options) (mfests []reg.Manifest, err error) {
+func (di *DefaultPromoterImplementation) ParseManifests(opts *options.Options) (mfests []schema.Manifest, err error) {
 	// If the options have a manifest file defined, we use that one
 	if opts.Manifest != "" {
-		mfest, err := reg.ParseManifestFromFile(opts.Manifest)
+		mfest, err := schema.ParseManifestFromFile(opts.Manifest)
 		if err != nil {
 			return mfests, errors.Wrap(err, "parsing the manifest file")
 		}
 
-		mfests = []reg.Manifest{mfest}
+		mfests = []schema.Manifest{mfest}
 		// The thin manifests
 	} else if opts.ThinManifestDir != "" {
-		mfests, err = reg.ParseThinManifestsFromDir(opts.ThinManifestDir)
+		mfests, err = schema.ParseThinManifestsFromDir(opts.ThinManifestDir)
 		if err != nil {
 			return nil, errors.Wrap(err, "parsing thin manifest directory")
 		}
@@ -52,7 +54,7 @@ func (di *DefaultPromoterImplementation) ParseManifests(opts *options.Options) (
 // MakeSyncContext takes a slice of manifests and creates a sync context
 // object based on them and the promoter options
 func (di DefaultPromoterImplementation) MakeSyncContext(
-	opts *options.Options, mfests []reg.Manifest,
+	opts *options.Options, mfests []schema.Manifest,
 ) (*reg.SyncContext, error) {
 	sc, err := reg.MakeSyncContext(
 		mfests, opts.Threads, opts.Confirm, opts.UseServiceAcct,
@@ -67,7 +69,7 @@ func (di DefaultPromoterImplementation) MakeSyncContext(
 // them the promotion edges, ie the images that need to be
 // promoted.
 func (di *DefaultPromoterImplementation) GetPromotionEdges(
-	sc *reg.SyncContext, mfests []reg.Manifest,
+	sc *reg.SyncContext, mfests []schema.Manifest,
 ) (promotionEdges map[reg.PromotionEdge]interface{}, err error) {
 	// First, get the "edges" from the manifests
 	promotionEdges, err = reg.ToPromotionEdges(mfests)
@@ -93,7 +95,7 @@ func (di *DefaultPromoterImplementation) MakeProducerFunction(useServiceAccount 
 	return func(
 		srcRegistry image.Registry,
 		srcImageName image.Name,
-		destRC reg.RegistryContext,
+		destRC registry.Context,
 		imageName image.Name,
 		digest image.Digest, tag image.Tag, tp reg.TagOp,
 	) stream.Producer {

@@ -31,6 +31,7 @@ import (
 	grafeaspb "google.golang.org/genproto/googleapis/grafeas/v1"
 	gogit "gopkg.in/src-d/go-git.v4"
 
+	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/schema"
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/stream"
 )
 
@@ -117,7 +118,7 @@ func (check *ImageRemovalCheck) Run() error {
 			" repo: %v", err)
 	}
 
-	mfests, err := ParseThinManifestsFromDir(check.GitRepoPath)
+	mfests, err := schema.ParseThinManifestsFromDir(check.GitRepoPath)
 	if err != nil {
 		return fmt.Errorf("could not parse manifests from the directory: %v",
 			err)

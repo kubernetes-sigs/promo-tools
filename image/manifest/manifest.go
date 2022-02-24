@@ -26,6 +26,8 @@ import (
 	"golang.org/x/xerrors"
 
 	reg "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
+	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/registry"
+	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/schema"
 	"sigs.k8s.io/promo-tools/v3/types/image"
 )
 
@@ -137,10 +139,10 @@ func Grow(
 	o *GrowOptions,
 ) error {
 	var err error
-	var riiCombined reg.RegInvImage
+	var riiCombined registry.RegInvImage
 
 	// (1) Scan the BaseDir and find the promoter manifest to modify.
-	manifest, err := Find(o)
+	mfest, err := Find(o)
 	if err != nil {
 		return err
 	}
@@ -160,19 +162,19 @@ func Grow(
 
 	// (4) Inject (2)'s output into (1)'s manifest's images to create a larger
 	// RegInvImage.
-	riiCombined = Union(manifest.ToRegInvImage(), riiFiltered)
+	riiCombined = Union(mfest.ToRegInvImage(), riiFiltered)
 
 	// (5) Write back RegInvImage as Manifest ([]Image field}) back onto disk.
-	err = Write(manifest, riiCombined)
+	err = Write(mfest, riiCombined)
 
 	return err
 }
 
 // Write writes images as YAML out to the expected path of the given
-// (thin) manifest.
-func Write(manifest reg.Manifest, rii reg.RegInvImage) error {
+// (thin) schema.
+func Write(m schema.Manifest, rii registry.RegInvImage) error {
 	// Chop off trailing "promoter-manifest.yaml".
-	p := path.Dir(manifest.Filepath)
+	p := path.Dir(m.Filepath)
 	// Get staging repo directory name as it is laid out in the thin manifest
 	// dir.
 	stagingRepoName := path.Base(p)
@@ -183,17 +185,17 @@ func Write(manifest reg.Manifest, rii reg.RegInvImage) error {
 
 	// Write the file.
 	err := ioutil.WriteFile(
-		imagesPath, []byte(rii.ToYAML(reg.YamlMarshalingOpts{})), 0o644)
+		imagesPath, []byte(rii.ToYAML(registry.YamlMarshalingOpts{})), 0o644)
 	return err
 }
 
 // Find finds the manifest to modify.
-func Find(o *GrowOptions) (reg.Manifest, error) {
+func Find(o *GrowOptions) (schema.Manifest, error) {
 	var err error
-	var manifests []reg.Manifest
-	manifests, err = reg.ParseThinManifestsFromDir(o.BaseDir)
+	var manifests []schema.Manifest
+	manifests, err = schema.ParseThinManifestsFromDir(o.BaseDir)
 	if err != nil {
-		return reg.Manifest{}, err
+		return schema.Manifest{}, err
 	}
 
 	logrus.Infof("%d manifests parsed", len(manifests))
@@ -202,26 +204,26 @@ func Find(o *GrowOptions) (reg.Manifest, error) {
 			return manifest, nil
 		}
 	}
-	return reg.Manifest{},
+	return schema.Manifest{},
 		xerrors.Errorf("could not find Manifest for %q", o.StagingRepo)
 }
 
 // ReadStagingRepo reads the StagingRepo, and applies whatever filters are
 // available to the resulting RegInvImage. This RegInvImage is what we want to
-// inject into the "images.yaml" of a thin manifest.
+// inject into the "images.yaml" of a thin schema.
 func ReadStagingRepo(
 	o *GrowOptions,
-) (reg.RegInvImage, error) {
-	stagingRepoRC := reg.RegistryContext{
+) (registry.RegInvImage, error) {
+	stagingRepoRC := registry.Context{
 		Name: o.StagingRepo,
 	}
 
-	manifests := []reg.Manifest{
+	manifests := []schema.Manifest{
 		{
-			Registries: []reg.RegistryContext{
+			Registries: []registry.Context{
 				stagingRepoRC,
 			},
-			Images: []reg.Image{},
+			Images: []registry.Image{},
 		},
 	}
 
@@ -231,10 +233,10 @@ func ReadStagingRepo(
 		true,
 		false)
 	if err != nil {
-		return reg.RegInvImage{}, err
+		return registry.RegInvImage{}, err
 	}
 	sc.ReadRegistries(
-		[]reg.RegistryContext{stagingRepoRC},
+		[]registry.Context{stagingRepoRC},
 		// Read all registries recursively, because we want to produce a
 		// complete snapshot.
 		true,
@@ -245,7 +247,7 @@ func ReadStagingRepo(
 
 // ApplyFilters applies the filters in the options to whittle down the given
 // rii.
-func ApplyFilters(o *GrowOptions, rii reg.RegInvImage) (reg.RegInvImage, error) {
+func ApplyFilters(o *GrowOptions, rii registry.RegInvImage) (registry.RegInvImage, error) {
 	// If nothing to filter, short-circuit.
 	if len(rii) == 0 {
 		return rii, nil
@@ -270,7 +272,7 @@ func ApplyFilters(o *GrowOptions, rii reg.RegInvImage) (reg.RegInvImage, error) 
 	rii = ExcludeTags(rii, excludeTags)
 
 	if len(rii) == 0 {
-		return reg.RegInvImage{}, xerrors.New(
+		return registry.RegInvImage{}, xerrors.New(
 			"no images survived filtering; double-check your --filter_* flag(s) for typos",
 		)
 	}
@@ -280,8 +282,8 @@ func ApplyFilters(o *GrowOptions, rii reg.RegInvImage) (reg.RegInvImage, error) 
 
 // FilterByImages removes all images in RegInvImage that do not match the
 // filterImage.
-func FilterByImages(rii reg.RegInvImage, filterImages []image.Name) reg.RegInvImage {
-	filtered := make(reg.RegInvImage)
+func FilterByImages(rii registry.RegInvImage, filterImages []image.Name) registry.RegInvImage {
+	filtered := make(registry.RegInvImage)
 	for imageName, digestTags := range rii {
 		for _, filterImage := range filterImages {
 			if imageName == filterImage {
@@ -295,8 +297,8 @@ func FilterByImages(rii reg.RegInvImage, filterImages []image.Name) reg.RegInvIm
 // FilterByTags removes all images in RegInvImage that do not match the
 // filterTag.
 // TODO(manifest): Dedupe with `FilterByTag` in legacy/dockerregistry/inventory.go
-func FilterByTags(rii reg.RegInvImage, filterTags []image.Tag) reg.RegInvImage {
-	filtered := make(reg.RegInvImage)
+func FilterByTags(rii registry.RegInvImage, filterTags []image.Tag) registry.RegInvImage {
+	filtered := make(registry.RegInvImage)
 
 	for imageName, digestTags := range rii {
 		for digest, tags := range digestTags {
@@ -304,7 +306,7 @@ func FilterByTags(rii reg.RegInvImage, filterTags []image.Tag) reg.RegInvImage {
 				for _, filterTag := range filterTags {
 					if tag == filterTag {
 						if filtered[imageName] == nil {
-							filtered[imageName] = make(reg.DigestTags)
+							filtered[imageName] = make(registry.DigestTags)
 						}
 
 						filtered[imageName][digest] = append(
@@ -322,14 +324,14 @@ func FilterByTags(rii reg.RegInvImage, filterTags []image.Tag) reg.RegInvImage {
 
 // FilterByDigests removes all images in RegInvImage that do not match the
 // filterDigest.
-func FilterByDigests(rii reg.RegInvImage, filterDigests []image.Digest) reg.RegInvImage {
-	filtered := make(reg.RegInvImage)
+func FilterByDigests(rii registry.RegInvImage, filterDigests []image.Digest) registry.RegInvImage {
+	filtered := make(registry.RegInvImage)
 	for imageName, digestTags := range rii {
 		for digest, tags := range digestTags {
 			for _, filterDigest := range filterDigests {
 				if digest == filterDigest {
 					if filtered[imageName] == nil {
-						filtered[imageName] = make(reg.DigestTags)
+						filtered[imageName] = make(registry.DigestTags)
 					}
 					filtered[imageName][digest] = tags
 				}
@@ -341,8 +343,8 @@ func FilterByDigests(rii reg.RegInvImage, filterDigests []image.Digest) reg.RegI
 }
 
 // ExcludeTags removes tags in rii that match excludedTags.
-func ExcludeTags(rii reg.RegInvImage, excludedTags map[image.Tag]bool) reg.RegInvImage {
-	filtered := make(reg.RegInvImage)
+func ExcludeTags(rii registry.RegInvImage, excludedTags map[image.Tag]bool) registry.RegInvImage {
+	filtered := make(registry.RegInvImage)
 	for imageName, digestTags := range rii {
 		for digest, tags := range digestTags {
 			for _, tag := range tags {
@@ -350,7 +352,7 @@ func ExcludeTags(rii reg.RegInvImage, excludedTags map[image.Tag]bool) reg.RegIn
 					continue
 				}
 				if filtered[imageName] == nil {
-					filtered[imageName] = make(reg.DigestTags)
+					filtered[imageName] = make(registry.DigestTags)
 				}
 				filtered[imageName][digest] = append(
 					filtered[imageName][digest],
@@ -362,7 +364,7 @@ func ExcludeTags(rii reg.RegInvImage, excludedTags map[image.Tag]bool) reg.RegIn
 }
 
 // Union inject b's contents into a. However, it does so in a special way.
-func Union(a, b reg.RegInvImage) reg.RegInvImage {
+func Union(a, b registry.RegInvImage) registry.RegInvImage {
 	for imageName, digestTags := range b {
 		// If a does not have this image at all, then it's a simple
 		// injection.
@@ -379,7 +381,7 @@ func Union(a, b reg.RegInvImage) reg.RegInvImage {
 			}
 			// If c has the digest already, try to inject those tags in b that
 			// are not already in a.
-			tagSlice := reg.TagSlice{}
+			tagSlice := registry.TagSlice{}
 			for tag := range tags.Union(a[imageName][digest]) {
 				if tag == "latest" {
 					continue
