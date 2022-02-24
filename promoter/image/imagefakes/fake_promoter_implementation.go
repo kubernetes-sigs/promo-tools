@@ -20,8 +20,8 @@ package imagefakes
 import (
 	"sync"
 
-	imagepromoterb "sigs.k8s.io/promo-tools/v3/internal/promoter/image"
 	inventory "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
+	imagepromoterb "sigs.k8s.io/promo-tools/v3/internal/promoter/image"
 	imagepromotera "sigs.k8s.io/promo-tools/v3/promoter/image/options"
 )
 
