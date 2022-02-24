@@ -30,11 +30,13 @@ import (
 	"github.com/sirupsen/logrus"
 	yaml "gopkg.in/yaml.v2"
 
-	"sigs.k8s.io/promo-tools/v3/internal/version"
-	reg "sigs.k8s.io/promo-tools/v3/legacy/dockerregistry"
-	"sigs.k8s.io/promo-tools/v3/legacy/gcloud"
-	"sigs.k8s.io/promo-tools/v3/legacy/stream"
 	"sigs.k8s.io/release-utils/command"
+
+	reg "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
+	"sigs.k8s.io/promo-tools/v3/internal/legacy/gcloud"
+	"sigs.k8s.io/promo-tools/v3/internal/legacy/stream"
+	"sigs.k8s.io/promo-tools/v3/internal/version"
+	"sigs.k8s.io/promo-tools/v3/types/image"
 )
 
 const kpromoMain = "cmd/kpromo/main.go"
@@ -116,7 +118,7 @@ func main() {
 }
 
 func checkSnapshot(
-	repo reg.RegistryName,
+	repo image.Registry,
 	expected []reg.Image,
 	repoRoot string,
 	rcs []reg.RegistryContext,
@@ -189,7 +191,7 @@ func runPromotion(repoRoot string, t *E2ETest) error {
 	return cmd.RunSuccess()
 }
 
-func extractSvcAcc(registry reg.RegistryName, rcs []reg.RegistryContext) string {
+func extractSvcAcc(registry image.Registry, rcs []reg.RegistryContext) string {
 	for _, r := range rcs {
 		if r.Name == registry {
 			return r.ServiceAccount
@@ -201,7 +203,7 @@ func extractSvcAcc(registry reg.RegistryName, rcs []reg.RegistryContext) string 
 
 func getSnapshot(
 	repoRoot string,
-	registry reg.RegistryName,
+	registry image.Registry,
 	rcs []reg.RegistryContext,
 ) ([]reg.Image, error) {
 	// TODO: Consider setting flag names in `cip` instead
@@ -278,11 +280,11 @@ func (t *E2ETest) clearRepositories() error {
 	return nil
 }
 
-func clearRepository(regName reg.RegistryName, sc *reg.SyncContext) {
+func clearRepository(regName image.Registry, sc *reg.SyncContext) {
 	mkDeletionCmd := func(
 		dest reg.RegistryContext,
-		imageName reg.ImageName,
-		digest reg.Digest) stream.Producer {
+		imageName image.Name,
+		digest image.Digest) stream.Producer {
 		var sp stream.Subprocess
 		sp.CmdInvocation = reg.GetDeleteCmd(
 			dest,
@@ -312,9 +314,9 @@ type E2ETests []E2ETest
 // RegistrySnapshot is the snapshot of a registry. It is basically the key/value
 // pair out of the reg.MasterInventory type (RegistryName + []Image).
 type RegistrySnapshot struct {
-	Name   reg.RegistryName `yaml:"name,omitempty"`
-	Before []reg.Image      `yaml:"before,omitempty"`
-	After  []reg.Image      `yaml:"after,omitempty"`
+	Name   image.Registry `yaml:"name,omitempty"`
+	Before []reg.Image    `yaml:"before,omitempty"`
+	After  []reg.Image    `yaml:"after,omitempty"`
 }
 
 func readE2ETests(filePath string) (E2ETests, error) {

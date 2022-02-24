@@ -23,13 +23,14 @@ import (
 	"github.com/stretchr/testify/require"
 	grafeaspb "google.golang.org/genproto/googleapis/grafeas/v1"
 
-	reg "sigs.k8s.io/promo-tools/v3/legacy/dockerregistry"
+	reg "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
+	"sigs.k8s.io/promo-tools/v3/types/image"
 )
 
 func TestImageRemovalCheck(t *testing.T) {
-	srcRegName := reg.RegistryName("gcr.io/foo")
-	srcRegName2 := reg.RegistryName("gcr.io/foo2")
-	destRegName := reg.RegistryName("gcr.io/bar")
+	srcRegName := image.Registry("gcr.io/foo")
+	srcRegName2 := image.Registry("gcr.io/foo2")
+	destRegName := image.Registry("gcr.io/bar")
 	destRC := reg.RegistryContext{
 		Name:           destRegName,
 		ServiceAccount: "robot",
@@ -48,21 +49,21 @@ func TestImageRemovalCheck(t *testing.T) {
 	registries2 := []reg.RegistryContext{destRC, srcRC, srcRC2}
 
 	imageA := reg.Image{
-		ImageName: "a",
+		Name: "a",
 		Dmap: reg.DigestTags{
 			"sha256:000": {"0.9"},
 		},
 	}
 
 	imageA2 := reg.Image{
-		ImageName: "a",
+		Name: "a",
 		Dmap: reg.DigestTags{
 			"sha256:111": {"0.9"},
 		},
 	}
 
 	imageB := reg.Image{
-		ImageName: "b",
+		Name: "b",
 		Dmap: reg.DigestTags{
 			"sha256:000": {"0.9"},
 		},
@@ -193,8 +194,8 @@ func TestImageRemovalCheck(t *testing.T) {
 }
 
 func TestImageSizeCheck(t *testing.T) {
-	srcRegName := reg.RegistryName("gcr.io/foo")
-	destRegName := reg.RegistryName("gcr.io/bar")
+	srcRegName := image.Registry("gcr.io/foo")
+	destRegName := image.Registry("gcr.io/bar")
 
 	destRC := reg.RegistryContext{
 		Name:           destRegName,
@@ -210,13 +211,13 @@ func TestImageSizeCheck(t *testing.T) {
 	registries := []reg.RegistryContext{destRC, srcRC}
 
 	image1 := reg.Image{
-		ImageName: "foo",
+		Name: "foo",
 		Dmap: reg.DigestTags{
 			"sha256:000": {"0.9"},
 		},
 	}
 	image2 := reg.Image{
-		ImageName: "bar",
+		Name: "bar",
 		Dmap: reg.DigestTags{
 			"sha256:111": {"0.9"},
 		},
@@ -226,7 +227,7 @@ func TestImageSizeCheck(t *testing.T) {
 		name       string
 		check      reg.ImageSizeCheck
 		manifests  []reg.Manifest
-		imageSizes map[reg.Digest]int
+		imageSizes map[image.Digest]int
 		expected   error
 	}{
 		{
@@ -244,7 +245,7 @@ func TestImageSizeCheck(t *testing.T) {
 					SrcRegistry: &srcRC,
 				},
 			},
-			map[reg.Digest]int{
+			map[image.Digest]int{
 				"sha256:000": reg.MBToBytes(1),
 			},
 			nil,
@@ -264,7 +265,7 @@ func TestImageSizeCheck(t *testing.T) {
 					SrcRegistry: &srcRC,
 				},
 			},
-			map[reg.Digest]int{
+			map[image.Digest]int{
 				"sha256:000": reg.MBToBytes(5),
 			},
 			reg.ImageSizeError{
@@ -291,7 +292,7 @@ func TestImageSizeCheck(t *testing.T) {
 					SrcRegistry: &srcRC,
 				},
 			},
-			map[reg.Digest]int{
+			map[image.Digest]int{
 				"sha256:000": reg.MBToBytes(5),
 				"sha256:111": reg.MBToBytes(10),
 			},
@@ -320,7 +321,7 @@ func TestImageSizeCheck(t *testing.T) {
 					SrcRegistry: &srcRC,
 				},
 			},
-			map[reg.Digest]int{
+			map[image.Digest]int{
 				"sha256:000": 0,
 				"sha256:111": reg.MBToBytes(-5),
 			},
@@ -342,8 +343,7 @@ func TestImageSizeCheck(t *testing.T) {
 		require.Equal(t, len(test.imageSizes), len(test.check.PullEdges))
 
 		for edge := range test.check.PullEdges {
-			test.check.DigestImageSize[edge.Digest] =
-				test.imageSizes[edge.Digest]
+			test.check.DigestImageSize[edge.Digest] = test.imageSizes[edge.Digest]
 		}
 
 		got := test.check.Run()
@@ -359,34 +359,34 @@ func TestImageSizeCheck(t *testing.T) {
 func TestImageVulnCheck(t *testing.T) {
 	edge1 := reg.PromotionEdge{
 		SrcImageTag: reg.ImageTag{
-			ImageName: "foo",
+			Name: "foo",
 		},
 		Digest: "sha256:000",
 		DstImageTag: reg.ImageTag{
-			ImageName: "foo",
+			Name: "foo",
 		},
 	}
 	edge2 := reg.PromotionEdge{
 		SrcImageTag: reg.ImageTag{
-			ImageName: "bar",
+			Name: "bar",
 		},
 		Digest: "sha256:111",
 		DstImageTag: reg.ImageTag{
-			ImageName: "bar/1",
+			Name: "bar/1",
 		},
 	}
 	edge3 := reg.PromotionEdge{
 		SrcImageTag: reg.ImageTag{
-			ImageName: "bar",
+			Name: "bar",
 		},
 		Digest: "sha256:111",
 		DstImageTag: reg.ImageTag{
-			ImageName: "bar/2",
+			Name: "bar/2",
 		},
 	}
 
 	mkVulnProducerFake := func(
-		edgeVulnOccurrences map[reg.Digest][]*grafeaspb.Occurrence,
+		edgeVulnOccurrences map[image.Digest][]*grafeaspb.Occurrence,
 	) reg.ImageVulnProducer {
 		return func(
 			edge reg.PromotionEdge,
@@ -399,7 +399,7 @@ func TestImageVulnCheck(t *testing.T) {
 		name              string
 		severityThreshold int
 		edges             map[reg.PromotionEdge]interface{}
-		vulnerabilities   map[reg.Digest][]*grafeaspb.Occurrence
+		vulnerabilities   map[image.Digest][]*grafeaspb.Occurrence
 		expected          error
 	}{
 		{
@@ -409,7 +409,7 @@ func TestImageVulnCheck(t *testing.T) {
 				edge1: nil,
 				edge2: nil,
 			},
-			map[reg.Digest][]*grafeaspb.Occurrence{
+			map[image.Digest][]*grafeaspb.Occurrence{
 				"sha256:000": {
 					{
 						Details: &grafeaspb.Occurrence_Vulnerability{
@@ -440,7 +440,7 @@ func TestImageVulnCheck(t *testing.T) {
 				edge1: nil,
 				edge2: nil,
 			},
-			map[reg.Digest][]*grafeaspb.Occurrence{
+			map[image.Digest][]*grafeaspb.Occurrence{
 				"sha256:000": {
 					{
 						Details: &grafeaspb.Occurrence_Vulnerability{
@@ -473,7 +473,7 @@ func TestImageVulnCheck(t *testing.T) {
 				edge1: nil,
 				edge2: nil,
 			},
-			map[reg.Digest][]*grafeaspb.Occurrence{
+			map[image.Digest][]*grafeaspb.Occurrence{
 				"sha256:000": {
 					{
 						Details: &grafeaspb.Occurrence_Vulnerability{
@@ -514,7 +514,7 @@ func TestImageVulnCheck(t *testing.T) {
 				edge2: nil,
 				edge3: nil,
 			},
-			map[reg.Digest][]*grafeaspb.Occurrence{
+			map[image.Digest][]*grafeaspb.Occurrence{
 				"sha256:111": {
 					{
 						Details: &grafeaspb.Occurrence_Vulnerability{
@@ -535,7 +535,7 @@ func TestImageVulnCheck(t *testing.T) {
 			map[reg.PromotionEdge]interface{}{
 				edge1: nil,
 			},
-			map[reg.Digest][]*grafeaspb.Occurrence{
+			map[image.Digest][]*grafeaspb.Occurrence{
 				"sha256:000": {
 					{
 						Details: &grafeaspb.Occurrence_Vulnerability{

@@ -27,9 +27,10 @@ import (
 	cr "github.com/google/go-containerregistry/pkg/v1/types"
 	"github.com/stretchr/testify/require"
 
-	reg "sigs.k8s.io/promo-tools/v3/legacy/dockerregistry"
-	"sigs.k8s.io/promo-tools/v3/legacy/json"
-	"sigs.k8s.io/promo-tools/v3/legacy/stream"
+	reg "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
+	"sigs.k8s.io/promo-tools/v3/internal/legacy/json"
+	"sigs.k8s.io/promo-tools/v3/internal/legacy/stream"
+	"sigs.k8s.io/promo-tools/v3/types/image"
 )
 
 type ParseJSONStreamResult struct {
@@ -184,13 +185,13 @@ images:
 
 				Images: []reg.Image{
 					{
-						ImageName: "agave",
+						Name: "agave",
 						Dmap: reg.DigestTags{
 							"sha256:aab34c5841987a1b133388fa9f27e7960c4b1307e2f9147dca407ba26af48a54": {"latest"},
 						},
 					},
 					{
-						ImageName: "banana",
+						Name: "banana",
 						Dmap: reg.DigestTags{
 							"sha256:07353f7b26327f0d933515a22b1de587b040d3d85c464ea299c1b9f242529326": {"1.8.3"},
 						},
@@ -285,7 +286,7 @@ func TestParseThinManifestsFromDir(t *testing.T) {
 					},
 					Images: []reg.Image{
 						{
-							ImageName: "foo-controller",
+							Name: "foo-controller",
 							Dmap: reg.DigestTags{
 								"sha256:c3d310f4741b3642497da8826e0986db5e02afc9777a2b8e668c8e41034128c1": {"1.0"},
 							},
@@ -322,7 +323,7 @@ func TestParseThinManifestsFromDir(t *testing.T) {
 					},
 					Images: []reg.Image{
 						{
-							ImageName: "foo-controller",
+							Name: "foo-controller",
 							Dmap: reg.DigestTags{
 								"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": {"1.0"},
 							},
@@ -352,7 +353,7 @@ func TestParseThinManifestsFromDir(t *testing.T) {
 					},
 					Images: []reg.Image{
 						{
-							ImageName: "bar-controller",
+							Name: "bar-controller",
 							Dmap: reg.DigestTags{
 								"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": {"1.0"},
 							},
@@ -389,7 +390,7 @@ func TestParseThinManifestsFromDir(t *testing.T) {
 					},
 					Images: []reg.Image{
 						{
-							ImageName: "foo-controller",
+							Name: "foo-controller",
 							Dmap: reg.DigestTags{
 								"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": {"1.0"},
 							},
@@ -419,7 +420,7 @@ func TestParseThinManifestsFromDir(t *testing.T) {
 					},
 					Images: []reg.Image{
 						{
-							ImageName: "bar-controller",
+							Name: "bar-controller",
 							Dmap: reg.DigestTags{
 								"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": {"1.0"},
 							},
@@ -449,7 +450,7 @@ func TestParseThinManifestsFromDir(t *testing.T) {
 					},
 					Images: []reg.Image{
 						{
-							ImageName: "cat-controller",
+							Name: "cat-controller",
 							Dmap: reg.DigestTags{
 								"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc": {"1.0"},
 							},
@@ -479,7 +480,7 @@ func TestParseThinManifestsFromDir(t *testing.T) {
 					},
 					Images: []reg.Image{
 						{
-							ImageName: "qux-controller",
+							Name: "qux-controller",
 							Dmap: reg.DigestTags{
 								"sha256:0000000000000000000000000000000000000000000000000000000000000000": {"1.0"},
 							},
@@ -626,7 +627,7 @@ func TestParseImageDigest(t *testing.T) {
 	}
 
 	for _, testInput := range shouldBeValid {
-		d := reg.Digest(testInput)
+		d := image.Digest(testInput)
 		got := reg.ValidateDigest(d)
 		require.Nil(t, got)
 	}
@@ -645,7 +646,7 @@ func TestParseImageDigest(t *testing.T) {
 	}
 
 	for _, testInput := range shouldBeInvalid {
-		d := reg.Digest(testInput)
+		d := image.Digest(testInput)
 		got := reg.ValidateDigest(d)
 		require.Equal(t, fmt.Errorf("invalid digest: %v", d), got)
 	}
@@ -664,7 +665,7 @@ func TestParseImageTag(t *testing.T) {
 	}
 
 	for _, testInput := range shouldBeValid {
-		tag := reg.Tag(testInput)
+		tag := image.Tag(testInput)
 		got := reg.ValidateTag(tag)
 		require.Nil(t, got)
 	}
@@ -685,7 +686,7 @@ func TestParseImageTag(t *testing.T) {
 	}
 
 	for _, testInput := range shouldBeInvalid {
-		tag := reg.Tag(testInput)
+		tag := image.Tag(testInput)
 		got := reg.ValidateTag(tag)
 		require.Equal(t, fmt.Errorf("invalid tag: %v", tag), got)
 	}
@@ -736,7 +737,7 @@ func TestValidateRegistryImagePath(t *testing.T) {
 }
 
 func TestSplitRegistryImagePath(t *testing.T) {
-	knownRegistryNames := []reg.RegistryName{
+	knownRegistryNames := []image.Registry{
 		`gcr.io/foo`,
 		`us.gcr.io/foo`,
 		`k8s.gcr.io`,
@@ -746,8 +747,8 @@ func TestSplitRegistryImagePath(t *testing.T) {
 	tests := []struct {
 		name                 string
 		input                reg.RegistryImagePath
-		expectedRegistryName reg.RegistryName
-		expectedImageName    reg.ImageName
+		expectedRegistryName image.Registry
+		expectedImageName    image.Name
 		expectedErr          error
 	}{
 		{
@@ -788,7 +789,7 @@ func TestSplitRegistryImagePath(t *testing.T) {
 }
 
 func TestSplitByKnownRegistries(t *testing.T) {
-	knownRegistryNames := []reg.RegistryName{
+	knownRegistryNames := []image.Registry{
 		// See
 		// https://github.com/kubernetes-sigs/promo-tools/issues/188.
 		`us.gcr.io/k8s-artifacts-prod/kube-state-metrics`,
@@ -804,9 +805,9 @@ func TestSplitByKnownRegistries(t *testing.T) {
 
 	tests := []struct {
 		name                 string
-		input                reg.RegistryName
-		expectedRegistryName reg.RegistryName
-		expectedImageName    reg.ImageName
+		input                image.Registry
+		expectedRegistryName image.Registry
+		expectedImageName    image.Name
 		expectedErr          error
 	}{
 		{
@@ -839,11 +840,11 @@ func TestCommandGeneration(t *testing.T) {
 	}
 
 	var (
-		srcRegName    reg.RegistryName = "gcr.io/bar"
-		srcImageName  reg.ImageName    = "baz"
-		destImageName reg.ImageName    = "baz"
-		digest        reg.Digest       = "sha256:000"
-		tag           reg.Tag          = "1.0"
+		srcRegName    image.Registry = "gcr.io/bar"
+		srcImageName  image.Name     = "baz"
+		destImageName image.Name     = "baz"
+		digest        image.Digest   = "sha256:000"
+		tag           image.Tag      = "1.0"
 		tp            reg.TagOp
 	)
 
@@ -935,7 +936,7 @@ func TestCommandGeneration(t *testing.T) {
 
 // TestReadRegistries tests reading images and tags from a registry.
 func TestReadRegistries(t *testing.T) {
-	const fakeRegName reg.RegistryName = "gcr.io/foo"
+	const fakeRegName image.Registry = "gcr.io/foo"
 
 	tests := []struct {
 		name           string
@@ -1147,7 +1148,7 @@ func TestReadRegistries(t *testing.T) {
 
 		sc := reg.SyncContext{
 			RegistryContexts: rcs,
-			Inv:              map[reg.RegistryName]reg.RegInvImage{fakeRegName: nil},
+			Inv:              map[image.Registry]reg.RegInvImage{fakeRegName: nil},
 			DigestMediaType:  make(reg.DigestMediaType),
 			DigestImageSize:  make(reg.DigestImageSize),
 		}
@@ -1175,7 +1176,7 @@ func TestReadRegistries(t *testing.T) {
 
 // TestReadGManifestLists tests reading ManifestList information from GCR.
 func TestReadGManifestLists(t *testing.T) {
-	const fakeRegName reg.RegistryName = "gcr.io/foo"
+	const fakeRegName image.Registry = "gcr.io/foo"
 
 	tests := []struct {
 		name           string
@@ -1228,7 +1229,7 @@ func TestReadGManifestLists(t *testing.T) {
 		}
 		sc := reg.SyncContext{
 			RegistryContexts: rcs,
-			Inv: map[reg.RegistryName]reg.RegInvImage{
+			Inv: map[image.Registry]reg.RegInvImage{
 				"gcr.io/foo": {
 					"someImage": reg.DigestTags{
 						"sha256:0000000000000000000000000000000000000000000000000000000000000000": {"1.0"},
@@ -1268,7 +1269,7 @@ func TestGetTokenKeyDomainRepoPath(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		input    reg.RegistryName
+		input    image.Registry
 		expected TokenKeyDomainRepoPath
 	}{
 		{
@@ -1455,9 +1456,9 @@ func TestSetManipulationsTags(t *testing.T) {
 }
 
 func TestToPromotionEdges(t *testing.T) {
-	srcRegName := reg.RegistryName("gcr.io/foo")
-	destRegName := reg.RegistryName("gcr.io/bar")
-	destRegName2 := reg.RegistryName("gcr.io/cat")
+	srcRegName := image.Registry("gcr.io/foo")
+	destRegName := image.Registry("gcr.io/bar")
+	destRegName2 := image.Registry("gcr.io/cat")
 	destRC := reg.RegistryContext{
 		Name:           destRegName,
 		ServiceAccount: "robot",
@@ -1524,7 +1525,7 @@ func TestToPromotionEdges(t *testing.T) {
 					Registries: registries1,
 					Images: []reg.Image{
 						{
-							ImageName: "a",
+							Name: "a",
 							Dmap: reg.DigestTags{
 								"sha256:000": {"0.9"},
 							},
@@ -1537,14 +1538,14 @@ func TestToPromotionEdges(t *testing.T) {
 				{
 					SrcRegistry: srcRC,
 					SrcImageTag: reg.ImageTag{
-						ImageName: "a",
-						Tag:       "0.9",
+						Name: "a",
+						Tag:  "0.9",
 					},
 					Digest:      "sha256:000",
 					DstRegistry: destRC,
 					DstImageTag: reg.ImageTag{
-						ImageName: "a",
-						Tag:       "0.9",
+						Name: "a",
+						Tag:  "0.9",
 					},
 				}: nil,
 			},
@@ -1559,7 +1560,7 @@ func TestToPromotionEdges(t *testing.T) {
 					Registries: registries2,
 					Images: []reg.Image{
 						{
-							ImageName: "a",
+							Name: "a",
 							Dmap: reg.DigestTags{
 								"sha256:000": {"0.9"},
 							},
@@ -1572,27 +1573,27 @@ func TestToPromotionEdges(t *testing.T) {
 				{
 					SrcRegistry: srcRC,
 					SrcImageTag: reg.ImageTag{
-						ImageName: "a",
-						Tag:       "0.9",
+						Name: "a",
+						Tag:  "0.9",
 					},
 					Digest:      "sha256:000",
 					DstRegistry: destRC,
 					DstImageTag: reg.ImageTag{
-						ImageName: "a",
-						Tag:       "0.9",
+						Name: "a",
+						Tag:  "0.9",
 					},
 				}: nil,
 				{
 					SrcRegistry: srcRC,
 					SrcImageTag: reg.ImageTag{
-						ImageName: "a",
-						Tag:       "0.9",
+						Name: "a",
+						Tag:  "0.9",
 					},
 					Digest:      "sha256:000",
 					DstRegistry: destRC2,
 					DstImageTag: reg.ImageTag{
-						ImageName: "a",
-						Tag:       "0.9",
+						Name: "a",
+						Tag:  "0.9",
 					},
 				}: nil,
 			},
@@ -1607,7 +1608,7 @@ func TestToPromotionEdges(t *testing.T) {
 					Registries: registries2,
 					Images: []reg.Image{
 						{
-							ImageName: "c",
+							Name: "c",
 							Dmap: reg.DigestTags{
 								"sha256:222": {"3.0"},
 								"sha256:333": {"2.0"},
@@ -1621,53 +1622,53 @@ func TestToPromotionEdges(t *testing.T) {
 				{
 					SrcRegistry: srcRC,
 					SrcImageTag: reg.ImageTag{
-						ImageName: "c",
-						Tag:       "2.0",
+						Name: "c",
+						Tag:  "2.0",
 					},
 					Digest:      "sha256:333",
 					DstRegistry: destRC,
 					DstImageTag: reg.ImageTag{
-						ImageName: "c",
-						Tag:       "2.0",
+						Name: "c",
+						Tag:  "2.0",
 					},
 				}: nil,
 				{
 					SrcRegistry: srcRC,
 					SrcImageTag: reg.ImageTag{
-						ImageName: "c",
-						Tag:       "3.0",
+						Name: "c",
+						Tag:  "3.0",
 					},
 					Digest:      "sha256:222",
 					DstRegistry: destRC,
 					DstImageTag: reg.ImageTag{
-						ImageName: "c",
-						Tag:       "3.0",
+						Name: "c",
+						Tag:  "3.0",
 					},
 				}: nil,
 				{
 					SrcRegistry: srcRC,
 					SrcImageTag: reg.ImageTag{
-						ImageName: "c",
-						Tag:       "2.0",
+						Name: "c",
+						Tag:  "2.0",
 					},
 					Digest:      "sha256:333",
 					DstRegistry: destRC2,
 					DstImageTag: reg.ImageTag{
-						ImageName: "c",
-						Tag:       "2.0",
+						Name: "c",
+						Tag:  "2.0",
 					},
 				}: nil,
 				{
 					SrcRegistry: srcRC,
 					SrcImageTag: reg.ImageTag{
-						ImageName: "c",
-						Tag:       "3.0",
+						Name: "c",
+						Tag:  "3.0",
 					},
 					Digest:      "sha256:222",
 					DstRegistry: destRC2,
 					DstImageTag: reg.ImageTag{
-						ImageName: "c",
-						Tag:       "3.0",
+						Name: "c",
+						Tag:  "3.0",
 					},
 				}: nil,
 			},
@@ -1695,8 +1696,8 @@ func TestToPromotionEdges(t *testing.T) {
 }
 
 func TestCheckOverlappingEdges(t *testing.T) {
-	srcRegName := reg.RegistryName("gcr.io/foo")
-	destRegName := reg.RegistryName("gcr.io/bar")
+	srcRegName := image.Registry("gcr.io/foo")
+	destRegName := image.Registry("gcr.io/bar")
 	destRC := reg.RegistryContext{
 		Name:           destRegName,
 		ServiceAccount: "robot",
@@ -1725,14 +1726,14 @@ func TestCheckOverlappingEdges(t *testing.T) {
 				{
 					SrcRegistry: srcRC,
 					SrcImageTag: reg.ImageTag{
-						ImageName: "a",
-						Tag:       "0.9",
+						Name: "a",
+						Tag:  "0.9",
 					},
 					Digest:      "sha256:000",
 					DstRegistry: destRC,
 					DstImageTag: reg.ImageTag{
-						ImageName: "a",
-						Tag:       "0.9",
+						Name: "a",
+						Tag:  "0.9",
 					},
 				}: nil,
 			},
@@ -1740,14 +1741,14 @@ func TestCheckOverlappingEdges(t *testing.T) {
 				{
 					SrcRegistry: srcRC,
 					SrcImageTag: reg.ImageTag{
-						ImageName: "a",
-						Tag:       "0.9",
+						Name: "a",
+						Tag:  "0.9",
 					},
 					Digest:      "sha256:000",
 					DstRegistry: destRC,
 					DstImageTag: reg.ImageTag{
-						ImageName: "a",
-						Tag:       "0.9",
+						Name: "a",
+						Tag:  "0.9",
 					},
 				}: nil,
 			},
@@ -1759,27 +1760,27 @@ func TestCheckOverlappingEdges(t *testing.T) {
 				{
 					SrcRegistry: srcRC,
 					SrcImageTag: reg.ImageTag{
-						ImageName: "a",
-						Tag:       "0.9",
+						Name: "a",
+						Tag:  "0.9",
 					},
 					Digest:      "sha256:000",
 					DstRegistry: destRC,
 					DstImageTag: reg.ImageTag{
-						ImageName: "a",
-						Tag:       "0.9",
+						Name: "a",
+						Tag:  "0.9",
 					},
 				}: nil,
 				{
 					SrcRegistry: srcRC,
 					SrcImageTag: reg.ImageTag{
-						ImageName: "b",
-						Tag:       "0.9",
+						Name: "b",
+						Tag:  "0.9",
 					},
 					Digest:      "sha256:111",
 					DstRegistry: destRC,
 					DstImageTag: reg.ImageTag{
-						ImageName: "b",
-						Tag:       "0.9",
+						Name: "b",
+						Tag:  "0.9",
 					},
 				}: nil,
 			},
@@ -1787,27 +1788,27 @@ func TestCheckOverlappingEdges(t *testing.T) {
 				{
 					SrcRegistry: srcRC,
 					SrcImageTag: reg.ImageTag{
-						ImageName: "a",
-						Tag:       "0.9",
+						Name: "a",
+						Tag:  "0.9",
 					},
 					Digest:      "sha256:000",
 					DstRegistry: destRC,
 					DstImageTag: reg.ImageTag{
-						ImageName: "a",
-						Tag:       "0.9",
+						Name: "a",
+						Tag:  "0.9",
 					},
 				}: nil,
 				{
 					SrcRegistry: srcRC,
 					SrcImageTag: reg.ImageTag{
-						ImageName: "b",
-						Tag:       "0.9",
+						Name: "b",
+						Tag:  "0.9",
 					},
 					Digest:      "sha256:111",
 					DstRegistry: destRC,
 					DstImageTag: reg.ImageTag{
-						ImageName: "b",
-						Tag:       "0.9",
+						Name: "b",
+						Tag:  "0.9",
 					},
 				}: nil,
 			},
@@ -1819,27 +1820,27 @@ func TestCheckOverlappingEdges(t *testing.T) {
 				{
 					SrcRegistry: srcRC,
 					SrcImageTag: reg.ImageTag{
-						ImageName: "a",
-						Tag:       "0.9",
+						Name: "a",
+						Tag:  "0.9",
 					},
 					Digest:      "sha256:000",
 					DstRegistry: destRC,
 					DstImageTag: reg.ImageTag{
-						ImageName: "a",
-						Tag:       "0.9",
+						Name: "a",
+						Tag:  "0.9",
 					},
 				}: nil,
 				{
 					SrcRegistry: srcRC,
 					SrcImageTag: reg.ImageTag{
-						ImageName: "b",
-						Tag:       "0.9",
+						Name: "b",
+						Tag:  "0.9",
 					},
 					Digest:      "sha256:111",
 					DstRegistry: destRC,
 					DstImageTag: reg.ImageTag{
-						ImageName: "a",
-						Tag:       "0.9",
+						Name: "a",
+						Tag:  "0.9",
 					},
 				}: nil,
 			},
@@ -1852,27 +1853,27 @@ func TestCheckOverlappingEdges(t *testing.T) {
 				{
 					SrcRegistry: srcRC,
 					SrcImageTag: reg.ImageTag{
-						ImageName: "a",
-						Tag:       "0.9",
+						Name: "a",
+						Tag:  "0.9",
 					},
 					Digest:      "sha256:000",
 					DstRegistry: destRC,
 					DstImageTag: reg.ImageTag{
-						ImageName: "a",
-						Tag:       "",
+						Name: "a",
+						Tag:  "",
 					},
 				}: nil,
 				{
 					SrcRegistry: srcRC,
 					SrcImageTag: reg.ImageTag{
-						ImageName: "b",
-						Tag:       "0.9",
+						Name: "b",
+						Tag:  "0.9",
 					},
 					Digest:      "sha256:111",
 					DstRegistry: destRC,
 					DstImageTag: reg.ImageTag{
-						ImageName: "a",
-						Tag:       "",
+						Name: "a",
+						Tag:  "",
 					},
 				}: nil,
 			},
@@ -1880,27 +1881,27 @@ func TestCheckOverlappingEdges(t *testing.T) {
 				{
 					SrcRegistry: srcRC,
 					SrcImageTag: reg.ImageTag{
-						ImageName: "a",
-						Tag:       "0.9",
+						Name: "a",
+						Tag:  "0.9",
 					},
 					Digest:      "sha256:000",
 					DstRegistry: destRC,
 					DstImageTag: reg.ImageTag{
-						ImageName: "a",
-						Tag:       "",
+						Name: "a",
+						Tag:  "",
 					},
 				}: nil,
 				{
 					SrcRegistry: srcRC,
 					SrcImageTag: reg.ImageTag{
-						ImageName: "b",
-						Tag:       "0.9",
+						Name: "b",
+						Tag:  "0.9",
 					},
 					Digest:      "sha256:111",
 					DstRegistry: destRC,
 					DstImageTag: reg.ImageTag{
-						ImageName: "a",
-						Tag:       "",
+						Name: "a",
+						Tag:  "",
 					},
 				}: nil,
 			},
@@ -1977,9 +1978,9 @@ func TestPromotion(t *testing.T) {
 	//
 	// We could make it even more "powerful" by storing a histogram instead of a
 	// set. Then we can check that all requests were generated exactly 1 time.
-	srcRegName := reg.RegistryName("gcr.io/foo")
-	destRegName := reg.RegistryName("gcr.io/bar")
-	destRegName2 := reg.RegistryName("gcr.io/cat")
+	srcRegName := image.Registry("gcr.io/foo")
+	destRegName := image.Registry("gcr.io/bar")
+	destRegName2 := image.Registry("gcr.io/cat")
 	destRC := reg.RegistryContext{
 		Name:           destRegName,
 		ServiceAccount: "robot",
@@ -1997,7 +1998,7 @@ func TestPromotion(t *testing.T) {
 
 	registriesRebase := []reg.RegistryContext{
 		{
-			Name:           reg.RegistryName("us.gcr.io/dog/some/subdir/path/foo"),
+			Name:           image.Registry("us.gcr.io/dog/some/subdir/path/foo"),
 			ServiceAccount: "robot",
 		},
 		srcRC,
@@ -2007,7 +2008,7 @@ func TestPromotion(t *testing.T) {
 		name                  string
 		inputM                reg.Manifest
 		inputSc               reg.SyncContext
-		badReads              []reg.RegistryName
+		badReads              []image.Registry
 		expectedReqs          reg.CapturedRequests
 		expectedFilteredClean bool
 	}{
@@ -2026,7 +2027,7 @@ func TestPromotion(t *testing.T) {
 				Registries: registries,
 				Images: []reg.Image{
 					{
-						ImageName: "a",
+						Name: "a",
 						Dmap: reg.DigestTags{
 							"sha256:000": {"0.9"},
 						},
@@ -2066,13 +2067,13 @@ func TestPromotion(t *testing.T) {
 				Registries: registries,
 				Images: []reg.Image{
 					{
-						ImageName: "a",
+						Name: "a",
 						Dmap: reg.DigestTags{
 							"sha256:000": {"0.9"},
 						},
 					},
 					{
-						ImageName: "b",
+						Name: "b",
 						Dmap: reg.DigestTags{
 							"sha256:111": {"0.9"},
 						},
@@ -2091,9 +2092,9 @@ func TestPromotion(t *testing.T) {
 						},
 					},
 				},
-				InvIgnore: []reg.ImageName{},
+				InvIgnore: []image.Name{},
 			},
-			[]reg.RegistryName{"gcr.io/foo/a", "gcr.io/foo/b", "gcr.io/foo/c"},
+			[]image.Registry{"gcr.io/foo/a", "gcr.io/foo/b", "gcr.io/foo/c"},
 			reg.CapturedRequests{},
 			true,
 		},
@@ -2103,7 +2104,7 @@ func TestPromotion(t *testing.T) {
 				Registries: registries,
 				Images: []reg.Image{
 					{
-						ImageName: "a",
+						Name: "a",
 						Dmap: reg.DigestTags{
 							"sha256:000": {"0.9"},
 						},
@@ -2151,7 +2152,7 @@ func TestPromotion(t *testing.T) {
 				Registries: registries,
 				Images: []reg.Image{
 					{
-						ImageName: "a",
+						Name: "a",
 						Dmap: reg.DigestTags{
 							"sha256:000": {"0.9"},
 						},
@@ -2199,7 +2200,7 @@ func TestPromotion(t *testing.T) {
 				Registries: registries,
 				Images: []reg.Image{
 					{
-						ImageName: "a",
+						Name: "a",
 						Dmap: reg.DigestTags{
 							// sha256:bad is a bad image uploaded by a
 							// compromised account. "good" is a good tag that is
@@ -2244,7 +2245,7 @@ func TestPromotion(t *testing.T) {
 				Registries: registriesRebase,
 				Images: []reg.Image{
 					{
-						ImageName: "a",
+						Name: "a",
 						Dmap: reg.DigestTags{
 							"sha256:000": {"0.9"},
 						},
@@ -2287,7 +2288,7 @@ func TestPromotion(t *testing.T) {
 				Registries: registries,
 				Images: []reg.Image{
 					{
-						ImageName: "a",
+						Name: "a",
 						Dmap: reg.DigestTags{
 							"sha256:000": {},
 						},
@@ -2336,7 +2337,7 @@ func TestPromotion(t *testing.T) {
 				Registries: registries,
 				Images: []reg.Image{
 					{
-						ImageName: "a",
+						Name: "a",
 						Dmap: reg.DigestTags{
 							"sha256:000": {"0.9"},
 						},
@@ -2373,14 +2374,14 @@ func TestPromotion(t *testing.T) {
 				Registries: registries,
 				Images: []reg.Image{
 					{
-						ImageName: "a",
+						Name: "a",
 						Dmap: reg.DigestTags{
 							"sha256:000": {"missing-from-src"},
 							"sha256:333": {"0.8"},
 						},
 					},
 					{
-						ImageName: "b",
+						Name: "b",
 						Dmap: reg.DigestTags{
 							"sha256:bbb": {"also-missing"},
 						},
@@ -2415,7 +2416,7 @@ func TestPromotion(t *testing.T) {
 				Registries: registries,
 				Images: []reg.Image{
 					{
-						ImageName: "a",
+						Name: "a",
 						Dmap: reg.DigestTags{
 							"sha256:000": {"0.9", "1.0"},
 						},
@@ -2473,7 +2474,7 @@ func TestPromotion(t *testing.T) {
 				Registries: registries,
 				Images: []reg.Image{
 					{
-						ImageName: "a",
+						Name: "a",
 						Dmap: reg.DigestTags{
 							"sha256:000": {"0.9", "1.0"},
 						},
@@ -2525,12 +2526,12 @@ func TestPromotion(t *testing.T) {
 	processRequestFake := reg.MkRequestCapturer(&captured)
 
 	nopStream := func(
-		srcRegistry reg.RegistryName,
-		srcImageName reg.ImageName,
+		srcRegistry image.Registry,
+		srcImageName image.Name,
 		rc reg.RegistryContext,
-		destImageName reg.ImageName,
-		digest reg.Digest,
-		tag reg.Tag,
+		destImageName image.Name,
+		digest image.Digest,
+		tag image.Tag,
 		tp reg.TagOp,
 	) stream.Producer {
 		// We don't even need a stream producer, because we are not creating
@@ -2577,17 +2578,17 @@ func TestExecRequests(t *testing.T) {
 	sc := reg.SyncContext{}
 
 	destRC := reg.RegistryContext{
-		Name:           reg.RegistryName("gcr.io/bar"),
+		Name:           image.Registry("gcr.io/bar"),
 		ServiceAccount: "robot",
 	}
 
 	destRC2 := reg.RegistryContext{
-		Name:           reg.RegistryName("gcr.io/cat"),
+		Name:           image.Registry("gcr.io/cat"),
 		ServiceAccount: "robot",
 	}
 
 	srcRC := reg.RegistryContext{
-		Name:           reg.RegistryName("gcr.io/foo"),
+		Name:           image.Registry("gcr.io/foo"),
 		ServiceAccount: "robot",
 		Src:            true,
 	}
@@ -2595,12 +2596,12 @@ func TestExecRequests(t *testing.T) {
 	registries := []reg.RegistryContext{destRC, srcRC, destRC2}
 
 	nopStream := func(
-		srcRegistry reg.RegistryName,
-		srcImageName reg.ImageName,
+		srcRegistry image.Registry,
+		srcImageName image.Name,
 		rc reg.RegistryContext,
-		destImageName reg.ImageName,
-		digest reg.Digest,
-		tag reg.Tag,
+		destImageName image.Name,
+		digest image.Digest,
+		tag image.Tag,
 		tp reg.TagOp,
 	) stream.Producer {
 		return nil
@@ -2612,7 +2613,7 @@ func TestExecRequests(t *testing.T) {
 				Registries: registries,
 				Images: []reg.Image{
 					{
-						ImageName: "a",
+						Name: "a",
 						Dmap: reg.DigestTags{
 							"sha256:000": {"0.9"},
 						},
@@ -2685,8 +2686,8 @@ func TestExecRequests(t *testing.T) {
 }
 
 func TestValidateEdges(t *testing.T) {
-	srcRegName := reg.RegistryName("gcr.io/src")
-	dstRegName := reg.RegistryName("gcr.io/dst")
+	srcRegName := image.Registry("gcr.io/src")
+	dstRegName := image.Registry("gcr.io/dst")
 	srcRegistry := reg.RegistryContext{
 		Name:           srcRegName,
 		ServiceAccount: "robot",
@@ -2715,7 +2716,7 @@ func TestValidateEdges(t *testing.T) {
 				Registries:  registries,
 				Images: []reg.Image{
 					{
-						ImageName: "a",
+						Name: "a",
 						Dmap: reg.DigestTags{
 							"sha256:000": {"0.0"},
 						},
@@ -2745,7 +2746,7 @@ func TestValidateEdges(t *testing.T) {
 				Registries:  registries,
 				Images: []reg.Image{
 					{
-						ImageName: "a",
+						Name: "a",
 						Dmap: reg.DigestTags{
 							"sha256:000": {"0.0"},
 							// This is an image we want to promote. There are no
@@ -2779,7 +2780,7 @@ func TestValidateEdges(t *testing.T) {
 				Registries:  registries,
 				Images: []reg.Image{
 					{
-						ImageName: "a",
+						Name: "a",
 						Dmap: reg.DigestTags{
 							// The idea here is that we've already promoted
 							// sha256:111 as tag 1.0, but we want to try to
@@ -2819,9 +2820,9 @@ func TestValidateEdges(t *testing.T) {
 }
 
 func TestGarbageCollection(t *testing.T) {
-	srcRegName := reg.RegistryName("gcr.io/foo")
-	destRegName := reg.RegistryName("gcr.io/bar")
-	destRegName2 := reg.RegistryName("gcr.io/cat")
+	srcRegName := image.Registry("gcr.io/foo")
+	destRegName := image.Registry("gcr.io/bar")
+	destRegName2 := image.Registry("gcr.io/cat")
 	registries := []reg.RegistryContext{
 		{
 			Name:           srcRegName,
@@ -2850,14 +2851,14 @@ func TestGarbageCollection(t *testing.T) {
 				Registries: registries,
 				Images: []reg.Image{
 					{
-						ImageName: "a",
+						Name: "a",
 						Dmap: reg.DigestTags{
 							"sha256:000": {"missing-from-src"},
 							"sha256:333": {"0.8"},
 						},
 					},
 					{
-						ImageName: "b",
+						Name: "b",
 						Dmap: reg.DigestTags{
 							"sha256:bbb": {"also-missing"},
 						},
@@ -2889,14 +2890,14 @@ func TestGarbageCollection(t *testing.T) {
 				Registries: registries,
 				Images: []reg.Image{
 					{
-						ImageName: "a",
+						Name: "a",
 						Dmap: reg.DigestTags{
 							"sha256:000": {"missing-from-src"},
 							"sha256:333": {"0.8"},
 						},
 					},
 					{
-						ImageName: "b",
+						Name: "b",
 						Dmap: reg.DigestTags{
 							"sha256:bbb": {"also-missing"},
 						},
@@ -2974,8 +2975,8 @@ func TestGarbageCollection(t *testing.T) {
 		captured = make(reg.CapturedRequests)
 		nopStream := func(
 			destRC reg.RegistryContext,
-			imageName reg.ImageName,
-			digest reg.Digest) stream.Producer {
+			imageName image.Name,
+			digest image.Digest) stream.Producer {
 			return nil
 		}
 		srcReg, err := reg.GetSrcRegistry(registries)
@@ -2989,9 +2990,9 @@ func TestGarbageCollection(t *testing.T) {
 }
 
 func TestGarbageCollectionMulti(t *testing.T) {
-	srcRegName := reg.RegistryName("gcr.io/src")
-	destRegName1 := reg.RegistryName("gcr.io/dest1")
-	destRegName2 := reg.RegistryName("gcr.io/dest2")
+	srcRegName := image.Registry("gcr.io/src")
+	destRegName1 := image.Registry("gcr.io/dest1")
+	destRegName2 := image.Registry("gcr.io/dest2")
 
 	destRC := reg.RegistryContext{
 		Name:           destRegName1,
@@ -3022,14 +3023,14 @@ func TestGarbageCollectionMulti(t *testing.T) {
 				Registries: registries,
 				Images: []reg.Image{
 					{
-						ImageName: "a",
+						Name: "a",
 						Dmap: reg.DigestTags{
 							"sha256:000": {"missing-from-src"},
 							"sha256:333": {"0.8"},
 						},
 					},
 					{
-						ImageName: "b",
+						Name: "b",
 						Dmap: reg.DigestTags{
 							"sha256:bbb": {"also-missing"},
 						},
@@ -3133,8 +3134,8 @@ func TestGarbageCollectionMulti(t *testing.T) {
 		captured = make(reg.CapturedRequests)
 		nopStream := func(
 			destRC reg.RegistryContext,
-			imageName reg.ImageName,
-			digest reg.Digest,
+			imageName image.Name,
+			digest image.Digest,
 		) stream.Producer {
 			return nil
 		}
@@ -3336,7 +3337,7 @@ func TestMatch(t *testing.T) {
 		},
 		Images: []reg.Image{
 			{
-				ImageName: "foo-controller",
+				Name: "foo-controller",
 				Dmap: reg.DigestTags{
 					"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": {"1.0"},
 				},

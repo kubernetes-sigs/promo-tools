@@ -26,7 +26,8 @@ import (
 	"golang.org/x/xerrors"
 
 	"sigs.k8s.io/promo-tools/v3/image/manifest"
-	reg "sigs.k8s.io/promo-tools/v3/legacy/dockerregistry"
+	reg "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
+	"sigs.k8s.io/promo-tools/v3/types/image"
 )
 
 // TODO: Consider merging this with bazelTestPath() from inventory
@@ -91,7 +92,7 @@ func TestFind(t *testing.T) {
 				},
 				Images: []reg.Image{
 					{
-						ImageName: "foo-controller",
+						Name: "foo-controller",
 						Dmap: reg.DigestTags{
 							"sha256:c3d310f4741b3642497da8826e0986db5e02afc9777a2b8e668c8e41034128c1": {"1.0"},
 						},
@@ -184,7 +185,7 @@ func TestApplyFilters(t *testing.T) {
 		{
 			"filter on image name only",
 			manifest.GrowOptions{
-				FilterImages: []reg.ImageName{"bar"},
+				FilterImages: []image.Name{"bar"},
 			},
 			reg.RegInvImage{
 				"foo": {
@@ -204,7 +205,7 @@ func TestApplyFilters(t *testing.T) {
 		{
 			"filter on tag only",
 			manifest.GrowOptions{
-				FilterTags: []reg.Tag{"1.0"},
+				FilterTags: []image.Tag{"1.0"},
 			},
 			reg.RegInvImage{
 				"foo": {
@@ -224,7 +225,7 @@ func TestApplyFilters(t *testing.T) {
 		{
 			"filter on 'latest' tag",
 			manifest.GrowOptions{
-				FilterTags: []reg.Tag{"latest"},
+				FilterTags: []image.Tag{"latest"},
 			},
 			reg.RegInvImage{
 				"foo": {
@@ -240,7 +241,7 @@ func TestApplyFilters(t *testing.T) {
 		{
 			"filter on digest",
 			manifest.GrowOptions{
-				FilterDigests: []reg.Digest{"sha256:222"},
+				FilterDigests: []image.Digest{"sha256:222"},
 			},
 			reg.RegInvImage{
 				"foo": {
@@ -261,7 +262,7 @@ func TestApplyFilters(t *testing.T) {
 		{
 			"filter on shared tag (multiple images share same tag)",
 			manifest.GrowOptions{
-				FilterTags: []reg.Tag{"1.2.3"},
+				FilterTags: []image.Tag{"1.2.3"},
 			},
 			reg.RegInvImage{
 				"foo": {
@@ -285,8 +286,8 @@ func TestApplyFilters(t *testing.T) {
 		{
 			"filter on shared tag and image name (multiple images share same tag)",
 			manifest.GrowOptions{
-				FilterImages: []reg.ImageName{"foo"},
-				FilterTags:   []reg.Tag{"1.2.3"},
+				FilterImages: []image.Name{"foo"},
+				FilterTags:   []image.Tag{"1.2.3"},
 			},
 			reg.RegInvImage{
 				"foo": {

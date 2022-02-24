@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	tw "sigs.k8s.io/promo-tools/v3/legacy/timewrapper"
+	tw "sigs.k8s.io/promo-tools/v3/internal/legacy/timewrapper"
 )
 
 // RequestCounter records the number of HTTP requests to GCR.

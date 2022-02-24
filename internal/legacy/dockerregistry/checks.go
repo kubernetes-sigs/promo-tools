@@ -31,7 +31,7 @@ import (
 	grafeaspb "google.golang.org/genproto/googleapis/grafeas/v1"
 	gogit "gopkg.in/src-d/go-git.v4"
 
-	"sigs.k8s.io/promo-tools/v3/legacy/stream"
+	"sigs.k8s.io/promo-tools/v3/internal/legacy/stream"
 )
 
 // MBToBytes converts a value from MiB to Bytes.
@@ -170,7 +170,7 @@ func (check *ImageRemovalCheck) Compare(
 		}]
 		if !found {
 			removedImages = append(removedImages,
-				string(edge.DstImageTag.ImageName))
+				string(edge.DstImageTag.Name))
 		}
 	}
 
@@ -240,7 +240,7 @@ func (check *ImageSizeCheck) Run() error {
 	invalidImages := make(map[string]int)
 	for edge := range check.PullEdges {
 		imageSize := check.DigestImageSize[edge.Digest]
-		imageName := string(edge.DstImageTag.ImageName)
+		imageName := string(edge.DstImageTag.Name)
 		if imageSize > maxImageSizeByte {
 			oversizedImages[imageName] = imageSize
 		}
@@ -349,7 +349,7 @@ func (check *ImageVulnCheck) Run() error {
 			for _, occ := range occurrences {
 				vuln := occ.GetVulnerability()
 				vulnErr := ImageVulnError{
-					edge.SrcImageTag.ImageName,
+					edge.SrcImageTag.Name,
 					edge.Digest,
 					occ.GetName(),
 					vuln,
@@ -372,7 +372,7 @@ func (check *ImageVulnCheck) Run() error {
 				vulnerableImages = append(vulnerableImages,
 					fmt.Sprintf("%v@%v [%v fixable severe vulnerabilities, "+
 						"%v total]",
-						edge.SrcImageTag.ImageName,
+						edge.SrcImageTag.Name,
 						edge.Digest,
 						fixableSevereOccurrences,
 						len(occurrences)))
@@ -434,7 +434,7 @@ func mkRealVulnProducer(client *containeranalysis.Client) ImageVulnProducer {
 	) ([]*grafeaspb.Occurrence, error) {
 		// resourceURL is of the form https://gcr.io/[projectID]/my-image
 		resourceURL := "https://" + path.Join(string(edge.SrcRegistry.Name),
-			string(edge.SrcImageTag.ImageName)) + "@" + string(edge.Digest)
+			string(edge.SrcImageTag.Name)) + "@" + string(edge.Digest)
 
 		projectID, err := parseImageProjectID(&edge)
 		if err != nil {

@@ -23,8 +23,9 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
-	reg "sigs.k8s.io/promo-tools/v3/legacy/dockerregistry"
+	reg "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
 	options "sigs.k8s.io/promo-tools/v3/promoter/image/options"
+	"sigs.k8s.io/promo-tools/v3/types/image"
 )
 
 // Run a snapshot
@@ -60,9 +61,9 @@ func (di *DefaultPromoterImplementation) GetSnapshotSourceRegistry(
 	// ManifestBasedSnapshotOf will be the Name property
 	// of the source registry
 	if opts.Snapshot != "" {
-		srcRegistry.Name = reg.RegistryName(opts.Snapshot)
+		srcRegistry.Name = image.Registry(opts.Snapshot)
 	} else if opts.ManifestBasedSnapshotOf == "" {
-		srcRegistry.Name = reg.RegistryName(opts.ManifestBasedSnapshotOf)
+		srcRegistry.Name = image.Registry(opts.ManifestBasedSnapshotOf)
 	} else {
 		return nil, errors.New(
 			"when snapshotting, Snapshot or ManifestBasedSnapshotOf have to be set",
