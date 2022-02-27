@@ -2561,9 +2561,10 @@ func TestPromotion(t *testing.T) {
 		edges, err := reg.ToPromotionEdges([]schema.Manifest{test.inputM})
 		require.Nil(t, err)
 
-		filteredEdges, gotClean := test.inputSc.FilterPromotionEdges(
+		filteredEdges, gotClean, err := test.inputSc.FilterPromotionEdges(
 			edges,
 			false)
+		require.NoError(t, err)
 		require.Equal(t, test.expectedFilteredClean, gotClean)
 
 		err = test.inputSc.Promote(

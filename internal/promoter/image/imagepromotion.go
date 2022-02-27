@@ -62,7 +62,7 @@ func (di DefaultPromoterImplementation) MakeSyncContext(
 	if err != nil {
 		return nil, errors.Wrap(err, "creating sync context")
 	}
-	return &sc, err
+	return sc, err
 }
 
 // GetPromotionEdges checks the manifests and determines from
@@ -80,7 +80,10 @@ func (di *DefaultPromoterImplementation) GetPromotionEdges(
 	}
 
 	// Run the promotion edge filtering
-	promotionEdges, ok := sc.FilterPromotionEdges(promotionEdges, true)
+	promotionEdges, ok, err := sc.FilterPromotionEdges(promotionEdges, true)
+	if err != nil {
+		return nil, errors.Wrap(err, "filtering promotion edges")
+	}
 	if !ok {
 		// If any funny business was detected during a comparison of the manifests
 		// with the state of the registries, then exit immediately.
