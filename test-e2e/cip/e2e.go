@@ -277,7 +277,7 @@ func (t *E2ETest) clearRepositories() error {
 	// Clear ALL registries in the test manifest. Blank slate!
 	for _, rc := range t.Registries {
 		fmt.Println("CLEARING REPO", rc.Name)
-		clearRepository(rc.Name, &sc)
+		clearRepository(rc.Name, sc)
 	}
 	return nil
 }
