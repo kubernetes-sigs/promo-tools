@@ -80,6 +80,10 @@ func (di *DefaultPromoterImplementation) ValidateStagingSignatures(
 func (di *DefaultPromoterImplementation) SignImages(
 	opts *options.Options, sc *reg.SyncContext, edges map[reg.PromotionEdge]interface{},
 ) error {
+	if len(edges) == 0 {
+		logrus.Info("No images were promoted. Nothing to sign.")
+		return nil
+	}
 	token, err := di.GetIdentityToken(opts, TestSigningAccount)
 	if err != nil {
 		return errors.Wrap(err, "generating identity token")
