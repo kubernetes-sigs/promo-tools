@@ -19,6 +19,7 @@ package imagepromoter
 import (
 	"context"
 	"fmt"
+	"os"
 
 	credentials "cloud.google.com/go/iam/credentials/apiv1"
 	"github.com/pkg/errors"
@@ -32,8 +33,10 @@ import (
 )
 
 const (
-	oidcTokenAudience  = "sigstore"
-	TestSigningAccount = "test-signer@ulabs-cloud-tests.iam.gserviceaccount.com"
+	oidcTokenAudience = "sigstore"
+
+	TestSigningAccount = "k8s-infra-promoter-test-signer@k8s-cip-test-prod.iam.gserviceaccount.com"
+	SigningAccount     = "test-signer@ulabs-cloud-tests.iam.gserviceaccount.com"
 )
 
 // ValidateStagingSignatures checks if edges (images) have a signature
@@ -122,6 +125,15 @@ func (di *DefaultPromoterImplementation) GetIdentityToken(
 	opts *options.Options, serviceAccount string,
 ) (tok string, err error) {
 	credOptions := []gopts.ClientOption{}
+	// If the test signer file is found switch to test credentials
+	if os.Getenv("CIP_E2E_KEY_FILE") != "" {
+		logrus.Infof("Test keyfile set using e2e test credentials")
+		serviceAccount = TestSigningAccount
+		credOptions = []gopts.ClientOption{
+			gopts.WithCredentialsFile(os.Getenv("CIP_E2E_KEY_FILE")),
+		}
+	}
+
 	// If SignerInitCredentials, initialize the iam client using
 	// the identityu in that file instead of Default Application Credentials
 	if opts.SignerInitCredentials != "" {
