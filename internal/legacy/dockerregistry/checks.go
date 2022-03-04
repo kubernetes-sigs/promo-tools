@@ -270,7 +270,7 @@ func MKImageVulnCheck(
 	fakeVulnProducer ImageVulnProducer,
 ) *ImageVulnCheck {
 	return &ImageVulnCheck{
-		*syncContext,
+		syncContext,
 		newPullEdges,
 		severityThreshold,
 		fakeVulnProducer,

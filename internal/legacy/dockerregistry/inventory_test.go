@@ -2542,37 +2542,38 @@ func TestPromotion(t *testing.T) {
 		return nil
 	}
 
-	for _, test := range tests {
+	for i := range tests {
 		// Reset captured for each test.
 		captured = make(reg.CapturedRequests)
 		srcReg, err := registry.GetSrcRegistry(registries)
 
 		require.Nil(t, err)
 
-		test.inputSc.SrcRegistry = srcReg
+		tests[i].inputSc.SrcRegistry = srcReg
 
 		// Simulate bad network conditions.
-		if test.badReads != nil {
-			for _, badRead := range test.badReads {
-				test.inputSc.IgnoreFromPromotion(badRead)
+		if tests[i].badReads != nil {
+			for _, badRead := range tests[i].badReads {
+				tests[i].inputSc.IgnoreFromPromotion(badRead)
 			}
 		}
 
-		edges, err := reg.ToPromotionEdges([]schema.Manifest{test.inputM})
+		edges, err := reg.ToPromotionEdges([]schema.Manifest{tests[i].inputM})
 		require.Nil(t, err)
 
-		filteredEdges, gotClean := test.inputSc.FilterPromotionEdges(
-			edges,
-			false)
-		require.Equal(t, test.expectedFilteredClean, gotClean)
+		filteredEdges, gotClean, err := tests[i].inputSc.FilterPromotionEdges(
+			edges, false,
+		)
+		require.NoError(t, err)
+		require.Equal(t, tests[i].expectedFilteredClean, gotClean)
 
-		err = test.inputSc.Promote(
+		err = tests[i].inputSc.Promote(
 			filteredEdges,
 			nopStream,
 			&processRequestFake,
 		)
 		require.Nil(t, err)
-		require.Equal(t, test.expectedReqs, captured)
+		require.Equal(t, tests[i].expectedReqs, captured)
 	}
 }
 
@@ -2813,11 +2814,11 @@ func TestValidateEdges(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
-		edges, err := reg.ToPromotionEdges([]schema.Manifest{test.inputM})
+	for i := range tests {
+		edges, err := reg.ToPromotionEdges([]schema.Manifest{tests[i].inputM})
 		require.Nil(t, err)
-		got := test.inputSc.ValidateEdges(edges)
-		require.Equal(t, test.expected, got)
+		got := tests[i].inputSc.ValidateEdges(edges)
+		require.Equal(t, tests[i].expected, got)
 	}
 }
 
@@ -2972,7 +2973,7 @@ func TestGarbageCollection(t *testing.T) {
 		}
 	}
 
-	for _, test := range tests {
+	for i := range tests {
 		// Reset captured for each test.
 		captured = make(reg.CapturedRequests)
 		nopStream := func(
@@ -2984,10 +2985,10 @@ func TestGarbageCollection(t *testing.T) {
 		srcReg, err := registry.GetSrcRegistry(registries)
 		require.Nil(t, err)
 
-		test.inputSc.SrcRegistry = srcReg
-		test.inputSc.GarbageCollect(test.inputM, nopStream, &processRequestFake)
+		tests[i].inputSc.SrcRegistry = srcReg
+		tests[i].inputSc.GarbageCollect(tests[i].inputM, nopStream, &processRequestFake)
 
-		require.Equal(t, test.expectedReqs, captured)
+		require.Equal(t, tests[i].expectedReqs, captured)
 	}
 }
 
@@ -3131,7 +3132,7 @@ func TestGarbageCollectionMulti(t *testing.T) {
 		}
 	}
 
-	for _, test := range tests {
+	for i := range tests {
 		// Reset captured for each test.
 		captured = make(reg.CapturedRequests)
 		nopStream := func(
@@ -3145,10 +3146,10 @@ func TestGarbageCollectionMulti(t *testing.T) {
 		srcReg, err := registry.GetSrcRegistry(registries)
 		require.Nil(t, err)
 
-		test.inputSc.SrcRegistry = srcReg
-		test.inputSc.GarbageCollect(test.inputM, nopStream, &processRequestFake)
+		tests[i].inputSc.SrcRegistry = srcReg
+		tests[i].inputSc.GarbageCollect(tests[i].inputM, nopStream, &processRequestFake)
 
-		require.Equal(t, test.expectedReqs, captured)
+		require.Equal(t, tests[i].expectedReqs, captured)
 	}
 }
 

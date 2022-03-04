@@ -79,6 +79,7 @@ type CollectedLogs struct {
 
 // SyncContext is the main data structure for performing the promotion.
 type SyncContext struct {
+	sync.Mutex
 	Threads           int
 	Confirm           bool
 	UseServiceAccount bool
@@ -105,7 +106,7 @@ type PreCheck interface {
 // ImageVulnCheck implements the PreCheck interface and checks against
 // images that have known vulnerabilities.
 type ImageVulnCheck struct {
-	SyncContext       SyncContext
+	SyncContext       *SyncContext
 	PullEdges         map[PromotionEdge]interface{}
 	SeverityThreshold int
 	FakeVulnProducer  ImageVulnProducer

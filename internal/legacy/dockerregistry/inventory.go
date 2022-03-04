@@ -54,7 +54,7 @@ func MakeSyncContext(
 	mfests []schema.Manifest,
 	threads int,
 	confirm, useSvcAcc bool,
-) (SyncContext, error) {
+) (*SyncContext, error) {
 	sc := SyncContext{
 		Threads:           threads,
 		Confirm:           confirm,
@@ -103,11 +103,11 @@ func MakeSyncContext(
 	if useSvcAcc {
 		err := sc.PopulateTokens()
 		if err != nil {
-			return SyncContext{}, err
+			return &SyncContext{}, err
 		}
 	}
 
-	return sc, nil
+	return &sc, nil
 }
 
 // LogJSONSummary logs the SyncContext's Logs as a prettified JSON.
@@ -718,72 +718,86 @@ func GetTokenKeyDomainRepoPath(registryName image.Registry) (key, domain, repoPa
 func (sc *SyncContext) ReadRegistriesGGCR(
 	toRead []registry.Context, recurse bool,
 ) error {
-	logrus.Infof("Reading %d registries:", len(sc.RegistryContexts))
+	logrus.Infof(
+		"Reading %d registries (recursive: %v)",
+		len(sc.RegistryContexts), recurse,
+	)
 
-	if !recurse {
-		return errors.New("Not iplemented")
+	opts := []ggcrV1Google.Option{
+		ggcrV1Google.WithAuthFromKeychain(gcrane.Keychain),
 	}
-
-	mutex := sync.Mutex{}
-
-	// TODO(puerco): Paralelize this
-	for _, r := range sc.RegistryContexts {
-		logrus.Debugf(" > %s", r.Name)
-		opts := []ggcrV1Google.Option{
-			ggcrV1Google.WithAuthFromKeychain(gcrane.Keychain),
-		}
+	for _, r := range toRead {
 		repo, err := name.NewRepository(string(r.Name))
 		if err != nil {
 			return errors.Wrap(err, "parsing repo name")
 		}
-		if err := ggcrV1Google.Walk(repo,
-			func(repo name.Repository, tags *ggcrV1Google.Tags, err error) error {
-				if err != nil {
-					return errors.Wrap(err, "before attempting to walk the registry")
-				}
-				regName, imageName, err := SplitByKnownRegistries(
-					image.Registry(repo.Name()), sc.RegistryContexts,
-				)
-				if err != nil {
-					return errors.Wrap(err, "splitting repo and image name")
-				}
-				logrus.Infof("Registry: %s Image: %s Got: %s", regName, imageName, repo.Name())
-				digestTags := make(registry.DigestTags)
-				if tags != nil && tags.Manifests != nil {
-					for digest, manifest := range tags.Manifests {
-						tagSlice := registry.TagSlice{}
-						for _, tag := range manifest.Tags {
-							tagSlice = append(tagSlice, image.Tag(tag))
-						}
-						digestTags[image.Digest(digest)] = tagSlice
 
-						mediaType, err := supportedMediaType(manifest.MediaType)
-						if err != nil {
-							logrus.Error(errors.Wrapf(err, "processing digest %s", digest))
-						}
+		if recurse {
+			if err := ggcrV1Google.Walk(
+				repo, sc.recordFoundTags, opts...,
+			); err != nil {
+				return errors.Wrap(err, "walking repo")
+			}
+		} else {
+			tags, err := ggcrV1Google.List(repo, opts...)
+			if err != nil {
+				return errors.Wrap(err, "getting tag list")
+			}
 
-						sc.DigestMediaType[image.Digest(digest)] = mediaType
-						sc.DigestImageSize[image.Digest(digest)] = int(manifest.Size)
-					}
-				}
-
-				logrus.Debugf("%d tags found", len(digestTags))
-
-				mutex.Lock()
-				if _, ok := sc.Inv[regName]; !ok {
-					sc.Inv[regName] = make(registry.RegInvImage)
-				}
-
-				if len(digestTags) > 0 {
-					sc.Inv[regName][imageName] = digestTags
-				}
-				mutex.Unlock()
-
-				return nil
-			}, opts...); err != nil {
-			return errors.Wrap(err, "walking repo")
+			if err := sc.recordFoundTags(repo, tags, nil); err != nil {
+				return errors.Wrap(err, "registering tags")
+			}
 		}
 	}
+	return nil
+}
+
+// recordFoundTags registers a list of tags read from a registry
+// into the sync context
+func (sc *SyncContext) recordFoundTags(
+	repo name.Repository, tags *ggcrV1Google.Tags, err error,
+) error {
+	if err != nil {
+		return errors.Wrap(err, "before attempting to walk the registry")
+	}
+	regName, imageName, err := SplitByKnownRegistries(
+		image.Registry(repo.Name()), sc.RegistryContexts,
+	)
+	if err != nil {
+		return errors.Wrap(err, "splitting repo and image name")
+	}
+	logrus.Infof("Registry: %s Image: %s Got: %s", regName, imageName, repo.Name())
+	digestTags := make(registry.DigestTags)
+	if tags != nil && tags.Manifests != nil {
+		for digest, manifest := range tags.Manifests {
+			tagSlice := registry.TagSlice{}
+			for _, tag := range manifest.Tags {
+				tagSlice = append(tagSlice, image.Tag(tag))
+			}
+			digestTags[image.Digest(digest)] = tagSlice
+
+			mediaType, err := supportedMediaType(manifest.MediaType)
+			if err != nil {
+				logrus.Error(errors.Wrapf(err, "processing digest %s", digest))
+			}
+
+			sc.DigestMediaType[image.Digest(digest)] = mediaType
+			sc.DigestImageSize[image.Digest(digest)] = int(manifest.Size)
+		}
+	}
+
+	logrus.Debugf("%d tags found", len(digestTags))
+
+	sc.Lock()
+	if _, ok := sc.Inv[regName]; !ok {
+		sc.Inv[regName] = make(registry.RegInvImage)
+	}
+
+	if len(digestTags) > 0 {
+		sc.Inv[regName][imageName] = digestTags
+	}
+	sc.Unlock()
+
 	return nil
 }
 
@@ -1521,24 +1535,23 @@ func (sc *SyncContext) RunChecks(preChecks []PreCheck) error {
 
 // FilterPromotionEdges generates all "edges" that we want to promote.
 func (sc *SyncContext) FilterPromotionEdges(
-	edges map[PromotionEdge]interface{},
-	readRepos bool,
-) (map[PromotionEdge]interface{}, bool) {
+	edges map[PromotionEdge]interface{}, readRepos bool,
+) (nedges map[PromotionEdge]interface{}, gotClean bool, err error) {
 	if readRepos {
 		regs := getRegistriesToRead(edges)
 		for _, reg := range regs {
 			logrus.Infof("reading registry %s (src=%v)", reg.Name, reg.Src)
 		}
 
-		sc.ReadRegistries(
-			regs,
-			// Do not read these registries recursively, because we already know
-			// exactly which repositories to read (getRegistriesToRead()).
-			false,
-			MkReadRepositoryCmdReal)
+		// Do not read these registries recursively, because we already know
+		// exactly which repositories to read (getRegistriesToRead()).
+		if err := sc.ReadRegistriesGGCR(regs, false); err != nil {
+			return nil, false, errors.Wrap(err, "reading registries")
+		}
 	}
 
-	return sc.GetPromotionCandidates(edges)
+	nedges, gotClean = sc.GetPromotionCandidates(edges)
+	return nedges, gotClean, nil
 }
 
 // EdgesToRegInvImage takes the destination endpoints of all edges and converts
