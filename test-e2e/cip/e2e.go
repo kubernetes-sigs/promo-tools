@@ -102,20 +102,38 @@ func main() {
 			}
 		}
 
-		err = runPromotion(*repoRootPtr, &t)
-		if err != nil {
+		if err = runPromotion(*repoRootPtr, &t); err != nil {
 			logrus.Fatalf("error with promotion: %q", err)
 		}
 
 		fmt.Println("checking snapshots AFTER promotion:")
 		for _, snapshot := range t.Snapshots {
-			err := checkSnapshot(snapshot.Name, snapshot.After, *repoRootPtr, t.Registries)
-			if err != nil {
+			if err := checkSnapshot(snapshot.Name, snapshot.After, *repoRootPtr, t.Registries); err != nil {
 				logrus.Fatalf("error checking snapshot for %s: %q", snapshot.Name, err)
 			}
 		}
 
 		fmt.Printf("\n===> e2e test '%s': OK\n", t.Name)
+	}
+}
+
+// removeSignatureLayers removes the signature layers from a snapshot
+func removeSignatureLayers(snapshot *[]registry.Image) {
+	var remove []image.Digest
+	for i := range *snapshot {
+		remove = []image.Digest{}
+		for dgst := range (*snapshot)[i].Dmap {
+			// Signature layers only have one tag
+			if len((*snapshot)[i].Dmap[dgst]) != 1 || !strings.HasSuffix(
+				string((*snapshot)[i].Dmap[dgst][0]), ".sig",
+			) {
+				continue
+			}
+			remove = append(remove, dgst)
+		}
+		for _, dgst := range remove {
+			delete((*snapshot)[i].Dmap, dgst)
+		}
 	}
 }
 
@@ -125,14 +143,16 @@ func checkSnapshot(
 	repoRoot string,
 	rcs []registry.Context,
 ) error {
-	got, err := getSnapshot(
-		repoRoot,
-		repo,
-		rcs,
-	)
+	// Get the snapshot of the repo
+	got, err := getSnapshot(repoRoot, repo, rcs)
 	if err != nil {
 		return errors.Wrapf(err, "getting snapshot of %s", repo)
 	}
+
+	// After signing images, the repo snapshots will never match. In order
+	// to compare them, we remove the signature layers from the current
+	// snapshot to ensure the original images were promoted.
+	removeSignatureLayers(&got)
 
 	diff := cmp.Diff(got, expected)
 	if diff != "" {
