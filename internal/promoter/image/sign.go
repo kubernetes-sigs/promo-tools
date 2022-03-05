@@ -20,8 +20,12 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	credentials "cloud.google.com/go/iam/credentials/apiv1"
+	"github.com/google/go-containerregistry/pkg/authn"
+	"github.com/google/go-containerregistry/pkg/name"
+	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	gopts "google.golang.org/api/option"
@@ -29,11 +33,13 @@ import (
 
 	reg "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
 	options "sigs.k8s.io/promo-tools/v3/promoter/image/options"
+	"sigs.k8s.io/promo-tools/v3/types/image"
 	"sigs.k8s.io/release-sdk/sign"
 )
 
 const (
-	oidcTokenAudience = "sigstore"
+	oidcTokenAudience  = "sigstore"
+	signatureTagSuffix = ".sig"
 
 	TestSigningAccount = "k8s-infra-promoter-test-signer@k8s-cip-test-prod.iam.gserviceaccount.com"
 	SigningAccount     = "test-signer@ulabs-cloud-tests.iam.gserviceaccount.com"
@@ -95,7 +101,26 @@ func (di *DefaultPromoterImplementation) SignImages(
 	signOpts.IdentityToken = token
 	signer := sign.New(signOpts)
 
-	for edge := range edges {
+	// We only sign the first image of each edge. If there are more
+	// than one destination registries for an image, we copy the
+	// signature to avoid varying valid signatures in each registry.
+	logrus.Infof("+%v", edges)
+	edgesToSign := map[reg.PromotionEdge]interface{}{}
+	edgesToCopy := map[reg.PromotionEdge][]reg.PromotionEdge{}
+	seen := map[image.Digest]reg.PromotionEdge{}
+	for edge, iface := range edges {
+		if _, ok := seen[edge.Digest]; !ok {
+			seen[edge.Digest] = edge
+			edgesToSign[edge] = iface
+			continue
+		}
+		if _, ok := edgesToCopy[seen[edge.Digest]]; !ok {
+			edgesToCopy[seen[edge.Digest]] = []reg.PromotionEdge{}
+		}
+		edgesToCopy[seen[edge.Digest]] = append(edgesToCopy[seen[edge.Digest]], edge)
+	}
+	// Sign the required edges
+	for edge := range edgesToSign {
 		imageRef := fmt.Sprintf(
 			"%s/%s@%s",
 			edge.DstRegistry.Name,
@@ -107,6 +132,73 @@ func (di *DefaultPromoterImplementation) SignImages(
 		}
 		logrus.Infof("Signing image %s", imageRef)
 	}
+
+	// Now copy any mirrored signatures
+	for source, destinations := range edgesToCopy {
+		logrus.Infof("Copying signature from %s/%s to %d registries",
+			source.DstRegistry.Name, source.DstImageTag.Name, len(destinations),
+		)
+		if err := di.copySignatures(&source, destinations); err != nil {
+			return errors.Wrap(err, "copying signatures")
+		}
+	}
+
+	return nil
+}
+
+// digestToSignatureTag takes a digest and infers the tag name where
+// its signature can be found
+func digestToSignatureTag(dg image.Digest) string {
+	return strings.ReplaceAll(string(dg), "sha256:", "sha256-") + signatureTagSuffix
+}
+
+// copySignatures takes a source edge (an image) and a list of destinations
+// and copies the signature to all of them
+func (di *DefaultPromoterImplementation) copySignatures(
+	src *reg.PromotionEdge, dsts []reg.PromotionEdge,
+) error {
+	sigTag := digestToSignatureTag(src.Digest)
+	sourceRefStr := fmt.Sprintf(
+		"%s/%s:%s", src.DstRegistry.Name, src.DstImageTag.Name, sigTag,
+	)
+	srcRef, err := name.ParseReference(sourceRefStr)
+	if err != nil {
+		return fmt.Errorf("parsing reference %q: %w", sourceRefStr, err)
+	}
+
+	dstRefs := []name.Reference{}
+	for i := range dsts {
+		ref, err := name.ParseReference(fmt.Sprintf(
+			"%s/%s:%s", dsts[i].DstRegistry.Name, dsts[i].DstImageTag.Name, sigTag,
+		))
+		if err != nil {
+			return fmt.Errorf("parsing signature destination referece: %w", err)
+		}
+		dstRefs = append(dstRefs, ref)
+	}
+
+	// Get the remote descriptor for the source
+	desc, err := remote.Get(srcRef)
+	if err != nil {
+		return fmt.Errorf("fetching %q: %w", srcRef, err)
+	}
+
+	// Fetch the image from the descriptor
+	img, err := desc.Image()
+	if err != nil {
+		return fmt.Errorf("converting source descriptor into image: %w", err)
+	}
+
+	// Copy the signatures to the missing registries
+	for _, dstRef := range dstRefs {
+		logrus.Infof("Copying signature %s to %s", sigTag, dstRef.String())
+		if err := remote.Write(
+			dstRef, img, remote.WithAuthFromKeychain(authn.DefaultKeychain),
+		); err != nil {
+			return fmt.Errorf("copying signature to %q %w", dstRef, err)
+		}
+	}
+
 	return nil
 }
 
