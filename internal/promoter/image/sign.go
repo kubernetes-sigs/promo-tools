@@ -23,15 +23,15 @@ import (
 	"strings"
 
 	credentials "cloud.google.com/go/iam/credentials/apiv1"
-	"github.com/google/go-containerregistry/pkg/authn"
+	"github.com/google/go-containerregistry/pkg/crane"
 	"github.com/google/go-containerregistry/pkg/name"
-	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	gopts "google.golang.org/api/option"
 	credentialspb "google.golang.org/genproto/googleapis/iam/credentials/v1"
 
 	reg "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
+	"sigs.k8s.io/promo-tools/v3/internal/legacy/gcloud"
 	options "sigs.k8s.io/promo-tools/v3/promoter/image/options"
 	"sigs.k8s.io/promo-tools/v3/types/image"
 	"sigs.k8s.io/release-sdk/sign"
@@ -93,7 +93,7 @@ func (di *DefaultPromoterImplementation) SignImages(
 		logrus.Info("No images were promoted. Nothing to sign.")
 		return nil
 	}
-	token, err := di.GetIdentityToken(opts, TestSigningAccount)
+	token, err := di.GetIdentityToken(opts, SigningAccount)
 	if err != nil {
 		return errors.Wrap(err, "generating identity token")
 	}
@@ -104,45 +104,43 @@ func (di *DefaultPromoterImplementation) SignImages(
 	// We only sign the first image of each edge. If there are more
 	// than one destination registries for an image, we copy the
 	// signature to avoid varying valid signatures in each registry.
-	logrus.Infof("+%v", edges)
-	edgesToSign := map[reg.PromotionEdge]interface{}{}
-	edgesToCopy := map[reg.PromotionEdge][]reg.PromotionEdge{}
-	seen := map[image.Digest]reg.PromotionEdge{}
-	for edge, iface := range edges {
-		if _, ok := seen[edge.Digest]; !ok {
-			seen[edge.Digest] = edge
-			edgesToSign[edge] = iface
-			continue
+	sortedEdges := map[image.Digest][]reg.PromotionEdge{}
+	for edge := range edges {
+		if _, ok := sortedEdges[edge.Digest]; !ok {
+			sortedEdges[edge.Digest] = []reg.PromotionEdge{}
 		}
-		if _, ok := edgesToCopy[seen[edge.Digest]]; !ok {
-			edgesToCopy[seen[edge.Digest]] = []reg.PromotionEdge{}
-		}
-		edgesToCopy[seen[edge.Digest]] = append(edgesToCopy[seen[edge.Digest]], edge)
+		sortedEdges[edge.Digest] = append(sortedEdges[edge.Digest], edge)
 	}
+
 	// Sign the required edges
-	for edge := range edgesToSign {
+	for digest := range sortedEdges {
 		imageRef := fmt.Sprintf(
 			"%s/%s@%s",
-			edge.DstRegistry.Name,
-			edge.DstImageTag.Name,
-			edge.Digest,
+			sortedEdges[digest][0].DstRegistry.Name,
+			sortedEdges[digest][0].DstImageTag.Name,
+			sortedEdges[digest][0].Digest,
 		)
+
+		logrus.Infof("Signing image %s", imageRef)
+		// Sign the first promoted image in the esges list:
 		if _, err := signer.SignImage(imageRef); err != nil {
 			return errors.Wrapf(err, "signing image %s", imageRef)
 		}
-		logrus.Infof("Signing image %s", imageRef)
-	}
 
-	// Now copy any mirrored signatures
-	for source, destinations := range edgesToCopy {
-		logrus.Infof("Copying signature from %s/%s to %d registries",
-			source.DstRegistry.Name, source.DstImageTag.Name, len(destinations),
-		)
-		if err := di.copySignatures(&source, destinations); err != nil {
-			return errors.Wrap(err, "copying signatures")
+		// If the same digest was promoted to more than one
+		// registry, copy the signature from the first one
+		if len(sortedEdges[digest]) == 1 {
+			logrus.WithField("image", string(digest)).Debug(
+				"Not copying signatures, image promoted to single registry",
+			)
+			continue
+		}
+		if err := di.copySignatures(
+			&sortedEdges[digest][0], sortedEdges[digest][1:],
+		); err != nil {
+			return fmt.Errorf("copying signatures: %w", err)
 		}
 	}
-
 	return nil
 }
 
@@ -166,7 +164,11 @@ func (di *DefaultPromoterImplementation) copySignatures(
 		return fmt.Errorf("parsing reference %q: %w", sourceRefStr, err)
 	}
 
-	dstRefs := []name.Reference{}
+	dstRefs := []struct {
+		reference name.Reference
+		token     gcloud.Token
+	}{}
+
 	for i := range dsts {
 		ref, err := name.ParseReference(fmt.Sprintf(
 			"%s/%s:%s", dsts[i].DstRegistry.Name, dsts[i].DstImageTag.Name, sigTag,
@@ -174,28 +176,19 @@ func (di *DefaultPromoterImplementation) copySignatures(
 		if err != nil {
 			return fmt.Errorf("parsing signature destination referece: %w", err)
 		}
-		dstRefs = append(dstRefs, ref)
-	}
-
-	// Get the remote descriptor for the source
-	desc, err := remote.Get(srcRef)
-	if err != nil {
-		return fmt.Errorf("fetching %q: %w", srcRef, err)
-	}
-
-	// Fetch the image from the descriptor
-	img, err := desc.Image()
-	if err != nil {
-		return fmt.Errorf("converting source descriptor into image: %w", err)
+		dstRefs = append(dstRefs, struct {
+			reference name.Reference
+			token     gcloud.Token
+		}{ref, dsts[i].DstRegistry.Token})
 	}
 
 	// Copy the signatures to the missing registries
 	for _, dstRef := range dstRefs {
-		logrus.Infof("Copying signature %s to %s", sigTag, dstRef.String())
-		if err := remote.Write(
-			dstRef, img, remote.WithAuthFromKeychain(authn.DefaultKeychain),
-		); err != nil {
-			return fmt.Errorf("copying signature to %q %w", dstRef, err)
+		if err := crane.Copy(srcRef.String(), dstRef.reference.String()); err != nil {
+			return fmt.Errorf(
+				"copying signature %s to %s: %w",
+				srcRef.String(), dstRef.reference.String(), err,
+			)
 		}
 	}
 
@@ -219,7 +212,8 @@ func (di *DefaultPromoterImplementation) GetIdentityToken(
 	credOptions := []gopts.ClientOption{}
 	// If the test signer file is found switch to test credentials
 	if os.Getenv("CIP_E2E_KEY_FILE") != "" {
-		logrus.Infof("Test keyfile set using e2e test credentials")
+		logrus.Info("Test keyfile set using e2e test credentials")
+		// ... and also use the e2e signing identity
 		serviceAccount = TestSigningAccount
 		credOptions = []gopts.ClientOption{
 			gopts.WithCredentialsFile(os.Getenv("CIP_E2E_KEY_FILE")),
@@ -242,6 +236,7 @@ func (di *DefaultPromoterImplementation) GetIdentityToken(
 		return tok, errors.Wrap(err, "creating credentials token")
 	}
 	defer c.Close()
+	logrus.Infof("Signing identity for images will be %s", serviceAccount)
 	req := &credentialspb.GenerateIdTokenRequest{
 		Name:         fmt.Sprintf("projects/-/serviceAccounts/%s", serviceAccount),
 		Audience:     oidcTokenAudience, // Should be set to "sigstore"
