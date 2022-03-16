@@ -1956,6 +1956,8 @@ func supportedMediaType(v string) (ggcrV1Types.MediaType, error) {
 		return ggcrV1Types.DockerManifestSchema1Signed, nil
 	case ggcrV1Types.DockerManifestSchema2:
 		return ggcrV1Types.DockerManifestSchema2, nil
+	case ggcrV1Types.OCIManifestSchema1:
+		return ggcrV1Types.OCIManifestSchema1, nil
 	default:
 		return ggcrV1Types.MediaType(""),
 			fmt.Errorf("unsupported MediaType %s", v)
