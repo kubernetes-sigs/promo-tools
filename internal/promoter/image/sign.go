@@ -50,9 +50,9 @@ const (
 // returns an error if they are not valid.
 func (di *DefaultPromoterImplementation) ValidateStagingSignatures(
 	edges map[reg.PromotionEdge]interface{},
-) error {
+) (map[reg.PromotionEdge]interface{}, error) {
 	signer := sign.New(sign.Default())
-
+	signedEdges := map[reg.PromotionEdge]interface{}{}
 	for edge := range edges {
 		imageRef := fmt.Sprintf(
 			"%s/%s@%s",
@@ -65,7 +65,7 @@ func (di *DefaultPromoterImplementation) ValidateStagingSignatures(
 		// If image is not signed, skip
 		isSigned, err := signer.IsImageSigned(imageRef)
 		if err != nil {
-			return errors.Wrapf(err, "checking if %s is signed", imageRef)
+			return nil, errors.Wrapf(err, "checking if %s is signed", imageRef)
 		}
 
 		if !isSigned {
@@ -73,14 +73,25 @@ func (di *DefaultPromoterImplementation) ValidateStagingSignatures(
 			continue
 		}
 
+		signedEdges[edge] = edges[edge]
+
 		// Check the staged image signatures
 		if _, err := signer.VerifyImage(imageRef); err != nil {
-			return errors.Wrapf(
+			return nil, errors.Wrapf(
 				err, "verifying signatures of image %s", imageRef,
 			)
 		}
 		logrus.Infof("Signatures for ref %s verfified", imageRef)
 	}
+	return signedEdges, nil
+}
+
+// CopySignatures copies sboms and signatures from source images to
+// the newly promoted images before stamping them with the
+// Kubernetes org signature
+func (di *DefaultPromoterImplementation) CopySignatures(
+	opts *options.Options, sc *reg.SyncContext, signedEdges map[reg.PromotionEdge]interface{},
+) error {
 	return nil
 }
 
@@ -93,13 +104,16 @@ func (di *DefaultPromoterImplementation) SignImages(
 		logrus.Info("No images were promoted. Nothing to sign.")
 		return nil
 	}
+
+	// Options for the new signer
+	signOpts := sign.Default()
+
+	// Get the identity token we will use
 	token, err := di.GetIdentityToken(opts, SigningAccount)
 	if err != nil {
 		return errors.Wrap(err, "generating identity token")
 	}
-	signOpts := sign.Default()
 	signOpts.IdentityToken = token
-	signer := sign.New(signOpts)
 
 	// We only sign the first image of each edge. If there are more
 	// than one destination registries for an image, we copy the
@@ -114,12 +128,30 @@ func (di *DefaultPromoterImplementation) SignImages(
 
 	// Sign the required edges
 	for digest := range sortedEdges {
+		// Build the reference we will use
 		imageRef := fmt.Sprintf(
 			"%s/%s@%s",
 			sortedEdges[digest][0].DstRegistry.Name,
 			sortedEdges[digest][0].DstImageTag.Name,
 			sortedEdges[digest][0].Digest,
 		)
+
+		// Add all the references as annotations to ensure we
+		// get a 2nd signature
+		mirrorList := []string{}
+		for i := range sortedEdges[digest] {
+			mirrorList = append(
+				mirrorList, fmt.Sprintf(
+					"%s/%s",
+					sortedEdges[digest][i].DstRegistry.Name,
+					sortedEdges[digest][i].DstImageTag.Name,
+				),
+			)
+		}
+		signOpts.Annotations = map[string]interface{}{
+			"org.kubernetes.kpromo.mirrors": strings.Join(mirrorList, ","),
+		}
+		signer := sign.New(signOpts)
 
 		logrus.Infof("Signing image %s", imageRef)
 		// Sign the first promoted image in the esges list:

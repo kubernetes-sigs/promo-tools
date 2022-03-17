@@ -77,7 +77,8 @@ type promoterImplementation interface {
 	ValidateManifestLists(opts *options.Options) error
 
 	// Methods for image signing
-	ValidateStagingSignatures(map[reg.PromotionEdge]interface{}) error
+	ValidateStagingSignatures(map[reg.PromotionEdge]interface{}) (map[reg.PromotionEdge]interface{}, error)
+	CopySignatures(*options.Options, *reg.SyncContext, map[reg.PromotionEdge]interface{}) error
 	SignImages(*options.Options, *reg.SyncContext, map[reg.PromotionEdge]interface{}) error
 	WriteSBOMs(*options.Options, *reg.SyncContext, map[reg.PromotionEdge]interface{}) error
 
@@ -128,7 +129,8 @@ func (p *Promoter) PromoteImages(opts *options.Options) (err error) {
 	}
 
 	// Verify any signatures in staged images
-	if err := p.impl.ValidateStagingSignatures(promotionEdges); err != nil {
+	signedEdges, err := p.impl.ValidateStagingSignatures(promotionEdges)
+	if err != nil {
 		return errors.Wrap(err, "checking signtaures in staging images")
 	}
 
@@ -141,12 +143,16 @@ func (p *Promoter) PromoteImages(opts *options.Options) (err error) {
 		return errors.Wrap(err, "running promotion")
 	}
 
+	if err := p.impl.CopySignatures(opts, sc, signedEdges); err != nil {
+		return errors.Wrap(err, "copying existing signatures")
+	}
+
 	if err := p.impl.SignImages(opts, sc, promotionEdges); err != nil {
 		return errors.Wrap(err, "signing images")
 	}
 
 	if err := p.impl.WriteSBOMs(opts, sc, promotionEdges); err != nil {
-		return errors.Wrap(err, "signing images")
+		return errors.Wrap(err, "writing sboms")
 	}
 
 	return nil
