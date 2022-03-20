@@ -120,6 +120,12 @@ func (di *DefaultPromoterImplementation) SignImages(
 	// signature to avoid varying valid signatures in each registry.
 	sortedEdges := map[image.Digest][]reg.PromotionEdge{}
 	for edge := range edges {
+		// Skip signing the signature and sbom layers
+		if strings.HasSuffix(string(edge.DstImageTag.Name), ".sig") ||
+			strings.HasSuffix(string(edge.DstImageTag.Name), ".sbom") {
+			continue
+		}
+
 		if _, ok := sortedEdges[edge.Digest]; !ok {
 			sortedEdges[edge.Digest] = []reg.PromotionEdge{}
 		}
