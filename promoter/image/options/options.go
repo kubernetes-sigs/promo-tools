@@ -84,6 +84,9 @@ type Options struct {
 	// MaxImageSize is the maximum size of an image accepted for promotion
 	MaxImageSize int
 
+	// When tru, sign the container images using the sigstore cosign libraries
+	SignImages bool
+
 	// SignerAccount is a service account that will provide the identity
 	// when signing promoted images
 	SignerAccount string
@@ -103,6 +106,7 @@ var DefaultOptions = &Options{
 	MaxImageSize:      2048,
 	Threads:           10,
 	SeverityThreshold: -1,
+	SignImages:        true,
 	SignerAccount:     "krel-trust@k8s-artifacts-prod.iam.gserviceaccount.com",
 }
 

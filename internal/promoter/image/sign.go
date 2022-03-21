@@ -99,6 +99,10 @@ func (di *DefaultPromoterImplementation) CopySignatures(
 func (di *DefaultPromoterImplementation) SignImages(
 	opts *options.Options, sc *reg.SyncContext, edges map[reg.PromotionEdge]interface{},
 ) error {
+	if !opts.SignImages {
+		logrus.Info("Not signing images (--sign=false)")
+		return nil
+	}
 	if len(edges) == 0 {
 		logrus.Info("No images were promoted. Nothing to sign.")
 		return nil

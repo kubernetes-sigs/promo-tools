@@ -205,6 +205,13 @@ network from a registry, it reads from the local manifests only`,
 		"service account to use as signing identity",
 	)
 
+	CipCmd.PersistentFlags().BoolVar(
+		&runOpts.SignImages,
+		"sign",
+		options.DefaultOptions.SignImages,
+		"when true, sign promoted images",
+	)
+
 	// TODO: Set this in a function instead
 	if runOpts.MaxImageSize <= 0 {
 		runOpts.MaxImageSize = 2048
