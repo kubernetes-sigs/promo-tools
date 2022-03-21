@@ -84,6 +84,10 @@ type Options struct {
 	// MaxImageSize is the maximum size of an image accepted for promotion
 	MaxImageSize int
 
+	// SignerAccount is a service account that will provide the identity
+	// when signing promoted images
+	SignerAccount string
+
 	// SignerCredentials is a credentials json file to initialize the identity
 	// of the signer before running. If specified, the promoter will
 	// initialize its API client with the identity in the file and use it
@@ -99,6 +103,7 @@ var DefaultOptions = &Options{
 	MaxImageSize:      2048,
 	Threads:           10,
 	SeverityThreshold: -1,
+	SignerAccount:     "krel-trust@k8s-artifacts-prod.iam.gserviceaccount.com",
 }
 
 func (o *Options) Validate() error {

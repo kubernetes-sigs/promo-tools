@@ -42,7 +42,6 @@ const (
 	signatureTagSuffix = ".sig"
 
 	TestSigningAccount = "k8s-infra-promoter-test-signer@k8s-cip-test-prod.iam.gserviceaccount.com"
-	SigningAccount     = "test-signer@ulabs-cloud-tests.iam.gserviceaccount.com"
 )
 
 // ValidateStagingSignatures checks if edges (images) have a signature
@@ -109,7 +108,7 @@ func (di *DefaultPromoterImplementation) SignImages(
 	signOpts := sign.Default()
 
 	// Get the identity token we will use
-	token, err := di.GetIdentityToken(opts, SigningAccount)
+	token, err := di.GetIdentityToken(opts, opts.SignerAccount)
 	if err != nil {
 		return errors.Wrap(err, "generating identity token")
 	}
