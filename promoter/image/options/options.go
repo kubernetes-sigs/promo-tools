@@ -83,6 +83,22 @@ type Options struct {
 
 	// MaxImageSize is the maximum size of an image accepted for promotion
 	MaxImageSize int
+
+	// When tru, sign the container images using the sigstore cosign libraries
+	SignImages bool
+
+	// SignerAccount is a service account that will provide the identity
+	// when signing promoted images
+	SignerAccount string
+
+	// SignerCredentials is a credentials json file to initialize the identity
+	// of the signer before running. If specified, the promoter will
+	// initialize its API client with the identity in the file and use it
+	// to request tokens of the signer account.
+	//
+	// If this credentials file is not set, the promoter will attempt to generate
+	// the OIDC tokens getting its identity from the default application credentials.
+	SignerInitCredentials string
 }
 
 var DefaultOptions = &Options{
@@ -90,6 +106,8 @@ var DefaultOptions = &Options{
 	MaxImageSize:      2048,
 	Threads:           10,
 	SeverityThreshold: -1,
+	SignImages:        true,
+	SignerAccount:     "krel-trust@k8s-artifacts-prod.iam.gserviceaccount.com",
 }
 
 func (o *Options) Validate() error {

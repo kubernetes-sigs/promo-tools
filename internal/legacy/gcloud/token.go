@@ -35,6 +35,7 @@ type Token string
 func GetServiceAccountToken(
 	serviceAccount string,
 	useServiceAccount bool) (Token, error) {
+	logrus.Infof("Obtaining access token for %s", serviceAccount)
 	args := []string{
 		"auth",
 		"print-access-token",

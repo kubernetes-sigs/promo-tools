@@ -198,6 +198,20 @@ network from a registry, it reads from the local manifests only`,
 		"the maximum image size (in MiB) allowed for promotion",
 	)
 
+	CipCmd.PersistentFlags().StringVar(
+		&runOpts.SignerAccount,
+		"signer-account",
+		options.DefaultOptions.SignerAccount,
+		"service account to use as signing identity",
+	)
+
+	CipCmd.PersistentFlags().BoolVar(
+		&runOpts.SignImages,
+		"sign",
+		options.DefaultOptions.SignImages,
+		"when true, sign promoted images",
+	)
+
 	// TODO: Set this in a function instead
 	if runOpts.MaxImageSize <= 0 {
 		runOpts.MaxImageSize = 2048
