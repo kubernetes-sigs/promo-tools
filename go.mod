@@ -36,7 +36,7 @@ require (
 	sigs.k8s.io/yaml v1.3.0
 )
 
-require cloud.google.com/go/iam v0.2.0
+require cloud.google.com/go/iam v0.3.0
 
 require (
 	bitbucket.org/creachadair/shell v0.0.6 // indirect
