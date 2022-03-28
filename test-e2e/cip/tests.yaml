@@ -15,7 +15,7 @@
   invocation:
   - "--manifest=$PWD/test-e2e/cip/fixture/sanity/promoter-manifest.yaml"
   snapshots:
-  - name: us.gcr.io/k8s-cip-test-prod/some/subdir
+  - name: us.gcr.io/k8s-cip-test-prod/e2e/some/subdir
     before: []
     after: &golden-images
     - name: foo
@@ -27,10 +27,10 @@
         sha256:d66f4b0bab4061ef6244f93bea2d414923e7504d92c77a91998c23f909033b02:
         - 1.0-linux_s390x
         sha256:27ba895d293e5e3192b2bb57f0126f923b48d20221bb017e899ca3f5af74f738: []
-  - name: eu.gcr.io/k8s-cip-test-prod/some/subdir
+  - name: eu.gcr.io/k8s-cip-test-prod/e2e/some/subdir
     before: []
     after: *golden-images
-  - name: asia.gcr.io/k8s-cip-test-prod/some/subdir
+  - name: asia.gcr.io/k8s-cip-test-prod/e2e/some/subdir
     before: []
     after: *golden-images
 - name: "recursive-thin"
@@ -46,20 +46,20 @@
   invocation:
   - "--thin-manifest-dir=$PWD/test-e2e/cip/fixture/recursive-thin"
   snapshots:
-  - name: us.gcr.io/k8s-cip-test-prod/golden-bar
+  - name: us.gcr.io/k8s-cip-test-prod/e2e/golden-bar
     before: []
     after: &golden-images-recursive-bar
     - name: bar
       dmap:
         sha256:dd19dc426fa901c12e9a2eeeef8d9ad6c24f50840b8121ccffbba40b5500cb5b:
         - 1.0
-  - name: eu.gcr.io/k8s-cip-test-prod/golden-bar
+  - name: eu.gcr.io/k8s-cip-test-prod/e2e/golden-bar
     before: []
     after: *golden-images-recursive-bar
-  - name: asia.gcr.io/k8s-cip-test-prod/golden-bar
+  - name: asia.gcr.io/k8s-cip-test-prod/e2e/golden-bar
     before: []
     after: *golden-images-recursive-bar
-  - name: us.gcr.io/k8s-cip-test-prod/golden-foo
+  - name: us.gcr.io/k8s-cip-test-prod/e2e/golden-foo
     before: []
     after: &golden-images-recursive-foo
     - name: foo
@@ -71,9 +71,9 @@
         sha256:d66f4b0bab4061ef6244f93bea2d414923e7504d92c77a91998c23f909033b02:
         - 1.0-linux_s390x
         sha256:27ba895d293e5e3192b2bb57f0126f923b48d20221bb017e899ca3f5af74f738: []
-  - name: eu.gcr.io/k8s-cip-test-prod/golden-foo
+  - name: eu.gcr.io/k8s-cip-test-prod/e2e/golden-foo
     before: []
     after: *golden-images-recursive-foo
-  - name: asia.gcr.io/k8s-cip-test-prod/golden-foo
+  - name: asia.gcr.io/k8s-cip-test-prod/e2e/golden-foo
     before: []
     after: *golden-images-recursive-foo
