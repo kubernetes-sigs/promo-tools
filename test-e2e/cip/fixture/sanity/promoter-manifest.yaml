@@ -2,11 +2,11 @@ registries:
 - name: gcr.io/k8s-staging-cip-test/golden-foo
   service-account: k8s-infra-gcr-promoter@k8s-cip-test-prod.iam.gserviceaccount.com
   src: true
-- name: us.gcr.io/k8s-cip-test-prod/some/subdir
+- name: us.gcr.io/k8s-cip-test-prod/e2e/some/subdir
   service-account: k8s-infra-gcr-promoter@k8s-cip-test-prod.iam.gserviceaccount.com
-- name: eu.gcr.io/k8s-cip-test-prod/some/subdir
+- name: eu.gcr.io/k8s-cip-test-prod/e2e/some/subdir
   service-account: k8s-infra-gcr-promoter@k8s-cip-test-prod.iam.gserviceaccount.com
-- name: asia.gcr.io/k8s-cip-test-prod/some/subdir
+- name: asia.gcr.io/k8s-cip-test-prod/e2e/some/subdir
   service-account: k8s-infra-gcr-promoter@k8s-cip-test-prod.iam.gserviceaccount.com
 
 images:
