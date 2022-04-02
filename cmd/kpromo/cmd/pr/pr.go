@@ -83,13 +83,6 @@ func (o *promoteOptions) Validate() error {
 		return errors.Wrap(err, "checking user's fork")
 	}
 
-	// Verify we got a valid tag
-	for _, tag := range o.tags {
-		if _, err := util.TagStringToSemver(tag); err != nil {
-			return errors.Wrapf(err, "verifying tag: %s", tag)
-		}
-	}
-
 	// Check that the GitHub token is set
 	token, isSet := os.LookupEnv(github.TokenEnvKey)
 	if !isSet || token == "" {
@@ -394,4 +387,3 @@ func generatePRBody(opts *promoteOptions) string {
 // - TODO(cip-mm): Fix spacing in tag list
 //                 ref: https://github.com/kubernetes/k8s.io/pull/3212/files#r771604521
 // - TODO(cip-mm): Confirm options are validated
-// - TODO(cip-mm): Support non-SemVer image tags
