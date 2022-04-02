@@ -289,7 +289,5 @@ func (di *DefaultPromoterImplementation) GetIdentityToken(
 		return tok, errors.Wrap(err, "getting error account")
 	}
 
-	logrus.Info(resp.Token)
-
 	return resp.Token, nil
 }
