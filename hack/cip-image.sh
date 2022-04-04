@@ -135,17 +135,20 @@ main() {
         # Only build and push the auditor image.
         handleVariant "auditor" \
             "${test_tag_prefix}-auditor-test:latest" \
+            "${test_tag_prefix}-auditor-test:latest-canary" \
             "${test_tag_prefix}-auditor-test:${IMG_TAG}" \
             "${test_tag_prefix}-auditor-test:${IMG_VERSION}"
     else
         # Build and push auditor and cip images.
         handleVariant "auditor" \
             "${tag_prefix}-auditor:latest" \
+            "${tag_prefix}-auditor:latest-canary" \
             "${tag_prefix}-auditor:${IMG_TAG}" \
             "${tag_prefix}-auditor:${IMG_VERSION}"
 
         handleVariant "cip" \
             "${tag_prefix}:latest" \
+            "${tag_prefix}:latest-canary" \
             "${tag_prefix}:${IMG_TAG}" \
             "${tag_prefix}:${IMG_VERSION}"
     fi
