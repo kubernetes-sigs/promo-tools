@@ -107,7 +107,7 @@ var DefaultOptions = &Options{
 	Threads:           10,
 	SeverityThreshold: -1,
 	SignImages:        true,
-	SignerAccount:     "krel-trust@k8s-artifacts-prod.iam.gserviceaccount.com",
+	SignerAccount:     "krel-trust@k8s-releng-prod.iam.gserviceaccount.com",
 }
 
 func (o *Options) Validate() error {
