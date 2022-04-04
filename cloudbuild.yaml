@@ -43,6 +43,8 @@ images:
 - 'gcr.io/$PROJECT_ID/kpromo:$_GIT_TAG'
 - 'gcr.io/$PROJECT_ID/kpromo:$_IMG_VERSION'
 - 'gcr.io/$PROJECT_ID/kpromo:latest'
+- 'gcr.io/$PROJECT_ID/kpromo:latest-canary'
 - 'gcr.io/$PROJECT_ID/kpromo-auditor:$_GIT_TAG'
 - 'gcr.io/$PROJECT_ID/kpromo-auditor:$_IMG_VERSION'
 - 'gcr.io/$PROJECT_ID/kpromo-auditor:latest'
+- 'gcr.io/$PROJECT_ID/kpromo-auditor:latest-canary'
