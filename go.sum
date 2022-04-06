@@ -3249,8 +3249,8 @@ sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.15/go.mod h1:LEScyz
 sigs.k8s.io/json v0.0.0-20211020170558-c049b76a60c6/go.mod h1:p4QtZmO4uMYipTQNzagwnNoseA6OxSUutVw05NhYDRs=
 sigs.k8s.io/json v0.0.0-20211208200746-9f7c6b3444d2 h1:kDi4JBNAsJWfz1aEXhO8Jg87JJaPNLh5tIzYHgStQ9Y=
 sigs.k8s.io/json v0.0.0-20211208200746-9f7c6b3444d2/go.mod h1:B+TnT182UBxE84DiCz4CVE26eOSDAeYCpfDnC2kdKMY=
-sigs.k8s.io/release-sdk v0.8.0 h1:pBFoQMc8hZpXhptBPX2hEkh9Je3/Pt95JfPFamtFoDA=
-sigs.k8s.io/release-sdk v0.8.0/go.mod h1:ERXAwkYpWgdhnx/6R0tH54bFZPY7I8ztUeChU5FEWcM=
+sigs.k8s.io/release-sdk v0.8.1-0.20220406200226-3018c7851979 h1:7VD/1mCXK7DoJ2zlc/uRVHfp8kenYQytxVPxuyyOtjk=
+sigs.k8s.io/release-sdk v0.8.1-0.20220406200226-3018c7851979/go.mod h1:oRaMd2AqfTH3Sl6RGNoxGkDkNzwY1KxpJkgLdQSHtVA=
 sigs.k8s.io/release-utils v0.6.1-0.20220405215325-d4a2a2f0e8fd h1:HUAAyjpYEZCn9+yZxLmCSp0zVZPjGd3vk89E3CxenpQ=
 sigs.k8s.io/release-utils v0.6.1-0.20220405215325-d4a2a2f0e8fd/go.mod h1:KpxSx7wcASB1Rk430h8XRd6f8mWdptpMCy8fZA/taik=
 sigs.k8s.io/structured-merge-diff/v4 v4.0.2/go.mod h1:bJZC9H9iH24zzfZ/41RGcq60oK1F7G282QMXDPYydCw=
