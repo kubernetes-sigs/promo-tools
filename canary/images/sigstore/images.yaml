@@ -1,0 +1,3 @@
+- name: cosigned
+  dmap:
+    "sha256:45d88f483c2eeaab4a4437cb0990705f285625d9968c3d6a0419a0b88e5668d3": ["v1.7.1"]
