@@ -85,12 +85,40 @@ func (di *DefaultPromoterImplementation) ValidateStagingSignatures(
 	return signedEdges, nil
 }
 
-// CopySignatures copies sboms and signatures from source images to
-// the newly promoted images before stamping them with the
-// Kubernetes org signature
+// CopySignatures copies sboms and signatures from the signed edges and
+// attaches them to the newly promoted images before stamping
+// the Kubernetes org signature
 func (di *DefaultPromoterImplementation) CopySignatures(
 	opts *options.Options, sc *reg.SyncContext, signedEdges map[reg.PromotionEdge]interface{},
 ) error {
+	// Cycle all signedEdges to copy them
+	logrus.Infof("Precopying %d previous signatures", len(signedEdges))
+	for edge := range signedEdges {
+		sigTag := digestToSignatureTag(edge.Digest)
+		srcRefString := fmt.Sprintf(
+			"%s/%s:%s", edge.SrcRegistry.Name, edge.SrcImageTag.Name, sigTag,
+		)
+		srcRef, err := name.ParseReference(srcRefString)
+		if err != nil {
+			return fmt.Errorf("parsing signed source reference %s: %w", srcRefString, err)
+		}
+
+		dstRefString := fmt.Sprintf(
+			"%s/%s:%s", edge.DstRegistry.Name, edge.DstImageTag.Name, sigTag,
+		)
+		dstRef, err := name.ParseReference(dstRefString)
+		if err != nil {
+			return fmt.Errorf("parsing signature destination reference %s: %w", dstRefString, err)
+		}
+
+		logrus.Infof("Signature pre copy: %s to %s", srcRefString, dstRefString)
+		if err := crane.Copy(srcRef.String(), dstRef.String()); err != nil {
+			return fmt.Errorf(
+				"copying signature %s to %s: %w",
+				srcRef.String(), dstRef.String(), err,
+			)
+		}
+	}
 	return nil
 }
 
@@ -176,7 +204,7 @@ func (di *DefaultPromoterImplementation) SignImages(
 			)
 			continue
 		}
-		if err := di.copySignatures(
+		if err := di.replicateSignatures(
 			&sortedEdges[digest][0], sortedEdges[digest][1:],
 		); err != nil {
 			return fmt.Errorf("copying signatures: %w", err)
@@ -191,15 +219,16 @@ func digestToSignatureTag(dg image.Digest) string {
 	return strings.ReplaceAll(string(dg), "sha256:", "sha256-") + signatureTagSuffix
 }
 
-// copySignatures takes a source edge (an image) and a list of destinations
+// replicateSignatures takes a source edge (an image) and a list of destinations
 // and copies the signature to all of them
-func (di *DefaultPromoterImplementation) copySignatures(
+func (di *DefaultPromoterImplementation) replicateSignatures(
 	src *reg.PromotionEdge, dsts []reg.PromotionEdge,
 ) error {
 	sigTag := digestToSignatureTag(src.Digest)
 	sourceRefStr := fmt.Sprintf(
 		"%s/%s:%s", src.DstRegistry.Name, src.DstImageTag.Name, sigTag,
 	)
+	logrus.WithField("src", sourceRefStr).Infof("Replicating signature to %d images", len(dsts))
 	srcRef, err := name.ParseReference(sourceRefStr)
 	if err != nil {
 		return fmt.Errorf("parsing reference %q: %w", sourceRefStr, err)
@@ -225,6 +254,7 @@ func (di *DefaultPromoterImplementation) copySignatures(
 
 	// Copy the signatures to the missing registries
 	for _, dstRef := range dstRefs {
+		logrus.WithField("src", srcRef.String()).Infof("replication > %s", dstRef.reference.String())
 		if err := crane.Copy(srcRef.String(), dstRef.reference.String()); err != nil {
 			return fmt.Errorf(
 				"copying signature %s to %s: %w",
