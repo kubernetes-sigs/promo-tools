@@ -176,7 +176,7 @@ func (di *DefaultPromoterImplementation) SignImages(
 			)
 			continue
 		}
-		if err := di.copySignatures(
+		if err := di.replicateSignatures(
 			&sortedEdges[digest][0], sortedEdges[digest][1:],
 		); err != nil {
 			return fmt.Errorf("copying signatures: %w", err)
@@ -191,9 +191,9 @@ func digestToSignatureTag(dg image.Digest) string {
 	return strings.ReplaceAll(string(dg), "sha256:", "sha256-") + signatureTagSuffix
 }
 
-// copySignatures takes a source edge (an image) and a list of destinations
+// replicateSignatures takes a source edge (an image) and a list of destinations
 // and copies the signature to all of them
-func (di *DefaultPromoterImplementation) copySignatures(
+func (di *DefaultPromoterImplementation) replicateSignatures(
 	src *reg.PromotionEdge, dsts []reg.PromotionEdge,
 ) error {
 	sigTag := digestToSignatureTag(src.Digest)
