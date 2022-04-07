@@ -228,6 +228,7 @@ func (di *DefaultPromoterImplementation) replicateSignatures(
 	sourceRefStr := fmt.Sprintf(
 		"%s/%s:%s", src.DstRegistry.Name, src.DstImageTag.Name, sigTag,
 	)
+	logrus.WithField("src", sourceRefStr).Infof("Replicating signature to %d images", len(dsts))
 	srcRef, err := name.ParseReference(sourceRefStr)
 	if err != nil {
 		return fmt.Errorf("parsing reference %q: %w", sourceRefStr, err)
@@ -253,6 +254,7 @@ func (di *DefaultPromoterImplementation) replicateSignatures(
 
 	// Copy the signatures to the missing registries
 	for _, dstRef := range dstRefs {
+		logrus.WithField("src", srcRef.String()).Infof("replication > %s", dstRef.reference.String())
 		if err := crane.Copy(srcRef.String(), dstRef.reference.String()); err != nil {
 			return fmt.Errorf(
 				"copying signature %s to %s: %w",
