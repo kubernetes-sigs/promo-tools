@@ -306,7 +306,8 @@ func clearRepository(regName image.Registry, sc *reg.SyncContext) {
 	mkDeletionCmd := func(
 		dest registry.Context,
 		imageName image.Name,
-		digest image.Digest) stream.Producer {
+		digest image.Digest,
+	) stream.Producer {
 		var sp stream.Subprocess
 		sp.CmdInvocation = reg.GetDeleteCmd(
 			dest,

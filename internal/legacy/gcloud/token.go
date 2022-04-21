@@ -34,7 +34,8 @@ type Token string
 // service account.
 func GetServiceAccountToken(
 	serviceAccount string,
-	useServiceAccount bool) (Token, error) {
+	useServiceAccount bool,
+) (Token, error) {
 	logrus.Infof("Obtaining access token for %s", serviceAccount)
 	args := []string{
 		"auth",
@@ -65,7 +66,8 @@ func GetServiceAccountToken(
 func MaybeUseServiceAccount(
 	serviceAccount string,
 	useServiceAccount bool,
-	cmd []string) []string {
+	cmd []string,
+) []string {
 	if useServiceAccount && len(serviceAccount) > 0 {
 		cmd = append(cmd, "")
 		copy(cmd[2:], cmd[1:])

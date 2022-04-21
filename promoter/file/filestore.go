@@ -156,7 +156,8 @@ func useStorageClientAuth(
 // computeNeededOperations determines the list of files that need to be copied
 func (p *FilestorePromoter) computeNeededOperations(
 	source, dest map[string]*SyncFileInfo,
-	destFilestore syncFilestore) ([]SyncFileOp, error) {
+	destFilestore syncFilestore,
+) ([]SyncFileOp, error) {
 	ops := make([]SyncFileOp, 0)
 
 	for i := range p.Files {
@@ -233,7 +234,8 @@ func joinFilepath(filestore *api.Filestore, relativePath string) string {
 // BuildOperations builds the required operations to sync from the
 // Source Filestore to the Dest Filestore.
 func (p *FilestorePromoter) BuildOperations(
-	ctx context.Context) ([]SyncFileOp, error) {
+	ctx context.Context,
+) ([]SyncFileOp, error) {
 	sourceFilestore, err := openFilestore(
 		ctx,
 		p.Source,
