@@ -36,7 +36,10 @@ require (
 	sigs.k8s.io/yaml v1.3.0
 )
 
-require cloud.google.com/go/iam v0.3.0
+require (
+	cloud.google.com/go/iam v0.3.0
+	github.com/nozzle/throttler v0.0.0-20180817012639-2ea982251481
+)
 
 require (
 	bitbucket.org/creachadair/shell v0.0.6 // indirect
