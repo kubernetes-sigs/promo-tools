@@ -40,7 +40,8 @@ type ManifestPromoter struct {
 // BuildOperations builds the required operations to sync from the
 // Source Filestore to all Dest Filestores in the manifest.
 func (p *ManifestPromoter) BuildOperations(
-	ctx context.Context) ([]SyncFileOp, error) {
+	ctx context.Context,
+) ([]SyncFileOp, error) {
 	source, err := getSourceFilestore(p.Manifest)
 	if err != nil {
 		return nil, err

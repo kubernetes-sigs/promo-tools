@@ -43,7 +43,8 @@ type gcsSyncFilestore struct {
 // OpenReader opens an io.ReadCloser for the specified file.
 func (s *gcsSyncFilestore) OpenReader(
 	ctx context.Context,
-	name string) (io.ReadCloser, error) {
+	name string,
+) (io.ReadCloser, error) {
 	absolutePath := s.prefix + name
 	return s.client.Bucket(s.bucket).Object(absolutePath).NewReader(ctx)
 }
@@ -105,7 +106,8 @@ func (s *gcsSyncFilestore) UploadFile(ctx context.Context, dest, localFile strin
 
 // ListFiles returns all the file artifacts in the filestore, recursively.
 func (s *gcsSyncFilestore) ListFiles(
-	ctx context.Context) (map[string]*SyncFileInfo, error) {
+	ctx context.Context,
+) (map[string]*SyncFileInfo, error) {
 	files := make(map[string]*SyncFileInfo)
 
 	q := &storage.Query{Prefix: s.prefix}

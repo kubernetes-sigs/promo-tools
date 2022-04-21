@@ -308,7 +308,8 @@ func (sc *SyncContext) getDigestForTag(inputTag image.Tag) *image.Digest {
 // a malicious attack (someone trying to push an image to an endpoint they
 // shouldn't own).
 func CheckOverlappingEdges(
-	edges map[PromotionEdge]interface{}) (map[PromotionEdge]interface{}, error) {
+	edges map[PromotionEdge]interface{},
+) (map[PromotionEdge]interface{}, error) {
 	// Build up a "promotionIntent". This will be checked below.
 	promotionIntent := make(map[string]map[image.Digest][]PromotionEdge)
 	checked := make(map[PromotionEdge]interface{})
@@ -839,7 +840,8 @@ func (sc *SyncContext) ReadRegistries(
 	var populateRequests PopulateRequests = func(
 		sc *SyncContext,
 		reqs chan<- stream.ExternalRequest,
-		wg *sync.WaitGroup) {
+		wg *sync.WaitGroup,
+	) {
 		// For each registry, start the very first root "repo" read call.
 		for _, rc := range toRead {
 			// Create the request.

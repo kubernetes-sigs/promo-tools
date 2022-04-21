@@ -18,6 +18,7 @@ package manifest
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
 	"path"
 	"path/filepath"
@@ -62,7 +63,7 @@ func (o *GrowOptions) Populate(
 ) error {
 	baseDirAbsPath, err := filepath.Abs(baseDir)
 	if err != nil {
-		return xerrors.Errorf(
+		return fmt.Errorf(
 			"cannot resolve %q to absolute path: %w", baseDir, err)
 	}
 
@@ -116,7 +117,7 @@ func (o *GrowOptions) Validate() error {
 	}
 
 	if containsTag(o.FilterTags, latestTag) {
-		return xerrors.Errorf(
+		return fmt.Errorf(
 			"--filter_tag cannot be %q (anti-pattern)", latestTag)
 	}
 
@@ -205,7 +206,7 @@ func Find(o *GrowOptions) (schema.Manifest, error) {
 		}
 	}
 	return schema.Manifest{},
-		xerrors.Errorf("could not find Manifest for %q", o.StagingRepo)
+		fmt.Errorf("could not find Manifest for %q", o.StagingRepo)
 }
 
 // ReadStagingRepo reads the StagingRepo, and applies whatever filters are

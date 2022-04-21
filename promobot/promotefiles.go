@@ -25,7 +25,6 @@ import (
 	"sort"
 
 	"github.com/sirupsen/logrus"
-	"golang.org/x/xerrors"
 
 	api "sigs.k8s.io/promo-tools/v3/api/files"
 	"sigs.k8s.io/promo-tools/v3/promoter/file"
@@ -196,7 +195,7 @@ func ReadManifests(options PromoteFilesOptions) ([]*api.Manifest, error) {
 			return nil
 		},
 	); err != nil {
-		return nil, xerrors.Errorf("error listing projects: %w", err)
+		return nil, fmt.Errorf("error listing projects: %w", err)
 	}
 
 	for _, prj := range projects {
@@ -271,7 +270,7 @@ func readFilestores(p string) ([]api.Filestore, error) {
 	}
 
 	if len(manifest.Files) != 0 {
-		return nil, xerrors.Errorf(
+		return nil, fmt.Errorf(
 			"files should not be present in filestore manifest %q",
 			p)
 	}
@@ -296,7 +295,7 @@ func readFiles(filesPath string) ([]api.File, error) {
 		return nil
 	})
 	if err != nil {
-		return nil, xerrors.Errorf("error listing file manifests: %w", err)
+		return nil, fmt.Errorf("error listing file manifests: %w", err)
 	}
 
 	sort.Strings(paths)
@@ -305,16 +304,16 @@ func readFiles(filesPath string) ([]api.File, error) {
 	for _, p := range paths {
 		b, err := os.ReadFile(p)
 		if err != nil {
-			return nil, xerrors.Errorf("error reading file %q: %w", p, err)
+			return nil, fmt.Errorf("error reading file %q: %w", p, err)
 		}
 
 		manifest, err := api.ParseManifest(b)
 		if err != nil {
-			return nil, xerrors.Errorf("error parsing manifest %q: %v", p, err)
+			return nil, fmt.Errorf("error parsing manifest %q: %v", p, err)
 		}
 
 		if len(manifest.Filestores) != 0 {
-			return nil, xerrors.Errorf("filestores should not be present in manifest %q", p)
+			return nil, fmt.Errorf("filestores should not be present in manifest %q", p)
 		}
 
 		files = append(files, manifest.Files...)

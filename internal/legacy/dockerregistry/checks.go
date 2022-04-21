@@ -283,7 +283,8 @@ func (check *ImageVulnCheck) Run() error {
 	var populateRequests PopulateRequests = func(
 		sc *SyncContext,
 		reqs chan<- stream.ExternalRequest,
-		wg *sync.WaitGroup) {
+		wg *sync.WaitGroup,
+	) {
 		srcImages := make(map[PromotionEdge]interface{})
 		for edge := range check.PullEdges {
 			srcImage := PromotionEdge{

@@ -18,6 +18,7 @@ package promobot
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -65,7 +66,7 @@ func GenerateManifest(ctx context.Context, options GenerateManifestOptions) (*ap
 			return err
 		}
 		if !strings.HasPrefix(p, basedir) {
-			return xerrors.Errorf("expected path %q to have prefix %q", p, basedir)
+			return fmt.Errorf("expected path %q to have prefix %q", p, basedir)
 		}
 
 		if !strings.HasPrefix(p, filepath.Join(basedir, options.Prefix)) {
@@ -76,7 +77,7 @@ func GenerateManifest(ctx context.Context, options GenerateManifestOptions) (*ap
 			relativePath := strings.TrimPrefix(p, basedir)
 			sha256, err := hash.SHA256ForFile(p)
 			if err != nil {
-				return xerrors.Errorf("error hashing file %q: %w", p, err)
+				return fmt.Errorf("error hashing file %q: %w", p, err)
 			}
 			manifest.Files = append(manifest.Files, api.File{
 				Name:   relativePath,
@@ -85,7 +86,7 @@ func GenerateManifest(ctx context.Context, options GenerateManifestOptions) (*ap
 		}
 		return nil
 	}); err != nil {
-		return nil, xerrors.Errorf("error walking path %q: %w", options.BaseDir, err)
+		return nil, fmt.Errorf("error walking path %q: %w", options.BaseDir, err)
 	}
 
 	return manifest, nil

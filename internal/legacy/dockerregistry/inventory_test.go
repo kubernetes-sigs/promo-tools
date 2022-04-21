@@ -2638,7 +2638,8 @@ func TestExecRequests(t *testing.T) {
 		reqs chan stream.ExternalRequest,
 		requestResults chan<- reg.RequestResult,
 		wg *sync.WaitGroup,
-		mutex *sync.Mutex) {
+		mutex *sync.Mutex,
+	) {
 		for req := range reqs {
 			reqRes := reg.RequestResult{Context: req}
 			requestResults <- reqRes
@@ -2650,7 +2651,8 @@ func TestExecRequests(t *testing.T) {
 		reqs chan stream.ExternalRequest,
 		requestResults chan<- reg.RequestResult,
 		wg *sync.WaitGroup,
-		mutex *sync.Mutex) {
+		mutex *sync.Mutex,
+	) {
 		for req := range reqs {
 			reqRes := reg.RequestResult{Context: req}
 			errors := make(reg.Errors, 0)
@@ -2979,7 +2981,8 @@ func TestGarbageCollection(t *testing.T) {
 		nopStream := func(
 			destRC registry.Context,
 			imageName image.Name,
-			digest image.Digest) stream.Producer {
+			digest image.Digest,
+		) stream.Producer {
 			return nil
 		}
 		srcReg, err := registry.GetSrcRegistry(registries)
