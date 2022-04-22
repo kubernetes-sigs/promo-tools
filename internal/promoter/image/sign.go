@@ -47,6 +47,7 @@ const (
 
 	maxParallelVerifications = 10
 	maxParallelSignatures    = 10
+	maxParallelCopies        = 10
 )
 
 // FindSingedEdges takes a list of edges and returns a list of
@@ -141,33 +142,43 @@ func (di *DefaultPromoterImplementation) CopySignatures(
 ) error {
 	// Cycle all signedEdges to copy them
 	logrus.Infof("Precopying %d previous signatures", len(signedEdges))
-	for edge := range signedEdges {
-		sigTag := digestToSignatureTag(edge.Digest)
-		srcRefString := fmt.Sprintf(
-			"%s/%s:%s", edge.SrcRegistry.Name, edge.SrcImageTag.Name, sigTag,
-		)
-		srcRef, err := name.ParseReference(srcRefString)
-		if err != nil {
-			return fmt.Errorf("parsing signed source reference %s: %w", srcRefString, err)
-		}
-
-		dstRefString := fmt.Sprintf(
-			"%s/%s:%s", edge.DstRegistry.Name, edge.DstImageTag.Name, sigTag,
-		)
-		dstRef, err := name.ParseReference(dstRefString)
-		if err != nil {
-			return fmt.Errorf("parsing signature destination reference %s: %w", dstRefString, err)
-		}
-
-		logrus.Infof("Signature pre copy: %s to %s", srcRefString, dstRefString)
-		if err := crane.Copy(srcRef.String(), dstRef.String()); err != nil {
-			return fmt.Errorf(
-				"copying signature %s to %s: %w",
-				srcRef.String(), dstRef.String(), err,
+	t := throttler.New(maxParallelCopies, len(signedEdges))
+	for e := range signedEdges {
+		go func(edge reg.PromotionEdge) {
+			sigTag := digestToSignatureTag(edge.Digest)
+			srcRefString := fmt.Sprintf(
+				"%s/%s:%s", edge.SrcRegistry.Name, edge.SrcImageTag.Name, sigTag,
 			)
+			srcRef, err := name.ParseReference(srcRefString)
+			if err != nil {
+				t.Done(fmt.Errorf("parsing signed source reference %s: %w", srcRefString, err))
+				return
+			}
+
+			dstRefString := fmt.Sprintf(
+				"%s/%s:%s", edge.DstRegistry.Name, edge.DstImageTag.Name, sigTag,
+			)
+			dstRef, err := name.ParseReference(dstRefString)
+			if err != nil {
+				t.Done(fmt.Errorf("parsing signature destination reference %s: %w", dstRefString, err))
+				return
+			}
+
+			logrus.Infof("Signature pre copy: %s to %s", srcRefString, dstRefString)
+			if err := crane.Copy(srcRef.String(), dstRef.String()); err != nil {
+				t.Done(fmt.Errorf(
+					"copying signature %s to %s: %w",
+					srcRef.String(), dstRef.String(), err,
+				))
+				return
+			}
+			t.Done(nil)
+		}(e)
+		if t.Throttle() > 0 {
+			break
 		}
 	}
-	return nil
+	return t.Err()
 }
 
 // SignImages signs the promoted images and stores their signatures in
