@@ -46,6 +46,7 @@ const (
 	TestSigningAccount = "k8s-infra-promoter-test-signer@k8s-cip-test-prod.iam.gserviceaccount.com"
 
 	maxParallelVerifications = 10
+	maxParallelSignatures    = 10
 )
 
 // FindSingedEdges takes a list of edges and returns a list of
@@ -53,7 +54,6 @@ const (
 func (di *DefaultPromoterImplementation) FindSingedEdges(
 	edges map[reg.PromotionEdge]interface{},
 ) (map[reg.PromotionEdge]interface{}, error) {
-	signer := sign.New(sign.Default())
 	signedEdges := map[reg.PromotionEdge]interface{}{}
 	// Verify the signatures in the edges we are looking at
 	t := throttler.New(maxParallelVerifications, len(edges))
@@ -63,7 +63,7 @@ func (di *DefaultPromoterImplementation) FindSingedEdges(
 	// First, compile a list of signed images (edges)
 	for e := range edges {
 		go func(edge reg.PromotionEdge) {
-			// If image is not signed, skip
+			signer := sign.New(sign.Default())
 			isSigned, err := signer.IsImageSigned(edge.SrcReference())
 			if err != nil {
 				t.Done(
@@ -78,7 +78,7 @@ func (di *DefaultPromoterImplementation) FindSingedEdges(
 			}
 			logrus.Infof("Image %s, is signed", edge.SrcReference())
 			l.Lock()
-			signedEdges[edge] = edges[edge]
+			signedEdges[edge] = nil
 			l.Unlock()
 			t.Done(nil)
 		}(e)
@@ -211,52 +211,61 @@ func (di *DefaultPromoterImplementation) SignImages(
 		sortedEdges[edge.Digest] = append(sortedEdges[edge.Digest], edge)
 	}
 
+	t := throttler.New(maxParallelSignatures, len(sortedEdges))
 	// Sign the required edges
 	for digest := range sortedEdges {
-		// Build the reference we will use
-		imageRef := fmt.Sprintf(
-			"%s/%s@%s",
-			sortedEdges[digest][0].DstRegistry.Name,
-			sortedEdges[digest][0].DstImageTag.Name,
-			sortedEdges[digest][0].Digest,
+		go func() {
+			t.Done(di.signAndReplicate(signOpts, sortedEdges[digest]))
+		}()
+		if t.Throttle() > 0 {
+			break
+		}
+	}
+	if err := t.Err(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (di *DefaultPromoterImplementation) signAndReplicate(signOpts *sign.Options, edges []reg.PromotionEdge) error {
+	// Build the reference we will use
+	imageRef := edges[0].DstReference()
+
+	// Add all the references as annotations to ensure we
+	// get a 2nd signature, otherwise cosign will not resign
+	mirrorList := []string{}
+	for i := range edges {
+		mirrorList = append(
+			mirrorList, fmt.Sprintf(
+				"%s/%s",
+				edges[i].DstRegistry.Name,
+				edges[i].DstImageTag.Name,
+			),
 		)
+	}
+	signOpts.Annotations = map[string]interface{}{
+		"org.kubernetes.kpromo.mirrors": strings.Join(mirrorList, ","),
+	}
+	signer := sign.New(signOpts)
 
-		// Add all the references as annotations to ensure we
-		// get a 2nd signature
-		mirrorList := []string{}
-		for i := range sortedEdges[digest] {
-			mirrorList = append(
-				mirrorList, fmt.Sprintf(
-					"%s/%s",
-					sortedEdges[digest][i].DstRegistry.Name,
-					sortedEdges[digest][i].DstImageTag.Name,
-				),
-			)
-		}
-		signOpts.Annotations = map[string]interface{}{
-			"org.kubernetes.kpromo.mirrors": strings.Join(mirrorList, ","),
-		}
-		signer := sign.New(signOpts)
+	logrus.Infof("Signing image %s", imageRef)
+	// Sign the first promoted image in the edges list:
+	if _, err := signer.SignImage(imageRef); err != nil {
+		return errors.Wrapf(err, "signing image %s", imageRef)
+	}
 
-		logrus.Infof("Signing image %s", imageRef)
-		// Sign the first promoted image in the esges list:
-		if _, err := signer.SignImage(imageRef); err != nil {
-			return errors.Wrapf(err, "signing image %s", imageRef)
-		}
-
-		// If the same digest was promoted to more than one
-		// registry, copy the signature from the first one
-		if len(sortedEdges[digest]) == 1 {
-			logrus.WithField("image", string(digest)).Debug(
-				"Not copying signatures, image promoted to single registry",
-			)
-			continue
-		}
-		if err := di.replicateSignatures(
-			&sortedEdges[digest][0], sortedEdges[digest][1:],
-		); err != nil {
-			return fmt.Errorf("copying signatures: %w", err)
-		}
+	// If the same digest was promoted to more than one
+	// registry, copy the signature from the first one
+	if len(edges) == 1 {
+		logrus.WithField("image", string(edges[0].Digest)).Debug(
+			"Not replicating signatures, image promoted to single registry",
+		)
+		return nil
+	}
+	if err := di.replicateSignatures(
+		&edges[0], edges[1:],
+	); err != nil {
+		return fmt.Errorf("replicating signatures: %w", err)
 	}
 	return nil
 }
