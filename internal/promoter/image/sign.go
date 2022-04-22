@@ -25,6 +25,7 @@ import (
 	credentials "cloud.google.com/go/iam/credentials/apiv1"
 	"github.com/google/go-containerregistry/pkg/crane"
 	"github.com/google/go-containerregistry/pkg/name"
+	"github.com/nozzle/throttler"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	gopts "google.golang.org/api/option"
@@ -42,6 +43,8 @@ const (
 	signatureTagSuffix = ".sig"
 
 	TestSigningAccount = "k8s-infra-promoter-test-signer@k8s-cip-test-prod.iam.gserviceaccount.com"
+
+	maxParallelVerifications = 10
 )
 
 // ValidateStagingSignatures checks if edges (images) have a signature
@@ -52,36 +55,48 @@ func (di *DefaultPromoterImplementation) ValidateStagingSignatures(
 ) (map[reg.PromotionEdge]interface{}, error) {
 	signer := sign.New(sign.Default())
 	signedEdges := map[reg.PromotionEdge]interface{}{}
+	// First, compile a list of signed images (edges)
 	for edge := range edges {
-		imageRef := fmt.Sprintf(
-			"%s/%s@%s",
-			edge.SrcRegistry.Name,
-			edge.SrcImageTag.Name,
-			edge.Digest,
-		)
-		logrus.Infof("Verifying signatures of image %s", imageRef)
+		logrus.Infof("Verifying signatures of image %s", edge.SrcReference())
 
 		// If image is not signed, skip
-		isSigned, err := signer.IsImageSigned(imageRef)
+		isSigned, err := signer.IsImageSigned(edge.SrcReference())
 		if err != nil {
-			return nil, errors.Wrapf(err, "checking if %s is signed", imageRef)
+			return nil, errors.Wrapf(err, "checking if %s is signed", edge.SrcReference())
 		}
 
 		if !isSigned {
-			logrus.Infof("No signatures found for ref %s, not checking", imageRef)
+			logrus.Infof("No signatures found for ref %s, not checking", edge.SrcReference())
 			continue
 		}
 
 		signedEdges[edge] = edges[edge]
-
-		// Check the staged image signatures
-		if _, err := signer.VerifyImage(imageRef); err != nil {
-			return nil, errors.Wrapf(
-				err, "verifying signatures of image %s", imageRef,
-			)
-		}
-		logrus.Infof("Signatures for ref %s verfified", imageRef)
 	}
+
+	// Verify the signatures in the edges we are looking at
+	t := throttler.New(maxParallelVerifications, len(signedEdges))
+	for e := range signedEdges {
+		go func(edge reg.PromotionEdge) {
+			var err error
+
+			// Check the staged image signatures
+			if _, err = signer.VerifyImage(edge.SrcReference()); err != nil {
+				t.Done(fmt.Errorf(
+					"verifying signatures of image %s: %w", edge.SrcReference(), err,
+				))
+				return
+			}
+			logrus.Infof("Signatures for ref %s verfified", edge.SrcReference())
+			t.Done(nil)
+		}(e)
+		if t.Throttle() > 0 {
+			break
+		}
+	}
+	if err := t.Err(); err != nil {
+		return nil, err
+	}
+
 	return signedEdges, nil
 }
 
