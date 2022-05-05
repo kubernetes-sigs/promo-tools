@@ -24,7 +24,7 @@
 ARG variant
 ARG GO_VERSION
 ARG OS_CODENAME
-FROM golang:1.17-buster AS builder
+FROM golang:1.18-buster AS builder
 
 # Copy the sources
 WORKDIR /go/src/app

@@ -1,6 +1,6 @@
 module sigs.k8s.io/promo-tools/v3
 
-go 1.17
+go 1.18
 
 require (
 	cloud.google.com/go/containeranalysis v0.3.0

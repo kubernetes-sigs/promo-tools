@@ -141,7 +141,6 @@ func validateRequiredComponents(m Manifest) error {
 		}
 
 		// TODO(lint): SA4010: this result of append is never used, except maybe in other appends
-		//nolint:staticcheck
 		knownRegistries = append(knownRegistries, registry.Name)
 	}
 
