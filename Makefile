@@ -34,7 +34,7 @@ ifeq ($(DIFF), 1)
     GIT_TREESTATE = "dirty"
 endif
 
-PKG=sigs.k8s.io/promo-tools/v3/internal/version
+PKG=sigs.k8s.io/release-utils/version
 LDFLAGS='"-X $(PKG).gitVersion=$(GIT_VERSION) -X $(PKG).gitCommit=$(GIT_HASH) -X $(PKG).gitTreeState=$(GIT_TREESTATE) -X $(PKG).buildDate=$(BUILD_DATE)"'
 
 .PHONY: kpromo
