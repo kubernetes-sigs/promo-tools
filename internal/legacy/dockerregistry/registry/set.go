@@ -47,7 +47,6 @@ func toRegistryInventory(a container.Set) RegInvImage {
 
 // Minus is a set operation.
 // TODO: ST1016: methods on the same type should have the same receiver name
-// nolint: stylecheck
 func (a RegInvImage) Minus(b RegInvImage) RegInvImage {
 	aSet := a.ToSet()
 	bSet := b.ToSet()
