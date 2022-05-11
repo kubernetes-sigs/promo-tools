@@ -19,7 +19,7 @@ When cutting a new Kubernetes release, we need to publish images to the `k8s-sta
 
 First, take the following steps to prepare your environment for promoting images:
 
-- Install the [promotion tooling](/README#installation):
+- Install the [promotion tooling](/README.md#installation):
 
   ```shell
   go install sigs.k8s.io/promo-tools/v3/cmd/kpromo@latest

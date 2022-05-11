@@ -33,15 +33,15 @@ submitting a new PR.
 
 As the promoter uses a combination of network API calls and shell-instantiated
 processes, we have to fake them for the unit tests. To make this happen, these
-mechanisms all use a `stream.Producer` [interface](/legacy/stream/types.go). The
-real-world code uses either the [http](/legacy/stream/http.go) or
-[subprocess](/legacy/stream/subprocess.go) implementations of this interface to
+mechanisms all use a `stream.Producer` [interface](/internal/legacy/stream/types.go). The
+real-world code uses either the [http](/internal/legacy/stream/http.go) or
+[subprocess](/internal/legacy/stream/subprocess.go) implementations of this interface to
 create streams of data (JSON or not) which we can interpret and use.
 
-For tests, the [fake](/legacy/stream/fake.go) implementation is used instead, which
+For tests, the [fake](/internal/legacy/stream/fake.go) implementation is used instead, which
 predefines how that stream will behave, for the purposes of each unit test. A
 good example of this is the [`TestReadRegistries`
-test](/legacy/dockerregistry/inventory_test.go).
+test](/internal/legacy/dockerregistry/inventory_test.go).
 
 ### Automated builds
 
@@ -63,7 +63,7 @@ here][cloudbuild.yaml]. There are also production versions of these images here:
 
 The images from the staging GCR end up in `k8s-artifacts-prod` using the
 promoter image running in
-[Prow](https://github.com/kubernetes/test-infra/prow). "Using the
+[Prow](https://github.com/kubernetes/test-infra/tree/master/prow). "Using the
 promoter" here means creating a PR in the [k8s.io Github repo][k8sio-manifests-dir]
 to promote versions from staging to production, such as in
 [this PR](https://github.com/kubernetes/k8s.io/pull/704).
