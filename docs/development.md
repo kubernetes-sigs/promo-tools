@@ -72,7 +72,7 @@ to promote versions from staging to production, such as in
 
 There are a number of Prow jobs that consume the production container images
 of `cip`, `cip-auditor`, or `kpromo`. These jobs are defined
-[cip-prow-integration][here].
+[here][cip-prow-integration].
 
 The important thing to note is that ultimately the jobs there are downstream
 consumers of the production `cip` and `cip-auditor` images discussed above. So

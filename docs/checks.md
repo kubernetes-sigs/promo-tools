@@ -13,7 +13,7 @@ The `PreCheck` interface is implemented like so in the
 file. The `Run` function is the method used in order to actually execute the 
 check that implements this interface.
 
-```
+```golang
 type PreCheck interface {
 	Run() error   
 }
@@ -24,7 +24,7 @@ A `RunChecks` method has been implemented which iterates over an input list of
 PreChecks and runs them on an input set of promotion edges. `RunChecks` then 
 returns any errors that are returned from each `PreCheck`.
 
-```
+```golang
 func (sc *SyncContext) RunChecks(
 	checks []PreCheck,
 ) error {
@@ -45,7 +45,7 @@ requires a separate job.
 In order to add a check, all you need to do is create a check type that 
 implements the PreCheck interface.
 
-```
+```golang
 type foo struct {}
 ...
 func (f *foo) Run() error
@@ -59,15 +59,16 @@ parameters, so any information that you need for your check should be passed
 into the check type as a field. For example, if you are running a check over 
 promotion edges, then you can set up your check like so:
 
-```
+```golang
 type foo struct {
 	PromotionEdges map[PromotionEdge]interface{}
 }
 ```
+
 This way, in your check's `Run` function you can access the PromotionEdges as 
 a field of your check.
 
-```
+```golang
 func (f * foo) Run() error {
 	edges := foo.PromotionEdges
 }
