@@ -1,0 +1,13 @@
+regions:
+  # NOTE(jaypipes): As of April 2022, these regions were determined to be the
+  # source of >=90% of traffic for container pulls
+  # See: https://github.com/kubernetes-sigs/oci-proxy/issues/38#issuecomment-1085369923
+  - ap-northeast-1
+  - ap-south-1
+  - ap-southeast-1
+  - eu-central-1
+  - eu-west-1
+  - us-east-1
+  - us-east-2
+  - us-west-1
+  - us-west-2
