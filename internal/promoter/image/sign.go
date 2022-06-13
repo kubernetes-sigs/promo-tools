@@ -212,10 +212,9 @@ func (di *DefaultPromoterImplementation) SignImages(
 	sortedEdges := map[image.Digest][]reg.PromotionEdge{}
 	for edge := range edges {
 		// Skip signing the signature, sbom and attestation layers
-		if strings.HasSuffix(string(edge.DstImageTag.Name), ".sig") ||
-			strings.HasSuffix(string(edge.DstImageTag.Name), ".sbom") ||
-			strings.HasSuffix(string(edge.DstImageTag.Name), ".att") ||
-			edge.DstImageTag.Name == "" {
+		if strings.HasSuffix(string(edge.DstImageTag.Tag), ".sig") ||
+			strings.HasSuffix(string(edge.DstImageTag.Tag), ".att") ||
+			edge.DstImageTag.Tag == "" {
 			continue
 		}
 
