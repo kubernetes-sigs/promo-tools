@@ -90,7 +90,7 @@ func (di *DefaultPromoterImplementation) FindSingedEdges(
 	if err := t.Err(); err != nil {
 		return nil, err
 	}
-	logrus.Infof("%d of promotion candiadtes are signed", len(signedEdges))
+	logrus.Infof("%d of promotion candidates are signed", len(signedEdges))
 	return signedEdges, nil
 }
 
@@ -210,9 +210,11 @@ func (di *DefaultPromoterImplementation) SignImages(
 	// signature to avoid varying valid signatures in each registry.
 	sortedEdges := map[image.Digest][]reg.PromotionEdge{}
 	for edge := range edges {
-		// Skip signing the signature and sbom layers
+		// Skip signing the signature, sbom and attestation layers
 		if strings.HasSuffix(string(edge.DstImageTag.Name), ".sig") ||
-			strings.HasSuffix(string(edge.DstImageTag.Name), ".sbom") {
+			strings.HasSuffix(string(edge.DstImageTag.Name), ".sbom") ||
+			strings.HasSuffix(string(edge.DstImageTag.Name), ".att") ||
+			edge.DstImageTag.Name == "" {
 			continue
 		}
 
