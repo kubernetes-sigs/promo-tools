@@ -28,6 +28,7 @@ import (
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/nozzle/throttler"
 	"github.com/pkg/errors"
+	"github.com/sigstore/cosign/pkg/cosign/tuf"
 	"github.com/sirupsen/logrus"
 	gopts "google.golang.org/api/option"
 	credentialspb "google.golang.org/genproto/googleapis/iam/credentials/v1"
@@ -390,4 +391,15 @@ func (di *DefaultPromoterImplementation) GetIdentityToken(
 	}
 
 	return resp.Token, nil
+}
+
+// PrewarmTUFCache initializes the TUF cache so that threads do not have to compete
+// against each other creating the TUF database.
+func (di *DefaultPromoterImplementation) PrewarmTUFCache() error {
+	if err := tuf.Initialize(
+		context.Background(), tuf.DefaultRemoteRoot, nil,
+	); err != nil {
+		return fmt.Errorf("initializing TUF client: %w", err)
+	}
+	return nil
 }

@@ -77,6 +77,7 @@ type promoterImplementation interface {
 	ValidateManifestLists(opts *options.Options) error
 
 	// Methods for image signing
+	PrewarmTUFCache() error
 	ValidateStagingSignatures(map[reg.PromotionEdge]interface{}) (map[reg.PromotionEdge]interface{}, error)
 	CopySignatures(*options.Options, *reg.SyncContext, map[reg.PromotionEdge]interface{}) error
 	SignImages(*options.Options, *reg.SyncContext, map[reg.PromotionEdge]interface{}) error
@@ -99,6 +100,12 @@ func (p *Promoter) PromoteImages(opts *options.Options) (err error) {
 
 	if err := p.impl.ActivateServiceAccounts(opts); err != nil {
 		return errors.Wrap(err, "activating service accounts")
+	}
+
+	// Prewarm the TUF cache with the targets and keys. This is done
+	// to avoid collisions when signing and verifying in parallel
+	if err := p.impl.PrewarmTUFCache(); err != nil {
+		return errors.Wrap(err, "prewarming TUF cache")
 	}
 
 	mfests, err := p.impl.ParseManifests(opts)
