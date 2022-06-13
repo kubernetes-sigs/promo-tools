@@ -224,10 +224,10 @@ func (di *DefaultPromoterImplementation) SignImages(
 
 	t := throttler.New(maxParallelSignatures, len(sortedEdges))
 	// Sign the required edges
-	for digest := range sortedEdges {
-		go func() {
+	for d := range sortedEdges {
+		go func(digest image.Digest) {
 			t.Done(di.signAndReplicate(signOpts, sortedEdges[digest]))
-		}()
+		}(d)
 		if t.Throttle() > 0 {
 			break
 		}
