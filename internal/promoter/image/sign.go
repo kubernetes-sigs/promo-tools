@@ -21,11 +21,14 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 
 	credentials "cloud.google.com/go/iam/credentials/apiv1"
 	"github.com/google/go-containerregistry/pkg/crane"
 	"github.com/google/go-containerregistry/pkg/name"
+	"github.com/nozzle/throttler"
 	"github.com/pkg/errors"
+	"github.com/sigstore/sigstore/pkg/tuf"
 	"github.com/sirupsen/logrus"
 	gopts "google.golang.org/api/option"
 	credentialspb "google.golang.org/genproto/googleapis/iam/credentials/v1"
@@ -42,7 +45,55 @@ const (
 	signatureTagSuffix = ".sig"
 
 	TestSigningAccount = "k8s-infra-promoter-test-signer@k8s-cip-test-prod.iam.gserviceaccount.com"
+
+	maxParallelVerifications = 10
+	maxParallelSignatures    = 10
+	maxParallelCopies        = 10
 )
+
+// FindSingedEdges takes a list of edges and returns a list of
+// those that have a signature attached
+func (di *DefaultPromoterImplementation) FindSingedEdges(
+	edges map[reg.PromotionEdge]interface{},
+) (map[reg.PromotionEdge]interface{}, error) {
+	signedEdges := map[reg.PromotionEdge]interface{}{}
+	// Verify the signatures in the edges we are looking at
+	t := throttler.New(maxParallelVerifications, len(edges))
+
+	l := sync.Mutex{}
+
+	// First, compile a list of signed images (edges)
+	for e := range edges {
+		go func(edge reg.PromotionEdge) {
+			signer := sign.New(sign.Default())
+			isSigned, err := signer.IsImageSigned(edge.SrcReference())
+			if err != nil {
+				t.Done(
+					fmt.Errorf("checking if %s is signed: %w", edge.SrcReference(), err),
+				)
+				return
+			}
+
+			if !isSigned {
+				t.Done(nil)
+				return
+			}
+			logrus.Infof("Image %s, is signed", edge.SrcReference())
+			l.Lock()
+			signedEdges[edge] = nil
+			l.Unlock()
+			t.Done(nil)
+		}(e)
+		if t.Throttle() > 0 {
+			break
+		}
+	}
+	if err := t.Err(); err != nil {
+		return nil, err
+	}
+	logrus.Infof("%d of promotion candidates are signed", len(signedEdges))
+	return signedEdges, nil
+}
 
 // ValidateStagingSignatures checks if edges (images) have a signature
 // applied during its staging run. If they do it verifies them and
@@ -51,37 +102,35 @@ func (di *DefaultPromoterImplementation) ValidateStagingSignatures(
 	edges map[reg.PromotionEdge]interface{},
 ) (map[reg.PromotionEdge]interface{}, error) {
 	signer := sign.New(sign.Default())
-	signedEdges := map[reg.PromotionEdge]interface{}{}
-	for edge := range edges {
-		imageRef := fmt.Sprintf(
-			"%s/%s@%s",
-			edge.SrcRegistry.Name,
-			edge.SrcImageTag.Name,
-			edge.Digest,
-		)
-		logrus.Infof("Verifying signatures of image %s", imageRef)
-
-		// If image is not signed, skip
-		isSigned, err := signer.IsImageSigned(imageRef)
-		if err != nil {
-			return nil, errors.Wrapf(err, "checking if %s is signed", imageRef)
-		}
-
-		if !isSigned {
-			logrus.Infof("No signatures found for ref %s, not checking", imageRef)
-			continue
-		}
-
-		signedEdges[edge] = edges[edge]
-
-		// Check the staged image signatures
-		if _, err := signer.VerifyImage(imageRef); err != nil {
-			return nil, errors.Wrapf(
-				err, "verifying signatures of image %s", imageRef,
-			)
-		}
-		logrus.Infof("Signatures for ref %s verfified", imageRef)
+	signedEdges, err := di.FindSingedEdges(edges)
+	if err != nil {
+		return nil, errors.New("filtering signed edges")
 	}
+
+	// Verify the signatures in the edges we are looking at
+	t := throttler.New(maxParallelVerifications, len(signedEdges))
+	for e := range signedEdges {
+		go func(edge reg.PromotionEdge) {
+			logrus.Infof("Verifying signatures of image %s", edge.SrcReference())
+
+			// Check the staged image signatures
+			if _, err := signer.VerifyImage(edge.SrcReference()); err != nil {
+				t.Done(fmt.Errorf(
+					"verifying signatures of image %s: %w", edge.SrcReference(), err,
+				))
+				return
+			}
+			logrus.Infof("Signatures for ref %s verfified", edge.SrcReference())
+			t.Done(nil)
+		}(e)
+		if t.Throttle() > 0 {
+			break
+		}
+	}
+	if err := t.Err(); err != nil {
+		return nil, err
+	}
+
 	return signedEdges, nil
 }
 
@@ -93,33 +142,43 @@ func (di *DefaultPromoterImplementation) CopySignatures(
 ) error {
 	// Cycle all signedEdges to copy them
 	logrus.Infof("Precopying %d previous signatures", len(signedEdges))
-	for edge := range signedEdges {
-		sigTag := digestToSignatureTag(edge.Digest)
-		srcRefString := fmt.Sprintf(
-			"%s/%s:%s", edge.SrcRegistry.Name, edge.SrcImageTag.Name, sigTag,
-		)
-		srcRef, err := name.ParseReference(srcRefString)
-		if err != nil {
-			return fmt.Errorf("parsing signed source reference %s: %w", srcRefString, err)
-		}
-
-		dstRefString := fmt.Sprintf(
-			"%s/%s:%s", edge.DstRegistry.Name, edge.DstImageTag.Name, sigTag,
-		)
-		dstRef, err := name.ParseReference(dstRefString)
-		if err != nil {
-			return fmt.Errorf("parsing signature destination reference %s: %w", dstRefString, err)
-		}
-
-		logrus.Infof("Signature pre copy: %s to %s", srcRefString, dstRefString)
-		if err := crane.Copy(srcRef.String(), dstRef.String()); err != nil {
-			return fmt.Errorf(
-				"copying signature %s to %s: %w",
-				srcRef.String(), dstRef.String(), err,
+	t := throttler.New(maxParallelCopies, len(signedEdges))
+	for e := range signedEdges {
+		go func(edge reg.PromotionEdge) {
+			sigTag := digestToSignatureTag(edge.Digest)
+			srcRefString := fmt.Sprintf(
+				"%s/%s:%s", edge.SrcRegistry.Name, edge.SrcImageTag.Name, sigTag,
 			)
+			srcRef, err := name.ParseReference(srcRefString)
+			if err != nil {
+				t.Done(fmt.Errorf("parsing signed source reference %s: %w", srcRefString, err))
+				return
+			}
+
+			dstRefString := fmt.Sprintf(
+				"%s/%s:%s", edge.DstRegistry.Name, edge.DstImageTag.Name, sigTag,
+			)
+			dstRef, err := name.ParseReference(dstRefString)
+			if err != nil {
+				t.Done(fmt.Errorf("parsing signature destination reference %s: %w", dstRefString, err))
+				return
+			}
+
+			logrus.Infof("Signature pre copy: %s to %s", srcRefString, dstRefString)
+			if err := crane.Copy(srcRef.String(), dstRef.String()); err != nil {
+				t.Done(fmt.Errorf(
+					"copying signature %s to %s: %w",
+					srcRef.String(), dstRef.String(), err,
+				))
+				return
+			}
+			t.Done(nil)
+		}(e)
+		if t.Throttle() > 0 {
+			break
 		}
 	}
-	return nil
+	return t.Err()
 }
 
 // SignImages signs the promoted images and stores their signatures in
@@ -151,9 +210,10 @@ func (di *DefaultPromoterImplementation) SignImages(
 	// signature to avoid varying valid signatures in each registry.
 	sortedEdges := map[image.Digest][]reg.PromotionEdge{}
 	for edge := range edges {
-		// Skip signing the signature and sbom layers
-		if strings.HasSuffix(string(edge.DstImageTag.Name), ".sig") ||
-			strings.HasSuffix(string(edge.DstImageTag.Name), ".sbom") {
+		// Skip signing the signature, sbom and attestation layers
+		if strings.HasSuffix(string(edge.DstImageTag.Tag), ".sig") ||
+			strings.HasSuffix(string(edge.DstImageTag.Tag), ".att") ||
+			edge.DstImageTag.Tag == "" {
 			continue
 		}
 
@@ -163,52 +223,61 @@ func (di *DefaultPromoterImplementation) SignImages(
 		sortedEdges[edge.Digest] = append(sortedEdges[edge.Digest], edge)
 	}
 
+	t := throttler.New(maxParallelSignatures, len(sortedEdges))
 	// Sign the required edges
-	for digest := range sortedEdges {
-		// Build the reference we will use
-		imageRef := fmt.Sprintf(
-			"%s/%s@%s",
-			sortedEdges[digest][0].DstRegistry.Name,
-			sortedEdges[digest][0].DstImageTag.Name,
-			sortedEdges[digest][0].Digest,
+	for d := range sortedEdges {
+		go func(digest image.Digest) {
+			t.Done(di.signAndReplicate(signOpts, sortedEdges[digest]))
+		}(d)
+		if t.Throttle() > 0 {
+			break
+		}
+	}
+	if err := t.Err(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (di *DefaultPromoterImplementation) signAndReplicate(signOpts *sign.Options, edges []reg.PromotionEdge) error {
+	// Build the reference we will use
+	imageRef := edges[0].DstReference()
+
+	// Add all the references as annotations to ensure we
+	// get a 2nd signature, otherwise cosign will not resign
+	mirrorList := []string{}
+	for i := range edges {
+		mirrorList = append(
+			mirrorList, fmt.Sprintf(
+				"%s/%s",
+				edges[i].DstRegistry.Name,
+				edges[i].DstImageTag.Name,
+			),
 		)
+	}
+	signOpts.Annotations = map[string]interface{}{
+		"org.kubernetes.kpromo.mirrors": strings.Join(mirrorList, ","),
+	}
+	signer := sign.New(signOpts)
 
-		// Add all the references as annotations to ensure we
-		// get a 2nd signature
-		mirrorList := []string{}
-		for i := range sortedEdges[digest] {
-			mirrorList = append(
-				mirrorList, fmt.Sprintf(
-					"%s/%s",
-					sortedEdges[digest][i].DstRegistry.Name,
-					sortedEdges[digest][i].DstImageTag.Name,
-				),
-			)
-		}
-		signOpts.Annotations = map[string]interface{}{
-			"org.kubernetes.kpromo.mirrors": strings.Join(mirrorList, ","),
-		}
-		signer := sign.New(signOpts)
+	logrus.Infof("Signing image %s", imageRef)
+	// Sign the first promoted image in the edges list:
+	if _, err := signer.SignImage(imageRef); err != nil {
+		return errors.Wrapf(err, "signing image %s", imageRef)
+	}
 
-		logrus.Infof("Signing image %s", imageRef)
-		// Sign the first promoted image in the esges list:
-		if _, err := signer.SignImage(imageRef); err != nil {
-			return errors.Wrapf(err, "signing image %s", imageRef)
-		}
-
-		// If the same digest was promoted to more than one
-		// registry, copy the signature from the first one
-		if len(sortedEdges[digest]) == 1 {
-			logrus.WithField("image", string(digest)).Debug(
-				"Not copying signatures, image promoted to single registry",
-			)
-			continue
-		}
-		if err := di.replicateSignatures(
-			&sortedEdges[digest][0], sortedEdges[digest][1:],
-		); err != nil {
-			return fmt.Errorf("copying signatures: %w", err)
-		}
+	// If the same digest was promoted to more than one
+	// registry, copy the signature from the first one
+	if len(edges) == 1 {
+		logrus.WithField("image", string(edges[0].Digest)).Debug(
+			"Not replicating signatures, image promoted to single registry",
+		)
+		return nil
+	}
+	if err := di.replicateSignatures(
+		&edges[0], edges[1:],
+	); err != nil {
+		return fmt.Errorf("replicating signatures: %w", err)
 	}
 	return nil
 }
@@ -320,4 +389,15 @@ func (di *DefaultPromoterImplementation) GetIdentityToken(
 	}
 
 	return resp.Token, nil
+}
+
+// PrewarmTUFCache initializes the TUF cache so that threads do not have to compete
+// against each other creating the TUF database.
+func (di *DefaultPromoterImplementation) PrewarmTUFCache() error {
+	if err := tuf.Initialize(
+		context.Background(), tuf.DefaultRemoteRoot, nil,
+	); err != nil {
+		return fmt.Errorf("initializing TUF client: %w", err)
+	}
+	return nil
 }

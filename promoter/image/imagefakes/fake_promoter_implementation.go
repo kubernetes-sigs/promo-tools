@@ -170,6 +170,16 @@ type FakePromoterImplementation struct {
 	precheckAndExitReturnsOnCall map[int]struct {
 		result1 error
 	}
+	PrewarmTUFCacheStub        func() error
+	prewarmTUFCacheMutex       sync.RWMutex
+	prewarmTUFCacheArgsForCall []struct {
+	}
+	prewarmTUFCacheReturns struct {
+		result1 error
+	}
+	prewarmTUFCacheReturnsOnCall map[int]struct {
+		result1 error
+	}
 	PrintSecDisclaimerStub        func()
 	printSecDisclaimerMutex       sync.RWMutex
 	printSecDisclaimerArgsForCall []struct {
@@ -1011,6 +1021,59 @@ func (fake *FakePromoterImplementation) PrecheckAndExitReturnsOnCall(i int, resu
 	}{result1}
 }
 
+func (fake *FakePromoterImplementation) PrewarmTUFCache() error {
+	fake.prewarmTUFCacheMutex.Lock()
+	ret, specificReturn := fake.prewarmTUFCacheReturnsOnCall[len(fake.prewarmTUFCacheArgsForCall)]
+	fake.prewarmTUFCacheArgsForCall = append(fake.prewarmTUFCacheArgsForCall, struct {
+	}{})
+	stub := fake.PrewarmTUFCacheStub
+	fakeReturns := fake.prewarmTUFCacheReturns
+	fake.recordInvocation("PrewarmTUFCache", []interface{}{})
+	fake.prewarmTUFCacheMutex.Unlock()
+	if stub != nil {
+		return stub()
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakePromoterImplementation) PrewarmTUFCacheCallCount() int {
+	fake.prewarmTUFCacheMutex.RLock()
+	defer fake.prewarmTUFCacheMutex.RUnlock()
+	return len(fake.prewarmTUFCacheArgsForCall)
+}
+
+func (fake *FakePromoterImplementation) PrewarmTUFCacheCalls(stub func() error) {
+	fake.prewarmTUFCacheMutex.Lock()
+	defer fake.prewarmTUFCacheMutex.Unlock()
+	fake.PrewarmTUFCacheStub = stub
+}
+
+func (fake *FakePromoterImplementation) PrewarmTUFCacheReturns(result1 error) {
+	fake.prewarmTUFCacheMutex.Lock()
+	defer fake.prewarmTUFCacheMutex.Unlock()
+	fake.PrewarmTUFCacheStub = nil
+	fake.prewarmTUFCacheReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakePromoterImplementation) PrewarmTUFCacheReturnsOnCall(i int, result1 error) {
+	fake.prewarmTUFCacheMutex.Lock()
+	defer fake.prewarmTUFCacheMutex.Unlock()
+	fake.PrewarmTUFCacheStub = nil
+	if fake.prewarmTUFCacheReturnsOnCall == nil {
+		fake.prewarmTUFCacheReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.prewarmTUFCacheReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
+}
+
 func (fake *FakePromoterImplementation) PrintSecDisclaimer() {
 	fake.printSecDisclaimerMutex.Lock()
 	fake.printSecDisclaimerArgsForCall = append(fake.printSecDisclaimerArgsForCall, struct {
@@ -1617,6 +1680,8 @@ func (fake *FakePromoterImplementation) Invocations() map[string][][]interface{}
 	defer fake.parseManifestsMutex.RUnlock()
 	fake.precheckAndExitMutex.RLock()
 	defer fake.precheckAndExitMutex.RUnlock()
+	fake.prewarmTUFCacheMutex.RLock()
+	defer fake.prewarmTUFCacheMutex.RUnlock()
 	fake.printSecDisclaimerMutex.RLock()
 	defer fake.printSecDisclaimerMutex.RUnlock()
 	fake.printSectionMutex.RLock()

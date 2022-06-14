@@ -445,6 +445,34 @@ func (edge *PromotionEdge) VertexPropsFor(
 	return p
 }
 
+// SrcReference returns a reference pointing to the source image
+func (edge *PromotionEdge) SrcReference() string {
+	if edge.SrcRegistry.Name == "" || edge.SrcImageTag.Name == "" || edge.Digest == "" {
+		return ""
+	}
+
+	return fmt.Sprintf(
+		"%s/%s@%s",
+		edge.SrcRegistry.Name,
+		edge.SrcImageTag.Name,
+		edge.Digest,
+	)
+}
+
+// DstReference returns a reference pointing to the destination image
+func (edge *PromotionEdge) DstReference() string {
+	if edge.DstRegistry.Name == "" || edge.DstImageTag.Name == "" || edge.Digest == "" {
+		return ""
+	}
+
+	return fmt.Sprintf(
+		"%s/%s@%s",
+		edge.DstRegistry.Name,
+		edge.DstImageTag.Name,
+		edge.Digest,
+	)
+}
+
 // ValidateRegistryImagePath validates the RegistryImagePath.
 func ValidateRegistryImagePath(rip RegistryImagePath) error {
 	// \w is [0-9a-zA-Z_]
