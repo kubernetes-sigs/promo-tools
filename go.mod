@@ -31,7 +31,7 @@ require (
 	gopkg.in/src-d/go-git.v4 v4.13.1
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/utils v0.0.0-20220210201930-3a6ce19ff2f9
-	sigs.k8s.io/release-sdk v0.9.1
+	sigs.k8s.io/release-sdk v0.9.2-0.20220614205333-fb482c6638eb
 	sigs.k8s.io/release-utils v0.7.1
 	sigs.k8s.io/yaml v1.3.0
 )
@@ -203,7 +203,7 @@ require (
 	github.com/secure-systems-lab/go-securesystemslib v0.4.0 // indirect
 	github.com/segmentio/ksuid v1.0.4 // indirect
 	github.com/shibumi/go-pathspec v1.3.0 // indirect
-	github.com/sigstore/cosign v1.9.1-0.20220612122233-b01a173cab38 // indirect
+	github.com/sigstore/cosign v1.9.1-0.20220614200746-190e679f4cf8 // indirect
 	github.com/sigstore/fulcio v0.1.2-0.20220114150912-86a2036f9bc7 // indirect
 	github.com/sigstore/rekor v0.4.1-0.20220114213500-23f583409af3 // indirect
 	github.com/skratchdot/open-golang v0.0.0-20200116055534-eef842397966 // indirect
