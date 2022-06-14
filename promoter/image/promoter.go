@@ -19,7 +19,8 @@ package imagepromoter
 //go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate
 
 import (
-	"github.com/pkg/errors"
+	"fmt"
+
 	"github.com/sirupsen/logrus"
 
 	reg "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
@@ -95,22 +96,22 @@ func (p *Promoter) PromoteImages(opts *options.Options) (err error) {
 	// Validate the options. Perhaps another image-specific
 	// validation function may be needed.
 	if err := p.impl.ValidateOptions(opts); err != nil {
-		return errors.Wrap(err, "validating options")
+		return fmt.Errorf("validating options: %w", err)
 	}
 
 	if err := p.impl.ActivateServiceAccounts(opts); err != nil {
-		return errors.Wrap(err, "activating service accounts")
+		return fmt.Errorf("activating service accounts: %w", err)
 	}
 
 	// Prewarm the TUF cache with the targets and keys. This is done
 	// to avoid collisions when signing and verifying in parallel
 	if err := p.impl.PrewarmTUFCache(); err != nil {
-		return errors.Wrap(err, "prewarming TUF cache")
+		return fmt.Errorf("prewarming TUF cache: %w", err)
 	}
 
 	mfests, err := p.impl.ParseManifests(opts)
 	if err != nil {
-		return errors.Wrap(err, "parsing manifests")
+		return fmt.Errorf("parsing manifests: %w", err)
 	}
 
 	p.impl.PrintVersion()
@@ -118,12 +119,12 @@ func (p *Promoter) PromoteImages(opts *options.Options) (err error) {
 
 	sc, err := p.impl.MakeSyncContext(opts, mfests)
 	if err != nil {
-		return errors.Wrap(err, "creating sync context")
+		return fmt.Errorf("creating sync context: %w", err)
 	}
 
 	promotionEdges, err := p.impl.GetPromotionEdges(sc, mfests)
 	if err != nil {
-		return errors.Wrap(err, "filtering edges")
+		return fmt.Errorf("filtering edges: %w", err)
 	}
 
 	// MakeProducer
@@ -138,7 +139,7 @@ func (p *Promoter) PromoteImages(opts *options.Options) (err error) {
 	// Verify any signatures in staged images
 	signedEdges, err := p.impl.ValidateStagingSignatures(promotionEdges)
 	if err != nil {
-		return errors.Wrap(err, "checking signtaures in staging images")
+		return fmt.Errorf("checking signtaures in staging images: %w", err)
 	}
 
 	// Check the pull request
@@ -147,19 +148,19 @@ func (p *Promoter) PromoteImages(opts *options.Options) (err error) {
 	}
 
 	if err := p.impl.PromoteImages(sc, promotionEdges, producerFunc); err != nil {
-		return errors.Wrap(err, "running promotion")
+		return fmt.Errorf("running promotion: %w", err)
 	}
 
 	if err := p.impl.CopySignatures(opts, sc, signedEdges); err != nil {
-		return errors.Wrap(err, "copying existing signatures")
+		return fmt.Errorf("copying existing signatures: %w", err)
 	}
 
 	if err := p.impl.SignImages(opts, sc, promotionEdges); err != nil {
-		return errors.Wrap(err, "signing images")
+		return fmt.Errorf("signing images: %w", err)
 	}
 
 	if err := p.impl.WriteSBOMs(opts, sc, promotionEdges); err != nil {
-		return errors.Wrap(err, "writing sboms")
+		return fmt.Errorf("writing sboms: %w", err)
 	}
 
 	return nil
@@ -168,11 +169,11 @@ func (p *Promoter) PromoteImages(opts *options.Options) (err error) {
 // Snapshot runs the steps to output a representation in json or yaml of a registry
 func (p *Promoter) Snapshot(opts *options.Options) (err error) {
 	if err := p.impl.ValidateOptions(opts); err != nil {
-		return errors.Wrap(err, "validating options")
+		return fmt.Errorf("validating options: %w", err)
 	}
 
 	if err := p.impl.ActivateServiceAccounts(opts); err != nil {
-		return errors.Wrap(err, "activating service accounts")
+		return fmt.Errorf("activating service accounts: %w", err)
 	}
 
 	p.impl.PrintVersion()
@@ -180,20 +181,23 @@ func (p *Promoter) Snapshot(opts *options.Options) (err error) {
 
 	mfests, err := p.impl.GetSnapshotManifests(opts)
 	if err != nil {
-		return errors.Wrap(err, "getting snapshot manifests")
+		return fmt.Errorf("getting snapshot manifests: %w", err)
 	}
 
 	mfests, err = p.impl.AppendManifestToSnapshot(opts, mfests)
 	if err != nil {
-		return errors.Wrap(err, "adding the specified manifest to the snapshot context")
+		return fmt.Errorf("adding the specified manifest to the snapshot context: %w", err)
 	}
 
 	rii, err := p.impl.GetRegistryImageInventory(opts, mfests)
 	if err != nil {
-		return errors.Wrap(err, "getting registry image inventory")
+		return fmt.Errorf("getting registry image inventory: %w", err)
 	}
 
-	return errors.Wrap(p.impl.Snapshot(opts, rii), "generating snapshot")
+	if err := p.impl.Snapshot(opts, rii); err != nil {
+		return fmt.Errorf("generating snapshot: %w", err)
+	}
+	return nil
 }
 
 // SecurityScan runs just like an image promotion, but instead of
@@ -201,16 +205,16 @@ func (p *Promoter) Snapshot(opts *options.Options) (err error) {
 // scan on them
 func (p *Promoter) SecurityScan(opts *options.Options) error {
 	if err := p.impl.ValidateOptions(opts); err != nil {
-		return errors.Wrap(err, "validating options")
+		return fmt.Errorf("validating options: %w", err)
 	}
 
 	if err := p.impl.ActivateServiceAccounts(opts); err != nil {
-		return errors.Wrap(err, "activating service accounts")
+		return fmt.Errorf("activating service accounts: %w", err)
 	}
 
 	mfests, err := p.impl.ParseManifests(opts)
 	if err != nil {
-		return errors.Wrap(err, "parsing manifests")
+		return fmt.Errorf("parsing manifests: %w", err)
 	}
 
 	p.impl.PrintVersion()
@@ -219,12 +223,12 @@ func (p *Promoter) SecurityScan(opts *options.Options) error {
 
 	sc, err := p.impl.MakeSyncContext(opts, mfests)
 	if err != nil {
-		return errors.Wrap(err, "creating sync context")
+		return fmt.Errorf("creating sync context: %w", err)
 	}
 
 	promotionEdges, err := p.impl.GetPromotionEdges(sc, mfests)
 	if err != nil {
-		return errors.Wrap(err, "filtering edges")
+		return fmt.Errorf("filtering edges: %w", err)
 	}
 
 	// TODO: Let's rethink this option
@@ -238,24 +242,25 @@ func (p *Promoter) SecurityScan(opts *options.Options) error {
 		return p.impl.PrecheckAndExit(opts, mfests)
 	}
 
-	return errors.Wrap(
-		p.impl.ScanEdges(opts, sc, promotionEdges),
-		"running vulnerability scan",
-	)
+	if err := p.impl.ScanEdges(opts, sc, promotionEdges); err != nil {
+		return fmt.Errorf("running vulnerability scan: %w", err)
+	}
+	return nil
 }
 
 // CheckManifestLists is a mode that just checks manifests
 // and exists.
 func (p *Promoter) CheckManifestLists(opts *options.Options) error {
 	if err := p.impl.ValidateOptions(opts); err != nil {
-		return errors.Wrap(err, "validating options")
+		return fmt.Errorf("validating options: %w", err)
 	}
 
 	if err := p.impl.ActivateServiceAccounts(opts); err != nil {
-		return errors.Wrap(err, "activating service accounts")
+		return fmt.Errorf("activating service accounts: %w", err)
 	}
 
-	return errors.Wrap(
-		p.impl.ValidateManifestLists(opts), "checking manifest lists",
-	)
+	if err := p.impl.ValidateManifestLists(opts); err != nil {
+		return fmt.Errorf("checking manifest lists: %w", err)
+	}
+	return nil
 }
