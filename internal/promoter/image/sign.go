@@ -104,18 +104,17 @@ func (di *DefaultPromoterImplementation) ValidateStagingSignatures(
 	signer := sign.New(sign.Default())
 	signedEdges, err := di.FindSingedEdges(edges)
 	if err != nil {
-		return nil, errors.Errorf("filtering signed edges")
+		return nil, errors.New("filtering signed edges")
 	}
 
 	// Verify the signatures in the edges we are looking at
 	t := throttler.New(maxParallelVerifications, len(signedEdges))
 	for e := range signedEdges {
 		go func(edge reg.PromotionEdge) {
-			var err error
 			logrus.Infof("Verifying signatures of image %s", edge.SrcReference())
 
 			// Check the staged image signatures
-			if _, err = signer.VerifyImage(edge.SrcReference()); err != nil {
+			if _, err := signer.VerifyImage(edge.SrcReference()); err != nil {
 				t.Done(fmt.Errorf(
 					"verifying signatures of image %s: %w", edge.SrcReference(), err,
 				))
