@@ -28,7 +28,7 @@ import (
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/nozzle/throttler"
 	"github.com/pkg/errors"
-	"github.com/sigstore/cosign/pkg/cosign/tuf"
+	"github.com/sigstore/sigstore/pkg/tuf"
 	"github.com/sirupsen/logrus"
 	gopts "google.golang.org/api/option"
 	credentialspb "google.golang.org/genproto/googleapis/iam/credentials/v1"
