@@ -47,6 +47,10 @@ func New() *Promoter {
 	}
 }
 
+func (p *Promoter) SetImplementation(pi promoterImplementation) {
+	p.impl = pi
+}
+
 //counterfeiter:generate . promoterImplementation
 
 // promoterImplementation handles all the functionality in the promoter
