@@ -59,13 +59,26 @@ func (di *DefaultPromoterImplementation) FindSingedEdges(
 	signedEdges := map[reg.PromotionEdge]interface{}{}
 	// Verify the signatures in the edges we are looking at
 	t := throttler.New(maxParallelVerifications, len(edges))
-
+	seenEdges := struct {
+		sync.Mutex
+		list map[string]struct{}
+	}{
+		list: map[string]struct{}{},
+	}
 	l := sync.Mutex{}
 
 	// First, compile a list of signed images (edges)
 	for e := range edges {
 		go func(edge reg.PromotionEdge) {
 			signer := sign.New(sign.Default())
+			if _, ok := seenEdges.list[edge.SrcReference()]; ok {
+				t.Done(nil)
+				return
+			}
+			seenEdges.Lock()
+			seenEdges.list[edge.SrcReference()] = struct{}{}
+			seenEdges.Unlock()
+
 			isSigned, err := signer.IsImageSigned(edge.SrcReference())
 			if err != nil {
 				t.Done(
