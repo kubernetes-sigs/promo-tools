@@ -11,7 +11,7 @@ require (
 	github.com/blang/semver v3.5.1+incompatible // indirect
 	github.com/cenkalti/backoff/v4 v4.1.3
 	github.com/google/go-cmp v0.5.8
-	github.com/google/go-containerregistry v0.9.0
+	github.com/google/go-containerregistry v0.10.0
 	github.com/google/uuid v1.3.0
 	github.com/kevinburke/ssh_config v1.1.0 // indirect
 	github.com/maxbrunsfeld/counterfeiter/v6 v6.5.0
