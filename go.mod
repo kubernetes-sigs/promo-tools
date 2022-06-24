@@ -7,7 +7,7 @@ require (
 	cloud.google.com/go/errorreporting v0.2.0
 	cloud.google.com/go/grafeas v0.1.0 // indirect
 	cloud.google.com/go/logging v1.4.2
-	cloud.google.com/go/storage v1.22.1
+	cloud.google.com/go/storage v1.23.0
 	github.com/blang/semver v3.5.1+incompatible // indirect
 	github.com/cenkalti/backoff/v4 v4.1.3
 	github.com/google/go-cmp v0.5.8
@@ -44,7 +44,7 @@ require (
 
 require (
 	bitbucket.org/creachadair/shell v0.0.6 // indirect
-	cloud.google.com/go v0.102.0 // indirect
+	cloud.google.com/go v0.102.1 // indirect
 	cloud.google.com/go/compute v1.7.0 // indirect
 	cuelang.org/go v0.4.3 // indirect
 	github.com/Azure/azure-sdk-for-go v65.0.0+incompatible // indirect
