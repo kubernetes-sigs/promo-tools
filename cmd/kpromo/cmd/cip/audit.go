@@ -17,7 +17,8 @@ limitations under the License.
 package cip
 
 import (
-	"github.com/pkg/errors"
+	"fmt"
+
 	"github.com/spf13/cobra"
 
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/cli"
@@ -35,10 +36,10 @@ Start an audit server that responds to Pub/Sub push events.
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return errors.Wrap(
-			cli.RunAuditCmd(auditOpts),
-			"run `cip audit`",
-		)
+		if err := cli.RunAuditCmd(auditOpts); err != nil {
+			return fmt.Errorf("run `cip audit`: %w", err)
+		}
+		return nil
 	},
 }
 

@@ -18,6 +18,7 @@ package imagepromoter
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -27,7 +28,6 @@ import (
 	"github.com/google/go-containerregistry/pkg/crane"
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/nozzle/throttler"
-	"github.com/pkg/errors"
 	"github.com/sigstore/sigstore/pkg/tuf"
 	"github.com/sirupsen/logrus"
 	gopts "google.golang.org/api/option"
@@ -214,7 +214,7 @@ func (di *DefaultPromoterImplementation) SignImages(
 	// Get the identity token we will use
 	token, err := di.GetIdentityToken(opts, opts.SignerAccount)
 	if err != nil {
-		return errors.Wrap(err, "generating identity token")
+		return fmt.Errorf("generating identity token: %w", err)
 	}
 	signOpts.IdentityToken = token
 
@@ -276,7 +276,7 @@ func (di *DefaultPromoterImplementation) signAndReplicate(signOpts *sign.Options
 	logrus.Infof("Signing image %s", imageRef)
 	// Sign the first promoted image in the edges list:
 	if _, err := signer.SignImage(imageRef); err != nil {
-		return errors.Wrapf(err, "signing image %s", imageRef)
+		return fmt.Errorf("signing image %s: %w", imageRef, err)
 	}
 
 	// If the same digest was promoted to more than one
@@ -386,7 +386,7 @@ func (di *DefaultPromoterImplementation) GetIdentityToken(
 		ctx, credOptions...,
 	)
 	if err != nil {
-		return tok, errors.Wrap(err, "creating credentials token")
+		return tok, fmt.Errorf("creating credentials token: %w", err)
 	}
 	defer c.Close()
 	logrus.Infof("Signing identity for images will be %s", serviceAccount)
@@ -398,7 +398,7 @@ func (di *DefaultPromoterImplementation) GetIdentityToken(
 
 	resp, err := c.GenerateIdToken(ctx, req)
 	if err != nil {
-		return tok, errors.Wrap(err, "getting error account")
+		return tok, fmt.Errorf("getting error account: %w", err)
 	}
 
 	return resp.Token, nil

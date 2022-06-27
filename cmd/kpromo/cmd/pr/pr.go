@@ -19,12 +19,12 @@ package pr
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
@@ -80,7 +80,7 @@ func (o *promoteOptions) Validate() error {
 
 	// Check the fork slug
 	if _, _, err := git.ParseRepoSlug(o.userFork); err != nil {
-		return errors.Wrap(err, "checking user's fork")
+		return fmt.Errorf("checking user's fork: %w", err)
 	}
 
 	// Check that the GitHub token is set
@@ -152,7 +152,7 @@ func init() {
 
 	for _, flagName := range []string{"tag", "fork"} {
 		if err := PRCmd.MarkPersistentFlagRequired(flagName); err != nil {
-			logrus.Error(errors.Wrapf(err, "marking tag %s as required", flagName))
+			logrus.Errorf("Marking tag %s as required: %v", flagName, err)
 		}
 	}
 }
@@ -160,7 +160,7 @@ func init() {
 func runPromote(opts *promoteOptions) error {
 	// Check the cmd line opts
 	if err := opts.Validate(); err != nil {
-		return errors.Wrap(err, "checking command line options")
+		return fmt.Errorf("checking command line options: %w", err)
 	}
 
 	ctx := context.Background()
@@ -171,7 +171,7 @@ func runPromote(opts *promoteOptions) error {
 	// Get the github org and repo from the fork slug
 	userForkOrg, userForkRepo, err := git.ParseRepoSlug(opts.userFork)
 	if err != nil {
-		return errors.Wrap(err, "parsing user's fork")
+		return fmt.Errorf("parsing user's fork: %w", err)
 	}
 	if userForkRepo == "" {
 		userForkRepo = k8sioRepo
@@ -184,13 +184,13 @@ func runPromote(opts *promoteOptions) error {
 	if err = github.VerifyFork(
 		branchname, userForkOrg, userForkRepo, git.DefaultGithubOrg, k8sioRepo,
 	); err != nil {
-		return errors.Wrapf(err, "while checking fork of %s/%s ", git.DefaultGithubOrg, k8sioRepo)
+		return fmt.Errorf("while checking fork of %s/%s: %w ", git.DefaultGithubOrg, k8sioRepo, err)
 	}
 
 	// Clone k8s.io
 	repo, err := github.PrepareFork(branchname, git.DefaultGithubOrg, k8sioRepo, userForkOrg, userForkRepo)
 	if err != nil {
-		return errors.Wrap(err, "while preparing k/k8s.io fork")
+		return fmt.Errorf("while preparing k/k8s.io fork: %w", err)
 	}
 
 	defer func() {
@@ -218,7 +218,7 @@ func runPromote(opts *promoteOptions) error {
 			logrus.Debug("Reading the current image promoter manifest (image list)")
 			oldlist, err = os.ReadFile(filepath.Join(repo.Dir(), imagesListPath))
 			if err != nil {
-				return errors.Wrap(err, "while reading the current promoter image list")
+				return fmt.Errorf("while reading the current promoter image list: %w", err)
 			}
 		}
 
@@ -226,23 +226,23 @@ func runPromote(opts *promoteOptions) error {
 		if err := opt.Populate(
 			filepath.Join(repo.Dir(), image.ProdRegistry),
 			image.StagingRepoPrefix+opts.project, opts.images, opts.digests, opts.tags); err != nil {
-			return errors.Wrapf(err, "populating image promoter options for tag %s with image filter %s", opts.tags, opts.images)
+			return fmt.Errorf("populating image promoter options for tag %s with image filter %s: %w", opts.tags, opts.images, err)
 		}
 
 		if err := opt.Validate(); err != nil {
-			return errors.Wrapf(err, "validate promoter options tag %s with image filter %s", opts.tags, opts.images)
+			return fmt.Errorf("validate promoter options tag %s with image filter %s: %w", opts.tags, opts.images, err)
 		}
 
 		logrus.Infof("Growing manifests for images matching filter %s and matching tag %s", opts.images, opts.tags)
 		if err := manifest.Grow(ctx, &opt); err != nil {
-			return errors.Wrapf(err, "Growing manifest with image filter %s and tag %s", opts.images, opts.tags)
+			return fmt.Errorf("growing manifest with image filter %s and tag %s: %w", opts.images, opts.tags, err)
 		}
 	}
 
 	// Re-write the image list without the mock images
 	rawImageList, err := image.NewManifestListFromFile(filepath.Join(repo.Dir(), imagesListPath))
 	if err != nil {
-		return errors.Wrap(err, "parsing the current manifest")
+		return fmt.Errorf("parsing the current manifest: %w", err)
 	}
 
 	// Create a new imagelist to copy the non-mock images
@@ -257,7 +257,7 @@ func runPromote(opts *promoteOptions) error {
 
 	// Write the modified manifest
 	if err := newImageList.Write(filepath.Join(repo.Dir(), imagesListPath)); err != nil {
-		return errors.Wrap(err, "while writing the promoter image list")
+		return fmt.Errorf("while writing the promoter image list: %w", err)
 	}
 
 	// Check if the image list was modified
@@ -266,7 +266,7 @@ func runPromote(opts *promoteOptions) error {
 		// read the newly modified manifest
 		newlist, err := os.ReadFile(filepath.Join(repo.Dir(), imagesListPath))
 		if err != nil {
-			return errors.Wrap(err, "while reading the modified manifest images list")
+			return fmt.Errorf("while reading the modified manifest images list: %w", err)
 		}
 
 		// If the manifest was not modified, exit now
@@ -279,7 +279,7 @@ func runPromote(opts *promoteOptions) error {
 	// add the modified manifest to staging
 	logrus.Debugf("Adding %s to staging area", imagesListPath)
 	if err := repo.Add(imagesListPath); err != nil {
-		return errors.Wrap(err, "adding image manifest to staging area")
+		return fmt.Errorf("adding image manifest to staging area: %w", err)
 	}
 
 	commitMessage := "Image promotion for " + opts.project + " " + strings.Join(opts.tags, " / ")
@@ -290,14 +290,14 @@ func runPromote(opts *promoteOptions) error {
 	// Commit files
 	logrus.Debug("Creating commit")
 	if err := repo.UserCommit(commitMessage); err != nil {
-		return errors.Wrapf(err, "Error creating commit in %s/%s", git.DefaultGithubOrg, k8sioRepo)
+		return fmt.Errorf("creating commit in %s/%s: %w", git.DefaultGithubOrg, k8sioRepo, err)
 	}
 
 	// Push to fork
 	if mustRun(opts, fmt.Sprintf("Push changes to user's fork at %s/%s?", userForkOrg, userForkRepo)) {
 		logrus.Infof("Pushing manifest changes to %s/%s", userForkOrg, userForkRepo)
 		if err := repo.PushToRemote(github.UserForkName, branchname); err != nil {
-			return errors.Wrapf(err, "pushing %s to %s/%s", github.UserForkName, userForkOrg, userForkRepo)
+			return fmt.Errorf("pushing %s to %s/%s: %w", github.UserForkName, userForkOrg, userForkRepo, err)
 		}
 	} else {
 		// Exit if no push was made
@@ -314,7 +314,7 @@ func runPromote(opts *promoteOptions) error {
 			commitMessage, generatePRBody(opts),
 		)
 		if err != nil {
-			return errors.Wrap(err, "creating the pull request in k/k8s.io")
+			return fmt.Errorf("creating the pull request in k/k8s.io: %w", err)
 		}
 		logrus.Infof(
 			"Successfully created PR: %s%s/%s/pull/%d",

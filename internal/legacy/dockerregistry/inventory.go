@@ -37,7 +37,6 @@ import (
 	ggcrV1 "github.com/google/go-containerregistry/pkg/v1"
 	ggcrV1Google "github.com/google/go-containerregistry/pkg/v1/google"
 	ggcrV1Types "github.com/google/go-containerregistry/pkg/v1/types"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/registry"
@@ -758,23 +757,23 @@ func (sc *SyncContext) ReadRegistriesGGCR(
 	for _, r := range toRead {
 		repo, err := name.NewRepository(string(r.Name))
 		if err != nil {
-			return errors.Wrap(err, "parsing repo name")
+			return fmt.Errorf("parsing repo name: %w", err)
 		}
 
 		if recurse {
 			if err := ggcrV1Google.Walk(
 				repo, sc.recordFoundTags, opts...,
 			); err != nil {
-				return errors.Wrap(err, "walking repo")
+				return fmt.Errorf("walking repo: %w", err)
 			}
 		} else {
 			tags, err := ggcrV1Google.List(repo, opts...)
 			if err != nil {
-				return errors.Wrap(err, "getting tag list")
+				return fmt.Errorf("getting tag list: %w", err)
 			}
 
 			if err := sc.recordFoundTags(repo, tags, nil); err != nil {
-				return errors.Wrap(err, "registering tags")
+				return fmt.Errorf("registering tags: %w", err)
 			}
 		}
 	}
@@ -787,13 +786,13 @@ func (sc *SyncContext) recordFoundTags(
 	repo name.Repository, tags *ggcrV1Google.Tags, err error,
 ) error {
 	if err != nil {
-		return errors.Wrap(err, "before attempting to walk the registry")
+		return fmt.Errorf("before attempting to walk the registry: %w", err)
 	}
 	regName, imageName, err := SplitByKnownRegistries(
 		image.Registry(repo.Name()), sc.RegistryContexts,
 	)
 	if err != nil {
-		return errors.Wrap(err, "splitting repo and image name")
+		return fmt.Errorf("splitting repo and image name: %w", err)
 	}
 	logrus.Infof("Registry: %s Image: %s Got: %s", regName, imageName, repo.Name())
 	digestTags := make(registry.DigestTags)
@@ -807,7 +806,7 @@ func (sc *SyncContext) recordFoundTags(
 
 			mediaType, err := supportedMediaType(manifest.MediaType)
 			if err != nil {
-				logrus.Error(errors.Wrapf(err, "processing digest %s", digest))
+				logrus.Errorf("Processing digest %s: %v", digest, err)
 			}
 
 			sc.DigestMediaType[image.Digest(digest)] = mediaType
@@ -1576,7 +1575,7 @@ func (sc *SyncContext) FilterPromotionEdges(
 		// Do not read these registries recursively, because we already know
 		// exactly which repositories to read (getRegistriesToRead()).
 		if err := sc.ReadRegistriesGGCR(regs, false); err != nil {
-			return nil, false, errors.Wrap(err, "reading registries")
+			return nil, false, fmt.Errorf("reading registries: %w", err)
 		}
 	}
 

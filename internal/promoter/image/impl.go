@@ -17,7 +17,9 @@ limitations under the License.
 package imagepromoter
 
 import (
-	"github.com/pkg/errors"
+	"errors"
+	"fmt"
+
 	"github.com/sirupsen/logrus"
 
 	reg "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
@@ -53,12 +55,12 @@ func (di *DefaultPromoterImplementation) ValidateManifestLists(opts *options.Opt
 	images := make([]registry.ImageWithDigestSlice, 0)
 
 	if err := reg.ParseSnapshot(opts.CheckManifestLists, &images); err != nil {
-		return errors.Wrap(err, "parsing snapshot")
+		return fmt.Errorf("parsing snapshot: %w", err)
 	}
 
 	imgs, err := registry.FilterParentImages(r, &images)
 	if err != nil {
-		return errors.Wrap(err, "filtering parent images")
+		return fmt.Errorf("filtering parent images: %w", err)
 	}
 
 	registry.ValidateParentImages(r, imgs)
@@ -82,7 +84,7 @@ func (di *DefaultPromoterImplementation) ActivateServiceAccounts(opts *options.O
 		logrus.Warn("Not setting a service account")
 	}
 	if err := gcloud.ActivateServiceAccounts(opts.KeyFiles); err != nil {
-		return errors.Wrap(err, "activating service accounts")
+		return fmt.Errorf("activating service accounts: %w", err)
 	}
 	// TODO: Output to log the accout used
 	return nil
@@ -96,15 +98,15 @@ func (di *DefaultPromoterImplementation) PrecheckAndExit(
 	// Make the sync context tu run the prechecks:
 	sc, err := di.MakeSyncContext(opts, mfests)
 	if err != nil {
-		return errors.Wrap(err, "generatinng sync context for prechecks")
+		return fmt.Errorf("generatinng sync context for prechecks: %w", err)
 	}
 
 	// Run the prechecks, these will be run and the calling
 	// mode of operation should exit.
-	return errors.Wrap(
-		sc.RunChecks([]reg.PreCheck{}),
-		"running prechecks before promotion",
-	)
+	if err := sc.RunChecks([]reg.PreCheck{}); err != nil {
+		return fmt.Errorf("running prechecks before promotion: %w", err)
+	}
+	return nil
 }
 
 func (di *DefaultPromoterImplementation) PrintVersion() {

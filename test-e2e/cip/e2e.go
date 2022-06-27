@@ -18,6 +18,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -26,7 +27,6 @@ import (
 	"strings"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	yaml "gopkg.in/yaml.v2"
 
@@ -146,7 +146,7 @@ func checkSnapshot(
 	// Get the snapshot of the repo
 	got, err := getSnapshot(repoRoot, repo, rcs)
 	if err != nil {
-		return errors.Wrapf(err, "getting snapshot of %s", repo)
+		return fmt.Errorf("getting snapshot of %s: %w", repo, err)
 	}
 
 	// After signing images, the repo snapshots will never match. In order
@@ -157,7 +157,7 @@ func checkSnapshot(
 	diff := cmp.Diff(got, expected)
 	if diff != "" {
 		fmt.Printf("the following diff exists: %s", diff)
-		return errors.Errorf("expected equivalent image sets")
+		return errors.New("expected equivalent image sets")
 	}
 
 	return nil
@@ -165,7 +165,7 @@ func checkSnapshot(
 
 func testSetup(repoRoot string, t *E2ETest) error {
 	if err := t.clearRepositories(); err != nil {
-		return errors.Wrap(err, "cleaning test repository")
+		return fmt.Errorf("cleaning test repository: %w", err)
 	}
 
 	goldenPush := fmt.Sprintf("%s/test-e2e/golden-images/push-golden.sh", repoRoot)
@@ -283,7 +283,7 @@ func (t *E2ETest) clearRepositories() error {
 		true,
 		true)
 	if err != nil {
-		return errors.Wrap(err, "trying to create sync context")
+		return fmt.Errorf("trying to create sync context: %w", err)
 	}
 
 	sc.ReadRegistries(
