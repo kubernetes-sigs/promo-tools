@@ -18,10 +18,10 @@ package manifest
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
 	"sigs.k8s.io/promo-tools/v3/promobot"
@@ -35,7 +35,10 @@ var filesCmd = &cobra.Command{
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return errors.Wrap(runFileManifest(filesOpts), "run `kpromo manifest files`")
+		if err := runFileManifest(filesOpts); err != nil {
+			return fmt.Errorf("run `kpromo manifest files`: %w", err)
+		}
+		return nil
 	},
 }
 
@@ -71,7 +74,7 @@ func runFileManifest(opts *promobot.GenerateManifestOptions) error {
 
 	src, err := filepath.Abs(opts.BaseDir)
 	if err != nil {
-		return errors.Wrapf(err, "resolving %q to absolute path", src)
+		return fmt.Errorf("resolving %q to absolute path: %w", src, err)
 	}
 
 	opts.BaseDir = src
@@ -83,7 +86,7 @@ func runFileManifest(opts *promobot.GenerateManifestOptions) error {
 
 	manifestYAML, err := yaml.Marshal(manifest)
 	if err != nil {
-		return errors.Wrap(err, "serializing manifest")
+		return fmt.Errorf("serializing manifest: %w", err)
 	}
 
 	if _, err := os.Stdout.Write(manifestYAML); err != nil {

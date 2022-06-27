@@ -17,10 +17,10 @@ limitations under the License.
 package imagepromoter
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
 	reg "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
@@ -41,7 +41,7 @@ func (di *DefaultPromoterImplementation) Snapshot(opts *options.Options, rii reg
 		snapshot = rii.ToYAML(registry.YamlMarshalingOpts{})
 	default:
 		// In the previous cli/run it took any malformed format string. Now we err.
-		return errors.Errorf("invalid snapshot output format: %s", opts.OutputFormat)
+		return fmt.Errorf("invalid snapshot output format: %s", opts.OutputFormat)
 	}
 
 	// TODO: Maybe store the snapshot somewhere?
@@ -83,7 +83,7 @@ func (di *DefaultPromoterImplementation) GetSnapshotManifests(
 	// Build the source registry:
 	srcRegistry, err := di.GetSnapshotSourceRegistry(opts)
 	if err != nil {
-		return nil, errors.Wrap(err, "building source registry for snapshot")
+		return nil, fmt.Errorf("building source registry for snapshot")
 	}
 
 	// Add it to a new manifest and return it:
@@ -114,7 +114,7 @@ func (di *DefaultPromoterImplementation) AppendManifestToSnapshot(
 	// Parse the specified manifest and append it to the list
 	mfest, err := schema.ParseManifestFromFile(opts.Manifest)
 	if err != nil {
-		return nil, errors.Wrap(err, "parsing specified manifest")
+		return nil, fmt.Errorf("parsing specified manifest: %w", err)
 	}
 
 	return append(mfests, mfest), nil
@@ -129,20 +129,18 @@ func (di *DefaultPromoterImplementation) GetRegistryImageInventory(
 	// In the 2nd case (Snapshot), it was recreated like we do here.
 	sc, err := di.MakeSyncContext(opts, mfests)
 	if err != nil {
-		return nil, errors.Wrap(err, "making sync context for registry inventory")
+		return nil, fmt.Errorf("making sync context for registry inventory: %w", err)
 	}
 
 	srcRegistry, err := di.GetSnapshotSourceRegistry(opts)
 	if err != nil {
-		return nil, errors.Wrap(err, "creting source registry for image inventory")
+		return nil, fmt.Errorf("creting source registry for image inventory: %w", err)
 	}
 
 	if len(opts.ManifestBasedSnapshotOf) > 0 {
 		promotionEdges, err := reg.ToPromotionEdges(mfests)
 		if err != nil {
-			return nil, errors.Wrap(
-				err, "converting list of manifests to edges for promotion",
-			)
+			return nil, fmt.Errorf("converting list of manifests to edges for promotion: %w", err)
 		}
 
 		// Create the registry inventory
@@ -156,7 +154,7 @@ func (di *DefaultPromoterImplementation) GetRegistryImageInventory(
 				[]registry.Context{*srcRegistry},
 				true,
 			); err != nil {
-				return nil, errors.Wrap(err, "reading registry for minimal snapshot")
+				return nil, fmt.Errorf("reading registry for minimal snapshot: %w", err)
 			}
 
 			sc.ReadGCRManifestLists(reg.MkReadManifestListCmdReal)
@@ -169,7 +167,7 @@ func (di *DefaultPromoterImplementation) GetRegistryImageInventory(
 	if err := sc.ReadRegistriesGGCR(
 		[]registry.Context{*srcRegistry}, true,
 	); err != nil {
-		return nil, errors.Wrap(err, "reading registries")
+		return nil, fmt.Errorf("reading registries: %w", err)
 	}
 
 	rii := sc.Inv[mfests[0].Registries[0].Name]

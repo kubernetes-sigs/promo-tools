@@ -17,10 +17,11 @@ limitations under the License.
 package gh
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"strings"
 
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -168,11 +169,11 @@ func checkRequiredFlags(flags *pflag.FlagSet) error {
 
 func run(opts *options) error {
 	if err := opts.SetAndValidate(); err != nil {
-		return errors.Wrap(err, "validating gh2gcs options")
+		return fmt.Errorf("validating gh2gcs options: %w", err)
 	}
 
 	if err := gcli.PreCheck(); err != nil {
-		return errors.Wrap(err, "pre-checking for GCP package usage")
+		return fmt.Errorf("pre-checking for GCP package usage: %w", err)
 	}
 
 	releaseCfgs := &gh2gcs.Config{}
@@ -180,13 +181,13 @@ func run(opts *options) error {
 		logrus.Infof("Reading the config file %s...", opts.configFilePath)
 		data, err := os.ReadFile(opts.configFilePath)
 		if err != nil {
-			return errors.Wrap(err, "failed to read the file")
+			return fmt.Errorf("failed to read the file: %w", err)
 		}
 
 		logrus.Info("Parsing the config...")
 		err = yaml.UnmarshalStrict(data, &releaseCfgs)
 		if err != nil {
-			return errors.Wrap(err, "failed to decode the file")
+			return fmt.Errorf("failed to decode the file: %w", err)
 		}
 	} else {
 		// TODO: Expose certain GCSCopyOptions for user configuration
@@ -209,20 +210,20 @@ func run(opts *options) error {
 		if len(releaseCfg.Tags) == 0 {
 			releaseTags, err := gh.GetReleaseTags(releaseCfg.Org, releaseCfg.Repo, releaseCfg.IncludePrereleases)
 			if err != nil {
-				return errors.Wrap(err, "getting release tags")
+				return fmt.Errorf("getting release tags: %w", err)
 			}
 
 			releaseCfg.Tags = releaseTags
 		}
 
 		if err := gh2gcs.DownloadReleases(&releaseCfg, gh, opts.outputDir); err != nil {
-			return errors.Wrap(err, "downloading release assets")
+			return fmt.Errorf("downloading release assets: %w", err)
 		}
 		logrus.Infof("Files downloaded to %s directory", opts.outputDir)
 
 		if !opts.downloadOnly {
 			if err := gh2gcs.Upload(&releaseCfg, gh, opts.outputDir); err != nil {
-				return errors.Wrap(err, "uploading release assets to GCS")
+				return fmt.Errorf("uploading release assets to GCS: %w", err)
 			}
 		}
 	}
@@ -236,12 +237,12 @@ func (o *options) SetAndValidate() error {
 
 	if o.outputDir == "" {
 		if opts.downloadOnly {
-			return errors.Errorf("when %s flag is set you need to specify the %s", downloadOnlyFlag, outputDirFlag)
+			return fmt.Errorf("when %s flag is set you need to specify the %s", downloadOnlyFlag, outputDirFlag)
 		}
 
 		tmpDir, err := os.MkdirTemp("", "gh")
 		if err != nil {
-			return errors.Wrap(err, "creating temp directory")
+			return fmt.Errorf("creating temp directory: %w", err)
 		}
 
 		o.outputDir = tmpDir

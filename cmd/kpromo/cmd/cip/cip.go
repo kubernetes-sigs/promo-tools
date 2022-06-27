@@ -19,7 +19,6 @@ package cip
 import (
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/cli"
@@ -39,10 +38,10 @@ Promote images from a staging registry to production
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return errors.Wrap(
-			cli.RunPromoteCmd(runOpts),
-			"run `cip run`",
-		)
+		if err := cli.RunPromoteCmd(runOpts); err != nil {
+			return fmt.Errorf("run `cip run`: %w", err)
+		}
+		return nil
 	},
 }
 

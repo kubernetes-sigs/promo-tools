@@ -17,7 +17,7 @@ limitations under the License.
 package imagepromoter
 
 import (
-	"github.com/pkg/errors"
+	"fmt"
 
 	reg "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
 	options "sigs.k8s.io/promo-tools/v3/promoter/image/options"
@@ -39,7 +39,7 @@ func (di *DefaultPromoterImplementation) ScanEdges(
 			),
 		},
 	); err != nil {
-		return errors.Wrap(err, "checking image vulnerabilities")
+		return fmt.Errorf("checking image vulnerabilities: %w", err)
 	}
 	di.PrintSection("END (VULNSCAN)", opts.Confirm)
 	return nil

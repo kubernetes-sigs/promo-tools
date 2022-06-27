@@ -18,8 +18,8 @@ package run
 
 import (
 	"context"
+	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
 	"sigs.k8s.io/promo-tools/v3/promobot"
@@ -32,7 +32,10 @@ var filesCmd = &cobra.Command{
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return errors.Wrap(runFilePromotion(filesOpts), "run `kpromo run files`")
+		if err := runFilePromotion(filesOpts); err != nil {
+			return fmt.Errorf("run `kpromo run files`: %w", err)
+		}
+		return nil
 	},
 }
 

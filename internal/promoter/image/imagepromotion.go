@@ -17,7 +17,8 @@ limitations under the License.
 package imagepromoter
 
 import (
-	"github.com/pkg/errors"
+	"errors"
+	"fmt"
 
 	reg "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/registry"
@@ -37,7 +38,7 @@ func (di *DefaultPromoterImplementation) ParseManifests(opts *options.Options) (
 	if opts.Manifest != "" {
 		mfest, err := schema.ParseManifestFromFile(opts.Manifest)
 		if err != nil {
-			return mfests, errors.Wrap(err, "parsing the manifest file")
+			return mfests, fmt.Errorf("parsing the manifest file: %w", err)
 		}
 
 		mfests = []schema.Manifest{mfest}
@@ -45,7 +46,7 @@ func (di *DefaultPromoterImplementation) ParseManifests(opts *options.Options) (
 	} else if opts.ThinManifestDir != "" {
 		mfests, err = schema.ParseThinManifestsFromDir(opts.ThinManifestDir)
 		if err != nil {
-			return nil, errors.Wrap(err, "parsing thin manifest directory")
+			return nil, fmt.Errorf("parsing thin manifest directory: %w", err)
 		}
 	}
 	return mfests, nil
@@ -60,7 +61,7 @@ func (di DefaultPromoterImplementation) MakeSyncContext(
 		mfests, opts.Threads, opts.Confirm, opts.UseServiceAcct,
 	)
 	if err != nil {
-		return nil, errors.Wrap(err, "creating sync context")
+		return nil, fmt.Errorf("creating sync context: %w", err)
 	}
 	return sc, err
 }
@@ -74,15 +75,13 @@ func (di *DefaultPromoterImplementation) GetPromotionEdges(
 	// First, get the "edges" from the manifests
 	promotionEdges, err = reg.ToPromotionEdges(mfests)
 	if err != nil {
-		return nil, errors.Wrap(
-			err, "converting list of manifests to edges for promotion",
-		)
+		return nil, fmt.Errorf("converting list of manifests to edges for promotion: %w", err)
 	}
 
 	// Run the promotion edge filtering
 	promotionEdges, ok, err := sc.FilterPromotionEdges(promotionEdges, true)
 	if err != nil {
-		return nil, errors.Wrap(err, "filtering promotion edges")
+		return nil, fmt.Errorf("filtering promotion edges: %w", err)
 	}
 	if !ok {
 		// If any funny business was detected during a comparison of the manifests
@@ -119,7 +118,7 @@ func (di *DefaultPromoterImplementation) PromoteImages(
 	fn StreamProducerFunc,
 ) error {
 	if err := sc.Promote(promotionEdges, fn, nil); err != nil {
-		return errors.Wrap(err, "running image promotion")
+		return fmt.Errorf("running image promotion: %w", err)
 	}
 	di.PrintSection("END (PROMOTION)", true)
 	return nil

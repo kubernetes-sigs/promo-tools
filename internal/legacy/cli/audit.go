@@ -17,10 +17,10 @@ limitations under the License.
 package cli
 
 import (
+	"fmt"
 	"os"
 
 	guuid "github.com/google/uuid"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/audit"
@@ -41,7 +41,7 @@ func RunAuditCmd(opts *AuditOptions) error {
 	opts.set()
 
 	if err := validateAuditOptions(opts); err != nil {
-		return errors.Wrap(err, "validating audit options")
+		return fmt.Errorf("validating audit options: %w", err)
 	}
 
 	auditorContext, err := audit.InitRealServerContext(
@@ -52,7 +52,7 @@ func RunAuditCmd(opts *AuditOptions) error {
 		opts.UUID,
 	)
 	if err != nil {
-		return errors.Wrap(err, "creating auditor context")
+		return fmt.Errorf("creating auditor context: %w", err)
 	}
 
 	if opts.Verbose {

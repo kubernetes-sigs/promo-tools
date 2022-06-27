@@ -17,9 +17,10 @@ limitations under the License.
 package manifest
 
 import (
+	"errors"
+	"fmt"
 	"os"
 
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
@@ -75,7 +76,10 @@ the yaml file manifests can be found. For example:
 			cmd.Use = "validate [ manifestsPath | filestores.yaml files1.yaml ]"
 			return cmd.Help()
 		}
-		return errors.Wrap(runValidate(args), "validating manifests")
+		if err := runValidate(args); err != nil {
+			return fmt.Errorf("validating manifests: %w", err)
+		}
+		return nil
 	},
 }
 
@@ -98,7 +102,7 @@ func runValidate(manifestPaths []string) error {
 func validateSingle(filestoresPath, filesPath string) error {
 	i, err := os.Stat(filestoresPath)
 	if err != nil {
-		return errors.Wrap(err, "opening filestores manifest file")
+		return fmt.Errorf("opening filestores manifest file: %w", err)
 	}
 	if i.IsDir() {
 		return errors.New("first argument has to be a yaml file defining the filestores")
@@ -109,7 +113,7 @@ func validateSingle(filestoresPath, filesPath string) error {
 		FilesPath:      filesPath,
 	})
 	if err != nil {
-		return errors.Wrapf(err, "reading manifest from %s and %s", filestoresPath, filesPath)
+		return fmt.Errorf("reading manifest from %s and %s: %w", filestoresPath, filesPath, err)
 	}
 
 	if err := m.Validate(); err != nil {
@@ -123,21 +127,21 @@ func validateSingle(filestoresPath, filesPath string) error {
 func validateDirectory(mPath string) error {
 	i, err := os.Stat(mPath)
 	if err != nil {
-		return errors.Wrapf(err, "opening manifest path %s", mPath)
+		return fmt.Errorf("opening manifest path %s: %w", mPath, err)
 	}
 	if !i.IsDir() {
-		return errors.Errorf("path is not a directory: %s", mPath)
+		return fmt.Errorf("path is not a directory: %s", mPath)
 	}
 
 	manifests, err := promobot.ReadManifests(promobot.PromoteFilesOptions{
 		ManifestsPath: mPath,
 	})
 	if err != nil {
-		return errors.Wrapf(err, "reading manifests from %s", mPath)
+		return fmt.Errorf("reading manifests from %s: %w", mPath, err)
 	}
 	for i, m := range manifests {
 		if err := m.Validate(); err != nil {
-			return errors.Wrapf(err, "validating manifest %d from %s", i, mPath)
+			return fmt.Errorf("validating manifest %d from %s: %w", i, mPath, err)
 		}
 	}
 	logrus.Infof("%d correct manifests found in %s", len(manifests), mPath)
