@@ -137,7 +137,7 @@ func init() {
 		"image",
 		"",
 		// TODO: Parameterize
-		[]string{""},
+		[]string{},
 		"image to promote. If not specified, all images matching the tag will be promoted",
 	)
 
@@ -146,7 +146,7 @@ func init() {
 		"digests",
 		"",
 		// TODO: Parameterize
-		[]string{""},
+		[]string{},
 		"digests to promote. If not specified, all images matching the tag will be promoted",
 	)
 
