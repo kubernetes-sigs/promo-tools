@@ -6,7 +6,7 @@ require (
 	cloud.google.com/go/containeranalysis v0.3.0
 	cloud.google.com/go/errorreporting v0.2.0
 	cloud.google.com/go/grafeas v0.1.0 // indirect
-	cloud.google.com/go/logging v1.4.2
+	cloud.google.com/go/logging v1.5.0
 	cloud.google.com/go/storage v1.23.0
 	github.com/blang/semver v3.5.1+incompatible // indirect
 	github.com/cenkalti/backoff/v4 v4.1.3
