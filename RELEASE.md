@@ -92,6 +92,59 @@ Once the pull request has been merged,
 
 ## Image promotion
 
+Once the new images are built, they have to be promoted to
+make them available on the community production registries. 
+
+To create the image promotion PR follow these instructions:
+
+#### 1. Build `kpromo` from the repository
+
+```
+# From the root of your clone of kubernetes-sigs/promo-tools
+
+make kpromo
+
+# The kpromo binary shoold no be in ./bin/kpromo
+
+```
+
+#### 2. Ensure the New Image Is Staged:
+```
+# Use something like crane to search for v3.4.4
+
+gcrane ls gcr.io/k8s-staging-artifact-promoter/kpromo | grep v3.4.4
+v3.4.4-1
+
+# ... or skopeo
+
+skopeo list-tags docker://gcr.io/k8s-staging-artifact-promoter/kpromo | grep v3.4.4
+        "v3.4.4-1"
+```
+#### 3. Create the Image Promotion PR
+
+Before proceeding, make sure you have already a fork of
+[kubernetes/k8s.io](https://github.com/kubernetes/k8s.io) in
+you github user. You will also need a to export `GITHUB_TOKEN`
+with a [personal access token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token) 
+with enough permissions to create a pull request on your behalf.
+
+Now, run the following from the `promo-tools` repo, replacing 
+`yourUsername` with your GitHub userbaname and `v3.4.4-1` with the
+actual tag you want to promote:
+
+```
+./bin/kpromo pr --fork puerco --interactive --project artifact-promoter --tag v3.4.4-1
+```
+
+`kpromo` will ask you some questions before proceeding and it will
+open a pull request similar to [k/k8s.io#3933](https://github.com/kubernetes/k8s.io/pull/3933).
+
+#### 4. Check the Image Promotion Process
+
+After merging the PR, the promoter postsubmits will run to promote
+and sign you images. To check the status of the PR monitor the
+[post-k8sio-image-promo job](https://prow.k8s.io/?job=post-k8sio-image-promo).
+
 ## Publishing
 
 ## Rollout
