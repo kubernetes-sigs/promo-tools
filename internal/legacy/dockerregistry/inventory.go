@@ -1750,7 +1750,10 @@ func (sc *SyncContext) Promote(
 						)
 					}
 
-					if err := crane.Copy(srcVertex, dstVertex); err != nil {
+					opts := []crane.Option{
+						crane.WithAuthFromKeychain(gcrane.Keychain),
+					}
+					if err := crane.Copy(srcVertex, dstVertex, opts...); err != nil {
 						logrus.Error(err)
 						errors = append(
 							errors,
