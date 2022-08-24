@@ -24,9 +24,9 @@ require (
 	github.com/stretchr/testify v1.8.0
 	github.com/xanzy/ssh-agent v0.3.0 // indirect
 	golang.org/x/crypto v0.0.0-20220411220226-7b82a4e95df4 // indirect
-	golang.org/x/oauth2 v0.0.0-20220718184931-c8730f7fcb92
+	golang.org/x/oauth2 v0.0.0-20220822191816-0ebed06d0094
 	golang.org/x/xerrors v0.0.0-20220609144429-65e65417b02f
-	google.golang.org/api v0.93.0
+	google.golang.org/api v0.94.0
 	google.golang.org/genproto v0.0.0-20220720214146-176da50484ac
 	gopkg.in/src-d/go-git.v4 v4.13.1
 	gopkg.in/yaml.v2 v2.4.0
