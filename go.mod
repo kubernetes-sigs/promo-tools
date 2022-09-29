@@ -27,7 +27,7 @@ require (
 	golang.org/x/oauth2 v0.0.0-20220909003341-f21342109be1
 	golang.org/x/xerrors v0.0.0-20220609144429-65e65417b02f
 	google.golang.org/api v0.98.0
-	google.golang.org/genproto v0.0.0-20220926165614-551eb538f295
+	google.golang.org/genproto v0.0.0-20220926220553-6981cbe3cfce
 	gopkg.in/src-d/go-git.v4 v4.13.1
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/utils v0.0.0-20220728103510-ee6ede2d64ed
@@ -37,7 +37,7 @@ require (
 )
 
 require (
-	cloud.google.com/go/iam v0.4.0
+	cloud.google.com/go/iam v0.5.0
 	github.com/nozzle/throttler v0.0.0-20180817012639-2ea982251481
 	github.com/sigstore/sigstore v1.4.2
 )
