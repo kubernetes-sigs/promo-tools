@@ -348,7 +348,7 @@ func (di *DefaultPromoterImplementation) replicateSignatures(
 	// Copy the signatures to the missing registries
 	for _, dstRef := range dstRefs {
 		logrus.WithField("src", srcRef.String()).Infof("replication > %s", dstRef.reference.String())
-		if err := crane.Copy(srcRef.String(), dstRef.String(),
+		if err := crane.Copy(srcRef.String(), dstRef.reference.String(),
 			crane.WithAuthFromKeychain(gcrane.Keychain),
 		); err != nil {
 			return fmt.Errorf(
