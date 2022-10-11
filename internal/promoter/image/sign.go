@@ -26,6 +26,7 @@ import (
 
 	credentials "cloud.google.com/go/iam/credentials/apiv1"
 	"github.com/google/go-containerregistry/pkg/crane"
+	"github.com/google/go-containerregistry/pkg/gcrane"
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/nozzle/throttler"
 	"github.com/sigstore/sigstore/pkg/tuf"
@@ -186,7 +187,9 @@ func (di *DefaultPromoterImplementation) CopySignatures(
 			}
 
 			logrus.Infof("Signature pre copy: %s to %s", srcRefString, dstRefString)
-			if err := crane.Copy(srcRef.String(), dstRef.String()); err != nil {
+			if err := crane.Copy(srcRef.String(), dstRef.String(),
+				crane.WithAuthFromKeychain(gcrane.Keychain),
+			); err != nil {
 				t.Done(fmt.Errorf(
 					"copying signature %s to %s: %w",
 					srcRef.String(), dstRef.String(), err,
@@ -345,7 +348,9 @@ func (di *DefaultPromoterImplementation) replicateSignatures(
 	// Copy the signatures to the missing registries
 	for _, dstRef := range dstRefs {
 		logrus.WithField("src", srcRef.String()).Infof("replication > %s", dstRef.reference.String())
-		if err := crane.Copy(srcRef.String(), dstRef.reference.String()); err != nil {
+		if err := crane.Copy(srcRef.String(), dstRef.String(),
+			crane.WithAuthFromKeychain(gcrane.Keychain),
+		); err != nil {
 			return fmt.Errorf(
 				"copying signature %s to %s: %w",
 				srcRef.String(), dstRef.reference.String(), err,
