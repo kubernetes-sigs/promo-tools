@@ -47,9 +47,10 @@ const (
 
 	TestSigningAccount = "k8s-infra-promoter-test-signer@k8s-cip-test-prod.iam.gserviceaccount.com"
 
-	maxParallelVerifications = 10
-	maxParallelSignatures    = 10
-	maxParallelCopies        = 10
+	maxParallelActions       = 100
+	maxParallelVerifications = maxParallelActions
+	maxParallelSignatures    = maxParallelActions
+	maxParallelCopies        = maxParallelActions
 )
 
 // FindSingedEdges takes a list of edges and returns a list of
