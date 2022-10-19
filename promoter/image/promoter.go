@@ -20,6 +20,7 @@ package imagepromoter
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/sirupsen/logrus"
 
@@ -97,6 +98,8 @@ type promoterImplementation interface {
 // PromoteImages is the main method for image promotion
 // it runs by taking all its parameters from a set of options.
 func (p *Promoter) PromoteImages(opts *options.Options) (err error) {
+	logrus.Infof("kpromo[%d]: PromoteImages start", time.Now().Unix())
+
 	// Validate the options. Perhaps another image-specific
 	// validation function may be needed.
 	if err := p.impl.ValidateOptions(opts); err != nil {
@@ -113,6 +116,7 @@ func (p *Promoter) PromoteImages(opts *options.Options) (err error) {
 		return fmt.Errorf("prewarming TUF cache: %w", err)
 	}
 
+	logrus.Infof("kpromo[%d]: Parsing manifests", time.Now().Unix())
 	mfests, err := p.impl.ParseManifests(opts)
 	if err != nil {
 		return fmt.Errorf("parsing manifests: %w", err)
@@ -121,17 +125,20 @@ func (p *Promoter) PromoteImages(opts *options.Options) (err error) {
 	p.impl.PrintVersion()
 	p.impl.PrintSection("START (PROMOTION)", opts.Confirm)
 
+	logrus.Infof("kpromo[%d]: Creating sync context manifests", time.Now().Unix())
 	sc, err := p.impl.MakeSyncContext(opts, mfests)
 	if err != nil {
 		return fmt.Errorf("creating sync context: %w", err)
 	}
 
+	logrus.Infof("kpromo[%d]: Getting promotion edges", time.Now().Unix())
 	promotionEdges, err := p.impl.GetPromotionEdges(sc, mfests)
 	if err != nil {
 		return fmt.Errorf("filtering edges: %w", err)
 	}
 
 	// MakeProducer
+	logrus.Infof("kpromo[%d]: Creating producer function", time.Now().Unix())
 	producerFunc := p.impl.MakeProducerFunction(sc.UseServiceAccount)
 
 	// TODO: Let's rethink this option
@@ -141,6 +148,7 @@ func (p *Promoter) PromoteImages(opts *options.Options) (err error) {
 	}
 
 	// Verify any signatures in staged images
+	logrus.Infof("kpromo[%d]: Validating staging signatures", time.Now().Unix())
 	signedEdges, err := p.impl.ValidateStagingSignatures(promotionEdges)
 	if err != nil {
 		return fmt.Errorf("checking signtaures in staging images: %w", err)
@@ -151,14 +159,17 @@ func (p *Promoter) PromoteImages(opts *options.Options) (err error) {
 		return p.impl.PrecheckAndExit(opts, mfests)
 	}
 
+	logrus.Infof("kpromo[%d]: Promoting images", time.Now().Unix())
 	if err := p.impl.PromoteImages(sc, promotionEdges, producerFunc); err != nil {
 		return fmt.Errorf("running promotion: %w", err)
 	}
 
+	logrus.Infof("kpromo[%d]: Replicating signatures", time.Now().Unix())
 	if err := p.impl.CopySignatures(opts, sc, signedEdges); err != nil {
 		return fmt.Errorf("copying existing signatures: %w", err)
 	}
 
+	logrus.Infof("kpromo[%d]: Signing images", time.Now().Unix())
 	if err := p.impl.SignImages(opts, sc, promotionEdges); err != nil {
 		return fmt.Errorf("signing images: %w", err)
 	}
@@ -167,6 +178,7 @@ func (p *Promoter) PromoteImages(opts *options.Options) (err error) {
 		return fmt.Errorf("writing sboms: %w", err)
 	}
 
+	logrus.Infof("kpromo[%d]: Finish", time.Now().Unix())
 	return nil
 }
 
