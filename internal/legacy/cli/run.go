@@ -17,6 +17,10 @@ limitations under the License.
 package cli
 
 import (
+	"sync"
+	"time"
+
+	"github.com/sirupsen/logrus"
 	promoter "sigs.k8s.io/promo-tools/v3/promoter/image"
 	options "sigs.k8s.io/promo-tools/v3/promoter/image/options"
 )
@@ -30,8 +34,39 @@ const (
 	PromoterOutputFlag                  = "output"
 )
 
+type Hook struct {
+	lastTime time.Time
+	mu       sync.RWMutex
+}
+
+func NewHook() *Hook {
+	return &Hook{
+		lastTime: time.Now(),
+		mu:       sync.RWMutex{},
+	}
+}
+
+func (h *Hook) Fire(e *logrus.Entry) error {
+	h.mu.Lock()
+	e.Data["diff"] = e.Time.Sub(h.lastTime).Round(time.Millisecond)
+	h.lastTime = e.Time
+	h.mu.Unlock()
+	return nil
+}
+
+func (h *Hook) Levels() []logrus.Level {
+	return logrus.AllLevels
+}
+
 func RunPromoteCmd(opts *options.Options) error {
 	cip := promoter.New()
+
+	logrus.SetFormatter(&logrus.TextFormatter{
+		DisableTimestamp: false,
+		FullTimestamp:    true,
+		TimestampFormat:  "15:04:05.000",
+	})
+	logrus.AddHook(NewHook())
 
 	// Mode 1: Manifest list verification
 	if opts.CheckManifestLists != "" {

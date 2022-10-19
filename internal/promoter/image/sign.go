@@ -89,6 +89,7 @@ func (di *DefaultPromoterImplementation) FindSingedEdges(
 			seenEdges.list[edge.SrcReference()] = struct{}{}
 			seenEdges.Unlock()
 
+			logrus.Infof("Checking if image is signed: %s", edge.SrcReference())
 			isSigned, err := signer.IsImageSigned(edge.SrcReference())
 			if err != nil {
 				t.Done(
@@ -96,6 +97,7 @@ func (di *DefaultPromoterImplementation) FindSingedEdges(
 				)
 				return
 			}
+			logrus.Infof("Image %s is signed: %v", edge.SrcReference(), isSigned)
 
 			if !isSigned {
 				t.Done(nil)
