@@ -24,7 +24,7 @@
 ARG variant
 ARG GO_VERSION
 ARG OS_CODENAME
-FROM golang:1.18-buster AS builder
+FROM golang:1.19-buster AS builder
 
 # Copy the sources
 WORKDIR /go/src/app
@@ -39,16 +39,10 @@ ENV GOARCH=${ARCH}
 
 RUN make kpromo
 
-FROM gcr.io/google.com/cloudsdktool/cloud-sdk:slim AS base
+FROM gcr.io/distroless/static-debian11 AS base
 
 WORKDIR /
 COPY --from=builder /go/src/app/bin/kpromo .
-
-# The Docker configuration file (which include credential helpers for
-# authenticating to various container registries) should be placed in the home
-# directory of the running user, so it can be detected by artifact promotion
-# tooling.
-COPY --from=builder /go/src/app/docker/config.json /root/.docker/config.json
 
 ENTRYPOINT ["/kpromo"]
 
