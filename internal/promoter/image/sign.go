@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"sync"
 
 	credentials "cloud.google.com/go/iam/credentials/apiv1"
 	"github.com/google/go-containerregistry/pkg/crane"
@@ -53,69 +52,51 @@ const (
 	maxParallelCopies        = maxParallelActions
 )
 
-// FindSingedEdges takes a list of edges and returns a list of
+// FindSingedEdges takes a map of edges and returns a map of
 // those that have a signature attached
 func (di *DefaultPromoterImplementation) FindSingedEdges(
 	edges map[reg.PromotionEdge]interface{},
 ) (map[reg.PromotionEdge]interface{}, error) {
+	logrus.Info("Finding signed edges")
+
+	refs := []string{}
+	refsToEdges := map[string]reg.PromotionEdge{}
+	for edge := range edges {
+		ref := edge.SrcReference()
+		refs = append(refs, ref)
+		refsToEdges[ref] = edge
+	}
+
+	signer := sign.New(sign.Default())
+	res, err := signer.ImagesSigned(context.Background(), refs...)
+	if err != nil {
+		return nil, fmt.Errorf("check signed images: %w", err)
+	}
+
 	signedEdges := map[reg.PromotionEdge]interface{}{}
-	// Verify the signatures in the edges we are looking at
-	t := throttler.New(maxParallelVerifications, len(edges))
-	seenEdges := struct {
-		sync.RWMutex
-		list map[string]struct{}
-	}{
-		list: map[string]struct{}{},
-	}
-	l := sync.Mutex{}
-
-	// First, compile a list of signed images (edges)
-	for e := range edges {
-		go func(edge reg.PromotionEdge) {
-			signer := sign.New(sign.Default())
-
-			// Check if we've verified this edge before
-			seenEdges.RLock()
-			// .. if we have, we can skip it.
-			if _, ok := seenEdges.list[edge.SrcReference()]; ok {
-				seenEdges.RUnlock()
-				t.Done(nil)
-				return
-			}
-			seenEdges.RUnlock()
-
-			// If not, add it to the list
-			seenEdges.Lock()
-			seenEdges.list[edge.SrcReference()] = struct{}{}
-			seenEdges.Unlock()
-
-			logrus.Infof("Checking if image is signed: %s", edge.SrcReference())
-			isSigned, err := signer.IsImageSigned(edge.SrcReference())
-			if err != nil {
-				t.Done(
-					fmt.Errorf("checking if %s is signed: %w", edge.SrcReference(), err),
-				)
-				return
-			}
-			logrus.Infof("Image %s is signed: %v", edge.SrcReference(), isSigned)
-
-			if !isSigned {
-				t.Done(nil)
-				return
-			}
-			logrus.Infof("Image %s, is signed", edge.SrcReference())
-			l.Lock()
-			signedEdges[edge] = nil
-			l.Unlock()
-			t.Done(nil)
-		}(e)
-		if t.Throttle() > 0 {
-			break
+	res.Range(func(key, value any) bool {
+		ref, ok := key.(string)
+		if !ok {
+			logrus.Errorf("Interface conversion failed: key is not a string: %v", key)
+			return false
 		}
-	}
-	if err := t.Err(); err != nil {
-		return nil, err
-	}
+		isSigned, ok := value.(bool)
+		if !ok {
+			logrus.Errorf("Interface conversion failed: value is not a bool: %v", value)
+			return false
+		}
+
+		if isSigned {
+			edge, ok := refsToEdges[ref]
+			if !ok {
+				logrus.Errorf("Reference %s is not in edge map", ref)
+				return true
+			}
+			signedEdges[edge] = nil
+		}
+		return true
+	})
+
 	logrus.Infof("%d of promotion candidates are signed", len(signedEdges))
 	return signedEdges, nil
 }
