@@ -16,6 +16,9 @@ limitations under the License.
 
 package image
 
+// UserAgent header to be used in the requests
+const UserAgent = "kpromo"
+
 // Name can be just the bare name itself (e.g., "addon-builder" in
 // "gcr.io/k8s-image-staging/addon-builder") or the prefix + name
 // ("foo/bar/baz/quux" in "gcr.io/hello/foo/bar/baz/quux").

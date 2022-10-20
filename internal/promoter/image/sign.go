@@ -173,6 +173,7 @@ func (di *DefaultPromoterImplementation) CopySignatures(
 			logrus.Infof("Signature pre copy: %s to %s", srcRefString, dstRefString)
 			opts := []crane.Option{
 				crane.WithAuthFromKeychain(gcrane.Keychain),
+				crane.WithUserAgent(image.UserAgent),
 			}
 			if err := crane.Copy(srcRef.String(), dstRef.String(), opts...); err != nil {
 				t.Done(fmt.Errorf(
@@ -335,6 +336,7 @@ func (di *DefaultPromoterImplementation) replicateSignatures(
 		logrus.WithField("src", srcRef.String()).Infof("replication > %s", dstRef.reference.String())
 		opts := []crane.Option{
 			crane.WithAuthFromKeychain(gcrane.Keychain),
+			crane.WithUserAgent(image.UserAgent),
 		}
 		if err := crane.Copy(srcRef.String(), dstRef.reference.String(), opts...); err != nil {
 			return fmt.Errorf(
