@@ -43,7 +43,7 @@ type Promoter struct {
 func New() *Promoter {
 	return &Promoter{
 		Options: options.DefaultOptions,
-		impl:    &impl.DefaultPromoterImplementation{},
+		impl:    impl.NewDefaultPromoterImplementation(),
 	}
 }
 

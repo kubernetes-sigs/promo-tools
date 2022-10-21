@@ -30,6 +30,7 @@ import (
 	"sigs.k8s.io/promo-tools/v3/internal/version"
 	options "sigs.k8s.io/promo-tools/v3/promoter/image/options"
 	"sigs.k8s.io/promo-tools/v3/types/image"
+	"sigs.k8s.io/release-sdk/sign"
 )
 
 const vulnerabilityDiscalimer = `DISCLAIMER: Vulnerabilities are found as issues with package
@@ -46,7 +47,16 @@ type StreamProducerFunc func(
 	digest image.Digest, tag image.Tag, tp reg.TagOp,
 ) stream.Producer
 
-type DefaultPromoterImplementation struct{}
+type DefaultPromoterImplementation struct {
+	signer *sign.Signer
+}
+
+// NewDefaultPromoterImplementation creates a new DefaultPromoterImplementation instance.
+func NewDefaultPromoterImplementation() *DefaultPromoterImplementation {
+	return &DefaultPromoterImplementation{
+		signer: sign.New(sign.Default()),
+	}
+}
 
 // ValidateManifestLists implements one of the run modes of the promoter
 // where it parses the manifests, checks the images and exits

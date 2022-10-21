@@ -31,7 +31,7 @@ require (
 	gopkg.in/src-d/go-git.v4 v4.13.1
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/utils v0.0.0-20220728103510-ee6ede2d64ed
-	sigs.k8s.io/release-sdk v0.9.4-0.20221020144501-0f5793938dbc
+	sigs.k8s.io/release-sdk v0.9.4-0.20221021230357-ec4a8b814014
 	sigs.k8s.io/release-utils v0.7.3
 	sigs.k8s.io/yaml v1.3.0
 )
@@ -175,6 +175,7 @@ require (
 	github.com/inconshreveable/mousetrap v1.0.1 // indirect
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
 	github.com/jedisct1/go-minisign v0.0.0-20211028175153-1c139d1cc84b // indirect
+	github.com/jellydator/ttlcache/v3 v3.0.0 // indirect
 	github.com/jhump/protoreflect v1.13.0 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/jonboulle/clockwork v0.3.0 // indirect
