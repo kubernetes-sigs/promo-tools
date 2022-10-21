@@ -839,11 +839,11 @@ func (sc *SyncContext) recordFoundTags(
 // We use the term "registry" to mean the "root repository" in this program, but
 // to be technically correct, for gcr.io/google-containers/foo/bar/baz:
 //
-//  - gcr.io is the registry
-//  - gcr.io/google-containers is the toplevel repository (or "root" repo)
-//  - gcr.io/google-containers/foo is a child repository
-//  - gcr.io/google-containers/foo/bar is a child repository
-//  - gcr.io/google-containers/foo/bar/baz is a child repository
+//   - gcr.io is the registry
+//   - gcr.io/google-containers is the toplevel repository (or "root" repo)
+//   - gcr.io/google-containers/foo is a child repository
+//   - gcr.io/google-containers/foo/bar is a child repository
+//   - gcr.io/google-containers/foo/bar/baz is a child repository
 //
 // It may or may not be the case that the child repository is empty. E.g., if
 // only one image gcr.io/google-containers/foo/bar/baz:1.0 exists in the entire
@@ -1752,6 +1752,7 @@ func (sc *SyncContext) Promote(
 
 					opts := []crane.Option{
 						crane.WithAuthFromKeychain(gcrane.Keychain),
+						crane.WithUserAgent(image.UserAgent),
 					}
 					if err := crane.Copy(srcVertex, dstVertex, opts...); err != nil {
 						logrus.Error(err)
