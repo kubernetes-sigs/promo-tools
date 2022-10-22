@@ -18,7 +18,6 @@ package imagepromoter
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -46,19 +45,17 @@ const (
 
 	TestSigningAccount = "k8s-infra-promoter-test-signer@k8s-cip-test-prod.iam.gserviceaccount.com"
 
-	maxParallelActions       = 100
-	maxParallelVerifications = maxParallelActions
-	maxParallelSignatures    = maxParallelActions
-	maxParallelCopies        = maxParallelActions
+	maxParallelActions    = 100
+	maxParallelSignatures = maxParallelActions
+	maxParallelCopies     = maxParallelActions
 )
 
-// FindSingedEdges takes a map of edges and returns a map of
-// those that have a signature attached
-func (di *DefaultPromoterImplementation) FindSingedEdges(
+// ValidateStagingSignatures checks if edges (images) have a signature
+// applied during its staging run. If they do it verifies them and
+// returns an error if they are not valid.
+func (di *DefaultPromoterImplementation) ValidateStagingSignatures(
 	edges map[reg.PromotionEdge]interface{},
 ) (map[reg.PromotionEdge]interface{}, error) {
-	logrus.Info("Finding signed edges")
-
 	refs := []string{}
 	refsToEdges := map[string]reg.PromotionEdge{}
 	for edge := range edges {
@@ -67,75 +64,27 @@ func (di *DefaultPromoterImplementation) FindSingedEdges(
 		refsToEdges[ref] = edge
 	}
 
-	signer := sign.New(sign.Default())
-	res, err := signer.ImagesSigned(context.Background(), refs...)
+	res, err := di.signer.VerifyImages(refs...)
 	if err != nil {
-		return nil, fmt.Errorf("check signed images: %w", err)
+		return nil, fmt.Errorf("verify images: %w", err)
 	}
 
 	signedEdges := map[reg.PromotionEdge]interface{}{}
-	res.Range(func(key, value any) bool {
+	res.Range(func(key, _ any) bool {
 		ref, ok := key.(string)
 		if !ok {
 			logrus.Errorf("Interface conversion failed: key is not a string: %v", key)
 			return false
 		}
-		isSigned, ok := value.(bool)
-		if !ok {
-			logrus.Errorf("Interface conversion failed: value is not a bool: %v", value)
-			return false
-		}
 
-		if isSigned {
-			edge, ok := refsToEdges[ref]
-			if !ok {
-				logrus.Errorf("Reference %s is not in edge map", ref)
-				return true
-			}
-			signedEdges[edge] = nil
+		edge, ok := refsToEdges[ref]
+		if !ok {
+			logrus.Errorf("Reference %s is not in edge map", ref)
+			return true
 		}
+		signedEdges[edge] = nil
 		return true
 	})
-
-	logrus.Infof("%d of promotion candidates are signed", len(signedEdges))
-	return signedEdges, nil
-}
-
-// ValidateStagingSignatures checks if edges (images) have a signature
-// applied during its staging run. If they do it verifies them and
-// returns an error if they are not valid.
-func (di *DefaultPromoterImplementation) ValidateStagingSignatures(
-	edges map[reg.PromotionEdge]interface{},
-) (map[reg.PromotionEdge]interface{}, error) {
-	signer := sign.New(sign.Default())
-	signedEdges, err := di.FindSingedEdges(edges)
-	if err != nil {
-		return nil, errors.New("filtering signed edges")
-	}
-
-	// Verify the signatures in the edges we are looking at
-	t := throttler.New(maxParallelVerifications, len(signedEdges))
-	for e := range signedEdges {
-		go func(edge reg.PromotionEdge) {
-			logrus.Infof("Verifying signatures of image %s", edge.SrcReference())
-
-			// Check the staged image signatures
-			if _, err := signer.VerifyImage(edge.SrcReference()); err != nil {
-				t.Done(fmt.Errorf(
-					"verifying signatures of image %s: %w", edge.SrcReference(), err,
-				))
-				return
-			}
-			logrus.Infof("Signatures for ref %s verfified", edge.SrcReference())
-			t.Done(nil)
-		}(e)
-		if t.Throttle() > 0 {
-			break
-		}
-	}
-	if err := t.Err(); err != nil {
-		return nil, err
-	}
 
 	return signedEdges, nil
 }
