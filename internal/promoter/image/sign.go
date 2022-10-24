@@ -217,11 +217,10 @@ func (di *DefaultPromoterImplementation) signAndReplicate(signOpts *sign.Options
 	signOpts.Annotations = map[string]interface{}{
 		"org.kubernetes.kpromo.mirrors": strings.Join(mirrorList, ","),
 	}
-	signer := sign.New(signOpts)
 
 	logrus.Infof("Signing image %s", imageRef)
 	// Sign the first promoted image in the edges list:
-	if _, err := signer.SignImage(imageRef); err != nil {
+	if _, err := di.signer.SignImageWithOptions(signOpts, imageRef); err != nil {
 		return fmt.Errorf("signing image %s: %w", imageRef, err)
 	}
 
