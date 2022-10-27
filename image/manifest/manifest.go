@@ -194,7 +194,7 @@ func Write(m schema.Manifest, rii registry.RegInvImage) error {
 func Find(o *GrowOptions) (schema.Manifest, error) {
 	var err error
 	var manifests []schema.Manifest
-	manifests, err = schema.ParseThinManifestsFromDir(o.BaseDir)
+	manifests, err = schema.ParseThinManifestsFromDir(o.BaseDir, false)
 	if err != nil {
 		return schema.Manifest{}, err
 	}
