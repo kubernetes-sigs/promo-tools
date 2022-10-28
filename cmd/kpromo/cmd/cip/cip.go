@@ -76,6 +76,13 @@ manifests but instead of defining the 'images: ...' field directly, the
 the 'images: ...' contents`,
 	)
 
+	CipCmd.PersistentFlags().BoolVar(
+		&runOpts.UseProwManifestDiff,
+		"use-prow-manifest-diff",
+		runOpts.UseProwManifestDiff,
+		"use only the latest diff for the manifest dir. Works only on prow.",
+	)
+
 	CipCmd.PersistentFlags().IntVar(
 		&runOpts.Threads,
 		"threads",

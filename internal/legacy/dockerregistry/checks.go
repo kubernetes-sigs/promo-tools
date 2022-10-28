@@ -118,7 +118,7 @@ func (check *ImageRemovalCheck) Run() error {
 			" repo: %v", err)
 	}
 
-	mfests, err := schema.ParseThinManifestsFromDir(check.GitRepoPath)
+	mfests, err := schema.ParseThinManifestsFromDir(check.GitRepoPath, false)
 	if err != nil {
 		return fmt.Errorf("could not parse manifests from the directory: %v",
 			err)

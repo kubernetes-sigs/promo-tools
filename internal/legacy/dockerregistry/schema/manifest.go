@@ -29,6 +29,7 @@ import (
 
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/registry"
 	"sigs.k8s.io/promo-tools/v3/types/image"
+	"sigs.k8s.io/release-utils/command"
 )
 
 // Manifest stores the information in a manifest file (describing the
@@ -252,9 +253,15 @@ func (m *Manifest) ToRegInvImage() registry.RegInvImage {
 // We effectively have to create a map of manifests, keyed by the source
 // registry (there can only be 1 source registry).
 func ParseThinManifestsFromDir(
-	dir string,
-) ([]Manifest, error) {
-	mfests := make([]Manifest, 0)
+	dir string, onlyProwDiff bool,
+) (mfests []Manifest, err error) {
+	filesToCheck := []string{}
+	if onlyProwDiff {
+		filesToCheck, err = diffProwFiles(dir)
+		if err != nil {
+			return nil, fmt.Errorf("get prow diff files: %w", err)
+		}
+	}
 
 	// Check that the thin manifests dir follows a regular, predefined format.
 	// This is to ensure that there isn't any funny business going on around
@@ -270,7 +277,7 @@ func ParseThinManifestsFromDir(
 	) error {
 		if err != nil {
 			// Prevent panic in case of incoming errors accessing this path.
-			logrus.Errorf("failure accessing a path %q: %v\n", path, err)
+			logrus.Errorf("Failure accessing a path %q: %v\n", path, err)
 		}
 
 		// Skip directories (because they are not YAML files).
@@ -295,7 +302,7 @@ func ParseThinManifestsFromDir(
 				path)
 		}
 
-		mfest, errParse := ParseThinManifestFromFile(path)
+		mfest, errParse := ParseThinManifestFromFile(path, filesToCheck)
 		if errParse != nil {
 			logrus.Errorf("could not parse manifest file '%s'\n", path)
 			return errParse
@@ -318,6 +325,56 @@ func ParseThinManifestsFromDir(
 	}
 
 	return mfests, nil
+}
+
+func diffProwFiles(dir string) (files []string, err error) {
+	const (
+		git               = "git"
+		pullBaseSHAEnv    = "PULL_BASE_SHA"
+		jobTypeEnv        = "JOB_TYPE"
+		jobTypePostsubmit = "postsubmit"
+		jobTypePresubmit  = "presubmit"
+	)
+
+	jobType := os.Getenv(jobTypeEnv)
+	if jobType == "" {
+		return nil, fmt.Errorf("%s not set", jobTypeEnv)
+	}
+
+	var base string
+	if jobType == jobTypePresubmit {
+		pullBaseSHA := os.Getenv(pullBaseSHAEnv)
+		if pullBaseSHA == "" {
+			return nil, fmt.Errorf("%s not set", pullBaseSHAEnv)
+		}
+		base = pullBaseSHA
+	} else if jobType == jobTypePostsubmit {
+		base = "HEAD^"
+	} else {
+		return nil, fmt.Errorf("unknown job type: %s", jobType)
+	}
+
+	workdirRes, err := command.NewWithWorkDir(
+		dir, git, "rev-parse", "--show-toplevel",
+	).RunSilentSuccessOutput()
+	if err != nil {
+		return nil, fmt.Errorf("running git rev-parse: %w", err)
+	}
+	workdir := workdirRes.OutputTrimNL()
+
+	diff, err := command.NewWithWorkDir(
+		workdir, git, "diff", "--name-only", base,
+	).RunSilentSuccessOutput()
+	if err != nil {
+		return nil, fmt.Errorf("running git diff: %w", err)
+	}
+
+	// Normalize the path
+	for _, file := range strings.Split(diff.OutputTrimNL(), "\n") {
+		files = append(files, filepath.Join(workdir, file))
+	}
+
+	return files, nil
 }
 
 // ParseManifestFromFile parses a Manifest from a filepath.
@@ -347,7 +404,7 @@ func ParseManifestFromFile(filePath string) (Manifest, error) {
 
 // ParseThinManifestFromFile parses a ThinManifest from a filepath and generates
 // a Manifest.
-func ParseThinManifestFromFile(filePath string) (Manifest, error) {
+func ParseThinManifestFromFile(filePath string, filesToCheck []string) (Manifest, error) {
 	var thinManifest ThinManifest
 	var mfest Manifest
 	var empty Manifest
@@ -368,6 +425,18 @@ func ParseThinManifestFromFile(filePath string) (Manifest, error) {
 		"../../images",
 		subProject,
 		"images.yaml")
+
+	parseFile := len(filesToCheck) == 0
+	for _, fileToCheck := range filesToCheck {
+		if fileToCheck == imagesPath {
+			parseFile = true
+		}
+	}
+
+	if !parseFile {
+		return empty, nil
+	}
+
 	images, err := ParseImagesFromFile(imagesPath)
 	if err != nil {
 		return empty, err

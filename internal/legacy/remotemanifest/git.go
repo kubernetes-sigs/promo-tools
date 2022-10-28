@@ -51,7 +51,7 @@ func (remote *Git) Fetch() ([]schema.Manifest, error) {
 	// There is no remote; use the local path directly.
 	if remote.repoURL.String() == "" {
 		manifests, err := schema.ParseThinManifestsFromDir(
-			remote.thinManifestDirPath)
+			remote.thinManifestDirPath, false)
 		if err != nil {
 			return nil, err
 		}
@@ -66,7 +66,7 @@ func (remote *Git) Fetch() ([]schema.Manifest, error) {
 	}
 
 	manifests, err := schema.ParseThinManifestsFromDir(
-		filepath.Join(repoPath, remote.thinManifestDirPath))
+		filepath.Join(repoPath, remote.thinManifestDirPath), false)
 	if err != nil {
 		return nil, err
 	}

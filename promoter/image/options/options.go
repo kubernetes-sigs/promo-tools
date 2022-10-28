@@ -33,6 +33,9 @@ type Options struct {
 	// Use a service account when true
 	UseServiceAcct bool
 
+	// Use only the latest diff for the manifests. Works only when running in prow.
+	UseProwManifestDiff bool
+
 	// Manifest is the path of a manifest file
 	Manifest string
 

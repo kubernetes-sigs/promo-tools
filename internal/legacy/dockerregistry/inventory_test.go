@@ -505,7 +505,7 @@ func TestParseThinManifestsFromDir(t *testing.T) {
 			expectedModified = append(expectedModified, mfest)
 		}
 
-		got, errParse := schema.ParseThinManifestsFromDir(fixtureDir)
+		got, errParse := schema.ParseThinManifestsFromDir(fixtureDir, false)
 
 		// Clear private fields (redundant data) that are calculated on-the-fly
 		// (it's too verbose to include them here; besides, it's not what we're
@@ -551,7 +551,7 @@ func TestValidateThinManifestsFromDir(t *testing.T) {
 	for _, testInput := range shouldBeValid {
 		fixtureDir := filepath.Join(pwd, "valid", testInput)
 
-		mfests, errParse := schema.ParseThinManifestsFromDir(fixtureDir)
+		mfests, errParse := schema.ParseThinManifestsFromDir(fixtureDir, false)
 		require.Nil(t, errParse)
 
 		_, edgeErr := reg.ToPromotionEdges(mfests)
@@ -601,7 +601,7 @@ func TestValidateThinManifestsFromDir(t *testing.T) {
 		// It could be that a manifest, taken individually, failed on its own,
 		// before we even get to ValidateThinManifestsFromDir(). So handle these
 		// cases as well.
-		mfests, errParse := schema.ParseThinManifestsFromDir(fixtureDir)
+		mfests, errParse := schema.ParseThinManifestsFromDir(fixtureDir, false)
 
 		var errParseStr string
 		var expectedParseErrorStr string
