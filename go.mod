@@ -31,7 +31,7 @@ require (
 	gopkg.in/src-d/go-git.v4 v4.13.1
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/utils v0.0.0-20220728103510-ee6ede2d64ed
-	sigs.k8s.io/release-sdk v0.9.4-0.20221021230357-ec4a8b814014
+	sigs.k8s.io/release-sdk v0.9.4-0.20221027144632-494c2916c784
 	sigs.k8s.io/release-utils v0.7.3
 	sigs.k8s.io/yaml v1.3.0
 )
