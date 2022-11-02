@@ -18,7 +18,6 @@ package schema
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -128,7 +127,6 @@ func validateRequiredComponents(m Manifest) error {
 		}
 	}
 
-	knownRegistries := make([]image.Registry, 0)
 	if len(m.Registries) == 0 {
 		errs = append(errs, "'registries' field cannot be empty")
 	}
@@ -140,9 +138,6 @@ func validateRequiredComponents(m Manifest) error {
 				"registries: 'name' field cannot be empty",
 			)
 		}
-
-		// TODO(lint): SA4010: this result of append is never used, except maybe in other appends
-		knownRegistries = append(knownRegistries, registry.Name)
 	}
 
 	for _, img := range m.Images {
@@ -255,9 +250,9 @@ func (m *Manifest) ToRegInvImage() registry.RegInvImage {
 func ParseThinManifestsFromDir(
 	dir string, onlyProwDiff bool,
 ) (mfests []Manifest, err error) {
-	filesToCheck := []string{}
+	digestsToCheck := []string{}
 	if onlyProwDiff {
-		filesToCheck, err = diffProwFiles(dir)
+		digestsToCheck, err = diffProwFiles(dir)
 		if err != nil {
 			return nil, fmt.Errorf("get prow diff files: %w", err)
 		}
@@ -302,7 +297,7 @@ func ParseThinManifestsFromDir(
 				path)
 		}
 
-		mfest, errParse := ParseThinManifestFromFile(path, filesToCheck)
+		mfest, errParse := ParseThinManifestFromFile(path, digestsToCheck)
 		if errParse != nil {
 			logrus.Errorf("could not parse manifest file '%s'\n", path)
 			return errParse
@@ -327,7 +322,10 @@ func ParseThinManifestsFromDir(
 	return mfests, nil
 }
 
-func diffProwFiles(dir string) (files []string, err error) {
+var digestRe = regexp.MustCompile(`"(sha256:[0-9a-f]{64})"`)
+
+func diffProwFiles(dir string) (digests []string, err error) {
+	logrus.Info("Using prow diff")
 	const (
 		git               = "git"
 		pullBaseSHAEnv    = "PULL_BASE_SHA"
@@ -363,18 +361,23 @@ func diffProwFiles(dir string) (files []string, err error) {
 	workdir := workdirRes.OutputTrimNL()
 
 	diff, err := command.NewWithWorkDir(
-		workdir, git, "diff", "--name-only", base,
+		workdir, git, "diff", "--unified=0", base,
 	).RunSilentSuccessOutput()
 	if err != nil {
 		return nil, fmt.Errorf("running git diff: %w", err)
 	}
 
-	// Normalize the path
-	for _, file := range strings.Split(diff.OutputTrimNL(), "\n") {
-		files = append(files, filepath.Join(workdir, file))
+	// Normalize the digests
+	for _, line := range strings.Split(diff.OutputTrimNL(), "\n") {
+		matches := digestRe.FindAllStringSubmatch(line, -1)
+		if len(matches) != 1 || len(matches[0]) != 2 {
+			continue
+		}
+		digests = append(digests, matches[0][1])
 	}
 
-	return files, nil
+	logrus.Infof("Found %d digests to process in diff", len(digests))
+	return digests, nil
 }
 
 // ParseManifestFromFile parses a Manifest from a filepath.
@@ -382,7 +385,7 @@ func ParseManifestFromFile(filePath string) (Manifest, error) {
 	var mfest Manifest
 	var empty Manifest
 
-	b, err := ioutil.ReadFile(filePath)
+	b, err := os.ReadFile(filePath)
 	if err != nil {
 		return empty, err
 	}
@@ -404,12 +407,12 @@ func ParseManifestFromFile(filePath string) (Manifest, error) {
 
 // ParseThinManifestFromFile parses a ThinManifest from a filepath and generates
 // a Manifest.
-func ParseThinManifestFromFile(filePath string, filesToCheck []string) (Manifest, error) {
+func ParseThinManifestFromFile(filePath string, digestsToCheck []string) (Manifest, error) {
 	var thinManifest ThinManifest
 	var mfest Manifest
 	var empty Manifest
 
-	b, err := ioutil.ReadFile(filePath)
+	b, err := os.ReadFile(filePath)
 	if err != nil {
 		return empty, err
 	}
@@ -426,20 +429,30 @@ func ParseThinManifestFromFile(filePath string, filesToCheck []string) (Manifest
 		subProject,
 		"images.yaml")
 
-	parseFile := len(filesToCheck) == 0
-	for _, fileToCheck := range filesToCheck {
-		if fileToCheck == imagesPath {
-			parseFile = true
-		}
-	}
-
-	if !parseFile {
-		return empty, nil
-	}
-
 	images, err := ParseImagesFromFile(imagesPath)
 	if err != nil {
 		return empty, err
+	}
+
+	if len(digestsToCheck) > 0 {
+		for i, image := range images {
+			if image.Dmap == nil {
+				continue
+			}
+
+			newDmap := registry.DigestTags{}
+
+			for possibleDigest, tag := range image.Dmap {
+				for _, digestToCheck := range digestsToCheck {
+					if string(possibleDigest) == digestToCheck {
+						newDmap[possibleDigest] = tag
+					}
+				}
+			}
+
+			image.Dmap = newDmap
+			images[i] = image
+		}
 	}
 
 	mfest.Filepath = filePath
@@ -505,7 +518,7 @@ func ValidateThinManifestDirectoryStructure(
 	// For every subfolder in <dir>/manifests, ensure that a
 	// "promoter-manifest.yaml" file exists, and also that a corresponding file
 	// exists in the "images" folder.
-	files, err := ioutil.ReadDir(manifestDir)
+	files, err := os.ReadDir(manifestDir)
 	if err != nil {
 		return err
 	}
@@ -566,7 +579,7 @@ func ParseImagesFromFile(filePath string) (registry.Images, error) {
 	var images registry.Images
 	var empty registry.Images
 
-	b, err := ioutil.ReadFile(filePath)
+	b, err := os.ReadFile(filePath)
 	if err != nil {
 		return empty, err
 	}
