@@ -173,8 +173,9 @@ func (p *Promoter) PromoteImages(opts *options.Options) (err error) {
 		return fmt.Errorf("signing images: %w", err)
 	}
 
+	logrus.Infof("Writing SBOMs")
 	if err := p.impl.WriteSBOMs(opts, sc, promotionEdges); err != nil {
-		return fmt.Errorf("writing sboms: %w", err)
+		return fmt.Errorf("writing SBOMs: %w", err)
 	}
 
 	logrus.Infof("Finish")

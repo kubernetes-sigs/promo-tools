@@ -32,7 +32,7 @@ func TestParseThinManifestsFromDirPostsubmit(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "k8s.io-")
 	require.Nil(t, err)
 	testDir := filepath.Join(tmpDir, "test")
-	defer require.Nil(t, os.RemoveAll(tmpDir))
+	defer os.RemoveAll(tmpDir)
 
 	const (
 		repo   = "https://github.com/kubernetes/k8s.io"
@@ -51,15 +51,19 @@ func TestParseThinManifestsFromDirPostsubmit(t *testing.T) {
 		require.Nil(t, err)
 		require.Len(t, manifests, 76)
 
-		imageCount := 0
+		var digestCount, imageCount int
 		for _, manifest := range manifests {
 			imageCount += len(manifest.Images)
+			for _, image := range manifest.Images {
+				digestCount += len(image.Dmap)
+			}
 		}
 
+		expectedDigestCount := 12344
 		if onlyProwDiff {
-			assert.Equal(t, imageCount, 31)
-		} else {
-			assert.Equal(t, imageCount, 623)
+			expectedDigestCount = 1
 		}
+		assert.Equal(t, expectedDigestCount, digestCount)
+		assert.Equal(t, 623, imageCount)
 	}
 }

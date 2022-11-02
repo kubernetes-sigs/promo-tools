@@ -19,7 +19,7 @@ package manifest
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path"
 	"path/filepath"
 
@@ -185,7 +185,7 @@ func Write(m schema.Manifest, rii registry.RegInvImage) error {
 	logrus.Infoln("RENDER", imagesPath)
 
 	// Write the file.
-	err := ioutil.WriteFile(
+	err := os.WriteFile(
 		imagesPath, []byte(rii.ToYAML(registry.YamlMarshalingOpts{})), 0o644)
 	return err
 }
