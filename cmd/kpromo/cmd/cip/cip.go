@@ -83,13 +83,6 @@ the 'images: ...' contents`,
 		"use only the latest diff for the manifest dir. Works only on prow.",
 	)
 
-	CipCmd.PersistentFlags().IntVar(
-		&runOpts.Threads,
-		"threads",
-		options.DefaultOptions.Threads,
-		"number of concurrent goroutines to use when talking to GCR",
-	)
-
 	CipCmd.PersistentFlags().BoolVar(
 		&runOpts.JSONLogSummary,
 		"json-log-summary",
