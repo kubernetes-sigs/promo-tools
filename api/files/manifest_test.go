@@ -17,7 +17,6 @@ limitations under the License.
 package files_test
 
 import (
-	"fmt"
 	"strings"
 	"testing"
 
@@ -144,9 +143,8 @@ func checkErrorMatchesExpected(t *testing.T, err error, expected string) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	if err != nil && expected != "" {
-		actual := fmt.Sprintf("%v", err)
-		if !strings.Contains(actual, expected) {
-			t.Errorf("error %q did not contain expected %q", err, expected)
+		if !strings.Contains(err.Error(), expected) {
+			t.Errorf("error %v did not contain expected %v", err, expected)
 		}
 	}
 	if err == nil && expected != "" {

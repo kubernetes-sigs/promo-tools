@@ -401,7 +401,7 @@ func (check *ImageVulnCheck) Run() error {
 // Error is a function of ImageSizeError and implements the error interface.
 func (err ImageVulnError) Error() string {
 	// TODO: Why are we not checking errors here?
-	// nolint: errcheck
+	//nolint:errcheck,errchkjson
 	vulnJSON, _ := json.MarshalIndent(err, "", "  ")
 	return string(vulnJSON)
 }

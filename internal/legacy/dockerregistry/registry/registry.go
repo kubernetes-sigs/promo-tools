@@ -62,8 +62,8 @@ type TagSet map[image.Tag]interface{}
 
 // ToYAML displays a RegInvImage as YAML, but with the map items sorted
 // alphabetically.
-func (rii *RegInvImage) ToYAML(o YamlMarshalingOpts) string {
-	images := rii.ToSorted()
+func (a *RegInvImage) ToYAML(o YamlMarshalingOpts) string {
+	images := a.ToSorted()
 
 	var b strings.Builder
 	for _, image := range images {
@@ -111,8 +111,8 @@ func (rii *RegInvImage) ToYAML(o YamlMarshalingOpts) string {
 // a@sha256:0000000000000000000000000000000000000000000000000000000000000000,a:1.0
 // a@sha256:0000000000000000000000000000000000000000000000000000000000000000,a:latest
 // b@sha256:1111111111111111111111111111111111111111111111111111111111111111,-
-func (rii *RegInvImage) ToCSV() string {
-	images := rii.ToSorted()
+func (a *RegInvImage) ToCSV() string {
+	images := a.ToSorted()
 
 	var b strings.Builder
 	for _, image := range images {
@@ -135,10 +135,10 @@ func (rii *RegInvImage) ToCSV() string {
 }
 
 // ToSorted converts a RegInvImage type to a sorted structure.
-func (rii *RegInvImage) ToSorted() []ImageWithDigestSlice {
+func (a *RegInvImage) ToSorted() []ImageWithDigestSlice {
 	images := make([]ImageWithDigestSlice, 0)
 
-	for name, dmap := range *rii {
+	for name, dmap := range *a {
 		var digests []Digest
 		for k, v := range dmap {
 			var tags []string
@@ -373,8 +373,9 @@ func ValidateParentImages(registry image.Registry, images []ImageWithParentDiges
 // IsParentImageValid only returns true if all child images, from the parent's
 // manifest list, are from the same image location.
 // Example:
-//		VALID 	parent=gcr.io/foo/bar child=gcr.io/foo/bar
-// 		INVALID parent=gcr.io/foo/bar child=gcr.io/foo/bar/foo
+//
+//	VALID 	parent=gcr.io/foo/bar child=gcr.io/foo/bar
+//	INVALID parent=gcr.io/foo/bar child=gcr.io/foo/bar/foo
 //
 // TODO: Review/optimize/de-dupe (https://github.com/kubernetes-sigs/promo-tools/pull/351)
 func IsParentImageValid(registry image.Registry, img ImageWithParentDigestSlice) bool {

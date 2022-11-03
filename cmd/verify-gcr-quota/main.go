@@ -18,7 +18,7 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"math/rand"
 	"net/http"
 	"runtime"
@@ -106,7 +106,7 @@ func worker(c chan message) {
 	defer resp.Body.Close()
 
 	// Parse the request.
-	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		fmt.Println("Encountered an error when reading response body: ", err)
 	}

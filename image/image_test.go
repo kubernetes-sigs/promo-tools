@@ -34,7 +34,7 @@ func TestNewManifestListFromFile(t *testing.T) {
 	require.Nil(t, err, "creating temp file")
 	defer os.Remove(tempFile.Name())
 
-	_, err = tempFile.Write([]byte(listYAML))
+	_, err = tempFile.WriteString(listYAML)
 	require.Nil(t, err, "wrinting temporary promoter image list")
 
 	imageList, err := NewManifestListFromFile(tempFile.Name())
