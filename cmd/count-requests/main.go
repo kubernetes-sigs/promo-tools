@@ -20,7 +20,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -104,7 +104,7 @@ func (r *request) genQuery() string {
 
 // getPayload converts the HTTP response into a response payload.
 func getPayload(resp *http.Response) response {
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		panic(err)
 	}

@@ -21,7 +21,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"strings"
@@ -344,7 +343,7 @@ type RegistrySnapshot struct {
 
 func readE2ETests(filePath string) (E2ETests, error) {
 	var ts E2ETests
-	b, err := ioutil.ReadFile(filePath)
+	b, err := os.ReadFile(filePath)
 	if err != nil {
 		return ts, err
 	}

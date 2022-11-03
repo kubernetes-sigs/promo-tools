@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"regexp"
@@ -612,7 +611,7 @@ func getJSONSFromProcess(req stream.ExternalRequest) (cipJson.Objects, Errors) {
 		)
 	}
 
-	be, err := ioutil.ReadAll(stderrReader)
+	be, err := io.ReadAll(stderrReader)
 	if err != nil {
 		streamErrs = append(
 			streamErrs,
@@ -1214,7 +1213,7 @@ func MkReadRepositoryCmdReal(
 	httpReq, err := http.NewRequest(
 		"GET",
 		fmt.Sprintf("https://%s/v2/%s/tags/list", domain, repoPath),
-		nil,
+		http.NoBody,
 	)
 	if err != nil {
 		logrus.Fatalf(
@@ -1259,7 +1258,7 @@ func MkReadManifestListCmdReal(sc *SyncContext, gmlc *GCRManifestListContext) st
 		gmlc.Digest,
 	)
 
-	httpReq, err := http.NewRequest("GET", endpoint, nil)
+	httpReq, err := http.NewRequest("GET", endpoint, http.NoBody)
 
 	// Without this, GCR responds as we had used the "Accept:
 	// application/vnd.docker.distribution.manifest.v1+prettyjws" header.
@@ -1811,7 +1810,7 @@ func (sc *SyncContext) PrintCapturedRequests(capReqs *CapturedRequests) {
 		fmt.Println("captured reqs summary:")
 		fmt.Println("")
 		// TODO: Consider pointers or indexing (rangeValCopy)
-		// nolint: gocritic
+		//nolint: gocritic
 		for _, pr := range prs {
 			fmt.Printf("captured req: %v", pr.PrettyValue())
 		}
@@ -1869,7 +1868,7 @@ func MkRequestCapturer(captured *CapturedRequests) ProcessRequest {
 	) {
 		for req := range reqs {
 			// TODO: Why are we not checking errors here?
-			// nolint: errcheck
+			//nolint: errcheck
 			pr := req.RequestParams.(PromotionRequest)
 
 			mutex.Lock()
@@ -2265,8 +2264,7 @@ func (payload *GCRPubSubPayload) matchImage(
 ) GcrPayloadMatch {
 	var m GcrPayloadMatch
 
-	constructedPath := strings.Join(
-		[]string{string(rc.Name), string(img.Name)}, "/")
+	constructedPath := string(rc.Name) + "/" + string(img.Name)
 	if payload.Path != constructedPath {
 		return m
 	}

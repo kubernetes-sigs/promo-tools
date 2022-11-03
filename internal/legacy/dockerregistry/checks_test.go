@@ -185,10 +185,10 @@ func TestImageRemovalCheck(t *testing.T) {
 
 	for _, test := range tests {
 		// TODO: Why are we not checking errors here?
-		// nolint: errcheck
+		//nolint:errcheck
 		masterEdges, _ := reg.ToPromotionEdges(test.masterManifests)
 		// TODO: Why are we not checking errors here?
-		// nolint: errcheck
+		//nolint:errcheck
 		pullEdges, _ := reg.ToPromotionEdges(test.pullManifests)
 		got := test.check.Compare(masterEdges, pullEdges)
 		require.Equal(t, test.expected, got)
@@ -340,7 +340,7 @@ func TestImageSizeCheck(t *testing.T) {
 
 	for _, test := range tests {
 		// TODO: Why are we not checking errors here?
-		// nolint: errcheck
+		//nolint:errcheck
 		test.check.PullEdges, _ = reg.ToPromotionEdges(test.manifests)
 		require.Equal(t, len(test.imageSizes), len(test.check.PullEdges))
 

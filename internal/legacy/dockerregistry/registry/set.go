@@ -38,7 +38,7 @@ func toRegistryInventory(a container.Set) RegInvImage {
 	b := make(RegInvImage)
 	for k, v := range a {
 		// TODO: Why are we not checking errors here?
-		// nolint: errcheck
+		//nolint:errcheck
 		b[k.(image.Name)] = v.(DigestTags)
 	}
 

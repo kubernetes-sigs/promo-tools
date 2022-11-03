@@ -48,7 +48,8 @@ Promote images from a staging registry to production
 var runOpts = &options.Options{}
 
 // TODO: Function 'init' is too long (171 > 60) (funlen)
-// nolint: funlen
+//
+//nolint:funlen
 func init() {
 	CipCmd.PersistentFlags().BoolVar(
 		&runOpts.Confirm,

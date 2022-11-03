@@ -49,12 +49,12 @@ func TestHash(t *testing.T) {
 
 // AssertMatchesFile verifies that the contents of p match actual.
 //
-//  We break this out into a file because we also support the
-//  UPDATE_EXPECTED_OUTPUT magic env var. When that env var is
-//  set, we will write the actual output to the expected file, which
-//  is very handy when making bigger changes.  The intention of these
-//  tests is to make the changes explicit, particularly in code
-//  review, not to force manual updates.
+//	We break this out into a file because we also support the
+//	UPDATE_EXPECTED_OUTPUT magic env var. When that env var is
+//	set, we will write the actual output to the expected file, which
+//	is very handy when making bigger changes.  The intention of these
+//	tests is to make the changes explicit, particularly in code
+//	review, not to force manual updates.
 func AssertMatchesFile(t *testing.T, actual, p string) {
 	b, err := os.ReadFile(p)
 	if err != nil {

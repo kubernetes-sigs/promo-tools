@@ -120,7 +120,6 @@ func (di *DefaultPromoterImplementation) AppendManifestToSnapshot(
 	return append(mfests, mfest), nil
 }
 
-//
 func (di *DefaultPromoterImplementation) GetRegistryImageInventory(
 	opts *options.Options, mfests []schema.Manifest,
 ) (registry.RegInvImage, error) {

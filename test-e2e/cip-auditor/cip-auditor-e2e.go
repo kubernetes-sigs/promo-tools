@@ -19,7 +19,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
 	"time"
@@ -973,7 +972,7 @@ type E2ETests []*E2ETest
 
 func readE2ETests(filePath string) (E2ETests, error) {
 	var ts E2ETests
-	b, err := ioutil.ReadFile(filePath)
+	b, err := os.ReadFile(filePath)
 	if err != nil {
 		return ts, err
 	}

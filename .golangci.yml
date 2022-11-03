@@ -19,14 +19,23 @@ issues:
 linters:
   disable-all: true
   enable:
+    - asasalint
     - asciicheck
+    - bidichk
     - bodyclose
-    - deadcode
+    - containedctx
+    - contextcheck
+    - decorder
     - depguard
     - dogsled
     - dupl
+    - dupword
     - durationcheck
     - errcheck
+    - errchkjson
+    - errname
+    - execinquery
+    - exportloopref
     - goconst
     - gocritic
     - gocyclo
@@ -40,32 +49,39 @@ linters:
     - goprintffuncname
     - gosimple
     - govet
+    - grouper
     - importas
     - ineffassign
+    - loggercheck
     - makezero
     - misspell
     - nakedret
+    - nilerr
+    - nilnil
     - nolintlint
+    - nosprintfhostport
     - prealloc
     - predeclared
     - promlinter
+    - reassign
     - revive
     - rowserrcheck
     - sqlclosecheck
     - staticcheck
-    - structcheck
     - stylecheck
+    - tenv
+    - testableexamples
+    - tparallel
     - typecheck
     - unconvert
     - unparam
     - unused
-    - varcheck
+    - wastedassign
     - whitespace
     # - cyclop
     # - errorlint
     # - exhaustive
-    # - exhaustivestruct
-    # - exportloopref
+    # - exhaustruct
     # - forbidigo
     # - forcetypeassert
     # - funlen
@@ -77,19 +93,20 @@ linters:
     # - goerr113
     # - gomnd
     # - gosec
-    # - ifshort
+    # - interfacebloat
+    # - ireturn
     # - lll
+    # - maintidx
     # - nestif
-    # - nilerr
     # - nlreturn
     # - noctx
+    # - nonamedreturns
     # - paralleltest
-    # - scopelint
     # - tagliatelle
     # - testpackage
     # - thelper
-    # - tparallel
-    # - wastedassign
+    # - usestdlibvars
+    # - varnamelen
     # - wrapcheck
     # - wsl
 linters-settings:
@@ -103,84 +120,108 @@ linters-settings:
     check-blank: true
   gocritic:
     enabled-checks:
-      # Diagnostic
       - appendAssign
+      - appendCombine
       - argOrder
+      - assignOp
+      - badCall
       - badCond
+      - badLock
+      - badRegexp
+      - badSorting
+      - boolExprSimplify
+      - builtinShadow
+      - builtinShadowDecl
+      - captLocal
       - caseOrder
       - codegenComment
+      - commentFormatting
       - commentedOutCode
+      - commentedOutImport
+      - defaultCaseOrder
+      - deferInLoop
+      - deferUnlambda
       - deprecatedComment
+      - docStub
       - dupArg
       - dupBranchBody
       - dupCase
+      - dupImport
       - dupSubExpr
-      - exitAfterDefer
-      - flagDeref
-      - flagName
-      - nilValReturn
-      - offBy1
-      - sloppyReassign
-      - weakCond
-      - octalLiteral
-
-      # Performance
-      - appendCombine
-      - equalFold
-      - hugeParam
-      - indexAlloc
-      - rangeExprCopy
-      - rangeValCopy
-
-      # Style
-      - assignOp
-      - boolExprSimplify
-      - captLocal
-      - commentFormatting
-      - commentedOutImport
-      - defaultCaseOrder
-      - docStub
+      - dynamicFmtString
       - elseif
+      - emptyDecl
       - emptyFallthrough
       - emptyStringTest
+      - equalFold
+      - evalOrder
+      - exitAfterDefer
+      - externalErrorReassign
+      - flagDeref
+      - flagName
       - hexLiteral
+      - httpNoBody
+      - hugeParam
+      - importShadow
+      - indexAlloc
+      - initClause
+      - ioutilDeprecated
+      - mapKey
       - methodExprCall
+      - nestingReduce
+      - newDeref
+      - nilValReturn
+      - octalLiteral
+      - offBy1
+      - paramTypeCombine
+      - preferDecodeRune
+      - preferFilepathJoin
+      - preferFprint
+      - preferStringWriter
+      - preferWriteByte
+      - ptrToRefParam
+      - rangeExprCopy
+      - rangeValCopy
+      - redundantSprint
       - regexpMust
+      - regexpPattern
+      - regexpSimplify
+      - returnAfterHttpError
+      - ruleguard
       - singleCaseSwitch
+      - sliceClear
       - sloppyLen
+      - sloppyReassign
+      - sloppyTypeAssert
+      - sortSlice
+      - sprintfQuotedString
+      - sqlQuery
+      - stringConcatSimplify
       - stringXbytes
+      - stringsCompare
       - switchTrue
+      - syncMapLoadAndDelete
+      - timeCmpSimplify
+      - timeExprSimplify
+      - todoCommentWithoutDetail
+      - tooManyResultsChecker
+      - truncateCmp
       - typeAssertChain
       - typeSwitchVar
+      - typeUnparen
       - underef
       - unlabelStmt
       - unlambda
-      - unslice
-      - valSwap
-      - wrapperFunc
-      - yodaStyleExpr
-      # - ifElseChain
-
-      # Opinionated
-      - builtinShadow
-      - importShadow
-      - initClause
-      - nestingReduce
-      - paramTypeCombine
-      - ptrToRefParam
-      - typeUnparen
       - unnamedResult
       - unnecessaryBlock
-  nolintlint:
-    # Enable to ensure that nolint directives are all used. Default is true.
-    allow-unused: false
-    # Disable to ensure that nolint directives don't have a leading space. Default is true.
-    # TODO(lint): Enforce machine-readable `nolint` directives
-    allow-leading-space: true
-    # Exclude following linters from requiring an explanation.  Default is [].
-    allow-no-explanation: []
-    # Enable to require an explanation of nonzero length after each nolint directive. Default is false.
-    # TODO(lint): Enforce explanations for `nolint` directives
-    require-explanation: false
-    # Enable to require nolint directives to mention the specific linter being suppressed. Default is false.
-    require-specific: true
+      - unnecessaryDefer
+      - unslice
+      - valSwap
+      - weakCond
+      - wrapperFunc
+      - yodaStyleExpr
+      # - exposedSyncMutex
+      # - filepathJoin
+      # - ifElseChain
+      # - typeDefFirst
+      # - whyNoLint

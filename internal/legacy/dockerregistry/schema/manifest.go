@@ -17,6 +17,7 @@ limitations under the License.
 package schema
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -160,7 +161,7 @@ func validateRequiredComponents(m Manifest) error {
 		return nil
 	}
 
-	return fmt.Errorf(strings.Join(errs, "\n"))
+	return errors.New(strings.Join(errs, "\n"))
 }
 
 func (m Manifest) srcRegistryCount() int {
@@ -213,7 +214,7 @@ func ValidateDigest(digest image.Digest) error {
 
 // ValidateTag validates the tag.
 func ValidateTag(tag image.Tag) error {
-	validTag := regexp.MustCompile(`^[\w][\w.-]{0,127}$`)
+	validTag := regexp.MustCompile(`^\w[\w.-]{0,127}$`)
 	if !validTag.Match([]byte(tag)) {
 		return fmt.Errorf("invalid tag: %v", tag)
 	}
@@ -594,7 +595,7 @@ func ParseImagesFromFile(filePath string) (registry.Images, error) {
 
 // validateIsDirectory returns nil if it does exist, otherwise a non-nil error.
 func validateIsDirectory(dir string) error {
-	p, err := os.Stat(filepath.Join(dir))
+	p, err := os.Stat(dir)
 	if err != nil {
 		return err
 	}
