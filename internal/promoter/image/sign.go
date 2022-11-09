@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	credentials "cloud.google.com/go/iam/credentials/apiv1"
+	"cloud.google.com/go/iam/credentials/apiv1/credentialspb"
 	"github.com/google/go-containerregistry/pkg/crane"
 	"github.com/google/go-containerregistry/pkg/gcrane"
 	"github.com/google/go-containerregistry/pkg/name"
@@ -30,7 +31,6 @@ import (
 	"github.com/sigstore/sigstore/pkg/tuf"
 	"github.com/sirupsen/logrus"
 	gopts "google.golang.org/api/option"
-	credentialspb "google.golang.org/genproto/googleapis/iam/credentials/v1"
 
 	reg "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/gcloud"
