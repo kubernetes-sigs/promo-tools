@@ -7,7 +7,7 @@ require (
 	cloud.google.com/go/errorreporting v0.2.0
 	cloud.google.com/go/iam v0.7.0
 	cloud.google.com/go/logging v1.5.0
-	cloud.google.com/go/storage v1.27.0
+	cloud.google.com/go/storage v1.28.0
 	github.com/cenkalti/backoff/v4 v4.1.3
 	github.com/google/go-cmp v0.5.9
 	github.com/google/go-containerregistry v0.12.0
