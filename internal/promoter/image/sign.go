@@ -56,12 +56,15 @@ const (
 func (di *DefaultPromoterImplementation) ValidateStagingSignatures(
 	edges map[reg.PromotionEdge]interface{},
 ) (map[reg.PromotionEdge]interface{}, error) {
-	refs := []string{}
 	refsToEdges := map[string]reg.PromotionEdge{}
 	for edge := range edges {
 		ref := edge.SrcReference()
-		refs = append(refs, ref)
 		refsToEdges[ref] = edge
+	}
+
+	refs := []string{}
+	for ref := range refsToEdges {
+		refs = append(refs, ref)
 	}
 
 	res, err := di.signer.VerifyImages(refs...)
