@@ -10,7 +10,7 @@ require (
 	cloud.google.com/go/storage v1.28.0
 	github.com/cenkalti/backoff/v4 v4.1.3
 	github.com/google/go-cmp v0.5.9
-	github.com/google/go-containerregistry v0.12.0
+	github.com/google/go-containerregistry v0.12.1
 	github.com/google/uuid v1.3.0
 	github.com/maxbrunsfeld/counterfeiter/v6 v6.5.0
 	github.com/nozzle/throttler v0.0.0-20180817012639-2ea982251481
