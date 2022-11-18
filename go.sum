@@ -61,8 +61,8 @@ cloud.google.com/go/containeranalysis v0.6.0/go.mod h1:HEJoiEIu+lEXM+k7+qLCci0h3
 cloud.google.com/go/datastore v1.0.0/go.mod h1:LXYbyblFSglQ5pkeyhO+Qmw7ukd3C+pD7TKLgZqpHYE=
 cloud.google.com/go/datastore v1.1.0/go.mod h1:umbIZjpQpHh4hmRpGhH4tLFup+FVzqBi1b3c64qFpCk=
 cloud.google.com/go/datastore v1.5.0/go.mod h1:RGUNM0FFAVkYA94BLTxoXBgfIyY1Riq67TwaBXH0lwc=
-cloud.google.com/go/errorreporting v0.2.0 h1:b2QhVcl+43FS3qAYuoafNVvqYIc8uDUFeEB7mvFt9C8=
-cloud.google.com/go/errorreporting v0.2.0/go.mod h1:QkYzg92wgpJ0ChLdcO5LhtCEyYwq0tIa+jLrj6Nh5ME=
+cloud.google.com/go/errorreporting v0.3.0 h1:kj1XEWMu8P0qlLhm3FwcaFsUvXChV/OraZwA70trRR0=
+cloud.google.com/go/errorreporting v0.3.0/go.mod h1:xsP2yaAp+OAW4OIm60An2bbLpqIhKXdWR/tawvl7QzU=
 cloud.google.com/go/firestore v1.1.0/go.mod h1:ulACoGHTpvq5r8rxGJ4ddJZBZqakUQqClKRT5SZwBmk=
 cloud.google.com/go/grafeas v0.2.0 h1:CYjC+xzdPvbV65gi6Dr4YowKcmLo045pm18L0DhdELM=
 cloud.google.com/go/grafeas v0.2.0/go.mod h1:KhxgtF2hb0P191HlY5besjYm6MqTSTj3LSI+M+ByZHc=
