@@ -167,6 +167,8 @@ func (di *DefaultPromoterImplementation) SignImages(
 	}
 	signOpts.IdentityToken = token
 
+	di.signer = sign.New(signOpts)
+
 	// We only sign the first image of each edge. If there are more
 	// than one destination registries for an image, we copy the
 	// signature to avoid varying valid signatures in each registry.
