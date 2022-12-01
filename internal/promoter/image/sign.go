@@ -167,6 +167,10 @@ func (di *DefaultPromoterImplementation) SignImages(
 	}
 	signOpts.IdentityToken = token
 
+	// Creating a new Signer after setting the identity token is MANDATORY
+	// because that's the only way to propagate the identity token to the
+	// internal Signer structs. Without that, the identity token wouldn't be
+	// used at all and images would be signed with a wrong identity.
 	di.signer = sign.New(signOpts)
 
 	// We only sign the first image of each edge. If there are more
