@@ -333,6 +333,7 @@ func diffProwFiles(dir string) (digests []string, err error) {
 		jobTypeEnv        = "JOB_TYPE"
 		jobTypePostsubmit = "postsubmit"
 		jobTypePresubmit  = "presubmit"
+		jobTypeBatch      = "batch"
 	)
 
 	jobType := os.Getenv(jobTypeEnv)
@@ -341,7 +342,7 @@ func diffProwFiles(dir string) (digests []string, err error) {
 	}
 
 	var base string
-	if jobType == jobTypePresubmit {
+	if jobType == jobTypePresubmit || jobType == jobTypeBatch {
 		pullBaseSHA := os.Getenv(pullBaseSHAEnv)
 		if pullBaseSHA == "" {
 			return nil, fmt.Errorf("%s not set", pullBaseSHAEnv)
