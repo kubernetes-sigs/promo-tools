@@ -5,7 +5,7 @@ go 1.19
 require (
 	cloud.google.com/go/containeranalysis v0.7.0
 	cloud.google.com/go/errorreporting v0.3.0
-	cloud.google.com/go/iam v0.9.0
+	cloud.google.com/go/iam v0.10.0
 	cloud.google.com/go/logging v1.6.1
 	cloud.google.com/go/storage v1.28.1
 	github.com/cenkalti/backoff/v4 v4.2.0
