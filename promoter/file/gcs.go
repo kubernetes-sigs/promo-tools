@@ -30,10 +30,21 @@ import (
 	"google.golang.org/api/iterator"
 
 	api "sigs.k8s.io/promo-tools/v3/api/files"
-	"sigs.k8s.io/release-sdk/object"
 )
 
+// GoogleCloudStorage is the provider for Google Cloud Storage (GCS).
+var GoogleCloudStorage = &gcsProvider{}
+
+type gcsProvider struct{}
+
+var _ Provider = &gcsProvider{}
+
+func (p *gcsProvider) Scheme() string {
+	return api.GCSScheme
+}
+
 type gcsSyncFilestore struct {
+	provider  *gcsProvider
 	filestore *api.Filestore
 	client    *storage.Client
 	bucket    string
@@ -53,7 +64,7 @@ func (s *gcsSyncFilestore) OpenReader(
 func (s *gcsSyncFilestore) UploadFile(ctx context.Context, dest, localFile string) error {
 	absolutePath := s.prefix + dest
 
-	gcsURL := object.GcsPrefix + s.bucket + "/" + absolutePath
+	gcsURL := s.provider.Scheme() + "://" + s.bucket + "/" + absolutePath
 
 	in, err := os.Open(localFile)
 	if err != nil {
@@ -131,7 +142,7 @@ func (s *gcsSyncFilestore) ListFiles(
 		}
 
 		file := &SyncFileInfo{}
-		file.AbsolutePath = object.GcsPrefix + s.bucket + "/" + obj.Name
+		file.AbsolutePath = s.provider.Scheme() + "://" + s.bucket + "/" + obj.Name
 		file.RelativePath = strings.TrimPrefix(name, s.prefix)
 		if obj.MD5 == nil {
 			return nil, fmt.Errorf("MD5 not set on file %q", file.AbsolutePath)

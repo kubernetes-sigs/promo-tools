@@ -16,7 +16,11 @@ limitations under the License.
 
 package file
 
-import "context"
+import (
+	"context"
+
+	api "sigs.k8s.io/promo-tools/v3/api/files"
+)
 
 //go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate
 
@@ -25,4 +29,13 @@ import "context"
 //counterfeiter:generate . SyncFileOp
 type SyncFileOp interface {
 	Run(ctx context.Context) error
+}
+
+// Provider defines a file provider, able to work with GCS or S3.
+type Provider interface {
+	// Scheme returns the URI scheme we handle.
+	Scheme() string
+
+	// OpenFilestore opens a handle to the specified filestore.
+	OpenFilestore(ctx context.Context, filestore *api.Filestore, useServiceAccount, confirm bool) (syncFilestore, error)
 }

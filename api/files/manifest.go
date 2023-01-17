@@ -22,6 +22,14 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
+const (
+	// S3Scheme is the scheme for URIs describing files on Amazon S3.
+	S3Scheme = "s3"
+
+	// GCSScheme is the scheme for URIs describing files on Google Cloud Storage (GCS).
+	GCSScheme = "gs"
+)
+
 //go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate
 
 // Filestore holds information about a filestore (e.g. GCS or S3 bucket),
