@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"sort"
 	"strings"
 
 	"cloud.google.com/go/storage"
@@ -28,7 +29,6 @@ import (
 	"google.golang.org/api/option"
 
 	api "sigs.k8s.io/promo-tools/v3/api/files"
-	"sigs.k8s.io/release-sdk/object"
 )
 
 // FilestorePromoter manages the promotion of files.
@@ -58,7 +58,37 @@ type syncFilestore interface {
 	ListFiles(ctx context.Context) (map[string]*SyncFileInfo, error)
 }
 
+var supportedProviders = []Provider{
+	GoogleCloudStorage,
+	S3Storage,
+}
+
 func openFilestore(
+	ctx context.Context,
+	filestore *api.Filestore,
+	useServiceAccount, confirm bool,
+) (syncFilestore, error) {
+	for _, provider := range supportedProviders {
+		scheme := provider.Scheme()
+		if strings.HasPrefix(filestore.Base, scheme+"://") {
+			return provider.OpenFilestore(ctx, filestore, useServiceAccount, confirm)
+		}
+	}
+
+	expected := []string{}
+	for _, provider := range supportedProviders {
+		expected = append(expected, provider.Scheme())
+	}
+	sort.Strings(expected)
+	return nil, fmt.Errorf(
+		"unrecognized scheme %q (supported schemes: %s)",
+		filestore.Base,
+		strings.Join(expected, ", "),
+	)
+}
+
+// openGCSFilestore opens a filestore backed by Google Cloud Storage (GCS)
+func (p *gcsProvider) OpenFilestore(
 	ctx context.Context,
 	filestore *api.Filestore,
 	useServiceAccount, confirm bool,
@@ -72,12 +102,8 @@ func openFilestore(
 		)
 	}
 
-	if u.Scheme != "gs" {
-		return nil, fmt.Errorf(
-			"unrecognized scheme %q (supported schemes: %s)",
-			filestore.Base,
-			object.GcsPrefix,
-		)
+	if u.Scheme != p.Scheme() {
+		return nil, fmt.Errorf("unrecognized scheme %q, expected %s", filestore.Base, p.Scheme())
 	}
 
 	withAuth, err := useStorageClientAuth(filestore, useServiceAccount, confirm)
@@ -116,6 +142,7 @@ func openFilestore(
 	bucket := u.Host
 
 	s := &gcsSyncFilestore{
+		provider:  p,
 		filestore: filestore,
 		client:    client,
 		bucket:    bucket,

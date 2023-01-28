@@ -73,7 +73,7 @@ func TestValidateFilestores(t *testing.T) {
 		},
 		{
 			filestores: []files.Filestore{
-				{Src: true, Base: "gs://src"},
+				{Src: true, Base: "notsupported://src"},
 				{Base: "s3://dest"},
 			},
 			expectedError: "unsupported scheme in base",
