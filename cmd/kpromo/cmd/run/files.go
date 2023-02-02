@@ -81,6 +81,13 @@ func init() {
 		"allow service account usage with gcloud calls",
 	)
 
+	filesCmd.PersistentFlags().IntVar(
+		&filesOpts.ParallelUploads,
+		"parallel",
+		filesOpts.ParallelUploads,
+		"upload files in parallel goroutines",
+	)
+
 	// TODO(kpromo): Consider marking manifest flags as required
 
 	RunCmd.AddCommand(filesCmd)

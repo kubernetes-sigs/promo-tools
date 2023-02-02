@@ -23,6 +23,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"sync"
 
 	"github.com/sirupsen/logrus"
 
@@ -68,6 +69,10 @@ type PromoteFilesOptions struct {
 	// This gives some protection against a hostile manifest.
 	UseServiceAccount bool
 
+	// ParallelUploads can be set to a value greate than 1
+	// to run uploads in parallel on N goroutines.
+	ParallelUploads int
+
 	// Out is the destination for "normal" output (such as dry-run)
 	Out io.Writer
 }
@@ -77,6 +82,7 @@ func (o *PromoteFilesOptions) PopulateDefaults() {
 	o.Confirm = false
 	o.UseServiceAccount = false
 	o.Out = os.Stdout
+	o.ParallelUploads = 1
 }
 
 // RunPromoteFiles executes a file promotion command
@@ -114,35 +120,48 @@ func RunPromoteFiles(ctx context.Context, options PromoteFilesOptions) error {
 		ops = append(ops, o...)
 	}
 
-	// So that we can support future parallel execution, an error
-	// in one operation does not prevent us attempting the
-	// remaining operations
-	var errors []error
 	for _, op := range ops {
+		op := op
 		if _, err := fmt.Fprintf(options.Out, "%v\n", op); err != nil {
-			errors = append(
-				errors,
-				fmt.Errorf("error writing to output: %v", err),
-			)
-		}
-
-		if options.Confirm {
-			if err := op.Run(ctx); err != nil {
-				logrus.Warnf("error copying file: %v", err)
-				errors = append(errors, err)
-			}
+			return fmt.Errorf("error writing to output: %w", err)
 		}
 	}
 
-	if len(errors) != 0 {
-		fmt.Fprintf(
-			options.Out,
-			"********** FINISHED WITH ERRORS **********\n")
-		for _, err := range errors {
-			fmt.Fprintf(options.Out, "%v\n", err)
+	// So that we can support future parallel execution, an error
+	// in one operation does not prevent us attempting the
+	// remaining operations
+	if options.Confirm {
+		var jobs []func() error
+		for _, op := range ops {
+			op := op
+
+			jobs = append(jobs, func() error {
+				if err := op.Run(ctx); err != nil {
+					logrus.Warnf("error copying file: %v", err)
+					return err
+				}
+				return nil
+			})
 		}
 
-		return errors[0]
+		maxConcurrency := options.ParallelUploads
+		jobResults := RunInParallel(jobs, maxConcurrency)
+		var errors []error
+		for _, err := range jobResults {
+			if err != nil {
+				errors = append(errors, err)
+			}
+		}
+		if len(errors) != 0 {
+			fmt.Fprintf(
+				options.Out,
+				"********** FINISHED WITH ERRORS **********\n")
+			for _, err := range errors {
+				fmt.Fprintf(options.Out, "%v\n", err)
+			}
+
+			return errors[0]
+		}
 	}
 
 	if options.Confirm {
@@ -158,6 +177,49 @@ func RunPromoteFiles(ctx context.Context, options PromoteFilesOptions) error {
 	}
 
 	return nil
+}
+
+type job struct {
+	fn  func() error
+	err error
+}
+
+func RunInParallel(operations []func() error, maxConcurrent int) []error {
+	var wg sync.WaitGroup
+	queue := make(chan *job, maxConcurrent)
+	for i := 0; i < maxConcurrent; i++ {
+		go func() {
+			for {
+				job, ok := <-queue
+				if !ok {
+					// channel closed
+					return
+				}
+				err := job.fn()
+				wg.Done()
+				job.err = err
+			}
+		}()
+	}
+
+	var jobs []*job
+	for i := range operations {
+		wg.Add(1)
+		job := &job{fn: operations[i]}
+		jobs = append(jobs, job)
+		queue <- job
+	}
+
+	close(queue)
+
+	wg.Wait()
+
+	var errors []error
+	for i := range jobs {
+		errors = append(errors, jobs[i].err)
+	}
+
+	return errors
 }
 
 // ReadManifests reads a set of manifests.
@@ -216,6 +278,7 @@ func ReadManifests(options PromoteFilesOptions) ([]*api.Manifest, error) {
 			Confirm:           options.Confirm,
 			UseServiceAccount: options.UseServiceAccount,
 			Out:               options.Out,
+			ParallelUploads:   options.ParallelUploads,
 		}
 
 		m, err := ReadManifest(*prjOpts)
