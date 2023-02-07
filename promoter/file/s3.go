@@ -69,7 +69,18 @@ func (p *s3Provider) OpenFilestore(ctx context.Context, filestore *api.Filestore
 		return nil, fmt.Errorf("unrecognized scheme %q, expected %s", filestore.Base, p.Scheme())
 	}
 
-	awsSession, err := session.NewSession()
+	bucket := u.Host
+	// We send requests direct to the bucket region;
+	// it's more efficient and it's required for regional buckets.
+	bucketRegion, err := p.findRegionForBucket(ctx, bucket)
+	if err != nil {
+		return nil, fmt.Errorf("finding region for bucket: %w", err)
+	}
+
+	awsConfig := aws.NewConfig()
+	awsConfig = awsConfig.WithRegion(bucketRegion)
+
+	awsSession, err := session.NewSession(awsConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error building S3 session: %w", err)
 	}
@@ -81,8 +92,6 @@ func (p *s3Provider) OpenFilestore(ctx context.Context, filestore *api.Filestore
 		prefix += "/"
 	}
 
-	bucket := u.Host
-
 	s := &s3SyncFilestore{
 		provider:  p,
 		filestore: filestore,
@@ -91,6 +100,42 @@ func (p *s3Provider) OpenFilestore(ctx context.Context, filestore *api.Filestore
 		prefix:    prefix,
 	}
 	return s, nil
+}
+
+// findRegionForBucket returns the region in which the bucket is located.
+func (p *s3Provider) findRegionForBucket(ctx context.Context, bucket string) (string, error) {
+	// Pick a region to query, defaulting to the "normal" AWS_REGION env var if set.
+	lookupRegion := os.Getenv("AWS_REGION")
+	if lookupRegion == "" {
+		// We have to query some region, us-east-2 is pretty reliable.
+		lookupRegion = "us-east-2"
+	}
+
+	awsConfig := aws.NewConfig()
+	awsConfig = awsConfig.WithRegion(lookupRegion)
+
+	awsSession, err := session.NewSession(awsConfig)
+	if err != nil {
+		return "", fmt.Errorf("error building S3 session: %w", err)
+	}
+
+	client := s3.New(awsSession)
+
+	bucketLocationResponse, err := client.GetBucketLocationWithContext(ctx, &s3.GetBucketLocationInput{Bucket: &bucket})
+	if err != nil {
+		return "", fmt.Errorf("error from s3 GetBucketLocation(%q): %w", bucket, err)
+	}
+	var bucketRegion string
+	switch aws.StringValue(bucketLocationResponse.LocationConstraint) {
+	case "":
+		// us-classic does not return a value
+		bucketRegion = "us-east-1"
+	default:
+		// EU can mean eu-west-1
+		bucketRegion = aws.StringValue(bucketLocationResponse.LocationConstraint)
+	}
+
+	return bucketRegion, nil
 }
 
 // OpenReader opens an io.ReadCloser for the specified file.
