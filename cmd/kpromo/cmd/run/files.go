@@ -78,7 +78,7 @@ func init() {
 		&filesOpts.UseServiceAccount,
 		"use-service-account",
 		filesOpts.UseServiceAccount,
-		"allow service account usage with gcloud calls",
+		"allow service account usage with gcloud and S3 calls",
 	)
 
 	// TODO(kpromo): Consider marking manifest flags as required
