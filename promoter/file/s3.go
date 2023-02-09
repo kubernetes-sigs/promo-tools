@@ -30,8 +30,10 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/sirupsen/logrus"
 
 	api "sigs.k8s.io/promo-tools/v3/api/files"
@@ -79,6 +81,10 @@ func (p *s3Provider) OpenFilestore(ctx context.Context, filestore *api.Filestore
 
 	awsConfig := aws.NewConfig()
 	awsConfig = awsConfig.WithRegion(bucketRegion)
+	if !useServiceAccount {
+		awsConfig = awsConfig.WithCredentials(credentials.AnonymousCredentials)
+	}
+	awsConfig = awsConfig.WithCredentialsChainVerboseErrors(true)
 
 	awsSession, err := session.NewSession(awsConfig)
 	if err != nil {
@@ -111,28 +117,21 @@ func (p *s3Provider) findRegionForBucket(ctx context.Context, bucket string) (st
 		lookupRegion = "us-east-2"
 	}
 
+	// This is an unauthenticated request (it just does a HEAD on the bucket),
+	// but we still force anonymous credentials to be safe.
 	awsConfig := aws.NewConfig()
 	awsConfig = awsConfig.WithRegion(lookupRegion)
+	awsConfig = awsConfig.WithCredentials(credentials.AnonymousCredentials)
+	awsConfig = awsConfig.WithCredentialsChainVerboseErrors(true)
 
 	awsSession, err := session.NewSession(awsConfig)
 	if err != nil {
-		return "", fmt.Errorf("error building S3 session: %w", err)
+		return "", fmt.Errorf("error creating AWS session: %w", err)
 	}
 
-	client := s3.New(awsSession)
-
-	bucketLocationResponse, err := client.GetBucketLocationWithContext(ctx, &s3.GetBucketLocationInput{Bucket: &bucket})
+	bucketRegion, err := s3manager.GetBucketRegion(ctx, awsSession, bucket, lookupRegion)
 	if err != nil {
-		return "", fmt.Errorf("error from s3 GetBucketLocation(%q): %w", bucket, err)
-	}
-	var bucketRegion string
-	switch aws.StringValue(bucketLocationResponse.LocationConstraint) {
-	case "":
-		// us-classic does not return a value
-		bucketRegion = "us-east-1"
-	default:
-		// EU can mean eu-west-1
-		bucketRegion = aws.StringValue(bucketLocationResponse.LocationConstraint)
+		return "", fmt.Errorf("error finding s3 region for bucket %q: %w", bucket, err)
 	}
 
 	return bucketRegion, nil
