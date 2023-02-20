@@ -5,7 +5,7 @@ go 1.19
 require (
 	cloud.google.com/go/containeranalysis v0.7.0
 	cloud.google.com/go/errorreporting v0.3.0
-	cloud.google.com/go/iam v0.11.0
+	cloud.google.com/go/iam v0.12.0
 	cloud.google.com/go/logging v1.6.1
 	cloud.google.com/go/storage v1.29.0
 	github.com/aws/aws-sdk-go v1.44.204
@@ -23,7 +23,7 @@ require (
 	golang.org/x/oauth2 v0.5.0
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2
 	google.golang.org/api v0.110.0
-	google.golang.org/genproto v0.0.0-20230209215440-0dfe4f8abfcc
+	google.golang.org/genproto v0.0.0-20230216225411-c8e22ba71e44
 	gopkg.in/src-d/go-git.v4 v4.13.1
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/utils v0.0.0-20220728103510-ee6ede2d64ed
