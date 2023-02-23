@@ -16,10 +16,27 @@ limitations under the License.
 
 package imagepromoter
 
-import options "sigs.k8s.io/promo-tools/v3/promoter/image/options"
+import (
+	"errors"
+	"fmt"
+
+	"github.com/google/go-containerregistry/pkg/name"
+	options "sigs.k8s.io/promo-tools/v3/promoter/image/options"
+)
 
 func (di *DefaultPromoterImplementation) GetLatestImages(opts *options.Options) ([]string, error) {
-
+	// If there is a list of images to check in the options
+	// we default to checking those.
+	if len(opts.SignCheckReferences) > 0 {
+		for _, refString := range opts.SignCheckReferences {
+			_, err := name.ParseReference(refString)
+			if err != nil {
+				return nil, fmt.Errorf("invalid image reference %s: %w", refString, err)
+			}
+		}
+		return opts.SignCheckReferences, nil
+	}
+	return nil, errors.New("Automatic image reader not yet implemented")
 }
 
 func (di *DefaultPromoterImplementation) GetSignatureStatus(opts *options.Options, images []string) ([]string, []string, []string, error) {
