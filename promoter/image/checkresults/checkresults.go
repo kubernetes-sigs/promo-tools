@@ -16,9 +16,8 @@ limitations under the License.
 package checkresults
 
 type CheckList struct {
-	SignatureImage string
-	Signed         []string
-	Missing        []string
+	Signed  []string
+	Missing []string
 }
 
 type Signature map[string]CheckList

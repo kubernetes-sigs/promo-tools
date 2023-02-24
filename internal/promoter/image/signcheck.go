@@ -116,24 +116,26 @@ func (di *DefaultPromoterImplementation) GetSignatureStatus(
 		if err != nil {
 			return results, fmt.Errorf("getting digest for %s: %w", refString, err)
 		}
-		logrus.Infof("image digest: %s", digest)
 
 		targetImages := []string{}
 		for _, mirror := range mirrors {
+			rpath := repositoryPath
+			if strings.HasSuffix(mirror, ".gcr.io") {
+				logrus.Infof("Tiene: %s", mirror)
+				rpath = "k8s-artifacts-prod"
+			}
+
 			targetImages = append(targetImages, fmt.Sprintf("%s/%s/%s:%s.sig",
-				mirror, repositoryPath, ref.Context().RepositoryStr(),
+				mirror, rpath, ref.Context().RepositoryStr(),
 				strings.ReplaceAll(digest, ":", "-"),
 			))
 		}
+
 		existing, missing, err := checkObjects(targetImages)
 		if err != nil {
 			return results, fmt.Errorf("checking objects: %w", err)
 		}
 		results[refString] = checkresults.CheckList{
-			SignatureImage: fmt.Sprintf("%s/%s:%s.sig",
-				repositoryPath, ref.Context().RepositoryStr(),
-				strings.ReplaceAll(digest, ":", "-"),
-			),
 			Signed:  existing,
 			Missing: missing,
 		}
@@ -211,8 +213,6 @@ func (di *DefaultPromoterImplementation) FixPartialSignatures(opts *options.Opti
 		sourceRef := res.Signed[0]
 		for _, targetRef := range res.Missing {
 			// Copy the first signature to the target ref
-			logrus.Infof("Copying signature from %s to %s", sourceRef, targetRef)
-
 			if err := di.replicateReference(opts, sourceRef, targetRef); err != nil {
 				return fmt.Errorf("replicating signature: %w", err)
 			}
@@ -221,6 +221,7 @@ func (di *DefaultPromoterImplementation) FixPartialSignatures(opts *options.Opti
 	return nil
 }
 
+// replicateReference copies an image reference to another mirror
 func (di *DefaultPromoterImplementation) replicateReference(opts *options.Options, srcRef, dstRef string) error {
 	craneOpts := []crane.Option{
 		crane.WithAuthFromKeychain(gcrane.Keychain),
