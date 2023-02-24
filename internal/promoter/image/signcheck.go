@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	yaml "gopkg.in/yaml.v2"
+	"sigs.k8s.io/release-sdk/sign"
 	"sigs.k8s.io/release-utils/http"
 
 	"github.com/google/go-containerregistry/pkg/crane"
@@ -141,6 +142,7 @@ func (di *DefaultPromoterImplementation) GetSignatureStatus(
 }
 
 func checkObjects(oList []string) (existing, missing []string, err error) {
+	// TODO: Parallelize this check
 	existing = []string{}
 	missing = []string{}
 	logrus.Infof("Checking %d objects for signatures", len(oList))
@@ -183,12 +185,12 @@ func (di *DefaultPromoterImplementation) FixMissingSignatures(opts *options.Opti
 		logrus.Infof("Signing and replicating %s", mainImg)
 		// Build the digest of the first missing one
 		digestRef := strings.ReplaceAll(res.Missing[0], ":sha256-", "@sha256:")
-		if err := signDigest(opts, digestRef); err != nil {
+		if err := di.signReference(opts, digestRef); err != nil {
 			return fmt.Errorf("signing %s: %w", digestRef, err)
 		}
 
 		for _, targetRef := range res.Missing[1:] {
-			if err := replicateReference(opts, res.Missing[0], targetRef); err != nil {
+			if err := di.replicateReference(opts, res.Missing[0], targetRef); err != nil {
 				return fmt.Errorf("replicating signature: %w", err)
 			}
 		}
@@ -211,7 +213,7 @@ func (di *DefaultPromoterImplementation) FixPartialSignatures(opts *options.Opti
 			// Copy the first signature to the target ref
 			logrus.Infof("Copying signature from %s to %s", sourceRef, targetRef)
 
-			if err := replicateReference(opts, sourceRef, targetRef); err != nil {
+			if err := di.replicateReference(opts, sourceRef, targetRef); err != nil {
 				return fmt.Errorf("replicating signature: %w", err)
 			}
 		}
@@ -219,7 +221,7 @@ func (di *DefaultPromoterImplementation) FixPartialSignatures(opts *options.Opti
 	return nil
 }
 
-func replicateReference(opts *options.Options, srcRef, dstRef string) error {
+func (di *DefaultPromoterImplementation) replicateReference(opts *options.Options, srcRef, dstRef string) error {
 	craneOpts := []crane.Option{
 		crane.WithAuthFromKeychain(gcrane.Keychain),
 		crane.WithUserAgent(image.UserAgent),
@@ -240,12 +242,38 @@ func replicateReference(opts *options.Options, srcRef, dstRef string) error {
 	return nil
 }
 
-func signDigest(opts *options.Options, refString string) error {
+// signReference takes a reference and signs it
+func (di *DefaultPromoterImplementation) signReference(opts *options.Options, refString string) error {
 	if !opts.SignCheckFix {
 		logrus.Infof(" (NOOP) signing %s", refString)
 		return nil
 	}
 	logrus.Infof(" signing %s", refString)
-	// TODO: implement signing
+
+	// Get the mirrors list
+	mirrorList, err := di.getMirrors()
+	if err != nil {
+		return fmt.Errorf("getting mirror list: %w", err)
+	}
+
+	// Options for the new signer
+	signOpts := sign.Default()
+
+	// Get the identity token we will use
+	token, err := di.GetIdentityToken(opts, opts.SignerAccount)
+	if err != nil {
+		return fmt.Errorf("generating identity token: %w", err)
+	}
+	signOpts.IdentityToken = token
+	di.signer = sign.New(signOpts)
+
+	signOpts.Annotations = map[string]interface{}{
+		"org.kubernetes.kpromo.mirrors": strings.Join(mirrorList, ","),
+	}
+
+	if _, err := di.signer.SignImageWithOptions(signOpts, refString); err != nil {
+		return fmt.Errorf("signing image %s: %w", refString, err)
+	}
+
 	return nil
 }
