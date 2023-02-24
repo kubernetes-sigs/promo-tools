@@ -15,9 +15,10 @@ limitations under the License.
 */
 package checkresults
 
-type CheckList = struct {
-	Signed  []string
-	Missing []string
+type CheckList struct {
+	SignatureImage string
+	Signed         []string
+	Missing        []string
 }
 
 type Signature map[string]CheckList
@@ -25,10 +26,9 @@ type Signature map[string]CheckList
 func (s *Signature) TotalPartial() int {
 	total := 0
 	for _, list := range *s {
-		if len(list.Missing) == 0 || len(list.Missing) == len(list.Signed) {
-			continue
+		if len(list.Signed) > 0 && len(list.Missing) > 0 {
+			total++
 		}
-		total++
 	}
 	return total
 }

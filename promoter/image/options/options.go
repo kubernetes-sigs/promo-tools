@@ -105,6 +105,9 @@ type Options struct {
 
 	// SignCheckReferences list of image references to check for signatures
 	SignCheckReferences []string
+
+	// SignCheckFix when true, fix missing signatures
+	SignCheckFix bool
 }
 
 var DefaultOptions = &Options{
@@ -114,6 +117,7 @@ var DefaultOptions = &Options{
 	SeverityThreshold:   -1,
 	SignImages:          true,
 	SignerAccount:       "krel-trust@k8s-releng-prod.iam.gserviceaccount.com",
+	SignCheckFix:        false,
 	SignCheckReferences: []string{},
 }
 

@@ -307,12 +307,12 @@ func (p *Promoter) CheckSignatures(opts *options.Options) error {
 		return nil
 	}
 
-	logrus.Infof("Fixing %d missing signatures", results.TotalUnsigned())
+	logrus.Infof("Fixing %d unsigned images", results.TotalUnsigned())
 	if err := p.impl.FixMissingSignatures(opts, results); err != nil {
 		return fmt.Errorf("fixing missing signatures: %w", err)
 	}
 
-	logrus.Infof("Fixing %d partial signatures", results.TotalPartial())
+	logrus.Infof("Fixing %d images with partial signatures", results.TotalPartial())
 	if err := p.impl.FixPartialSignatures(opts, results); err != nil {
 		return fmt.Errorf("fixing partial signatures: %w", err)
 	}
