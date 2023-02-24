@@ -27,6 +27,7 @@ import (
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/registry"
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/schema"
 	impl "sigs.k8s.io/promo-tools/v3/internal/promoter/image"
+	"sigs.k8s.io/promo-tools/v3/promoter/image/checkresults"
 	options "sigs.k8s.io/promo-tools/v3/promoter/image/options"
 )
 
@@ -90,9 +91,9 @@ type promoterImplementation interface {
 
 	// Methods for checking signatures
 	GetLatestImages(*options.Options) ([]string, error)
-	GetSignatureStatus(*options.Options, []string) ([]string, []string, []string, error)
-	FixMissingSignatures(*options.Options, []string) error
-	FixPartialSignatures(*options.Options, []string) error
+	GetSignatureStatus(*options.Options, []string) (checkresults.Signature, error)
+	FixMissingSignatures(*options.Options, checkresults.Signature) error
+	FixPartialSignatures(*options.Options, checkresults.Signature) error
 
 	// Utility functions
 	PrintVersion()
@@ -296,24 +297,23 @@ func (p *Promoter) CheckSignatures(opts *options.Options) error {
 	}
 
 	logrus.Info("Checking signatures")
-	signed, partial, missing, err := p.impl.GetSignatureStatus(opts, images)
+	results, err := p.impl.GetSignatureStatus(opts, images)
 	if err != nil {
 		return fmt.Errorf("checking signature status in images: %w", err)
 	}
 
-	logrus.Infof("%d/%d images with consitent signatures", len(signed), len(images))
-	if len(partial) == 0 && len(missing) == 0 {
+	if results.TotalPartial() == 0 && results.TotalUnsigned() == 0 {
 		logrus.Info("Signature consistency OK!")
 		return nil
 	}
 
-	logrus.Infof("Fixing %d missing signatures", len(missing))
-	if err := p.impl.FixMissingSignatures(opts, missing); err != nil {
+	logrus.Infof("Fixing %d missing signatures", results.TotalUnsigned())
+	if err := p.impl.FixMissingSignatures(opts, results); err != nil {
 		return fmt.Errorf("fixing missing signatures: %w", err)
 	}
 
-	logrus.Infof("Fixing %d partial signatures", len(partial))
-	if err := p.impl.FixPartialSignatures(opts, partial); err != nil {
+	logrus.Infof("Fixing %d partial signatures", results.TotalPartial())
+	if err := p.impl.FixPartialSignatures(opts, results); err != nil {
 		return fmt.Errorf("fixing partial signatures: %w", err)
 	}
 
