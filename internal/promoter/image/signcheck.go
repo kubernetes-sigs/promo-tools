@@ -121,7 +121,6 @@ func (di *DefaultPromoterImplementation) GetSignatureStatus(
 		for _, mirror := range mirrors {
 			rpath := repositoryPath
 			if strings.HasSuffix(mirror, ".gcr.io") {
-				logrus.Infof("Tiene: %s", mirror)
 				rpath = "k8s-artifacts-prod"
 			}
 
