@@ -22,6 +22,7 @@
     "europe-southwest1-docker.pkg.dev": "gcloud",
     "europe-west1-docker.pkg.dev": "gcloud",
     "europe-west2-docker.pkg.dev": "gcloud",
+    "europe-west3-docker.pkg.dev": "gcloud",
     "europe-west4-docker.pkg.dev": "gcloud",
     "europe-west6-docker.pkg.dev": "gcloud",
     "europe-west8-docker.pkg.dev": "gcloud",
