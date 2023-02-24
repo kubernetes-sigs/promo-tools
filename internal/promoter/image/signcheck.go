@@ -26,10 +26,12 @@ import (
 	"sigs.k8s.io/release-utils/http"
 
 	"github.com/google/go-containerregistry/pkg/crane"
+	"github.com/google/go-containerregistry/pkg/gcrane"
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/sirupsen/logrus"
 	checkresults "sigs.k8s.io/promo-tools/v3/promoter/image/checkresults"
 	options "sigs.k8s.io/promo-tools/v3/promoter/image/options"
+	"sigs.k8s.io/promo-tools/v3/types/image"
 )
 
 var mirrorsList []string
@@ -48,7 +50,7 @@ func (di *DefaultPromoterImplementation) GetLatestImages(opts *options.Options) 
 		}
 		return opts.SignCheckReferences, nil
 	}
-	return nil, errors.New("Automatic image reader not yet implemented")
+	return nil, errors.New("automatic image reader not yet implemented")
 }
 
 func (di *DefaultPromoterImplementation) getMirrors() ([]string, error) {
@@ -108,11 +110,6 @@ func (di *DefaultPromoterImplementation) GetSignatureStatus(
 		if err != nil {
 			return results, fmt.Errorf("parsing reference: %w", err)
 		}
-		logrus.Info("Name: " + ref.Name())
-		logrus.Info("Identifier: " + ref.Identifier())
-		logrus.Info("Context Name: " + ref.Context().Name())
-		logrus.Info("Registry Name: " + ref.Context().RegistryStr())
-		logrus.Info("Repo Name: " + ref.Context().RepositoryStr())
 
 		digest, err := crane.Digest(refString)
 		if err != nil {
@@ -132,6 +129,10 @@ func (di *DefaultPromoterImplementation) GetSignatureStatus(
 			return results, fmt.Errorf("checking objects: %w", err)
 		}
 		results[refString] = checkresults.CheckList{
+			SignatureImage: fmt.Sprintf("%s/%s:%s.sig",
+				repositoryPath, ref.Context().RepositoryStr(),
+				strings.ReplaceAll(digest, ":", "-"),
+			),
 			Signed:  existing,
 			Missing: missing,
 		}
@@ -142,6 +143,7 @@ func (di *DefaultPromoterImplementation) GetSignatureStatus(
 func checkObjects(oList []string) (existing, missing []string, err error) {
 	existing = []string{}
 	missing = []string{}
+	logrus.Infof("Checking %d objects for signatures", len(oList))
 	for _, s := range oList {
 		e, err := objectExists(s)
 		if err != nil {
@@ -153,7 +155,6 @@ func checkObjects(oList []string) (existing, missing []string, err error) {
 		} else {
 			missing = append(missing, s)
 		}
-		break
 	}
 	return existing, missing, nil
 }
@@ -172,10 +173,79 @@ func objectExists(refString string) (bool, error) {
 	return false, fmt.Errorf("checking if reference exists in the registry: %w", err)
 }
 
+// FixMissingSignatures signs an image that has no signatures at all
 func (di *DefaultPromoterImplementation) FixMissingSignatures(opts *options.Options, results checkresults.Signature) error {
+	for mainImg, res := range results {
+		if len(res.Signed) > 0 {
+			continue
+		}
+
+		logrus.Infof("Signing and replicating %s", mainImg)
+		// Build the digest of the first missing one
+		digestRef := strings.ReplaceAll(res.Missing[0], ":sha256-", "@sha256:")
+		if err := signDigest(opts, digestRef); err != nil {
+			return fmt.Errorf("signing %s: %w", digestRef, err)
+		}
+
+		for _, targetRef := range res.Missing[1:] {
+			if err := replicateReference(opts, res.Missing[0], targetRef); err != nil {
+				return fmt.Errorf("replicating signature: %w", err)
+			}
+		}
+	}
 	return nil
 }
 
+// FixPartialSignatures fixes images that had some signatures but some mirrors
+// are missing some signatures
 func (di *DefaultPromoterImplementation) FixPartialSignatures(opts *options.Options, results checkresults.Signature) error {
+	for mainImg, res := range results {
+		if len(res.Missing) == 0 || len(res.Signed) == 0 {
+			continue
+		}
+
+		logrus.Infof("%s has %d signed copies, %d are missing", mainImg, len(res.Signed), len(res.Missing))
+
+		sourceRef := res.Signed[0]
+		for _, targetRef := range res.Missing {
+			// Copy the first signature to the target ref
+			logrus.Infof("Copying signature from %s to %s", sourceRef, targetRef)
+
+			if err := replicateReference(opts, sourceRef, targetRef); err != nil {
+				return fmt.Errorf("replicating signature: %w", err)
+			}
+		}
+	}
+	return nil
+}
+
+func replicateReference(opts *options.Options, srcRef, dstRef string) error {
+	craneOpts := []crane.Option{
+		crane.WithAuthFromKeychain(gcrane.Keychain),
+		crane.WithUserAgent(image.UserAgent),
+	}
+
+	if !opts.SignCheckFix {
+		logrus.Infof(" (NOOP) replicating %s to %s ", srcRef, dstRef)
+		return nil
+	}
+
+	logrus.Infof(" replicating %s to %s ", srcRef, dstRef)
+
+	if err := crane.Copy(srcRef, dstRef, craneOpts...); err != nil {
+		return fmt.Errorf(
+			"copying signature %s to %s: %w", srcRef, dstRef, err,
+		)
+	}
+	return nil
+}
+
+func signDigest(opts *options.Options, refString string) error {
+	if !opts.SignCheckFix {
+		logrus.Infof(" (NOOP) signing %s", refString)
+		return nil
+	}
+	logrus.Infof(" signing %s", refString)
+	// TODO: implement signing
 	return nil
 }
