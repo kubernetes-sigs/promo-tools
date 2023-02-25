@@ -17,18 +17,21 @@ limitations under the License.
 package imagepromoter
 
 import (
-	"errors"
 	"fmt"
 	"net/url"
 	"strings"
+	"sync"
+	"time"
 
 	yaml "gopkg.in/yaml.v2"
 	"sigs.k8s.io/release-sdk/sign"
 	"sigs.k8s.io/release-utils/http"
 
+	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/crane"
 	"github.com/google/go-containerregistry/pkg/gcrane"
 	"github.com/google/go-containerregistry/pkg/name"
+	"github.com/google/go-containerregistry/pkg/v1/google"
 	"github.com/sirupsen/logrus"
 	checkresults "sigs.k8s.io/promo-tools/v3/promoter/image/checkresults"
 	options "sigs.k8s.io/promo-tools/v3/promoter/image/options"
@@ -37,7 +40,12 @@ import (
 
 var mirrorsList []string
 
-const repositoryPath = "k8s-artifacts-prod/images"
+const (
+	repositoryPath = "k8s-artifacts-prod/images"
+
+	// scanRegistry is the one we index to search for images
+	scanRegistry = "us-central1-docker.pkg.dev"
+)
 
 func (di *DefaultPromoterImplementation) GetLatestImages(opts *options.Options) ([]string, error) {
 	// If there is a list of images to check in the options
@@ -51,7 +59,13 @@ func (di *DefaultPromoterImplementation) GetLatestImages(opts *options.Options) 
 		}
 		return opts.SignCheckReferences, nil
 	}
-	return nil, errors.New("automatic image reader not yet implemented")
+
+	images, err := di.readLatestImages(opts)
+	if err != nil {
+		return nil, fmt.Errorf("fetching latest images: %w", err)
+	}
+	logrus.Infof("+%v", images)
+	return images, nil
 }
 
 func (di *DefaultPromoterImplementation) getMirrors() ([]string, error) {
@@ -105,7 +119,10 @@ func (di *DefaultPromoterImplementation) GetSignatureStatus(
 	if err != nil {
 		return results, fmt.Errorf("reading mirrors: %w", err)
 	}
-	logrus.Infof("Checking signatures in %d mirrors", len(mirrors))
+	logrus.Infof(
+		"Checking %d images for signatures, each in %d mirrors",
+		len(images), len(mirrors),
+	)
 	for _, refString := range images {
 		ref, err := name.ParseReference(refString)
 		if err != nil {
@@ -130,6 +147,7 @@ func (di *DefaultPromoterImplementation) GetSignatureStatus(
 			))
 		}
 
+		logrus.Infof("Checking %s for signatures in %d mirrors", refString, len(targetImages))
 		existing, missing, err := checkObjects(targetImages)
 		if err != nil {
 			return results, fmt.Errorf("checking objects: %w", err)
@@ -146,7 +164,6 @@ func checkObjects(oList []string) (existing, missing []string, err error) {
 	// TODO: Parallelize this check
 	existing = []string{}
 	missing = []string{}
-	logrus.Infof("Checking %d objects for signatures", len(oList))
 	for _, s := range oList {
 		e, err := objectExists(s)
 		if err != nil {
@@ -276,4 +293,68 @@ func (di *DefaultPromoterImplementation) signReference(opts *options.Options, re
 	}
 
 	return nil
+}
+
+// readLatestImages returns the latest images uploaded to the registry.
+// Note that this function uses the google GCR/AR extensions so it will
+// not work on other non-GCP registries.
+func (di *DefaultPromoterImplementation) readLatestImages(opts *options.Options) ([]string, error) {
+	creds := google.WithAuthFromKeychain(authn.NewMultiKeychain(
+		authn.DefaultKeychain,
+		google.Keychain,
+	))
+
+	dateCutOff := time.Now().AddDate(0, 0, opts.SignCheckDays*-1)
+	images := []string{}
+
+	repo, err := name.NewRepository(scanRegistry+"/"+repositoryPath, name.WeakValidation)
+	if err != nil {
+		return nil, fmt.Errorf("creating repo: %w", err)
+	}
+
+	var mt sync.Mutex
+	walkFn := func(repo name.Repository, tags *google.Tags, err error) error {
+		if tags == nil {
+			return nil
+		}
+
+		// We ignore the -arch repositories as the promoter currently
+		// ignores them and does not sign them
+		if strings.HasSuffix(repo.String(), "-amd64") || strings.HasSuffix(repo.String(), "-arm") ||
+			strings.HasSuffix(repo.String(), "-arm64") || strings.HasSuffix(repo.String(), "-ppc64le") ||
+			strings.HasSuffix(repo.String(), "-s390x") {
+			return nil
+		}
+		logrus.Infof("Indexing %d images from %s", len(tags.Manifests), repo)
+		// First var (_) is the digest
+		for _, manifest := range tags.Manifests {
+			// Ignore if there are no tags
+			if len(manifest.Tags) == 0 {
+				continue
+			}
+			// Ignore signature tags
+			if strings.HasSuffix(manifest.Tags[0], ".sig") {
+				continue
+			}
+
+			// Ignore if uploaded before our date
+			if manifest.Uploaded.Before(dateCutOff) {
+				continue
+			}
+
+			mt.Lock()
+			images = append(images, strings.ReplaceAll(
+				fmt.Sprintf("%s:%s", repo, manifest.Tags[0]),
+				scanRegistry+"/"+repositoryPath, "registry.k8s.io"),
+			)
+			mt.Unlock()
+		}
+		return nil
+	}
+
+	if err := google.Walk(repo, walkFn, creds); err != nil {
+		return nil, fmt.Errorf("walking repo: %w", err)
+	}
+
+	return images, nil
 }
