@@ -54,5 +54,12 @@ to ensure copies in all mirrors have their signatures attached.
 		"when true, kpromo will sign and propagate missing signatures in images",
 	)
 
+	cmd.PersistentFlags().IntVar(
+		&opts.SignCheckDays,
+		"days",
+		5,
+		"check images uploaded this many days ago",
+	)
+
 	parent.AddCommand(cmd)
 }
