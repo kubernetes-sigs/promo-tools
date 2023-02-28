@@ -27,6 +27,7 @@ import (
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/registry"
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/schema"
 	impl "sigs.k8s.io/promo-tools/v3/internal/promoter/image"
+	"sigs.k8s.io/promo-tools/v3/promoter/image/checkresults"
 	options "sigs.k8s.io/promo-tools/v3/promoter/image/options"
 )
 
@@ -79,7 +80,7 @@ type promoterImplementation interface {
 	ScanEdges(*options.Options, *reg.SyncContext, map[reg.PromotionEdge]interface{}) error
 
 	// Methods for manifest list verification:
-	ValidateManifestLists(opts *options.Options) error
+	ValidateManifestLists(*options.Options) error
 
 	// Methods for image signing
 	PrewarmTUFCache() error
@@ -87,6 +88,12 @@ type promoterImplementation interface {
 	CopySignatures(*options.Options, *reg.SyncContext, map[reg.PromotionEdge]interface{}) error
 	SignImages(*options.Options, *reg.SyncContext, map[reg.PromotionEdge]interface{}) error
 	WriteSBOMs(*options.Options, *reg.SyncContext, map[reg.PromotionEdge]interface{}) error
+
+	// Methods for checking signatures
+	GetLatestImages(*options.Options) ([]string, error)
+	GetSignatureStatus(*options.Options, []string) (checkresults.Signature, error)
+	FixMissingSignatures(*options.Options, checkresults.Signature) error
+	FixPartialSignatures(*options.Options, checkresults.Signature) error
 
 	// Utility functions
 	PrintVersion()
@@ -278,5 +285,37 @@ func (p *Promoter) CheckManifestLists(opts *options.Options) error {
 	if err := p.impl.ValidateManifestLists(opts); err != nil {
 		return fmt.Errorf("checking manifest lists: %w", err)
 	}
+	return nil
+}
+
+// CheckSignatures checks the consistency of a set of images
+func (p *Promoter) CheckSignatures(opts *options.Options) error {
+	logrus.Info("Fetching latest promoted images")
+	images, err := p.impl.GetLatestImages(opts)
+	if err != nil {
+		return fmt.Errorf("getting latest promoted images: %w", err)
+	}
+
+	logrus.Info("Checking signatures")
+	results, err := p.impl.GetSignatureStatus(opts, images)
+	if err != nil {
+		return fmt.Errorf("checking signature status in images: %w", err)
+	}
+
+	if results.TotalPartial() == 0 && results.TotalUnsigned() == 0 {
+		logrus.Info("Signature consistency OK!")
+		return nil
+	}
+
+	logrus.Infof("Fixing %d unsigned images", results.TotalUnsigned())
+	if err := p.impl.FixMissingSignatures(opts, results); err != nil {
+		return fmt.Errorf("fixing missing signatures: %w", err)
+	}
+
+	logrus.Infof("Fixing %d images with partial signatures", results.TotalPartial())
+	if err := p.impl.FixPartialSignatures(opts, results); err != nil {
+		return fmt.Errorf("fixing partial signatures: %w", err)
+	}
+
 	return nil
 }

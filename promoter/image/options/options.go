@@ -102,15 +102,27 @@ type Options struct {
 	// If this credentials file is not set, the promoter will attempt to generate
 	// the OIDC tokens getting its identity from the default application credentials.
 	SignerInitCredentials string
+
+	// SignCheckReferences list of image references to check for signatures
+	SignCheckReferences []string
+
+	// SignCheckFix when true, fix missing signatures
+	SignCheckFix bool
+
+	// SignCheckDays number of days back to check for signatrures
+	SignCheckDays int
 }
 
 var DefaultOptions = &Options{
-	OutputFormat:      "yaml",
-	MaxImageSize:      2048,
-	Threads:           10,
-	SeverityThreshold: -1,
-	SignImages:        true,
-	SignerAccount:     "krel-trust@k8s-releng-prod.iam.gserviceaccount.com",
+	OutputFormat:        "yaml",
+	MaxImageSize:        2048,
+	Threads:             10,
+	SeverityThreshold:   -1,
+	SignImages:          true,
+	SignerAccount:       "krel-trust@k8s-releng-prod.iam.gserviceaccount.com",
+	SignCheckFix:        false,
+	SignCheckReferences: []string{},
+	SignCheckDays:       5,
 }
 
 func (o *Options) Validate() error {

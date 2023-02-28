@@ -28,6 +28,7 @@ import (
 	"sigs.k8s.io/promo-tools/v3/cmd/kpromo/cmd/mm"
 	"sigs.k8s.io/promo-tools/v3/cmd/kpromo/cmd/pr"
 	"sigs.k8s.io/promo-tools/v3/cmd/kpromo/cmd/run"
+	"sigs.k8s.io/promo-tools/v3/cmd/kpromo/cmd/sigcheck"
 	"sigs.k8s.io/release-utils/log"
 	"sigs.k8s.io/release-utils/version"
 )
@@ -84,6 +85,7 @@ func init() {
 	// TODO(cip-mm): Remove in the next minor release.
 	rootCmd.AddCommand(mm.MMCmd)
 	rootCmd.AddCommand(version.Version())
+	sigcheck.Add(rootCmd)
 }
 
 func initLogging(*cobra.Command, []string) error {
