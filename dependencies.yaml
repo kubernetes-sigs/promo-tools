@@ -56,7 +56,7 @@ dependencies:
     - path: go.mod
       match: go \d+.\d+
 
-  - name: "k8s.gcr.io/artifact-promoter/kpromo"
+  - name: "registry.k8s.io/artifact-promoter/kpromo"
     version: v3.4.12-1
     refPaths:
     - path: cloudbuild.yaml
