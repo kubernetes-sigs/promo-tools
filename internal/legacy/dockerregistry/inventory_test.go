@@ -698,6 +698,7 @@ func TestValidateRegistryImagePath(t *testing.T) {
 	shouldBeValid := []string{
 		`gcr.io/foo/bar`,
 		`k8s.gcr.io/foo`,
+		`registry.k8s.io/foo`,
 		`staging-k8s.gcr.io/foo`,
 		`staging-k8s.gcr.io/foo/bar/nested/path/image`,
 	}
@@ -743,6 +744,7 @@ func TestSplitRegistryImagePath(t *testing.T) {
 		`gcr.io/foo`,
 		`us.gcr.io/foo`,
 		`k8s.gcr.io`,
+		`registry.k8s.io`,
 		`eu.gcr.io/foo/d`,
 	}
 
@@ -778,6 +780,13 @@ func TestSplitRegistryImagePath(t *testing.T) {
 			`vanity GCR`,
 			`k8s.gcr.io/a/b/c`,
 			`k8s.gcr.io`,
+			`a/b/c`,
+			nil,
+		},
+		{
+			`registry.k8s.io`,
+			`registry.k8s.io/a/b/c`,
+			`registry.k8s.io`,
 			`a/b/c`,
 			nil,
 		},
@@ -3235,6 +3244,14 @@ func TestParseContainerParts(t *testing.T) {
 				nil,
 			},
 		},
+		{
+			"registry.k8s.io/a/b/c",
+			ContainerParts{
+				"registry.k8s.io",
+				"a/b/c",
+				nil,
+			},
+		},
 	}
 
 	for _, test := range shouldBeValid {
@@ -3281,29 +3298,29 @@ func TestParseContainerParts(t *testing.T) {
 		},
 		{
 			// Naked vanity domain (missing image name).
-			"k8s.gcr.io",
+			"registry.k8s.io",
 			ContainerParts{
 				"",
 				"",
-				fmt.Errorf("invalid string '%s'", "k8s.gcr.io"),
+				fmt.Errorf("invalid string '%s'", "registry.k8s.io"),
 			},
 		},
 		{
 			// Double slash.
-			"k8s.gcr.io//a/b",
+			"registry.k8s.io//a/b",
 			ContainerParts{
 				"",
 				"",
-				fmt.Errorf("invalid string '%s'", "k8s.gcr.io//a/b"),
+				fmt.Errorf("invalid string '%s'", "registry.k8s.io//a/b"),
 			},
 		},
 		{
 			// Trailing slash.
-			"k8s.gcr.io/a/b/",
+			"registry.k8s.io/a/b/",
 			ContainerParts{
 				"",
 				"",
-				fmt.Errorf("invalid string '%s'", "k8s.gcr.io/a/b/"),
+				fmt.Errorf("invalid string '%s'", "registry.k8s.io/a/b/"),
 			},
 		},
 	}
@@ -3441,17 +3458,17 @@ func TestPopulateExtraFields(t *testing.T) {
 			"basic",
 			reg.GCRPubSubPayload{
 				Action: "INSERT",
-				FQIN:   "k8s.gcr.io/subproject/foo@sha256:000",
-				PQIN:   "k8s.gcr.io/subproject/foo:1.0",
+				FQIN:   "registry.k8s.io/subproject/foo@sha256:000",
+				PQIN:   "registry.k8s.io/subproject/foo:1.0",
 				Path:   "",
 				Digest: "",
 				Tag:    "",
 			},
 			reg.GCRPubSubPayload{
 				Action: "INSERT",
-				FQIN:   "k8s.gcr.io/subproject/foo@sha256:000",
-				PQIN:   "k8s.gcr.io/subproject/foo:1.0",
-				Path:   "k8s.gcr.io/subproject/foo",
+				FQIN:   "registry.k8s.io/subproject/foo@sha256:000",
+				PQIN:   "registry.k8s.io/subproject/foo:1.0",
+				Path:   "registry.k8s.io/subproject/foo",
 				Digest: "sha256:000",
 				Tag:    "1.0",
 			},
@@ -3460,7 +3477,7 @@ func TestPopulateExtraFields(t *testing.T) {
 			"only FQIN",
 			reg.GCRPubSubPayload{
 				Action: "INSERT",
-				FQIN:   "k8s.gcr.io/subproject/foo@sha256:000",
+				FQIN:   "registry.k8s.io/subproject/foo@sha256:000",
 				PQIN:   "",
 				Path:   "",
 				Digest: "",
@@ -3468,9 +3485,9 @@ func TestPopulateExtraFields(t *testing.T) {
 			},
 			reg.GCRPubSubPayload{
 				Action: "INSERT",
-				FQIN:   "k8s.gcr.io/subproject/foo@sha256:000",
+				FQIN:   "registry.k8s.io/subproject/foo@sha256:000",
 				PQIN:   "",
-				Path:   "k8s.gcr.io/subproject/foo",
+				Path:   "registry.k8s.io/subproject/foo",
 				Digest: "sha256:000",
 				Tag:    "",
 			},
@@ -3480,7 +3497,7 @@ func TestPopulateExtraFields(t *testing.T) {
 			reg.GCRPubSubPayload{
 				Action: "DELETE",
 				FQIN:   "",
-				PQIN:   "k8s.gcr.io/subproject/foo:1.0",
+				PQIN:   "registry.k8s.io/subproject/foo:1.0",
 				Path:   "",
 				Digest: "",
 				Tag:    "",
@@ -3488,8 +3505,8 @@ func TestPopulateExtraFields(t *testing.T) {
 			reg.GCRPubSubPayload{
 				Action: "DELETE",
 				FQIN:   "",
-				PQIN:   "k8s.gcr.io/subproject/foo:1.0",
-				Path:   "k8s.gcr.io/subproject/foo",
+				PQIN:   "registry.k8s.io/subproject/foo:1.0",
+				Path:   "registry.k8s.io/subproject/foo",
 				Digest: "",
 				Tag:    "1.0",
 			},
@@ -3513,25 +3530,25 @@ func TestPopulateExtraFields(t *testing.T) {
 			"FQIN missing @-sign",
 			reg.GCRPubSubPayload{
 				Action: "INSERT",
-				FQIN:   "k8s.gcr.io/subproject/foosha256:000",
-				PQIN:   "k8s.gcr.io/subproject/foo:1.0",
+				FQIN:   "registry.k8s.io/subproject/foosha256:000",
+				PQIN:   "registry.k8s.io/subproject/foo:1.0",
 				Path:   "",
 				Digest: "",
 				Tag:    "",
 			},
-			fmt.Errorf("invalid FQIN: k8s.gcr.io/subproject/foosha256:000"),
+			fmt.Errorf("invalid FQIN: registry.k8s.io/subproject/foosha256:000"),
 		},
 		{
 			"PQIN missing colon",
 			reg.GCRPubSubPayload{
 				Action: "INSERT",
-				FQIN:   "k8s.gcr.io/subproject/foo@sha256:000",
-				PQIN:   "k8s.gcr.io/subproject/foo1.0",
+				FQIN:   "registry.k8s.io/subproject/foo@sha256:000",
+				PQIN:   "registry.k8s.io/subproject/foo1.0",
 				Path:   "",
 				Digest: "",
 				Tag:    "",
 			},
-			fmt.Errorf("invalid PQIN: k8s.gcr.io/subproject/foo1.0"),
+			fmt.Errorf("invalid PQIN: registry.k8s.io/subproject/foo1.0"),
 		},
 	}
 
