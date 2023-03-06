@@ -29,7 +29,10 @@ import (
 
 const (
 	// Production registry root URL
-	ProdRegistry = "k8s.gcr.io"
+	ProdRegistry = "registry.k8s.io"
+
+	// Production registry root URL (legacy k8s.gcr.io)
+	ProdRegistryLegacy = "k8s.gcr.io"
 
 	// Staging repository root URL prefix
 	StagingRepoPrefix = "gcr.io/k8s-staging-"

@@ -203,7 +203,7 @@ func runPromote(opts *promoteOptions) error {
 
 	// Path to the promoter image list
 	imagesListPath := filepath.Join(
-		image.ProdRegistry,
+		image.ProdRegistryLegacy,
 		"images",
 		filepath.Base(image.StagingRepoPrefix)+opts.project,
 		"images.yaml",
@@ -224,7 +224,7 @@ func runPromote(opts *promoteOptions) error {
 
 		opt := manifest.GrowOptions{}
 		if err := opt.Populate(
-			filepath.Join(repo.Dir(), image.ProdRegistry),
+			filepath.Join(repo.Dir(), image.ProdRegistryLegacy),
 			image.StagingRepoPrefix+opts.project, opts.images, opts.digests, opts.tags); err != nil {
 			return fmt.Errorf("populating image promoter options for tag %s with image filter %s: %w", opts.tags, opts.images, err)
 		}
