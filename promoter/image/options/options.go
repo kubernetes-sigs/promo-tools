@@ -109,8 +109,8 @@ type Options struct {
 	// SignCheckFix when true, fix missing signatures
 	SignCheckFix bool
 
-	// SignCheckDays number of days back to check for signatrures
-	SignCheckDays int
+	// SignCheckFromDays number of days back to check for signatrures
+	SignCheckFromDays int
 }
 
 var DefaultOptions = &Options{
@@ -122,7 +122,7 @@ var DefaultOptions = &Options{
 	SignerAccount:       "krel-trust@k8s-releng-prod.iam.gserviceaccount.com",
 	SignCheckFix:        false,
 	SignCheckReferences: []string{},
-	SignCheckDays:       5,
+	SignCheckFromDays:   5,
 }
 
 func (o *Options) Validate() error {

@@ -304,7 +304,7 @@ func (di *DefaultPromoterImplementation) readLatestImages(opts *options.Options)
 		google.Keychain,
 	))
 
-	dateCutOff := time.Now().AddDate(0, 0, opts.SignCheckDays*-1)
+	dateCutOff := time.Now().AddDate(0, 0, opts.SignCheckFromDays*-1)
 	images := []string{}
 
 	repo, err := name.NewRepository(scanRegistry+"/"+repositoryPath, name.WeakValidation)
