@@ -111,6 +111,9 @@ type Options struct {
 
 	// SignCheckFromDays number of days back to check for signatrures
 	SignCheckFromDays int
+
+	// SignCheckToDays
+	SignCheckToDays int
 }
 
 var DefaultOptions = &Options{

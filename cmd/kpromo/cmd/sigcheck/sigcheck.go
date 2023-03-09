@@ -58,7 +58,14 @@ to ensure copies in all mirrors have their signatures attached.
 		&opts.SignCheckFromDays,
 		"from-days",
 		5,
-		"check images uploaded this many days ago",
+		"check images uploaded starting this many days ago",
+	)
+
+	cmd.PersistentFlags().IntVar(
+		&opts.SignCheckToDays,
+		"to-days",
+		0,
+		"check images --from-days ago to this many days ago (defaults to today)",
 	)
 
 	parent.AddCommand(cmd)

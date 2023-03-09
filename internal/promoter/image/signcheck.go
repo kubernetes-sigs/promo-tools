@@ -305,6 +305,14 @@ func (di *DefaultPromoterImplementation) readLatestImages(opts *options.Options)
 	))
 
 	dateCutOff := time.Now().AddDate(0, 0, opts.SignCheckFromDays*-1)
+	dateCutOffTo := time.Now()
+	if opts.SignCheckToDays > 0 {
+		dateCutOffTo = time.Now().AddDate(0, 0, opts.SignCheckToDays*-1)
+	}
+	logrus.Infof("Checking images from %s to %s",
+		dateCutOff.Local().Format(time.RFC822),
+		dateCutOffTo.Local().Format(time.RFC822),
+	)
 	images := []string{}
 
 	repo, err := name.NewRepository(scanRegistry+"/"+repositoryPath, name.WeakValidation)
@@ -339,6 +347,10 @@ func (di *DefaultPromoterImplementation) readLatestImages(opts *options.Options)
 
 			// Ignore if uploaded before our date
 			if manifest.Uploaded.Before(dateCutOff) {
+				continue
+			}
+
+			if opts.SignCheckToDays > 0 && manifest.Uploaded.After(dateCutOffTo) {
 				continue
 			}
 
