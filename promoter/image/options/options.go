@@ -112,8 +112,11 @@ type Options struct {
 	// SignCheckFromDays number of days back to check for signatrures
 	SignCheckFromDays int
 
-	// SignCheckToDays
+	// SignCheckToDays complements SignCheckFromDays to enable date ranges
 	SignCheckToDays int
+
+	// SignCheckMaxImages limits the number of images to look when verifying
+	SignCheckMaxImages int
 }
 
 var DefaultOptions = &Options{

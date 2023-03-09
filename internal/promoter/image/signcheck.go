@@ -64,7 +64,7 @@ func (di *DefaultPromoterImplementation) GetLatestImages(opts *options.Options) 
 	if err != nil {
 		return nil, fmt.Errorf("fetching latest images: %w", err)
 	}
-	logrus.Infof("+%v", images)
+	logrus.Infof("Images to check: +%v", images)
 	return images, nil
 }
 
@@ -366,6 +366,10 @@ func (di *DefaultPromoterImplementation) readLatestImages(opts *options.Options)
 
 	if err := google.Walk(repo, walkFn, creds); err != nil {
 		return nil, fmt.Errorf("walking repo: %w", err)
+	}
+
+	if opts.SignCheckMaxImages != 0 {
+		images = images[0:opts.SignCheckMaxImages]
 	}
 
 	return images, nil

@@ -31,6 +31,21 @@ func Add(parent *cobra.Command) {
     
 This subcommand checks the signature consistency across promoted images
 to ensure copies in all mirrors have their signatures attached.
+
+By default, kpromo sigcheck will look at all images promoted during the last
+%d days. You can change the default using --from-days and determine a range
+using --to-days. For example, to verify all images promoted in an interval
+between 10 and 5 days ago run:
+
+   kpromo sigcheck --from-days=10 --to-days=5
+
+To debug the signature checker, you can limit the number of images kpromo
+verifies using --limit. When no limit is specified, kpromo will check the
+signatures of all images in the specified date range. As an example, to limit
+kpromo to the first three images it finds run:
+
+   kpromo sigcheck --limit=3
+
     `,
 		SilenceUsage:  true,
 		SilenceErrors: true,
@@ -66,6 +81,13 @@ to ensure copies in all mirrors have their signatures attached.
 		"to-days",
 		0,
 		"check images --from-days ago to this many days ago (defaults to today)",
+	)
+
+	cmd.PersistentFlags().IntVar(
+		&opts.SignCheckMaxImages,
+		"limit",
+		0,
+		"limit signature checks to a number of images (defaults to checking all)",
 	)
 
 	parent.AddCommand(cmd)
