@@ -117,6 +117,12 @@ type Options struct {
 
 	// SignCheckMaxImages limits the number of images to look when verifying
 	SignCheckMaxImages int
+
+	// SignCheckIdentity is the account we expect to sign all imges
+	SignCheckIdentity string
+
+	// SignCheckIssuer is the iisuer of the OIDC tokens used to identify the signer
+	SignCheckIssuer string
 }
 
 var DefaultOptions = &Options{
@@ -129,6 +135,8 @@ var DefaultOptions = &Options{
 	SignCheckFix:        false,
 	SignCheckReferences: []string{},
 	SignCheckFromDays:   5,
+	SignCheckIdentity:   "krel-trust@k8s-releng-prod.iam.gserviceaccount.com",
+	SignCheckIssuer:     "https://accounts.google.com",
 }
 
 func (o *Options) Validate() error {

@@ -72,7 +72,7 @@ kpromo to the first three images it finds run:
 	cmd.PersistentFlags().IntVar(
 		&opts.SignCheckFromDays,
 		"from-days",
-		5,
+		promoteropts.DefaultOptions.SignCheckFromDays,
 		"check images uploaded starting this many days ago",
 	)
 
@@ -88,6 +88,20 @@ kpromo to the first three images it finds run:
 		"limit",
 		0,
 		"limit signature checks to a number of images (defaults to checking all)",
+	)
+
+	cmd.PersistentFlags().StringVar(
+		&opts.SignCheckIdentity,
+		"certificate-identity",
+		promoteropts.DefaultOptions.SignCheckIdentity,
+		"identity to look for when verifying signatures",
+	)
+
+	cmd.PersistentFlags().StringVar(
+		&opts.SignCheckIssuer,
+		"certificate-oidc-issuer",
+		promoteropts.DefaultOptions.SignCheckIssuer,
+		"issuer of the OIDC token used to generate the signature certificate",
 	)
 
 	parent.AddCommand(cmd)
