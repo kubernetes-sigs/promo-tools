@@ -17,6 +17,8 @@ limitations under the License.
 package imagepromoter
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"strings"
@@ -33,6 +35,9 @@ import (
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1/google"
 	"github.com/sirupsen/logrus"
+
+	"github.com/sigstore/sigstore/pkg/cryptoutils"
+
 	checkresults "sigs.k8s.io/promo-tools/v3/promoter/image/checkresults"
 	options "sigs.k8s.io/promo-tools/v3/promoter/image/options"
 	"sigs.k8s.io/promo-tools/v3/types/image"
@@ -148,7 +153,7 @@ func (di *DefaultPromoterImplementation) GetSignatureStatus(
 		}
 
 		logrus.Infof("Checking %s for signatures in %d mirrors", refString, len(targetImages))
-		existing, missing, err := checkObjects(targetImages)
+		existing, missing, err := di.CheckSignatureLayers(opts, targetImages)
 		if err != nil {
 			return results, fmt.Errorf("checking objects: %w", err)
 		}
@@ -160,37 +165,90 @@ func (di *DefaultPromoterImplementation) GetSignatureStatus(
 	return results, nil
 }
 
-func checkObjects(oList []string) (existing, missing []string, err error) {
+// miniManifest is a minimal representation of the sigstore signature manifest
+type miniManifest struct {
+	Layers []struct {
+		MediaType   string
+		Annotations map[string]string `json:"annotations"`
+	} `json:"layers"`
+}
+
+// CheckSignatureLayers checks a list of signature layers to ensure
+func (di *DefaultPromoterImplementation) CheckSignatureLayers(opts *options.Options, oList []string) (existing, missing []string, err error) {
 	// TODO: Parallelize this check
 	existing = []string{}
 	missing = []string{}
 	for _, s := range oList {
-		e, err := objectExists(s)
+		e, err := objectExists(opts, s)
 		if err != nil {
 			return existing, missing, fmt.Errorf("checking reference: %w", err)
 		}
 
-		if e {
-			existing = append(existing, s)
-		} else {
+		if !e {
 			missing = append(missing, s)
+			continue
 		}
+
+		existing = append(existing, s)
 	}
 	return existing, missing, nil
 }
 
-func objectExists(refString string) (bool, error) {
+func objectExists(opts *options.Options, refString string) (bool, error) {
 	// Check
-	_, err := crane.Digest(refString)
-	if err == nil {
-		return true, nil
+	manifestData, err := crane.Manifest(refString)
+	if err != nil {
+		if strings.Contains(err.Error(), "MANIFEST_UNKNOWN") {
+			logrus.WithField("image", refString).Info("No signature found")
+			return false, nil
+		}
+		return false, fmt.Errorf("pulling signature manifest: %w", err)
 	}
 
-	if strings.Contains(err.Error(), "MANIFEST_UNKNOWN") {
+	manifest := &miniManifest{}
+	if err := json.Unmarshal(manifestData, manifest); err != nil {
+		return false, fmt.Errorf("parsing .sig image manifest: %w", err)
+	}
+
+	// Get the certificate
+	if manifest.Layers == nil || len(manifest.Layers) == 0 {
 		return false, nil
 	}
+	signedLayers := 0
+	for _, layer := range manifest.Layers {
+		if layer.MediaType != "application/vnd.dev.cosign.simplesigning.v1+json" {
+			continue
+		}
 
-	return false, fmt.Errorf("checking if reference exists in the registry: %w", err)
+		certData, ok := layer.Annotations["dev.sigstore.cosign/certificate"]
+		if !ok {
+			continue
+		}
+
+		var b bytes.Buffer
+		b.Write([]byte(certData))
+
+		certs, err := cryptoutils.LoadCertificatesFromPEM(&b)
+		if err != nil {
+			return false, err
+		}
+
+		names := cryptoutils.GetSubjectAlternateNames(certs[0])
+
+		for _, n := range names {
+			if n == opts.SignCheckIdentity {
+				return true, nil
+			}
+		}
+	}
+
+	if signedLayers == 0 {
+		logrus.WithField("image", refString).Info("No certificates found")
+	} else {
+		logrus.WithField("image", refString).Info("Image signed, but not with expected identity")
+	}
+
+	return false, nil
 }
 
 // FixMissingSignatures signs an image that has no signatures at all
@@ -200,13 +258,15 @@ func (di *DefaultPromoterImplementation) FixMissingSignatures(opts *options.Opti
 			continue
 		}
 
-		logrus.Infof("Signing and replicating %s", mainImg)
+		logrus.Infof("Signing and replicating first mirror (%s)", mainImg)
+
 		// Build the digest of the first missing one
-		digestRef := strings.ReplaceAll(res.Missing[0], ":sha256-", "@sha256:")
+		digestRef := strings.TrimSuffix(strings.ReplaceAll(res.Missing[0], ":sha256-", "@sha256:"), ".sig")
 		if err := di.signReference(opts, digestRef); err != nil {
-			return fmt.Errorf("signing %s: %w", digestRef, err)
+			return fmt.Errorf("signing first mirror reference %s: %w", digestRef, err)
 		}
 
+		logrus.Infof("Replicating image to %d mirrors", len(res.Missing[1:]))
 		for _, targetRef := range res.Missing[1:] {
 			if err := di.replicateReference(opts, res.Missing[0], targetRef); err != nil {
 				return fmt.Errorf("replicating signature: %w", err)
@@ -368,7 +428,7 @@ func (di *DefaultPromoterImplementation) readLatestImages(opts *options.Options)
 		return nil, fmt.Errorf("walking repo: %w", err)
 	}
 
-	if opts.SignCheckMaxImages != 0 {
+	if opts.SignCheckMaxImages != 0 && len(images) > opts.SignCheckMaxImages {
 		images = images[0:opts.SignCheckMaxImages]
 	}
 
