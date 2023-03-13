@@ -234,18 +234,18 @@ func objectExists(opts *options.Options, refString string) (bool, error) {
 		}
 
 		names := cryptoutils.GetSubjectAlternateNames(certs[0])
-
 		for _, n := range names {
 			if n == opts.SignCheckIdentity {
 				return true, nil
 			}
 		}
+		signedLayers++
 	}
 
 	if signedLayers == 0 {
-		logrus.WithField("image", refString).Info("No certificates found")
+		logrus.WithField("image", refString).Debugf("No certificates found")
 	} else {
-		logrus.WithField("image", refString).Info("Image signed, but not with expected identity")
+		logrus.WithField("image", refString).Debugf("Image signed, but not with expected identity")
 	}
 
 	return false, nil
