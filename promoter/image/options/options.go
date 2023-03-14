@@ -109,8 +109,20 @@ type Options struct {
 	// SignCheckFix when true, fix missing signatures
 	SignCheckFix bool
 
-	// SignCheckDays number of days back to check for signatrures
-	SignCheckDays int
+	// SignCheckFromDays number of days back to check for signatrures
+	SignCheckFromDays int
+
+	// SignCheckToDays complements SignCheckFromDays to enable date ranges
+	SignCheckToDays int
+
+	// SignCheckMaxImages limits the number of images to look when verifying
+	SignCheckMaxImages int
+
+	// SignCheckIdentity is the account we expect to sign all imges
+	SignCheckIdentity string
+
+	// SignCheckIssuer is the iisuer of the OIDC tokens used to identify the signer
+	SignCheckIssuer string
 }
 
 var DefaultOptions = &Options{
@@ -122,7 +134,9 @@ var DefaultOptions = &Options{
 	SignerAccount:       "krel-trust@k8s-releng-prod.iam.gserviceaccount.com",
 	SignCheckFix:        false,
 	SignCheckReferences: []string{},
-	SignCheckDays:       5,
+	SignCheckFromDays:   5,
+	SignCheckIdentity:   "krel-trust@k8s-releng-prod.iam.gserviceaccount.com",
+	SignCheckIssuer:     "https://accounts.google.com",
 }
 
 func (o *Options) Validate() error {
