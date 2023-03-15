@@ -123,6 +123,12 @@ type Options struct {
 
 	// SignCheckIssuer is the iisuer of the OIDC tokens used to identify the signer
 	SignCheckIssuer string
+
+	// MaxSignatureCopies maximum number of concurrent signature copies
+	MaxSignatureCopies int
+
+	// MaxSignatureOps maximum number of concurrent signature operations
+	MaxSignatureOps int
 }
 
 var DefaultOptions = &Options{
@@ -137,6 +143,8 @@ var DefaultOptions = &Options{
 	SignCheckFromDays:   5,
 	SignCheckIdentity:   "krel-trust@k8s-releng-prod.iam.gserviceaccount.com",
 	SignCheckIssuer:     "https://accounts.google.com",
+	MaxSignatureCopies:  50, // Maximum number of concurrent signature copies
+	MaxSignatureOps:     50, // Maximum number of concurrent signature operations
 }
 
 func (o *Options) Validate() error {
