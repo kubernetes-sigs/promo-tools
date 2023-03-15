@@ -212,6 +212,20 @@ network from a registry, it reads from the local manifests only`,
 		"when true, sign promoted images",
 	)
 
+	CipCmd.PersistentFlags().IntVar(
+		&runOpts.MaxSignatureCopies,
+		"max-signature-copies",
+		options.DefaultOptions.MaxSignatureCopies,
+		"maximum number of concurrent signature copies",
+	)
+
+	CipCmd.PersistentFlags().IntVar(
+		&runOpts.MaxSignatureOps,
+		"max-signature-ops",
+		options.DefaultOptions.MaxSignatureOps,
+		"maximum number of concurrent signature operations",
+	)
+
 	// TODO: Set this in a function instead
 	if runOpts.MaxImageSize <= 0 {
 		runOpts.MaxImageSize = 2048
