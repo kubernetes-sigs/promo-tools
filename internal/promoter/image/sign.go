@@ -44,10 +44,6 @@ const (
 	signatureTagSuffix = ".sig"
 
 	TestSigningAccount = "k8s-infra-promoter-test-signer@k8s-cip-test-prod.iam.gserviceaccount.com"
-
-	maxParallelActions    = 100
-	maxParallelSignatures = maxParallelActions
-	maxParallelCopies     = maxParallelActions
 )
 
 // ValidateStagingSignatures checks if edges (images) have a signature
@@ -100,7 +96,7 @@ func (di *DefaultPromoterImplementation) CopySignatures(
 ) error {
 	// Cycle all signedEdges to copy them
 	logrus.Infof("Precopying %d previous signatures", len(signedEdges))
-	t := throttler.New(maxParallelCopies, len(signedEdges))
+	t := throttler.New(opts.MaxSignatureCopies, len(signedEdges))
 	for e := range signedEdges {
 		go func(edge reg.PromotionEdge) {
 			sigTag := digestToSignatureTag(edge.Digest)
@@ -191,7 +187,7 @@ func (di *DefaultPromoterImplementation) SignImages(
 		sortedEdges[edge.Digest] = append(sortedEdges[edge.Digest], edge)
 	}
 
-	t := throttler.New(maxParallelSignatures, len(sortedEdges))
+	t := throttler.New(opts.MaxSignatureOps, len(sortedEdges))
 	// Sign the required edges
 	for d := range sortedEdges {
 		go func(digest image.Digest) {
