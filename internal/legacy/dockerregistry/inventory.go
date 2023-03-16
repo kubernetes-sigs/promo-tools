@@ -51,7 +51,7 @@ import (
 var rtripper *ratelimit.RoundTripper
 
 func init() {
-	rtripper = ratelimit.NewRoundTripper(83)
+	rtripper = ratelimit.NewRoundTripper(ratelimit.MaxEvents)
 }
 
 // MakeSyncContext creates a SyncContext.

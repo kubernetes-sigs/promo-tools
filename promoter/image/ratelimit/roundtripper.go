@@ -23,7 +23,15 @@ import (
 	"golang.org/x/time/rate"
 )
 
-const burst = 1
+const (
+	burst = 1
+
+	// Number of events to pass to the crane rate limiter to match the
+	// AR api limits:
+	// https://github.com/kubernetes/registry.k8s.io/issues/153#issuecomment-1460913153
+	// bentheelder: (83*60=4980)
+	MaxEvents = 83
+)
 
 // RoundTripper wraps an http.RoundTripper with rate limiting
 type RoundTripper struct {

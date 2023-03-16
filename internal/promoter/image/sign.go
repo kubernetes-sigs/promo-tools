@@ -45,12 +45,6 @@ const (
 	signatureTagSuffix = ".sig"
 
 	TestSigningAccount = "k8s-infra-promoter-test-signer@k8s-cip-test-prod.iam.gserviceaccount.com"
-
-	// Number of events to pass to the crane rate limiter to match the
-	// AR api limits:
-	// https://github.com/kubernetes/registry.k8s.io/issues/153#issuecomment-1460913153
-	// bentheelder: (83*60=4980)
-	rateLimitEvents = 83
 )
 
 // ValidateStagingSignatures checks if edges (images) have a signature
@@ -103,7 +97,7 @@ func (di *DefaultPromoterImplementation) CopySignatures(
 ) error {
 	// Cycle all signedEdges to copy them
 	logrus.Infof("Precopying %d previous signatures", len(signedEdges))
-	rtripper := ratelimit.NewRoundTripper(rateLimitEvents)
+	rtripper := ratelimit.NewRoundTripper(ratelimit.MaxEvents)
 	t := throttler.New(opts.MaxSignatureCopies, len(signedEdges))
 	for e := range signedEdges {
 		go func(edge reg.PromotionEdge) {
@@ -293,7 +287,7 @@ func (di *DefaultPromoterImplementation) replicateSignatures(
 		}{ref, dsts[i].DstRegistry.Token})
 	}
 
-	rtripper := ratelimit.NewRoundTripper(rateLimitEvents)
+	rtripper := ratelimit.NewRoundTripper(ratelimit.MaxEvents)
 
 	// Copy the signatures to the missing registries
 	for _, dstRef := range dstRefs {
