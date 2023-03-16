@@ -35,6 +35,7 @@ import (
 	reg "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/gcloud"
 	options "sigs.k8s.io/promo-tools/v3/promoter/image/options"
+	"sigs.k8s.io/promo-tools/v3/promoter/image/ratelimit"
 	"sigs.k8s.io/promo-tools/v3/types/image"
 	"sigs.k8s.io/release-sdk/sign"
 )
@@ -44,6 +45,12 @@ const (
 	signatureTagSuffix = ".sig"
 
 	TestSigningAccount = "k8s-infra-promoter-test-signer@k8s-cip-test-prod.iam.gserviceaccount.com"
+
+	// Number of events to pass to the crane rate limiter to match the
+	// AR api limits:
+	// https://github.com/kubernetes/registry.k8s.io/issues/153#issuecomment-1460913153
+	// bentheelder: (83*60=4980)
+	rateLimitEvents = 83
 )
 
 // ValidateStagingSignatures checks if edges (images) have a signature
@@ -96,6 +103,7 @@ func (di *DefaultPromoterImplementation) CopySignatures(
 ) error {
 	// Cycle all signedEdges to copy them
 	logrus.Infof("Precopying %d previous signatures", len(signedEdges))
+	rtripper := ratelimit.NewRoundTripper(rateLimitEvents)
 	t := throttler.New(opts.MaxSignatureCopies, len(signedEdges))
 	for e := range signedEdges {
 		go func(edge reg.PromotionEdge) {
@@ -122,6 +130,7 @@ func (di *DefaultPromoterImplementation) CopySignatures(
 			opts := []crane.Option{
 				crane.WithAuthFromKeychain(gcrane.Keychain),
 				crane.WithUserAgent(image.UserAgent),
+				crane.WithTransport(rtripper),
 			}
 			if err := crane.Copy(srcRef.String(), dstRef.String(), opts...); err != nil {
 				t.Done(fmt.Errorf(
@@ -284,12 +293,15 @@ func (di *DefaultPromoterImplementation) replicateSignatures(
 		}{ref, dsts[i].DstRegistry.Token})
 	}
 
+	rtripper := ratelimit.NewRoundTripper(rateLimitEvents)
+
 	// Copy the signatures to the missing registries
 	for _, dstRef := range dstRefs {
 		logrus.WithField("src", srcRef.String()).Infof("replication > %s", dstRef.reference.String())
 		opts := []crane.Option{
 			crane.WithAuthFromKeychain(gcrane.Keychain),
 			crane.WithUserAgent(image.UserAgent),
+			crane.WithTransport(rtripper),
 		}
 		if err := crane.Copy(srcRef.String(), dstRef.reference.String(), opts...); err != nil {
 			return fmt.Errorf(
