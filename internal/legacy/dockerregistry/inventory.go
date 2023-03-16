@@ -44,6 +44,7 @@ import (
 	cipJson "sigs.k8s.io/promo-tools/v3/internal/legacy/json"
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/reqcounter"
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/stream"
+	"sigs.k8s.io/promo-tools/v3/promoter/image/ratelimit"
 	"sigs.k8s.io/promo-tools/v3/types/image"
 )
 
@@ -1752,6 +1753,7 @@ func (sc *SyncContext) Promote(
 					opts := []crane.Option{
 						crane.WithAuthFromKeychain(gcrane.Keychain),
 						crane.WithUserAgent(image.UserAgent),
+						crane.WithTransport(ratelimit.Limiter),
 					}
 					if err := crane.Copy(srcVertex, dstVertex, opts...); err != nil {
 						logrus.Error(err)

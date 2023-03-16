@@ -35,6 +35,7 @@ import (
 	reg "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/gcloud"
 	options "sigs.k8s.io/promo-tools/v3/promoter/image/options"
+	"sigs.k8s.io/promo-tools/v3/promoter/image/ratelimit"
 	"sigs.k8s.io/promo-tools/v3/types/image"
 	"sigs.k8s.io/release-sdk/sign"
 )
@@ -96,6 +97,7 @@ func (di *DefaultPromoterImplementation) CopySignatures(
 ) error {
 	// Cycle all signedEdges to copy them
 	logrus.Infof("Precopying %d previous signatures", len(signedEdges))
+
 	t := throttler.New(opts.MaxSignatureCopies, len(signedEdges))
 	for e := range signedEdges {
 		go func(edge reg.PromotionEdge) {
@@ -122,6 +124,7 @@ func (di *DefaultPromoterImplementation) CopySignatures(
 			opts := []crane.Option{
 				crane.WithAuthFromKeychain(gcrane.Keychain),
 				crane.WithUserAgent(image.UserAgent),
+				crane.WithTransport(ratelimit.Limiter),
 			}
 			if err := crane.Copy(srcRef.String(), dstRef.String(), opts...); err != nil {
 				t.Done(fmt.Errorf(
@@ -290,6 +293,7 @@ func (di *DefaultPromoterImplementation) replicateSignatures(
 		opts := []crane.Option{
 			crane.WithAuthFromKeychain(gcrane.Keychain),
 			crane.WithUserAgent(image.UserAgent),
+			crane.WithTransport(ratelimit.Limiter),
 		}
 		if err := crane.Copy(srcRef.String(), dstRef.reference.String(), opts...); err != nil {
 			return fmt.Errorf(
