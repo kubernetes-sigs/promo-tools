@@ -97,7 +97,7 @@ func (di *DefaultPromoterImplementation) CopySignatures(
 ) error {
 	// Cycle all signedEdges to copy them
 	logrus.Infof("Precopying %d previous signatures", len(signedEdges))
-	rtripper := ratelimit.NewRoundTripper(ratelimit.MaxEvents)
+
 	t := throttler.New(opts.MaxSignatureCopies, len(signedEdges))
 	for e := range signedEdges {
 		go func(edge reg.PromotionEdge) {
@@ -124,7 +124,7 @@ func (di *DefaultPromoterImplementation) CopySignatures(
 			opts := []crane.Option{
 				crane.WithAuthFromKeychain(gcrane.Keychain),
 				crane.WithUserAgent(image.UserAgent),
-				crane.WithTransport(rtripper),
+				crane.WithTransport(ratelimit.Limiter),
 			}
 			if err := crane.Copy(srcRef.String(), dstRef.String(), opts...); err != nil {
 				t.Done(fmt.Errorf(
@@ -287,15 +287,13 @@ func (di *DefaultPromoterImplementation) replicateSignatures(
 		}{ref, dsts[i].DstRegistry.Token})
 	}
 
-	rtripper := ratelimit.NewRoundTripper(ratelimit.MaxEvents)
-
 	// Copy the signatures to the missing registries
 	for _, dstRef := range dstRefs {
 		logrus.WithField("src", srcRef.String()).Infof("replication > %s", dstRef.reference.String())
 		opts := []crane.Option{
 			crane.WithAuthFromKeychain(gcrane.Keychain),
 			crane.WithUserAgent(image.UserAgent),
-			crane.WithTransport(rtripper),
+			crane.WithTransport(ratelimit.Limiter),
 		}
 		if err := crane.Copy(srcRef.String(), dstRef.reference.String(), opts...); err != nil {
 			return fmt.Errorf(

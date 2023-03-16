@@ -48,12 +48,6 @@ import (
 	"sigs.k8s.io/promo-tools/v3/types/image"
 )
 
-var rtripper *ratelimit.RoundTripper
-
-func init() {
-	rtripper = ratelimit.NewRoundTripper(ratelimit.MaxEvents)
-}
-
 // MakeSyncContext creates a SyncContext.
 func MakeSyncContext(
 	mfests []schema.Manifest,
@@ -1759,7 +1753,7 @@ func (sc *SyncContext) Promote(
 					opts := []crane.Option{
 						crane.WithAuthFromKeychain(gcrane.Keychain),
 						crane.WithUserAgent(image.UserAgent),
-						crane.WithTransport(rtripper),
+						crane.WithTransport(ratelimit.Limiter),
 					}
 					if err := crane.Copy(srcVertex, dstVertex, opts...); err != nil {
 						logrus.Error(err)

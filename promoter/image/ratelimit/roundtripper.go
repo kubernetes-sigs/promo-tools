@@ -41,6 +41,14 @@ type RoundTripper struct {
 
 var _ http.RoundTripper = &RoundTripper{}
 
+var Limiter *RoundTripper
+
+func init() {
+	if Limiter == nil {
+		Limiter = NewRoundTripper(MaxEvents)
+	}
+}
+
 func NewRoundTripper(limit rate.Limit) *RoundTripper {
 	return &RoundTripper{
 		rateLimiter:  rate.NewLimiter(limit, burst),
