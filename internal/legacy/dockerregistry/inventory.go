@@ -1095,9 +1095,9 @@ func (sc *SyncContext) ReadGCRManifestLists(
 			//nolint:errcheck
 			gmlc := req.RequestParams.(GCRManifestListContext)
 
-			for _, gManifest := range gcrManifestList.Manifests {
+			for i := range gcrManifestList.Manifests {
 				mutex.Lock()
-				sc.ParentDigest[image.Digest((gManifest.Digest.Algorithm)+":"+(gManifest.Digest.Hex))] = gmlc.Digest
+				sc.ParentDigest[image.Digest((gcrManifestList.Manifests[i].Digest.Algorithm)+":"+(gcrManifestList.Manifests[i].Digest.Hex))] = gmlc.Digest
 				mutex.Unlock()
 			}
 
