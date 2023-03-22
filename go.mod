@@ -7,7 +7,7 @@ require (
 	cloud.google.com/go/errorreporting v0.3.0
 	cloud.google.com/go/iam v0.13.0
 	cloud.google.com/go/logging v1.7.0
-	cloud.google.com/go/storage v1.30.0
+	cloud.google.com/go/storage v1.30.1
 	github.com/aws/aws-sdk-go v1.44.225
 	github.com/cenkalti/backoff/v4 v4.2.0
 	github.com/google/go-cmp v0.5.9
@@ -24,7 +24,7 @@ require (
 	golang.org/x/time v0.3.0
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2
 	google.golang.org/api v0.114.0
-	google.golang.org/genproto v0.0.0-20230306155012-7f2fa6fef1f4
+	google.golang.org/genproto v0.0.0-20230320184635-7606e756e683
 	gopkg.in/src-d/go-git.v4 v4.13.1
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/utils v0.0.0-20221107191617-1a15be271d1d
