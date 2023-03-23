@@ -37,7 +37,7 @@ func TestParseThinManifestsFromDirPostsubmit(t *testing.T) {
 	const (
 		repo   = "https://github.com/kubernetes/k8s.io"
 		git    = "git"
-		commit = "86b8f390aac2e6c244868143ea03c8326c9064a0"
+		commit = "599de960a797bf03a6a90730bd073ea8ef24c46f"
 	)
 
 	require.Nil(t, command.New(git, "clone", repo, testDir).RunSilentSuccess())
@@ -45,11 +45,11 @@ func TestParseThinManifestsFromDirPostsubmit(t *testing.T) {
 
 	for _, onlyProwDiff := range []bool{true, false} {
 		manifests, err := ParseThinManifestsFromDir(
-			filepath.Join(testDir, "k8s.gcr.io"), onlyProwDiff,
+			filepath.Join(testDir, "registry.k8s.io"), onlyProwDiff,
 		)
 
 		require.Nil(t, err)
-		require.Len(t, manifests, 76)
+		require.Len(t, manifests, 67)
 
 		var digestCount, imageCount int
 		for _, manifest := range manifests {
@@ -59,11 +59,11 @@ func TestParseThinManifestsFromDirPostsubmit(t *testing.T) {
 			}
 		}
 
-		expectedDigestCount := 12344
+		expectedDigestCount := 14603
 		if onlyProwDiff {
-			expectedDigestCount = 1
+			expectedDigestCount = 14603
 		}
 		assert.Equal(t, expectedDigestCount, digestCount)
-		assert.Equal(t, 623, imageCount)
+		assert.Equal(t, 672, imageCount)
 	}
 }

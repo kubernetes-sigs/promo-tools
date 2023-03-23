@@ -697,7 +697,7 @@ func TestParseImageTag(t *testing.T) {
 func TestValidateRegistryImagePath(t *testing.T) {
 	shouldBeValid := []string{
 		`gcr.io/foo/bar`,
-		`k8s.gcr.io/foo`,
+		`registry.k8s.io/foo`,
 		`staging-k8s.gcr.io/foo`,
 		`staging-k8s.gcr.io/foo/bar/nested/path/image`,
 	}
@@ -3228,9 +3228,9 @@ func TestParseContainerParts(t *testing.T) {
 			},
 		},
 		{
-			"k8s.gcr.io/a/b/c",
+			"registry.k8s.io/a/b/c",
 			ContainerParts{
-				"k8s.gcr.io",
+				"registry.k8s.io",
 				"a/b/c",
 				nil,
 			},

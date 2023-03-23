@@ -110,4 +110,4 @@ the VERSION file often as the Docker images will always get a unique identifier.
 [cip-prow-integration]: https://git.k8s.io/k8s.io/k8s.gcr.io/Vanity-Domain-Flip.md#prow-integration
 [k/k8s.io]: https://git.k8s.io/k8s.io
 [k/test-infra]: https://git.k8s.io/test-infra
-[k8sio-manifests-dir]: https://git.k8s.io/k8s.io/k8s.gcr.io
+[k8sio-manifests-dir]: https://git.k8s.io/k8s.io/registry.k8s.io

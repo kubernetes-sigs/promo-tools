@@ -53,7 +53,7 @@ main() {
     # Use default value if environment variable is not set.
     manifest_repo_url="${CIP_AUDIT_MANIFEST_REPO_URL:-https://github.com/kubernetes/k8s.io}"    
     manifest_repo_branch="${CIP_AUDIT_MANIFEST_REPO_BRANCH:-main}"
-    manifest_repo_dir="${CIP_AUDIT_MANIFEST_REPO_MANIFEST_DIR:-k8s.gcr.io}"
+    manifest_repo_dir="${CIP_AUDIT_MANIFEST_REPO_MANIFEST_DIR:-registry.k8s.io}"
     gcp_project_id="${CIP_AUDIT_GCP_PROJECT_ID:-k8s-artifacts-prod}"
 
     # Start the auditor.

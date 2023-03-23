@@ -695,7 +695,7 @@ func ParseContainerParts(s string) (
 		}
 		return strings.Join(parts[0:2], "/"), strings.Join(parts[2:], "/"), nil
 	default:
-		if parts[0] != "k8s.gcr.io" && parts[0] != "staging-k8s.gcr.io" {
+		if parts[0] != "registry.k8s.io" && parts[0] != "staging-k8s.gcr.io" {
 			goto InvalidString
 		}
 

@@ -77,7 +77,7 @@ func getSubProjects() []string {
 	_, err = cmd.Output()
 	handle(cmd, err)
 	// List the number of sub-projects in the repo.
-	subProjects := fmt.Sprintf("%s/k8s.gcr.io/manifests", tmpDir)
+	subProjects := fmt.Sprintf("%s/registry.k8s.io/manifests", tmpDir)
 	cmd = exec.Command("ls", subProjects)
 	out, err = cmd.Output()
 	handle(cmd, err)

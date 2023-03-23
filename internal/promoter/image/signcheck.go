@@ -80,7 +80,7 @@ func (di *DefaultPromoterImplementation) getMirrors() ([]string, error) {
 	urls := []string{}
 	iurls := map[string]string{}
 	manifest, err := http.NewAgent().Get(
-		"https://github.com/kubernetes/k8s.io/raw/main/k8s.gcr.io/manifests/k8s-staging-kubernetes/promoter-manifest.yaml",
+		"https://github.com/kubernetes/k8s.io/raw/main/registry.k8s.io/manifests/k8s-staging-kubernetes/promoter-manifest.yaml",
 	)
 	if err != nil {
 		return nil, fmt.Errorf("downloading promoter manifest: %w", err)

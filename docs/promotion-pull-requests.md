@@ -77,7 +77,7 @@ kpromo pr -i --fork=<your-github-username> --tag=v1.20.0-rc.0 --tag=v1.21.0-alph
 The following steps are taken by the `kpromo pr` command:
 
 - Clone and update your `kubernetes/k8s.io` fork
-- Update the images manifest (`k8s.gcr.io/images/k8s-staging-kubernetes/images.yaml`) to add the image digests for specified releases/tags
+- Update the images manifest (`registry.k8s.io/images/k8s-staging-kubernetes/images.yaml`) to add the image digests for specified releases/tags
 - Create a branch and push it to your fork
 - Create a PR in the `kubernetes/k8s.io` repository with an explicit `/hold`
 
@@ -118,7 +118,7 @@ manifest.
 
   ```console
   kpromo mm \
-    --base_dir=$HOME/go/src/github.com/kubernetes/k8s.io/k8s.gcr.io  \
+    --base_dir=$HOME/go/src/github.com/kubernetes/k8s.io/registry.k8s.io  \
     --staging_repo=gcr.io/k8s-staging-artifact-promoter \
     --filter_digest=sha256:7594278deaf6eeaa35caedec81796d103e3c83a26d7beab091a5d25a9ba6aa16
   ```
@@ -128,7 +128,7 @@ manifest.
 
   ```console
   kpromo mm \
-    --base_dir=$HOME/go/src/github.com/kubernetes/k8s.io/k8s.gcr.io  \
+    --base_dir=$HOME/go/src/github.com/kubernetes/k8s.io/registry.k8s.io  \
     --staging_repo=gcr.io/k8s-staging-artifact-promoter \
     --filter_image=cip \
     --filter_tag=1.0
@@ -139,7 +139,7 @@ manifest.
 
   ```console
   kpromo mm \
-    --base_dir=$HOME/go/src/github.com/kubernetes/k8s.io/k8s.gcr.io  \
+    --base_dir=$HOME/go/src/github.com/kubernetes/k8s.io/registry.k8s.io  \
     --staging_repo=gcr.io/k8s-staging-artifact-promoter \
     --filter_image=cip \
     --filter_tag=1.0

@@ -259,7 +259,7 @@ We can answer the above question with:
 ```console
 cip \
   --manifest-based-snapshot-of=us.gcr.io/k8s-artifacts-prod \
-  --thin-manifest-dir=<path_to_k8s.gcr.io_thin_manifest_dir> \
+  --thin-manifest-dir=<path_to_registry.k8s.io_thin_manifest_dir> \
   --output=csv | wc -l
 ```
 
@@ -280,4 +280,4 @@ check to occur.
 [k/k8s.io]: https://git.k8s.io/k8s.io
 [k/release]: https://git.k8s.io/release
 [k/test-infra]: https://git.k8s.io/test-infra
-[k8sio-manifests-dir]: https://git.k8s.io/k8s.io/k8s.gcr.io
+[k8sio-manifests-dir]: https://git.k8s.io/k8s.io/registry.k8s.io
