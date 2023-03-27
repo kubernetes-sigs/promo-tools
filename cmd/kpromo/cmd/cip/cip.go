@@ -191,12 +191,16 @@ network from a registry, it reads from the local manifests only`,
 		"pass '--account=...' to all gcloud calls",
 	)
 
+	// This flag does nothing, but we don't want to remove it in case it breaks someone.
+	// Instead, we just keep it hidden.
+	unused := 0
 	CipCmd.PersistentFlags().IntVar(
-		&runOpts.MaxImageSize,
+		&unused,
 		"max-image-size",
-		options.DefaultOptions.MaxImageSize,
+		0,
 		"the maximum image size (in MiB) allowed for promotion",
 	)
+	CipCmd.PersistentFlags().MarkHidden("max-image-size")
 
 	CipCmd.PersistentFlags().StringVar(
 		&runOpts.SignerAccount,
@@ -225,11 +229,6 @@ network from a registry, it reads from the local manifests only`,
 		options.DefaultOptions.MaxSignatureOps,
 		"maximum number of concurrent signature operations",
 	)
-
-	// TODO: Set this in a function instead
-	if runOpts.MaxImageSize <= 0 {
-		runOpts.MaxImageSize = 2048
-	}
 
 	CipCmd.PersistentFlags().IntVar(
 		&runOpts.SeverityThreshold,
