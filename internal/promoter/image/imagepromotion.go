@@ -21,11 +21,8 @@ import (
 	"fmt"
 
 	reg "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
-	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/registry"
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/schema"
-	"sigs.k8s.io/promo-tools/v3/internal/legacy/stream"
 	options "sigs.k8s.io/promo-tools/v3/promoter/image/options"
-	"sigs.k8s.io/promo-tools/v3/types/image"
 )
 
 // This file has all the promoter implementation functions
@@ -91,33 +88,12 @@ func (di *DefaultPromoterImplementation) GetPromotionEdges(
 	return promotionEdges, nil
 }
 
-// MakeProducerFunction builds a function that will be called
-// during promotion to get the producer streams
-func (di *DefaultPromoterImplementation) MakeProducerFunction(useServiceAccount bool) StreamProducerFunc {
-	return func(
-		srcRegistry image.Registry,
-		srcImageName image.Name,
-		destRC registry.Context,
-		imageName image.Name,
-		digest image.Digest, tag image.Tag, tp reg.TagOp,
-	) stream.Producer {
-		var sp stream.Subprocess
-		sp.CmdInvocation = reg.GetWriteCmd(
-			destRC, useServiceAccount,
-			srcRegistry, srcImageName,
-			imageName, digest, tag, tp,
-		)
-		return &sp
-	}
-}
-
 // PromoteImages starts an image promotion of a set of edges
 func (di *DefaultPromoterImplementation) PromoteImages(
 	sc *reg.SyncContext,
 	promotionEdges map[reg.PromotionEdge]interface{},
-	fn StreamProducerFunc,
 ) error {
-	if err := sc.Promote(promotionEdges, fn, nil); err != nil {
+	if err := sc.Promote(promotionEdges, nil); err != nil {
 		return fmt.Errorf("running image promotion: %w", err)
 	}
 	di.PrintSection("END (PROMOTION)", true)

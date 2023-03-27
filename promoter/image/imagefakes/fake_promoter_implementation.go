@@ -23,7 +23,6 @@ import (
 	inventory "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/registry"
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/schema"
-	imagepromoterb "sigs.k8s.io/promo-tools/v3/internal/promoter/image"
 	"sigs.k8s.io/promo-tools/v3/promoter/image/checkresults"
 	imagepromotera "sigs.k8s.io/promo-tools/v3/promoter/image/options"
 )
@@ -172,17 +171,6 @@ type FakePromoterImplementation struct {
 		result1 *registry.Context
 		result2 error
 	}
-	MakeProducerFunctionStub        func(bool) imagepromoterb.StreamProducerFunc
-	makeProducerFunctionMutex       sync.RWMutex
-	makeProducerFunctionArgsForCall []struct {
-		arg1 bool
-	}
-	makeProducerFunctionReturns struct {
-		result1 imagepromoterb.StreamProducerFunc
-	}
-	makeProducerFunctionReturnsOnCall map[int]struct {
-		result1 imagepromoterb.StreamProducerFunc
-	}
 	MakeSyncContextStub        func(*imagepromotera.Options, []schema.Manifest) (*inventory.SyncContext, error)
 	makeSyncContextMutex       sync.RWMutex
 	makeSyncContextArgsForCall []struct {
@@ -246,12 +234,11 @@ type FakePromoterImplementation struct {
 	printVersionMutex       sync.RWMutex
 	printVersionArgsForCall []struct {
 	}
-	PromoteImagesStub        func(*inventory.SyncContext, map[inventory.PromotionEdge]interface{}, imagepromoterb.StreamProducerFunc) error
+	PromoteImagesStub        func(*inventory.SyncContext, map[inventory.PromotionEdge]interface{}) error
 	promoteImagesMutex       sync.RWMutex
 	promoteImagesArgsForCall []struct {
 		arg1 *inventory.SyncContext
 		arg2 map[inventory.PromotionEdge]interface{}
-		arg3 imagepromoterb.StreamProducerFunc
 	}
 	promoteImagesReturns struct {
 		result1 error
@@ -1069,67 +1056,6 @@ func (fake *FakePromoterImplementation) GetSnapshotSourceRegistryReturnsOnCall(i
 	}{result1, result2}
 }
 
-func (fake *FakePromoterImplementation) MakeProducerFunction(arg1 bool) imagepromoterb.StreamProducerFunc {
-	fake.makeProducerFunctionMutex.Lock()
-	ret, specificReturn := fake.makeProducerFunctionReturnsOnCall[len(fake.makeProducerFunctionArgsForCall)]
-	fake.makeProducerFunctionArgsForCall = append(fake.makeProducerFunctionArgsForCall, struct {
-		arg1 bool
-	}{arg1})
-	stub := fake.MakeProducerFunctionStub
-	fakeReturns := fake.makeProducerFunctionReturns
-	fake.recordInvocation("MakeProducerFunction", []interface{}{arg1})
-	fake.makeProducerFunctionMutex.Unlock()
-	if stub != nil {
-		return stub(arg1)
-	}
-	if specificReturn {
-		return ret.result1
-	}
-	return fakeReturns.result1
-}
-
-func (fake *FakePromoterImplementation) MakeProducerFunctionCallCount() int {
-	fake.makeProducerFunctionMutex.RLock()
-	defer fake.makeProducerFunctionMutex.RUnlock()
-	return len(fake.makeProducerFunctionArgsForCall)
-}
-
-func (fake *FakePromoterImplementation) MakeProducerFunctionCalls(stub func(bool) imagepromoterb.StreamProducerFunc) {
-	fake.makeProducerFunctionMutex.Lock()
-	defer fake.makeProducerFunctionMutex.Unlock()
-	fake.MakeProducerFunctionStub = stub
-}
-
-func (fake *FakePromoterImplementation) MakeProducerFunctionArgsForCall(i int) bool {
-	fake.makeProducerFunctionMutex.RLock()
-	defer fake.makeProducerFunctionMutex.RUnlock()
-	argsForCall := fake.makeProducerFunctionArgsForCall[i]
-	return argsForCall.arg1
-}
-
-func (fake *FakePromoterImplementation) MakeProducerFunctionReturns(result1 imagepromoterb.StreamProducerFunc) {
-	fake.makeProducerFunctionMutex.Lock()
-	defer fake.makeProducerFunctionMutex.Unlock()
-	fake.MakeProducerFunctionStub = nil
-	fake.makeProducerFunctionReturns = struct {
-		result1 imagepromoterb.StreamProducerFunc
-	}{result1}
-}
-
-func (fake *FakePromoterImplementation) MakeProducerFunctionReturnsOnCall(i int, result1 imagepromoterb.StreamProducerFunc) {
-	fake.makeProducerFunctionMutex.Lock()
-	defer fake.makeProducerFunctionMutex.Unlock()
-	fake.MakeProducerFunctionStub = nil
-	if fake.makeProducerFunctionReturnsOnCall == nil {
-		fake.makeProducerFunctionReturnsOnCall = make(map[int]struct {
-			result1 imagepromoterb.StreamProducerFunc
-		})
-	}
-	fake.makeProducerFunctionReturnsOnCall[i] = struct {
-		result1 imagepromoterb.StreamProducerFunc
-	}{result1}
-}
-
 func (fake *FakePromoterImplementation) MakeSyncContext(arg1 *imagepromotera.Options, arg2 []schema.Manifest) (*inventory.SyncContext, error) {
 	var arg2Copy []schema.Manifest
 	if arg2 != nil {
@@ -1465,20 +1391,19 @@ func (fake *FakePromoterImplementation) PrintVersionCalls(stub func()) {
 	fake.PrintVersionStub = stub
 }
 
-func (fake *FakePromoterImplementation) PromoteImages(arg1 *inventory.SyncContext, arg2 map[inventory.PromotionEdge]interface{}, arg3 imagepromoterb.StreamProducerFunc) error {
+func (fake *FakePromoterImplementation) PromoteImages(arg1 *inventory.SyncContext, arg2 map[inventory.PromotionEdge]interface{}) error {
 	fake.promoteImagesMutex.Lock()
 	ret, specificReturn := fake.promoteImagesReturnsOnCall[len(fake.promoteImagesArgsForCall)]
 	fake.promoteImagesArgsForCall = append(fake.promoteImagesArgsForCall, struct {
 		arg1 *inventory.SyncContext
 		arg2 map[inventory.PromotionEdge]interface{}
-		arg3 imagepromoterb.StreamProducerFunc
-	}{arg1, arg2, arg3})
+	}{arg1, arg2})
 	stub := fake.PromoteImagesStub
 	fakeReturns := fake.promoteImagesReturns
-	fake.recordInvocation("PromoteImages", []interface{}{arg1, arg2, arg3})
+	fake.recordInvocation("PromoteImages", []interface{}{arg1, arg2})
 	fake.promoteImagesMutex.Unlock()
 	if stub != nil {
-		return stub(arg1, arg2, arg3)
+		return stub(arg1, arg2)
 	}
 	if specificReturn {
 		return ret.result1
@@ -1492,17 +1417,17 @@ func (fake *FakePromoterImplementation) PromoteImagesCallCount() int {
 	return len(fake.promoteImagesArgsForCall)
 }
 
-func (fake *FakePromoterImplementation) PromoteImagesCalls(stub func(*inventory.SyncContext, map[inventory.PromotionEdge]interface{}, imagepromoterb.StreamProducerFunc) error) {
+func (fake *FakePromoterImplementation) PromoteImagesCalls(stub func(*inventory.SyncContext, map[inventory.PromotionEdge]interface{}) error) {
 	fake.promoteImagesMutex.Lock()
 	defer fake.promoteImagesMutex.Unlock()
 	fake.PromoteImagesStub = stub
 }
 
-func (fake *FakePromoterImplementation) PromoteImagesArgsForCall(i int) (*inventory.SyncContext, map[inventory.PromotionEdge]interface{}, imagepromoterb.StreamProducerFunc) {
+func (fake *FakePromoterImplementation) PromoteImagesArgsForCall(i int) (*inventory.SyncContext, map[inventory.PromotionEdge]interface{}) {
 	fake.promoteImagesMutex.RLock()
 	defer fake.promoteImagesMutex.RUnlock()
 	argsForCall := fake.promoteImagesArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
+	return argsForCall.arg1, argsForCall.arg2
 }
 
 func (fake *FakePromoterImplementation) PromoteImagesReturns(result1 error) {
@@ -1990,8 +1915,6 @@ func (fake *FakePromoterImplementation) Invocations() map[string][][]interface{}
 	defer fake.getSnapshotManifestsMutex.RUnlock()
 	fake.getSnapshotSourceRegistryMutex.RLock()
 	defer fake.getSnapshotSourceRegistryMutex.RUnlock()
-	fake.makeProducerFunctionMutex.RLock()
-	defer fake.makeProducerFunctionMutex.RUnlock()
 	fake.makeSyncContextMutex.RLock()
 	defer fake.makeSyncContextMutex.RUnlock()
 	fake.parseManifestsMutex.RLock()

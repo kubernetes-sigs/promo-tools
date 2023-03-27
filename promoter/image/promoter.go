@@ -66,8 +66,7 @@ type promoterImplementation interface {
 	ParseManifests(*options.Options) ([]schema.Manifest, error)
 	MakeSyncContext(*options.Options, []schema.Manifest) (*reg.SyncContext, error)
 	GetPromotionEdges(*reg.SyncContext, []schema.Manifest) (map[reg.PromotionEdge]interface{}, error)
-	MakeProducerFunction(bool) impl.StreamProducerFunc
-	PromoteImages(*reg.SyncContext, map[reg.PromotionEdge]interface{}, impl.StreamProducerFunc) error
+	PromoteImages(*reg.SyncContext, map[reg.PromotionEdge]interface{}) error
 
 	// Methods for snapshot mode:
 	GetSnapshotSourceRegistry(*options.Options) (*registry.Context, error)
@@ -143,10 +142,6 @@ func (p *Promoter) PromoteImages(opts *options.Options) (err error) {
 		return fmt.Errorf("filtering edges: %w", err)
 	}
 
-	// MakeProducer
-	logrus.Infof("Creating producer function")
-	producerFunc := p.impl.MakeProducerFunction(sc.UseServiceAccount)
-
 	// TODO: Let's rethink this option
 	if opts.ParseOnly {
 		logrus.Info("Manifests parsed, exiting as ParseOnly is set")
@@ -166,7 +161,7 @@ func (p *Promoter) PromoteImages(opts *options.Options) (err error) {
 	}
 
 	logrus.Infof("Promoting images")
-	if err := p.impl.PromoteImages(sc, promotionEdges, producerFunc); err != nil {
+	if err := p.impl.PromoteImages(sc, promotionEdges); err != nil {
 		return fmt.Errorf("running promotion: %w", err)
 	}
 
