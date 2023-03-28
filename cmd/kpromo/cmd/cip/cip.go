@@ -19,6 +19,7 @@ package cip
 import (
 	"fmt"
 
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/cli"
@@ -200,7 +201,9 @@ network from a registry, it reads from the local manifests only`,
 		0,
 		"the maximum image size (in MiB) allowed for promotion",
 	)
-	CipCmd.PersistentFlags().MarkHidden("max-image-size")
+	if err := CipCmd.PersistentFlags().MarkHidden("max-image-size"); err != nil {
+		logrus.Infof("Failed to mark max-image-size flag as hidden: %v", err)
+	}
 
 	CipCmd.PersistentFlags().StringVar(
 		&runOpts.SignerAccount,
