@@ -79,9 +79,6 @@ type promoterImplementation interface {
 	// Methods for image vulnerability scans:
 	ScanEdges(*options.Options, *reg.SyncContext, map[reg.PromotionEdge]interface{}) error
 
-	// Methods for manifest list verification:
-	ValidateManifestLists(*options.Options) error
-
 	// Methods for image signing
 	PrewarmTUFCache() error
 	ValidateStagingSignatures(map[reg.PromotionEdge]interface{}) (map[reg.PromotionEdge]interface{}, error)
@@ -267,23 +264,6 @@ func (p *Promoter) SecurityScan(opts *options.Options) error {
 
 	if err := p.impl.ScanEdges(opts, sc, promotionEdges); err != nil {
 		return fmt.Errorf("running vulnerability scan: %w", err)
-	}
-	return nil
-}
-
-// CheckManifestLists is a mode that just checks manifests
-// and exists.
-func (p *Promoter) CheckManifestLists(opts *options.Options) error {
-	if err := p.impl.ValidateOptions(opts); err != nil {
-		return fmt.Errorf("validating options: %w", err)
-	}
-
-	if err := p.impl.ActivateServiceAccounts(opts); err != nil {
-		return fmt.Errorf("activating service accounts: %w", err)
-	}
-
-	if err := p.impl.ValidateManifestLists(opts); err != nil {
-		return fmt.Errorf("checking manifest lists: %w", err)
 	}
 	return nil
 }
