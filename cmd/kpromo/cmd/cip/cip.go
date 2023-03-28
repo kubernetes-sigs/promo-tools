@@ -19,6 +19,7 @@ package cip
 import (
 	"fmt"
 
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
 	"sigs.k8s.io/promo-tools/v3/internal/legacy/cli"
@@ -191,12 +192,18 @@ network from a registry, it reads from the local manifests only`,
 		"pass '--account=...' to all gcloud calls",
 	)
 
+	// This flag does nothing, but we don't want to remove it in case it breaks someone.
+	// Instead, we just keep it hidden.
+	unused := 0
 	CipCmd.PersistentFlags().IntVar(
-		&runOpts.MaxImageSize,
+		&unused,
 		"max-image-size",
-		options.DefaultOptions.MaxImageSize,
+		0,
 		"the maximum image size (in MiB) allowed for promotion",
 	)
+	if err := CipCmd.PersistentFlags().MarkHidden("max-image-size"); err != nil {
+		logrus.Infof("Failed to mark max-image-size flag as hidden: %v", err)
+	}
 
 	CipCmd.PersistentFlags().StringVar(
 		&runOpts.SignerAccount,
@@ -225,11 +232,6 @@ network from a registry, it reads from the local manifests only`,
 		options.DefaultOptions.MaxSignatureOps,
 		"maximum number of concurrent signature operations",
 	)
-
-	// TODO: Set this in a function instead
-	if runOpts.MaxImageSize <= 0 {
-		runOpts.MaxImageSize = 2048
-	}
 
 	CipCmd.PersistentFlags().IntVar(
 		&runOpts.SeverityThreshold,

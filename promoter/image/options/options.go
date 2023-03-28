@@ -84,9 +84,6 @@ type Options struct {
 	// before promoting or generating a snapshot when set to true
 	ParseOnly bool
 
-	// MaxImageSize is the maximum size of an image accepted for promotion
-	MaxImageSize int
-
 	// When tru, sign the container images using the sigstore cosign libraries
 	SignImages bool
 
@@ -133,7 +130,6 @@ type Options struct {
 
 var DefaultOptions = &Options{
 	OutputFormat:        "yaml",
-	MaxImageSize:        2048,
 	Threads:             10,
 	SeverityThreshold:   -1,
 	SignImages:          true,

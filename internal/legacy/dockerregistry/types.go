@@ -45,14 +45,6 @@ type Error struct {
 	Error   error
 }
 
-// ImageSizeError contains ImageSizeCheck information on images that are either
-// over the promoter's max image size or have an invalid size of 0 or less.
-type ImageSizeError struct {
-	MaxImageSize    int
-	OversizedImages map[string]int
-	InvalidImages   map[string]int
-}
-
 // ImageVulnError contains ImageVulnCheck information on images that contain a
 // vulnerability with a severity level at or above the defined threshold.
 type ImageVulnError struct {
@@ -89,7 +81,6 @@ type SyncContext struct {
 	SrcRegistry       *registry.Context
 	Tokens            map[RootRepo]gcloud.Token
 	DigestMediaType   DigestMediaType
-	DigestImageSize   DigestImageSize
 	ParentDigest      ParentDigest
 	Logs              CollectedLogs
 }
@@ -110,15 +101,6 @@ type ImageVulnCheck struct {
 	PullEdges         map[PromotionEdge]interface{}
 	SeverityThreshold int
 	FakeVulnProducer  ImageVulnProducer
-}
-
-// ImageSizeCheck implements the PreCheck interface and checks against
-// images that are larger than a size threshold (controlled by the
-// max-image-size flag).
-type ImageSizeCheck struct {
-	MaxImageSize    int
-	DigestImageSize DigestImageSize
-	PullEdges       map[PromotionEdge]interface{}
 }
 
 // ImageRemovalCheck implements the PreCheck interface and checks against
@@ -215,9 +197,6 @@ type GCRManifestListContext struct {
 
 // DigestMediaType holds media information about a Digest.
 type DigestMediaType map[image.Digest]cr.MediaType
-
-// DigestImageSize holds information about the size of an image in bytes.
-type DigestImageSize map[image.Digest]int
 
 // ParentDigest holds a map of the digests of children to parent digests. It is
 // a reverse mapping of ManifestLists, which point to all the child manifests.
