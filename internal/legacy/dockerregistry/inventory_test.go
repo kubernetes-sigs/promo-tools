@@ -835,6 +835,56 @@ func TestSplitByKnownRegistries(t *testing.T) {
 	}
 }
 
+func TestCommandGeneration(t *testing.T) {
+	destRC := registry.Context{
+		Name:           "gcr.io/foo",
+		ServiceAccount: "robot",
+	}
+
+	var (
+		destImageName image.Name   = "baz"
+		digest        image.Digest = "sha256:000"
+	)
+
+	got := reg.GetDeleteCmd(
+		destRC,
+		true,
+		destImageName,
+		digest,
+		false)
+
+	expected := []string{
+		"gcloud",
+		"--account=robot",
+		"container",
+		"images",
+		"delete",
+		reg.ToFQIN(destRC.Name, destImageName, digest),
+		"--format=json",
+	}
+
+	require.Equal(t, expected, got)
+
+	got = reg.GetDeleteCmd(
+		destRC,
+		false,
+		destImageName,
+		digest,
+		false,
+	)
+
+	expected = []string{
+		"gcloud",
+		"container",
+		"images",
+		"delete",
+		reg.ToFQIN(destRC.Name, destImageName, digest),
+		"--format=json",
+	}
+
+	require.Equal(t, expected, got)
+}
+
 // TestReadRegistries tests reading images and tags from a registry.
 func TestReadRegistries(t *testing.T) {
 	const fakeRegName image.Registry = "gcr.io/foo"
