@@ -38,6 +38,7 @@ import (
 	"sigs.k8s.io/promo-tools/v3/promoter/image/ratelimit"
 	"sigs.k8s.io/promo-tools/v3/types/image"
 	"sigs.k8s.io/release-sdk/sign"
+	"sigs.k8s.io/release-utils/version"
 )
 
 const (
@@ -210,20 +211,10 @@ func (di *DefaultPromoterImplementation) signAndReplicate(signOpts *sign.Options
 	// Build the reference we will use
 	imageRef := edges[0].DstReference()
 
-	// Add all the references as annotations to ensure we
-	// get a 2nd signature, otherwise cosign will not resign
-	mirrorList := []string{}
-	for i := range edges {
-		mirrorList = append(
-			mirrorList, fmt.Sprintf(
-				"%s/%s",
-				edges[i].DstRegistry.Name,
-				edges[i].DstImageTag.Name,
-			),
-		)
-	}
+	// Add an annotation recording the kpromo version to ensure we
+	// get a 2nd signature, otherwise cosign will not resign a signed image:
 	signOpts.Annotations = map[string]interface{}{
-		"org.kubernetes.kpromo.mirrors": strings.Join(mirrorList, ","),
+		"org.kubernetes.kpromo.version": fmt.Sprintf("kpromo-%s", version.GetVersionInfo().GitVersion),
 	}
 
 	logrus.Infof("Signing image %s", imageRef)
