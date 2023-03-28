@@ -8,7 +8,7 @@ require (
 	cloud.google.com/go/iam v0.13.0
 	cloud.google.com/go/logging v1.7.0
 	cloud.google.com/go/storage v1.30.1
-	github.com/aws/aws-sdk-go v1.44.229
+	github.com/aws/aws-sdk-go v1.44.230
 	github.com/cenkalti/backoff/v4 v4.2.0
 	github.com/google/go-cmp v0.5.9
 	github.com/google/go-containerregistry v0.14.0
