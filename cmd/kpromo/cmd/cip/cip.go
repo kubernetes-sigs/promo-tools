@@ -144,23 +144,6 @@ format of the snapshot (allowed values: %q)`,
 		),
 	)
 
-	// TODO: Review/optimize/de-dupe (https://github.com/kubernetes-sigs/promo-tools/pull/351)
-	CipCmd.PersistentFlags().StringVar(
-		&runOpts.CheckManifestLists,
-		"check-manifest-lists-from-snapshot",
-		runOpts.CheckManifestLists,
-		`(only works with --repository) read snapshot from file and checks all
-manifest lists have children from the same location`,
-	)
-
-	// TODO: Review/optimize/de-dupe (https://github.com/kubernetes-sigs/promo-tools/pull/351)
-	CipCmd.PersistentFlags().StringVar(
-		&runOpts.Repository,
-		"repository",
-		runOpts.Repository,
-		"container repository to be parsed queried",
-	)
-
 	CipCmd.PersistentFlags().StringVar(
 		&runOpts.SnapshotSvcAcct,
 		"snapshot-service-account",

@@ -17,12 +17,10 @@ limitations under the License.
 package inventory
 
 import (
-	"bufio"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"regexp"
 	"sort"
 	"strings"
@@ -2201,60 +2199,4 @@ func (payload *GCRPubSubPayload) String() string {
 		payload.Digest,
 		payload.Tag,
 	)
-}
-
-// ParseSnapshot reads a given YAML snapshot from file.
-// TODO: Review/optimize/de-dupe (https://github.com/kubernetes-sigs/promo-tools/pull/351)
-func ParseSnapshot(pathToSnapshot string, images *[]registry.ImageWithDigestSlice) error {
-	f, err := os.Open(pathToSnapshot)
-	if err != nil {
-		return err
-	}
-
-	defer f.Close()
-
-	reader := bufio.NewReader(f)
-	img := registry.ImageWithDigestSlice{}
-
-	// Converts output like `["v1.7.12", "v1.7.13-beta.0"]` into golang string array.
-	getTags := func(s string) []string {
-		// Remove double quotes.
-		s = strings.ReplaceAll(s, `"`, "")
-		// Remove square brackets.
-		s = strings.ReplaceAll(s, `[`, "")
-		s = strings.ReplaceAll(s, `]`, "")
-		// Split by comma.
-		return strings.Split(s, ",")
-	}
-
-	for output, _, err := reader.ReadLine(); err == nil; output, _, err = reader.ReadLine() {
-		line := string(output)
-		if strings.Contains(line, "- name:") {
-			if len(img.Name) > 0 {
-				*images = append(*images, img)
-			}
-
-			imageName := line[8:]
-			img = registry.ImageWithDigestSlice{
-				Name:    imageName,
-				Digests: make([]registry.Digest, 0),
-			}
-		} else if strings.Contains(line, "sha256:") {
-			// Parse the line for sha256 and tags. The length and format of these
-			// lines are consistent, therefore it's safe to use fixed indices.
-			imageSha256 := line[5:76]
-			imageTags := getTags(line[79:])
-			img.Digests = append(
-				img.Digests,
-				registry.Digest{
-					Hash: imageSha256,
-					Tags: imageTags,
-				},
-			)
-		}
-	}
-
-	// Add the last image to the slice.
-	*images = append(*images, img)
-	return nil
 }

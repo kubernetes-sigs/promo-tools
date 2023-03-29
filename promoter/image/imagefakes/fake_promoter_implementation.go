@@ -284,17 +284,6 @@ type FakePromoterImplementation struct {
 	snapshotReturnsOnCall map[int]struct {
 		result1 error
 	}
-	ValidateManifestListsStub        func(*imagepromotera.Options) error
-	validateManifestListsMutex       sync.RWMutex
-	validateManifestListsArgsForCall []struct {
-		arg1 *imagepromotera.Options
-	}
-	validateManifestListsReturns struct {
-		result1 error
-	}
-	validateManifestListsReturnsOnCall map[int]struct {
-		result1 error
-	}
 	ValidateOptionsStub        func(*imagepromotera.Options) error
 	validateOptionsMutex       sync.RWMutex
 	validateOptionsArgsForCall []struct {
@@ -1641,67 +1630,6 @@ func (fake *FakePromoterImplementation) SnapshotReturnsOnCall(i int, result1 err
 	}{result1}
 }
 
-func (fake *FakePromoterImplementation) ValidateManifestLists(arg1 *imagepromotera.Options) error {
-	fake.validateManifestListsMutex.Lock()
-	ret, specificReturn := fake.validateManifestListsReturnsOnCall[len(fake.validateManifestListsArgsForCall)]
-	fake.validateManifestListsArgsForCall = append(fake.validateManifestListsArgsForCall, struct {
-		arg1 *imagepromotera.Options
-	}{arg1})
-	stub := fake.ValidateManifestListsStub
-	fakeReturns := fake.validateManifestListsReturns
-	fake.recordInvocation("ValidateManifestLists", []interface{}{arg1})
-	fake.validateManifestListsMutex.Unlock()
-	if stub != nil {
-		return stub(arg1)
-	}
-	if specificReturn {
-		return ret.result1
-	}
-	return fakeReturns.result1
-}
-
-func (fake *FakePromoterImplementation) ValidateManifestListsCallCount() int {
-	fake.validateManifestListsMutex.RLock()
-	defer fake.validateManifestListsMutex.RUnlock()
-	return len(fake.validateManifestListsArgsForCall)
-}
-
-func (fake *FakePromoterImplementation) ValidateManifestListsCalls(stub func(*imagepromotera.Options) error) {
-	fake.validateManifestListsMutex.Lock()
-	defer fake.validateManifestListsMutex.Unlock()
-	fake.ValidateManifestListsStub = stub
-}
-
-func (fake *FakePromoterImplementation) ValidateManifestListsArgsForCall(i int) *imagepromotera.Options {
-	fake.validateManifestListsMutex.RLock()
-	defer fake.validateManifestListsMutex.RUnlock()
-	argsForCall := fake.validateManifestListsArgsForCall[i]
-	return argsForCall.arg1
-}
-
-func (fake *FakePromoterImplementation) ValidateManifestListsReturns(result1 error) {
-	fake.validateManifestListsMutex.Lock()
-	defer fake.validateManifestListsMutex.Unlock()
-	fake.ValidateManifestListsStub = nil
-	fake.validateManifestListsReturns = struct {
-		result1 error
-	}{result1}
-}
-
-func (fake *FakePromoterImplementation) ValidateManifestListsReturnsOnCall(i int, result1 error) {
-	fake.validateManifestListsMutex.Lock()
-	defer fake.validateManifestListsMutex.Unlock()
-	fake.ValidateManifestListsStub = nil
-	if fake.validateManifestListsReturnsOnCall == nil {
-		fake.validateManifestListsReturnsOnCall = make(map[int]struct {
-			result1 error
-		})
-	}
-	fake.validateManifestListsReturnsOnCall[i] = struct {
-		result1 error
-	}{result1}
-}
-
 func (fake *FakePromoterImplementation) ValidateOptions(arg1 *imagepromotera.Options) error {
 	fake.validateOptionsMutex.Lock()
 	ret, specificReturn := fake.validateOptionsReturnsOnCall[len(fake.validateOptionsArgsForCall)]
@@ -1937,8 +1865,6 @@ func (fake *FakePromoterImplementation) Invocations() map[string][][]interface{}
 	defer fake.signImagesMutex.RUnlock()
 	fake.snapshotMutex.RLock()
 	defer fake.snapshotMutex.RUnlock()
-	fake.validateManifestListsMutex.RLock()
-	defer fake.validateManifestListsMutex.RUnlock()
 	fake.validateOptionsMutex.RLock()
 	defer fake.validateOptionsMutex.RUnlock()
 	fake.validateStagingSignaturesMutex.RLock()
