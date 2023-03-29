@@ -1484,7 +1484,6 @@ func (sc *SyncContext) ValidateEdge(edge *PromotionEdge) error {
 // requests to be processed
 func MKPopulateRequestsForPromotionEdges(
 	toPromote map[PromotionEdge]interface{},
-	mkProducer PromotionContext,
 ) PopulateRequests {
 	return func(sc *SyncContext, reqs chan<- stream.ExternalRequest, wg *sync.WaitGroup) {
 		if len(toPromote) == 0 {
@@ -1664,15 +1663,6 @@ func getRegistriesToRead(edges map[PromotionEdge]interface{}) []registry.Context
 // Manifest.
 func (sc *SyncContext) Promote(
 	edges map[PromotionEdge]interface{},
-	mkProducer func(
-		image.Registry,
-		image.Name,
-		registry.Context,
-		image.Name,
-		image.Digest,
-		image.Tag,
-		TagOp,
-	) stream.Producer,
 	customProcessRequest *ProcessRequest,
 ) error {
 	if len(edges) == 0 {
@@ -1701,10 +1691,7 @@ func (sc *SyncContext) Promote(
 	}
 
 	var (
-		populateRequests = MKPopulateRequestsForPromotionEdges(
-			edges,
-			mkProducer,
-		)
+		populateRequests = MKPopulateRequestsForPromotionEdges(edges)
 
 		processRequest     ProcessRequest
 		processRequestReal ProcessRequest = func(
@@ -1881,101 +1868,6 @@ func MkRequestCapturer(captured *CapturedRequests) ProcessRequest {
 	}
 }
 
-// GarbageCollect deletes all images that are not referenced by Docker tags.
-func (sc *SyncContext) GarbageCollect(
-	mfest schema.Manifest,
-	mkProducer func(registry.Context, image.Name, image.Digest) stream.Producer,
-	customProcessRequest *ProcessRequest,
-) {
-	var populateRequests PopulateRequests = func(
-		sc *SyncContext,
-		reqs chan<- stream.ExternalRequest,
-		wg *sync.WaitGroup,
-	) {
-		for _, registry := range mfest.Registries {
-			if registry.Name == sc.SrcRegistry.Name {
-				continue
-			}
-
-			for imageName, digestTags := range sc.Inv[registry.Name] {
-				for digest, tagArray := range digestTags {
-					if len(tagArray) != 0 {
-						continue
-					}
-
-					var req stream.ExternalRequest
-					req.StreamProducer = mkProducer(
-						registry,
-						imageName,
-						digest)
-					req.RequestParams = PromotionRequest{
-						Delete,
-						sc.SrcRegistry.Name,
-						registry.Name,
-						registry.ServiceAccount,
-
-						// No source image name, because tag deletions
-						// should only delete the what's in the
-						// destination registry
-						image.Name(""),
-
-						imageName,
-						digest,
-						"",
-						"",
-					}
-
-					wg.Add(1)
-					reqs <- req
-				}
-			}
-		}
-	}
-
-	var processRequest ProcessRequest
-	var processRequestReal ProcessRequest = func(
-		sc *SyncContext,
-		reqs chan stream.ExternalRequest,
-		requestResults chan<- RequestResult,
-		wg *sync.WaitGroup,
-		mutex *sync.Mutex,
-	) {
-		for req := range reqs {
-			reqRes := RequestResult{Context: req}
-			jsons, errors := getJSONSFromProcess(req)
-			if len(errors) > 0 {
-				reqRes.Errors = errors
-				requestResults <- reqRes
-				continue
-			}
-			for _, json := range jsons {
-				logrus.Info("DELETED image:", json)
-			}
-			reqRes.Errors = errors
-			requestResults <- reqRes
-		}
-	}
-
-	captured := make(CapturedRequests)
-
-	if sc.Confirm {
-		processRequest = processRequestReal
-	} else {
-		processRequestDryRun := MkRequestCapturer(&captured)
-		processRequest = processRequestDryRun
-	}
-
-	if customProcessRequest != nil {
-		processRequest = *customProcessRequest
-	}
-
-	sc.PrintCapturedRequests(&captured)
-	err := sc.ExecRequests(populateRequests, processRequest)
-	if err != nil {
-		logrus.Info(err)
-	}
-}
-
 func supportedMediaType(v string) (ggcrV1Types.MediaType, error) {
 	switch ggcrV1Types.MediaType(v) {
 	case ggcrV1Types.DockerManifestList:
@@ -2122,42 +2014,6 @@ func (sc *SyncContext) ClearRepository(
 	if err != nil {
 		logrus.Info(err)
 	}
-}
-
-// GetWriteCmd generates a gcloud command that is used to make modifications to
-// a Docker Registry.
-func GetWriteCmd(
-	dest registry.Context,
-	useServiceAccount bool,
-	srcRegistry image.Registry,
-	srcImageName image.Name,
-	destImageName image.Name,
-	digest image.Digest,
-	tag image.Tag,
-	tp TagOp,
-) []string {
-	var cmd []string
-
-	switch tp {
-	case Delete:
-		cmd = []string{
-			"gcloud",
-			"--quiet",
-			"container",
-			"images",
-			"untag",
-			ToPQIN(dest.Name, destImageName, tag),
-		}
-	default:
-		logrus.Fatalf("unsupported tag operation: %v", tp)
-	}
-
-	// Use the service account if it is desired.
-	return gcloud.MaybeUseServiceAccount(
-		dest.ServiceAccount,
-		useServiceAccount,
-		cmd,
-	)
 }
 
 // GetDeleteCmd generates the cloud command used to delete images (used for
