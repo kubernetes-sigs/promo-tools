@@ -6,7 +6,7 @@ timeout: 1200s
 
 options:
   substitution_option: ALLOW_LOOSE
-  machineType: N1_HIGHCPU_32
+  machineType: E2_HIGHCPU_32
 
 steps:
 - name: 'gcr.io/cloud-builders/docker'
