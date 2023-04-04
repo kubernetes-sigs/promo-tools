@@ -223,6 +223,12 @@ func (di *DefaultPromoterImplementation) copyAttachedObjects(edge *reg.Promotion
 	}
 
 	if err := crane.Copy(srcRef.String(), dstRef.String(), craneOpts...); err != nil {
+		// If the signature layer does not exist it means that the src image
+		// is not signed, so we catch the error and return nil
+		if strings.Contains(err.Error(), "MANIFEST_UNKNOWN") {
+			logrus.Debugf("Reference %s is not signed, not copying", srcRef.String())
+			return nil
+		}
 		return fmt.Errorf(
 			"copying signature %s to %s: %w", srcRef.String(), dstRef.String(), err,
 		)
