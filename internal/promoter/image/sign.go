@@ -90,59 +90,6 @@ func (di *DefaultPromoterImplementation) ValidateStagingSignatures(
 	return signedEdges, nil
 }
 
-// CopySignatures copies sboms and signatures from the signed edges and
-// attaches them to the newly promoted images before stamping
-// the Kubernetes org signature
-func (di *DefaultPromoterImplementation) CopySignatures(
-	opts *options.Options, sc *reg.SyncContext, signedEdges map[reg.PromotionEdge]interface{},
-) error {
-	// Cycle all signedEdges to copy them
-	logrus.Infof("Precopying %d previous signatures", len(signedEdges))
-
-	t := throttler.New(opts.MaxSignatureCopies, len(signedEdges))
-	for e := range signedEdges {
-		go func(edge reg.PromotionEdge) {
-			sigTag := digestToSignatureTag(edge.Digest)
-			srcRefString := fmt.Sprintf(
-				"%s/%s:%s", edge.SrcRegistry.Name, edge.SrcImageTag.Name, sigTag,
-			)
-			srcRef, err := name.ParseReference(srcRefString)
-			if err != nil {
-				t.Done(fmt.Errorf("parsing signed source reference %s: %w", srcRefString, err))
-				return
-			}
-
-			dstRefString := fmt.Sprintf(
-				"%s/%s:%s", edge.DstRegistry.Name, edge.DstImageTag.Name, sigTag,
-			)
-			dstRef, err := name.ParseReference(dstRefString)
-			if err != nil {
-				t.Done(fmt.Errorf("parsing signature destination reference %s: %w", dstRefString, err))
-				return
-			}
-
-			logrus.Infof("Signature pre copy: %s to %s", srcRefString, dstRefString)
-			opts := []crane.Option{
-				crane.WithAuthFromKeychain(gcrane.Keychain),
-				crane.WithUserAgent(image.UserAgent),
-				crane.WithTransport(ratelimit.Limiter),
-			}
-			if err := crane.Copy(srcRef.String(), dstRef.String(), opts...); err != nil {
-				t.Done(fmt.Errorf(
-					"copying signature %s to %s: %w",
-					srcRef.String(), dstRef.String(), err,
-				))
-				return
-			}
-			t.Done(nil)
-		}(e)
-		if t.Throttle() > 0 {
-			break
-		}
-	}
-	return t.Err()
-}
-
 // SignImages signs the promoted images and stores their signatures in
 // the registry
 func (di *DefaultPromoterImplementation) SignImages(
@@ -194,6 +141,7 @@ func (di *DefaultPromoterImplementation) SignImages(
 	t := throttler.New(opts.MaxSignatureOps, len(sortedEdges))
 	// Sign the required edges
 	for d := range sortedEdges {
+		d := d
 		go func(digest image.Digest) {
 			t.Done(di.signAndReplicate(signOpts, sortedEdges[digest]))
 		}(d)
@@ -218,6 +166,12 @@ func (di *DefaultPromoterImplementation) signAndReplicate(signOpts *sign.Options
 	}
 
 	logrus.Infof("Signing image %s", imageRef)
+
+	// Carry over existing signatures from the staging repo
+	if err := di.copyAttachedObjects(&edges[0]); err != nil {
+		return fmt.Errorf("copying staging signatures: %w", err)
+	}
+
 	// Sign the first promoted image in the edges list:
 	if _, err := di.signer.SignImageWithOptions(signOpts, imageRef); err != nil {
 		return fmt.Errorf("signing image %s: %w", imageRef, err)
@@ -231,10 +185,47 @@ func (di *DefaultPromoterImplementation) signAndReplicate(signOpts *sign.Options
 		)
 		return nil
 	}
+
 	if err := di.replicateSignatures(
 		&edges[0], edges[1:],
 	); err != nil {
 		return fmt.Errorf("replicating signatures: %w", err)
+	}
+	return nil
+}
+
+// copyAttachedObjects copies any attached signatures from the staging registry to
+// the production registry. The function is called copyAttachedObjects as it will
+// move attestations and SBOMs too once we stabilize the signing code.
+func (di *DefaultPromoterImplementation) copyAttachedObjects(edge *reg.PromotionEdge) error {
+	sigTag := digestToSignatureTag(edge.Digest)
+	srcRefString := fmt.Sprintf(
+		"%s/%s:%s", edge.SrcRegistry.Name, edge.SrcImageTag.Name, sigTag,
+	)
+	srcRef, err := name.ParseReference(srcRefString)
+	if err != nil {
+		return fmt.Errorf("parsing signed source reference %s: %w", srcRefString, err)
+	}
+
+	dstRefString := fmt.Sprintf(
+		"%s/%s:%s", edge.DstRegistry.Name, edge.DstImageTag.Name, sigTag,
+	)
+	dstRef, err := name.ParseReference(dstRefString)
+	if err != nil {
+		return fmt.Errorf("parsing reference: %w", err)
+	}
+
+	logrus.Infof("Signature pre copy: %s to %s", srcRefString, dstRefString)
+	craneOpts := []crane.Option{
+		crane.WithAuthFromKeychain(gcrane.Keychain),
+		crane.WithUserAgent(image.UserAgent),
+		crane.WithTransport(ratelimit.Limiter),
+	}
+
+	if err := crane.Copy(srcRef.String(), dstRef.String(), craneOpts...); err != nil {
+		return fmt.Errorf(
+			"copying signature %s to %s: %w", srcRef.String(), dstRef.String(), err,
+		)
 	}
 	return nil
 }

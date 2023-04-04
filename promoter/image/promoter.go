@@ -81,7 +81,6 @@ type promoterImplementation interface {
 	// Methods for image signing
 	PrewarmTUFCache() error
 	ValidateStagingSignatures(map[reg.PromotionEdge]interface{}) (map[reg.PromotionEdge]interface{}, error)
-	CopySignatures(*options.Options, *reg.SyncContext, map[reg.PromotionEdge]interface{}) error
 	SignImages(*options.Options, *reg.SyncContext, map[reg.PromotionEdge]interface{}) error
 	WriteSBOMs(*options.Options, *reg.SyncContext, map[reg.PromotionEdge]interface{}) error
 
@@ -147,8 +146,7 @@ func (p *Promoter) PromoteImages(opts *options.Options) (err error) {
 
 	// Verify any signatures in staged images
 	logrus.Infof("Validating staging signatures")
-	signedEdges, err := p.impl.ValidateStagingSignatures(promotionEdges)
-	if err != nil {
+	if _, err := p.impl.ValidateStagingSignatures(promotionEdges); err != nil {
 		return fmt.Errorf("checking signtaures in staging images: %w", err)
 	}
 
@@ -160,11 +158,6 @@ func (p *Promoter) PromoteImages(opts *options.Options) (err error) {
 	logrus.Infof("Promoting images")
 	if err := p.impl.PromoteImages(sc, promotionEdges); err != nil {
 		return fmt.Errorf("running promotion: %w", err)
-	}
-
-	logrus.Infof("Replicating signatures")
-	if err := p.impl.CopySignatures(opts, sc, signedEdges); err != nil {
-		return fmt.Errorf("copying existing signatures: %w", err)
 	}
 
 	logrus.Infof("Signing images")
