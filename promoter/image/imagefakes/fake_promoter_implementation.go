@@ -53,19 +53,6 @@ type FakePromoterImplementation struct {
 		result1 []schema.Manifest
 		result2 error
 	}
-	CopySignaturesStub        func(*imagepromotera.Options, *inventory.SyncContext, map[inventory.PromotionEdge]interface{}) error
-	copySignaturesMutex       sync.RWMutex
-	copySignaturesArgsForCall []struct {
-		arg1 *imagepromotera.Options
-		arg2 *inventory.SyncContext
-		arg3 map[inventory.PromotionEdge]interface{}
-	}
-	copySignaturesReturns struct {
-		result1 error
-	}
-	copySignaturesReturnsOnCall map[int]struct {
-		result1 error
-	}
 	FixMissingSignaturesStub        func(*imagepromotera.Options, checkresults.Signature) error
 	fixMissingSignaturesMutex       sync.RWMutex
 	fixMissingSignaturesArgsForCall []struct {
@@ -454,69 +441,6 @@ func (fake *FakePromoterImplementation) AppendManifestToSnapshotReturnsOnCall(i 
 		result1 []schema.Manifest
 		result2 error
 	}{result1, result2}
-}
-
-func (fake *FakePromoterImplementation) CopySignatures(arg1 *imagepromotera.Options, arg2 *inventory.SyncContext, arg3 map[inventory.PromotionEdge]interface{}) error {
-	fake.copySignaturesMutex.Lock()
-	ret, specificReturn := fake.copySignaturesReturnsOnCall[len(fake.copySignaturesArgsForCall)]
-	fake.copySignaturesArgsForCall = append(fake.copySignaturesArgsForCall, struct {
-		arg1 *imagepromotera.Options
-		arg2 *inventory.SyncContext
-		arg3 map[inventory.PromotionEdge]interface{}
-	}{arg1, arg2, arg3})
-	stub := fake.CopySignaturesStub
-	fakeReturns := fake.copySignaturesReturns
-	fake.recordInvocation("CopySignatures", []interface{}{arg1, arg2, arg3})
-	fake.copySignaturesMutex.Unlock()
-	if stub != nil {
-		return stub(arg1, arg2, arg3)
-	}
-	if specificReturn {
-		return ret.result1
-	}
-	return fakeReturns.result1
-}
-
-func (fake *FakePromoterImplementation) CopySignaturesCallCount() int {
-	fake.copySignaturesMutex.RLock()
-	defer fake.copySignaturesMutex.RUnlock()
-	return len(fake.copySignaturesArgsForCall)
-}
-
-func (fake *FakePromoterImplementation) CopySignaturesCalls(stub func(*imagepromotera.Options, *inventory.SyncContext, map[inventory.PromotionEdge]interface{}) error) {
-	fake.copySignaturesMutex.Lock()
-	defer fake.copySignaturesMutex.Unlock()
-	fake.CopySignaturesStub = stub
-}
-
-func (fake *FakePromoterImplementation) CopySignaturesArgsForCall(i int) (*imagepromotera.Options, *inventory.SyncContext, map[inventory.PromotionEdge]interface{}) {
-	fake.copySignaturesMutex.RLock()
-	defer fake.copySignaturesMutex.RUnlock()
-	argsForCall := fake.copySignaturesArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
-}
-
-func (fake *FakePromoterImplementation) CopySignaturesReturns(result1 error) {
-	fake.copySignaturesMutex.Lock()
-	defer fake.copySignaturesMutex.Unlock()
-	fake.CopySignaturesStub = nil
-	fake.copySignaturesReturns = struct {
-		result1 error
-	}{result1}
-}
-
-func (fake *FakePromoterImplementation) CopySignaturesReturnsOnCall(i int, result1 error) {
-	fake.copySignaturesMutex.Lock()
-	defer fake.copySignaturesMutex.Unlock()
-	fake.CopySignaturesStub = nil
-	if fake.copySignaturesReturnsOnCall == nil {
-		fake.copySignaturesReturnsOnCall = make(map[int]struct {
-			result1 error
-		})
-	}
-	fake.copySignaturesReturnsOnCall[i] = struct {
-		result1 error
-	}{result1}
 }
 
 func (fake *FakePromoterImplementation) FixMissingSignatures(arg1 *imagepromotera.Options, arg2 checkresults.Signature) error {
@@ -1825,8 +1749,6 @@ func (fake *FakePromoterImplementation) Invocations() map[string][][]interface{}
 	defer fake.activateServiceAccountsMutex.RUnlock()
 	fake.appendManifestToSnapshotMutex.RLock()
 	defer fake.appendManifestToSnapshotMutex.RUnlock()
-	fake.copySignaturesMutex.RLock()
-	defer fake.copySignaturesMutex.RUnlock()
 	fake.fixMissingSignaturesMutex.RLock()
 	defer fake.fixMissingSignaturesMutex.RUnlock()
 	fake.fixPartialSignaturesMutex.RLock()
