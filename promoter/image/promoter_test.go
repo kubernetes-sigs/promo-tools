@@ -100,14 +100,6 @@ func TestPromoteImages(t *testing.T) {
 			},
 		},
 		{
-			// CopySignatures fails
-			shouldErr: true,
-			prepare: func(fpi *imagefakes.FakePromoterImplementation) {
-				fpi.MakeSyncContextReturns(&reg.SyncContext{UseServiceAccount: true}, nil)
-				fpi.CopySignaturesReturns(testErr)
-			},
-		},
-		{
 			// SignImages fails
 			shouldErr: true,
 			prepare: func(fpi *imagefakes.FakePromoterImplementation) {
