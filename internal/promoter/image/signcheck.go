@@ -28,6 +28,7 @@ import (
 	yaml "gopkg.in/yaml.v2"
 	"sigs.k8s.io/release-sdk/sign"
 	"sigs.k8s.io/release-utils/http"
+	"sigs.k8s.io/release-utils/version"
 
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/crane"
@@ -327,12 +328,6 @@ func (di *DefaultPromoterImplementation) signReference(opts *options.Options, re
 	}
 	logrus.Infof(" signing %s", refString)
 
-	// Get the mirrors list
-	mirrorList, err := di.getMirrors()
-	if err != nil {
-		return fmt.Errorf("getting mirror list: %w", err)
-	}
-
 	// Options for the new signer
 	signOpts := sign.Default()
 
@@ -344,8 +339,12 @@ func (di *DefaultPromoterImplementation) signReference(opts *options.Options, re
 	signOpts.IdentityToken = token
 	di.signer = sign.New(signOpts)
 
+	// Add an annotation recording the kpromo version to ensure we
+	// get a 2nd signature, otherwise cosign will not resign a signed image:
 	signOpts.Annotations = map[string]interface{}{
-		"org.kubernetes.kpromo.mirrors": strings.Join(mirrorList, ","),
+		"org.kubernetes.kpromo.version": fmt.Sprintf(
+			"kpromo-%s", version.GetVersionInfo().GitVersion,
+		),
 	}
 
 	if _, err := di.signer.SignImageWithOptions(signOpts, refString); err != nil {

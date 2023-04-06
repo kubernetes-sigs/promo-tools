@@ -72,20 +72,9 @@ type Options struct {
 	// SnapshotTag when set, only images with this tag will be snapshotted
 	SnapshotTag string
 
-	// Repository container repository to be parsed queried
-	Repository string
-
-	// CheckManifestLists this should be a subcommand:
-	// (only works with --repository) read snapshot from file and checks all
-	// manifest lists have children from the same location
-	CheckManifestLists string
-
 	// ParseOnly is an options that causes the promoter to exit
 	// before promoting or generating a snapshot when set to true
 	ParseOnly bool
-
-	// MaxImageSize is the maximum size of an image accepted for promotion
-	MaxImageSize int
 
 	// When tru, sign the container images using the sigstore cosign libraries
 	SignImages bool
@@ -133,7 +122,6 @@ type Options struct {
 
 var DefaultOptions = &Options{
 	OutputFormat:        "yaml",
-	MaxImageSize:        2048,
 	Threads:             10,
 	SeverityThreshold:   -1,
 	SignImages:          true,
@@ -148,13 +136,6 @@ var DefaultOptions = &Options{
 }
 
 func (o *Options) Validate() error {
-	// CheckManifestLists is one of the modes, it just needs a repository
-	if o.CheckManifestLists != "" && o.Repository == "" {
-		return errors.New(
-			"a repository must be specified when checking manifest lists",
-		)
-	}
-
 	// If one of the snapshot options is set, manifests will not be checked
 	if o.Snapshot == "" && o.ManifestBasedSnapshotOf == "" {
 		if o.Manifest == "" && o.ThinManifestDir == "" {

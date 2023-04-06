@@ -17,12 +17,10 @@ limitations under the License.
 package inventory
 
 import (
-	"bufio"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"regexp"
 	"sort"
 	"strings"
@@ -63,7 +61,6 @@ func MakeSyncContext(
 		Tokens:            make(map[RootRepo]gcloud.Token),
 		RegistryContexts:  make([]registry.Context, 0),
 		DigestMediaType:   make(DigestMediaType),
-		DigestImageSize:   make(DigestImageSize),
 		ParentDigest:      make(ParentDigest),
 	}
 
@@ -810,7 +807,6 @@ func (sc *SyncContext) recordFoundTags(
 			}
 
 			sc.DigestMediaType[image.Digest(digest)] = mediaType
-			sc.DigestImageSize[image.Digest(digest)] = int(manifest.Size)
 		}
 	}
 
@@ -935,8 +931,6 @@ func (sc *SyncContext) ReadRegistries(
 				}
 				sc.DigestMediaType[image.Digest(digest)] = mediaType
 
-				// Store ImageSize
-				sc.DigestImageSize[image.Digest(digest)] = int(mfestInfo.Size)
 				mutex.Unlock()
 			}
 
@@ -1488,7 +1482,6 @@ func (sc *SyncContext) ValidateEdge(edge *PromotionEdge) error {
 // requests to be processed
 func MKPopulateRequestsForPromotionEdges(
 	toPromote map[PromotionEdge]interface{},
-	mkProducer PromotionContext,
 ) PopulateRequests {
 	return func(sc *SyncContext, reqs chan<- stream.ExternalRequest, wg *sync.WaitGroup) {
 		if len(toPromote) == 0 {
@@ -1668,15 +1661,6 @@ func getRegistriesToRead(edges map[PromotionEdge]interface{}) []registry.Context
 // Manifest.
 func (sc *SyncContext) Promote(
 	edges map[PromotionEdge]interface{},
-	mkProducer func(
-		image.Registry,
-		image.Name,
-		registry.Context,
-		image.Name,
-		image.Digest,
-		image.Tag,
-		TagOp,
-	) stream.Producer,
 	customProcessRequest *ProcessRequest,
 ) error {
 	if len(edges) == 0 {
@@ -1705,10 +1689,7 @@ func (sc *SyncContext) Promote(
 	}
 
 	var (
-		populateRequests = MKPopulateRequestsForPromotionEdges(
-			edges,
-			mkProducer,
-		)
+		populateRequests = MKPopulateRequestsForPromotionEdges(edges)
 
 		processRequest     ProcessRequest
 		processRequestReal ProcessRequest = func(
@@ -1885,101 +1866,6 @@ func MkRequestCapturer(captured *CapturedRequests) ProcessRequest {
 	}
 }
 
-// GarbageCollect deletes all images that are not referenced by Docker tags.
-func (sc *SyncContext) GarbageCollect(
-	mfest schema.Manifest,
-	mkProducer func(registry.Context, image.Name, image.Digest) stream.Producer,
-	customProcessRequest *ProcessRequest,
-) {
-	var populateRequests PopulateRequests = func(
-		sc *SyncContext,
-		reqs chan<- stream.ExternalRequest,
-		wg *sync.WaitGroup,
-	) {
-		for _, registry := range mfest.Registries {
-			if registry.Name == sc.SrcRegistry.Name {
-				continue
-			}
-
-			for imageName, digestTags := range sc.Inv[registry.Name] {
-				for digest, tagArray := range digestTags {
-					if len(tagArray) != 0 {
-						continue
-					}
-
-					var req stream.ExternalRequest
-					req.StreamProducer = mkProducer(
-						registry,
-						imageName,
-						digest)
-					req.RequestParams = PromotionRequest{
-						Delete,
-						sc.SrcRegistry.Name,
-						registry.Name,
-						registry.ServiceAccount,
-
-						// No source image name, because tag deletions
-						// should only delete the what's in the
-						// destination registry
-						image.Name(""),
-
-						imageName,
-						digest,
-						"",
-						"",
-					}
-
-					wg.Add(1)
-					reqs <- req
-				}
-			}
-		}
-	}
-
-	var processRequest ProcessRequest
-	var processRequestReal ProcessRequest = func(
-		sc *SyncContext,
-		reqs chan stream.ExternalRequest,
-		requestResults chan<- RequestResult,
-		wg *sync.WaitGroup,
-		mutex *sync.Mutex,
-	) {
-		for req := range reqs {
-			reqRes := RequestResult{Context: req}
-			jsons, errors := getJSONSFromProcess(req)
-			if len(errors) > 0 {
-				reqRes.Errors = errors
-				requestResults <- reqRes
-				continue
-			}
-			for _, json := range jsons {
-				logrus.Info("DELETED image:", json)
-			}
-			reqRes.Errors = errors
-			requestResults <- reqRes
-		}
-	}
-
-	captured := make(CapturedRequests)
-
-	if sc.Confirm {
-		processRequest = processRequestReal
-	} else {
-		processRequestDryRun := MkRequestCapturer(&captured)
-		processRequest = processRequestDryRun
-	}
-
-	if customProcessRequest != nil {
-		processRequest = *customProcessRequest
-	}
-
-	sc.PrintCapturedRequests(&captured)
-	err := sc.ExecRequests(populateRequests, processRequest)
-	if err != nil {
-		logrus.Info(err)
-	}
-}
-
 func supportedMediaType(v string) (ggcrV1Types.MediaType, error) {
 	switch ggcrV1Types.MediaType(v) {
 	case ggcrV1Types.DockerManifestList:
@@ -2126,42 +2012,6 @@ func (sc *SyncContext) ClearRepository(
 	if err != nil {
 		logrus.Info(err)
 	}
-}
-
-// GetWriteCmd generates a gcloud command that is used to make modifications to
-// a Docker Registry.
-func GetWriteCmd(
-	dest registry.Context,
-	useServiceAccount bool,
-	srcRegistry image.Registry,
-	srcImageName image.Name,
-	destImageName image.Name,
-	digest image.Digest,
-	tag image.Tag,
-	tp TagOp,
-) []string {
-	var cmd []string
-
-	switch tp {
-	case Delete:
-		cmd = []string{
-			"gcloud",
-			"--quiet",
-			"container",
-			"images",
-			"untag",
-			ToPQIN(dest.Name, destImageName, tag),
-		}
-	default:
-		logrus.Fatalf("unsupported tag operation: %v", tp)
-	}
-
-	// Use the service account if it is desired.
-	return gcloud.MaybeUseServiceAccount(
-		dest.ServiceAccount,
-		useServiceAccount,
-		cmd,
-	)
 }
 
 // GetDeleteCmd generates the cloud command used to delete images (used for
@@ -2349,60 +2199,4 @@ func (payload *GCRPubSubPayload) String() string {
 		payload.Digest,
 		payload.Tag,
 	)
-}
-
-// ParseSnapshot reads a given YAML snapshot from file.
-// TODO: Review/optimize/de-dupe (https://github.com/kubernetes-sigs/promo-tools/pull/351)
-func ParseSnapshot(pathToSnapshot string, images *[]registry.ImageWithDigestSlice) error {
-	f, err := os.Open(pathToSnapshot)
-	if err != nil {
-		return err
-	}
-
-	defer f.Close()
-
-	reader := bufio.NewReader(f)
-	img := registry.ImageWithDigestSlice{}
-
-	// Converts output like `["v1.7.12", "v1.7.13-beta.0"]` into golang string array.
-	getTags := func(s string) []string {
-		// Remove double quotes.
-		s = strings.ReplaceAll(s, `"`, "")
-		// Remove square brackets.
-		s = strings.ReplaceAll(s, `[`, "")
-		s = strings.ReplaceAll(s, `]`, "")
-		// Split by comma.
-		return strings.Split(s, ",")
-	}
-
-	for output, _, err := reader.ReadLine(); err == nil; output, _, err = reader.ReadLine() {
-		line := string(output)
-		if strings.Contains(line, "- name:") {
-			if len(img.Name) > 0 {
-				*images = append(*images, img)
-			}
-
-			imageName := line[8:]
-			img = registry.ImageWithDigestSlice{
-				Name:    imageName,
-				Digests: make([]registry.Digest, 0),
-			}
-		} else if strings.Contains(line, "sha256:") {
-			// Parse the line for sha256 and tags. The length and format of these
-			// lines are consistent, therefore it's safe to use fixed indices.
-			imageSha256 := line[5:76]
-			imageTags := getTags(line[79:])
-			img.Digests = append(
-				img.Digests,
-				registry.Digest{
-					Hash: imageSha256,
-					Tags: imageTags,
-				},
-			)
-		}
-	}
-
-	// Add the last image to the slice.
-	*images = append(*images, img)
-	return nil
 }

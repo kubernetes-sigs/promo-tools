@@ -66,8 +66,7 @@ type promoterImplementation interface {
 	ParseManifests(*options.Options) ([]schema.Manifest, error)
 	MakeSyncContext(*options.Options, []schema.Manifest) (*reg.SyncContext, error)
 	GetPromotionEdges(*reg.SyncContext, []schema.Manifest) (map[reg.PromotionEdge]interface{}, error)
-	MakeProducerFunction(bool) impl.StreamProducerFunc
-	PromoteImages(*reg.SyncContext, map[reg.PromotionEdge]interface{}, impl.StreamProducerFunc) error
+	PromoteImages(*reg.SyncContext, map[reg.PromotionEdge]interface{}) error
 
 	// Methods for snapshot mode:
 	GetSnapshotSourceRegistry(*options.Options) (*registry.Context, error)
@@ -79,13 +78,9 @@ type promoterImplementation interface {
 	// Methods for image vulnerability scans:
 	ScanEdges(*options.Options, *reg.SyncContext, map[reg.PromotionEdge]interface{}) error
 
-	// Methods for manifest list verification:
-	ValidateManifestLists(*options.Options) error
-
 	// Methods for image signing
 	PrewarmTUFCache() error
 	ValidateStagingSignatures(map[reg.PromotionEdge]interface{}) (map[reg.PromotionEdge]interface{}, error)
-	CopySignatures(*options.Options, *reg.SyncContext, map[reg.PromotionEdge]interface{}) error
 	SignImages(*options.Options, *reg.SyncContext, map[reg.PromotionEdge]interface{}) error
 	WriteSBOMs(*options.Options, *reg.SyncContext, map[reg.PromotionEdge]interface{}) error
 
@@ -143,10 +138,6 @@ func (p *Promoter) PromoteImages(opts *options.Options) (err error) {
 		return fmt.Errorf("filtering edges: %w", err)
 	}
 
-	// MakeProducer
-	logrus.Infof("Creating producer function")
-	producerFunc := p.impl.MakeProducerFunction(sc.UseServiceAccount)
-
 	// TODO: Let's rethink this option
 	if opts.ParseOnly {
 		logrus.Info("Manifests parsed, exiting as ParseOnly is set")
@@ -155,8 +146,7 @@ func (p *Promoter) PromoteImages(opts *options.Options) (err error) {
 
 	// Verify any signatures in staged images
 	logrus.Infof("Validating staging signatures")
-	signedEdges, err := p.impl.ValidateStagingSignatures(promotionEdges)
-	if err != nil {
+	if _, err := p.impl.ValidateStagingSignatures(promotionEdges); err != nil {
 		return fmt.Errorf("checking signtaures in staging images: %w", err)
 	}
 
@@ -166,13 +156,8 @@ func (p *Promoter) PromoteImages(opts *options.Options) (err error) {
 	}
 
 	logrus.Infof("Promoting images")
-	if err := p.impl.PromoteImages(sc, promotionEdges, producerFunc); err != nil {
+	if err := p.impl.PromoteImages(sc, promotionEdges); err != nil {
 		return fmt.Errorf("running promotion: %w", err)
-	}
-
-	logrus.Infof("Replicating signatures")
-	if err := p.impl.CopySignatures(opts, sc, signedEdges); err != nil {
-		return fmt.Errorf("copying existing signatures: %w", err)
 	}
 
 	logrus.Infof("Signing images")
@@ -267,23 +252,6 @@ func (p *Promoter) SecurityScan(opts *options.Options) error {
 
 	if err := p.impl.ScanEdges(opts, sc, promotionEdges); err != nil {
 		return fmt.Errorf("running vulnerability scan: %w", err)
-	}
-	return nil
-}
-
-// CheckManifestLists is a mode that just checks manifests
-// and exists.
-func (p *Promoter) CheckManifestLists(opts *options.Options) error {
-	if err := p.impl.ValidateOptions(opts); err != nil {
-		return fmt.Errorf("validating options: %w", err)
-	}
-
-	if err := p.impl.ActivateServiceAccounts(opts); err != nil {
-		return fmt.Errorf("activating service accounts: %w", err)
-	}
-
-	if err := p.impl.ValidateManifestLists(opts); err != nil {
-		return fmt.Errorf("checking manifest lists: %w", err)
 	}
 	return nil
 }
