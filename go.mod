@@ -23,8 +23,8 @@ require (
 	golang.org/x/oauth2 v0.7.0
 	golang.org/x/time v0.3.0
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2
-	google.golang.org/api v0.116.0
-	google.golang.org/genproto v0.0.0-20230331144136-dcfb400f0633
+	google.golang.org/api v0.117.0
+	google.golang.org/genproto v0.0.0-20230403163135-c38d8f061ccd
 	gopkg.in/src-d/go-git.v4 v4.13.1
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/utils v0.0.0-20221107191617-1a15be271d1d
@@ -156,6 +156,7 @@ require (
 	github.com/google/go-github/v50 v50.2.0 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
+	github.com/google/s2a-go v0.1.0 // indirect
 	github.com/google/trillian v1.5.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.2.3 // indirect
 	github.com/googleapis/gax-go/v2 v2.8.0 // indirect
