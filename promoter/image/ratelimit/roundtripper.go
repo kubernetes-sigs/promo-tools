@@ -30,7 +30,9 @@ const (
 	// AR api limits:
 	// https://github.com/kubernetes/registry.k8s.io/issues/153#issuecomment-1460913153
 	// bentheelder: (83*60=4980)
-	MaxEvents = 83
+	// Temp: We are temporarily dropping this from the max of 83 to
+	// two thirds while the rate limiter is instrumented everywhere.
+	MaxEvents = 50
 )
 
 // RoundTripper wraps an http.RoundTripper with rate limiting

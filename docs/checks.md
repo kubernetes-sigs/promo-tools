@@ -81,36 +81,6 @@ func (f * foo) Run() error {
 
 ## Current Checks
 
-### ImageRemovalCheck
-
-Images that have been promoted are pushed to production; and once pushed to
-production, they should never be removed. The `ImageRemovalCheck` checks if
-any images are removed in the pull request by comparing the state of the
-promoter manifests in the pull request's branch to the default development
-branch. Two sets of Promotion Edges are generated (one for both the default
-development branch and pull request) and then compared to make sure that every
-destination image (defined by its image tag and digest) found in the default
-development branch is found in the pull request.
-
-This method for detecting removed images should ensure that pull requests are
-only rejected if an image is completely removed from production, while still
-allowing edge cases. One example edge case is where a user has already
-promoted an image foo from registry A to registry B. Then in a later pull
-request, the user promotes the same image foo from registry C to registry B.
-Although image foo is removed from registry A, this pull request should be
-accepted because the same image is still being promoted, albeit from a new
-location.
-
-### ImageSizeCheck
-
-The larger an image is, the more likely it is to be a security risk; and in
-general, it is bad practice to use unnecessarily large images. The
-`ImageSizeCheck` checks if any images to be promoted are larger than the
-defined maximum image size. The api calls that get image information from GCR
-also give information on the image size in bytes. These image sizes are
-recorded and then checked to make sure they are under the maximum size
-defined by the *-max-image-size* in MiB.
-
 ### ImageVulnerabilityCheck
 
 Since promoted images are pushed to production and production images are

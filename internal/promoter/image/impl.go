@@ -58,26 +58,6 @@ func NewDefaultPromoterImplementation() *DefaultPromoterImplementation {
 	}
 }
 
-// ValidateManifestLists implements one of the run modes of the promoter
-// where it parses the manifests, checks the images and exits
-func (di *DefaultPromoterImplementation) ValidateManifestLists(opts *options.Options) error {
-	r := image.Registry(opts.Repository)
-	images := make([]registry.ImageWithDigestSlice, 0)
-
-	if err := reg.ParseSnapshot(opts.CheckManifestLists, &images); err != nil {
-		return fmt.Errorf("parsing snapshot: %w", err)
-	}
-
-	imgs, err := registry.FilterParentImages(r, &images)
-	if err != nil {
-		return fmt.Errorf("filtering parent images: %w", err)
-	}
-
-	registry.ValidateParentImages(r, imgs)
-	di.PrintSection("FINISHED (CHECKING MANIFESTS)", true)
-	return nil
-}
-
 // ValidateOptions checks an options set
 func (di *DefaultPromoterImplementation) ValidateOptions(opts *options.Options) error {
 	if opts.Snapshot == "" && opts.ManifestBasedSnapshotOf == "" {

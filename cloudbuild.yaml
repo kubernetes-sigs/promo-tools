@@ -6,7 +6,7 @@ timeout: 1200s
 
 options:
   substitution_option: ALLOW_LOOSE
-  machineType: N1_HIGHCPU_32
+  machineType: E2_HIGHCPU_32
 
 steps:
 - name: 'gcr.io/cloud-builders/docker'
@@ -31,7 +31,7 @@ substitutions:
   # vYYYYMMDD-hash, and can be used as a substitution
   _GIT_TAG: '12345'
   _PULL_BASE_REF: 'dev'
-  _IMG_VERSION: 'v3.5.1-0'
+  _IMG_VERSION: 'v3.5.2-0'
 
 tags:
 - 'kpromo'

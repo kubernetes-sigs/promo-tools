@@ -69,10 +69,7 @@ func RunPromoteCmd(opts *options.Options) error {
 	})
 	logrus.AddHook(NewHook())
 
-	// Mode 1: Manifest list verification
-	if opts.CheckManifestLists != "" {
-		return cip.CheckManifestLists(opts)
-	}
+	// Mode 1: Manifest list verification (removed)
 
 	// Mode 2: Snapshots
 	if len(opts.Snapshot) > 0 || len(opts.ManifestBasedSnapshotOf) > 0 {

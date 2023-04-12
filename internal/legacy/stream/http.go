@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"sigs.k8s.io/promo-tools/v3/promoter/image/ratelimit"
 )
 
 // HTTP is a wrapper around the net/http's Request type.
@@ -40,7 +41,8 @@ const (
 // stderr). In this case we equate the http.Respose "Body" with stdout.
 func (h *HTTP) Produce() (stdOut, stdErr io.Reader, err error) {
 	client := http.Client{
-		Timeout: time.Second * requestTimeoutSeconds,
+		Transport: ratelimit.Limiter,
+		Timeout:   time.Second * requestTimeoutSeconds,
 	}
 
 	// TODO: Does Close() need to be handled in a separate method?
