@@ -38,7 +38,7 @@ elif [ "$1" != build ] && [ "$1" != install ] && [ "$1" != run ]; then
     exit 1
 fi
 
-tool="$2"
+tool="$1"
 git_tree_state=dirty
 pkg=sigs.k8s.io/promo-tools/internal/version
 
