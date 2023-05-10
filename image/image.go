@@ -69,10 +69,7 @@ func NewManifestListFromFile(manifestPath string) (imagesList *ManifestList, err
 
 // Parse reads yaml code into an ImagePromoterManifest object
 func (imagesList *ManifestList) Parse(yamlCode []byte) error {
-	if err := yaml.Unmarshal(yamlCode, imagesList); err != nil {
-		return err
-	}
-	return nil
+	return yaml.Unmarshal(yamlCode, imagesList)
 }
 
 // Write writes the promoter image list into an YAML file.

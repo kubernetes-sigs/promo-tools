@@ -32,7 +32,7 @@ const defaultThreshold = 10000
 
 // defaultTime should be used as a timestamp for all request counters.
 // The actual time represents: September 22, 2002 at 05:03:16.
-var defaultTime, _ = time.Parse("020106 150405", "020106 150405")
+var defaultTime, _ = time.Parse("020106 150405", "020106 150405") //nolint: errcheck
 
 // NewRequestCounter returns a new request counter with the given number of requests.
 // All other object fields are set to default values.

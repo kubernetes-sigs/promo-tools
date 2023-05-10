@@ -165,7 +165,6 @@ linters-settings:
       - importShadow
       - indexAlloc
       - initClause
-      - ioutilDeprecated
       - mapKey
       - methodExprCall
       - nestingReduce

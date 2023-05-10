@@ -93,7 +93,7 @@ func (di *DefaultPromoterImplementation) ValidateStagingSignatures(
 // SignImages signs the promoted images and stores their signatures in
 // the registry
 func (di *DefaultPromoterImplementation) SignImages(
-	opts *options.Options, sc *reg.SyncContext, edges map[reg.PromotionEdge]interface{},
+	opts *options.Options, _ *reg.SyncContext, edges map[reg.PromotionEdge]interface{},
 ) error {
 	if !opts.SignImages {
 		logrus.Info("Not signing images (--sign=false)")
@@ -149,10 +149,8 @@ func (di *DefaultPromoterImplementation) SignImages(
 			break
 		}
 	}
-	if err := t.Err(); err != nil {
-		return err
-	}
-	return nil
+
+	return t.Err()
 }
 
 func (di *DefaultPromoterImplementation) signAndReplicate(signOpts *sign.Options, edges []reg.PromotionEdge) error {
@@ -297,7 +295,7 @@ func (di *DefaultPromoterImplementation) replicateSignatures(
 // WriteSBOMs writes SBOMs to each of the newly promoted images and stores
 // them along the signatures in the registry
 func (di *DefaultPromoterImplementation) WriteSBOMs(
-	opts *options.Options, sc *reg.SyncContext, edges map[reg.PromotionEdge]interface{},
+	_ *options.Options, _ *reg.SyncContext, _ map[reg.PromotionEdge]interface{},
 ) error {
 	return nil
 }

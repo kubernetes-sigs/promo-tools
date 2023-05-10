@@ -108,7 +108,7 @@ func (o *AuditOptions) set() {
 	)
 }
 
-func validateAuditOptions(o *AuditOptions) error {
+func validateAuditOptions(_ *AuditOptions) error {
 	// TODO: Validate root options
 	// TODO: Validate audit options
 	return nil

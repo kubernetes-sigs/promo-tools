@@ -49,9 +49,9 @@ func ValidateFilestores(filestores []Filestore) error {
 		}
 
 		// Currently we support GCS and s3 backends.
-		if strings.HasPrefix(filestore.Base, GCSScheme+"://") {
+		if strings.HasPrefix(filestore.Base, GCSScheme+"://") { //nolint: revive
 			// ok
-		} else if strings.HasPrefix(filestore.Base, S3Scheme+"://") {
+		} else if strings.HasPrefix(filestore.Base, S3Scheme+"://") { //nolint: revive
 			// ok
 		} else {
 			return fmt.Errorf(

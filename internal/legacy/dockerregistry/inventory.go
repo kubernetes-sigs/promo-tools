@@ -248,7 +248,7 @@ func (sc *SyncContext) GetPromotionCandidates(edges map[PromotionEdge]interface{
 					// NOP (already promoted).
 					logrus.Infof("edge %v: skipping because it was already promoted (case 2)\n", edge)
 					continue
-				} else {
+				} else { //nolint
 					logrus.Errorf("edge %v: tag %s: ERROR: tag move detected from %s to %s", edge, edge.DstImageTag.Tag, edge.Digest, *sc.getDigestForTag(edge.DstImageTag.Tag))
 					clean = false
 					// We continue instead of returning early, because we want
@@ -1588,8 +1588,10 @@ func EdgesToRegInvImage(
 	destRegistry = strings.TrimRight(destRegistry, "/")
 
 	for edge := range edges {
-		imgName := ""
-		prefix := ""
+		var (
+			imgName string
+			prefix  string
+		)
 
 		if strings.HasPrefix(string(edge.DstRegistry.Name), destRegistry) {
 			prefix = strings.TrimPrefix(

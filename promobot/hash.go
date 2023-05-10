@@ -49,7 +49,7 @@ func (o *GenerateManifestOptions) PopulateDefaults() {
 }
 
 // GenerateManifest generates a manifest containing the files in options.BaseDir
-func GenerateManifest(ctx context.Context, options GenerateManifestOptions) (*api.Manifest, error) {
+func GenerateManifest(_ context.Context, options GenerateManifestOptions) (*api.Manifest, error) {
 	manifest := &api.Manifest{}
 
 	if options.BaseDir == "" {

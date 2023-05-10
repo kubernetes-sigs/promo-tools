@@ -58,16 +58,13 @@ func DownloadReleases(releaseCfg *ReleaseConfig, ghClient *github.GitHub, output
 		releaseCfg.Repo,
 		tagsString,
 	)
-	if err := ghClient.DownloadReleaseAssets(releaseCfg.Org, releaseCfg.Repo, tags, outputDir); err != nil {
-		return err
-	}
 
-	return nil
+	return ghClient.DownloadReleaseAssets(releaseCfg.Org, releaseCfg.Repo, tags, outputDir)
 }
 
 // Upload copies a set of release assets from local directory to GCS
 // Assets to upload are derived from the tags specified in `ReleaseConfig`.
-func Upload(cfg *ReleaseConfig, ghClient *github.GitHub, outputDir string) error {
+func Upload(cfg *ReleaseConfig, _ *github.GitHub, outputDir string) error {
 	uploadBase := filepath.Join(outputDir, cfg.Org, cfg.Repo)
 
 	tags := cfg.Tags
