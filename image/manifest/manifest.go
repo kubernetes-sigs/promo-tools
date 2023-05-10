@@ -136,7 +136,7 @@ func containsTag(tags []image.Tag, check string) bool {
 
 // Grow modifies a manifest by adding images into it.
 func Grow(
-	ctx context.Context,
+	_ context.Context,
 	o *GrowOptions,
 ) error {
 	var err error

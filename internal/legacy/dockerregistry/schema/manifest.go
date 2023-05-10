@@ -115,15 +115,13 @@ func (m Manifest) Validate() error {
 func validateRequiredComponents(m Manifest) error {
 	// TODO: Should we return []error here instead?
 	errs := make([]string, 0)
-	srcRegistryName := image.Registry("")
 
 	if len(m.Registries) > 0 {
 		if m.srcRegistryCount() > 1 {
 			errs = append(errs, "cannot have more than 1 source registry")
 		}
 
-		srcRegistryName = m.srcRegistryName()
-		if len(srcRegistryName) == 0 {
+		if len(m.srcRegistryName()) == 0 {
 			errs = append(errs, "source registry must be set")
 		}
 	}

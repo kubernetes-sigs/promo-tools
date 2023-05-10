@@ -57,7 +57,8 @@ type s3SyncFilestore struct {
 }
 
 // openS3Filestore opens a filestore backed by Amazon S3 (S3)
-func (p *s3Provider) OpenFilestore(ctx context.Context, filestore *api.Filestore, useServiceAccount, confirm bool) (syncFilestore, error) {
+
+func (p *s3Provider) OpenFilestore(ctx context.Context, filestore *api.Filestore, useServiceAccount, config bool) (syncFilestore, error) { //nolint: revive
 	u, err := url.Parse(filestore.Base)
 	if err != nil {
 		return nil, fmt.Errorf(
