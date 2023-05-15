@@ -121,14 +121,11 @@ func removeSignatureLayers(snapshot *[]registry.Image) {
 	var remove []image.Digest
 	for i := range *snapshot {
 		remove = []image.Digest{}
-		for dgst := range (*snapshot)[i].Dmap {
-			// Signature layers only have one tag
-			if len((*snapshot)[i].Dmap[dgst]) != 1 || !strings.HasSuffix(
-				string((*snapshot)[i].Dmap[dgst][0]), ".sig",
-			) {
-				continue
+		for dgst, tags := range (*snapshot)[i].Dmap {
+			if len(tags) == 0 || // Recursive signing may add additional layers without tags
+				(len(tags) == 1 && strings.HasSuffix(string(tags[0]), ".sig")) { // Signature layers only have one tag
+				remove = append(remove, dgst)
 			}
-			remove = append(remove, dgst)
 		}
 		for _, dgst := range remove {
 			delete((*snapshot)[i].Dmap, dgst)
@@ -152,6 +149,7 @@ func checkSnapshot(
 	// to compare them, we remove the signature layers from the current
 	// snapshot to ensure the original images were promoted.
 	removeSignatureLayers(&got)
+	removeSignatureLayers(&expected)
 
 	diff := cmp.Diff(got, expected)
 	if diff != "" {
