@@ -11,7 +11,7 @@ require (
 	github.com/aws/aws-sdk-go v1.44.263
 	github.com/cenkalti/backoff/v4 v4.2.1
 	github.com/google/go-cmp v0.5.9
-	github.com/google/go-containerregistry v0.15.1
+	github.com/google/go-containerregistry v0.15.2
 	github.com/google/uuid v1.3.0
 	github.com/maxbrunsfeld/counterfeiter/v6 v6.6.1
 	github.com/nozzle/throttler v0.0.0-20180817012639-2ea982251481
