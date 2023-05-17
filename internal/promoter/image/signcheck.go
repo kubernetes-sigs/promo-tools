@@ -337,6 +337,10 @@ func (di *DefaultPromoterImplementation) signReference(opts *options.Options, re
 		return fmt.Errorf("generating identity token: %w", err)
 	}
 	signOpts.IdentityToken = token
+
+	// We want to sign all entities for multi-arch images
+	signOpts.Recursive = true
+
 	di.signer = sign.New(signOpts)
 
 	// Add an annotation recording the kpromo version to ensure we

@@ -114,6 +114,9 @@ func (di *DefaultPromoterImplementation) SignImages(
 	}
 	signOpts.IdentityToken = token
 
+	// We want to sign all entities for multi-arch images
+	signOpts.Recursive = true
+
 	// Creating a new Signer after setting the identity token is MANDATORY
 	// because that's the only way to propagate the identity token to the
 	// internal Signer structs. Without that, the identity token wouldn't be
