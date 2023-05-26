@@ -28,7 +28,7 @@ func Add(parent *cobra.Command) {
 		Use:   "sigcheck",
 		Short: "Check image signature consistency",
 		Long: `sigcheck - Check signature consistency across the K8s mirrors
-    
+
 This subcommand checks the signature consistency across promoted images
 to ensure copies in all mirrors have their signatures attached.
 
@@ -54,7 +54,7 @@ kpromo to the first three images it finds run:
 				opts.SignCheckReferences = args
 			}
 
-			p := imagepromoter.New()
+			p := imagepromoter.New(opts)
 			return p.CheckSignatures(opts)
 		},
 	}

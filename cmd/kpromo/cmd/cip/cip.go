@@ -195,6 +195,20 @@ network from a registry, it reads from the local manifests only`,
 		"service account to use as signing identity",
 	)
 
+	CipCmd.PersistentFlags().StringVar(
+		&runOpts.SignCheckIdentity,
+		"certificate-identity",
+		options.DefaultOptions.SignCheckIdentity,
+		"identity to look for when verifying signatures",
+	)
+
+	CipCmd.PersistentFlags().StringVar(
+		&runOpts.SignCheckIssuer,
+		"certificate-oidc-issuer",
+		options.DefaultOptions.SignCheckIssuer,
+		"OIDC Issuer that will be used for the signing identity, used for verify the images",
+	)
+
 	CipCmd.PersistentFlags().BoolVar(
 		&runOpts.SignImages,
 		"sign",

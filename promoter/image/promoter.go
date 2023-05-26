@@ -41,10 +41,10 @@ type Promoter struct {
 	impl    promoterImplementation
 }
 
-func New() *Promoter {
+func New(opts *options.Options) *Promoter {
 	return &Promoter{
 		Options: options.DefaultOptions,
-		impl:    impl.NewDefaultPromoterImplementation(),
+		impl:    impl.NewDefaultPromoterImplementation(opts),
 	}
 }
 
@@ -100,7 +100,6 @@ type promoterImplementation interface {
 // it runs by taking all its parameters from a set of options.
 func (p *Promoter) PromoteImages(opts *options.Options) (err error) {
 	logrus.Infof("PromoteImages start")
-
 	// Validate the options. Perhaps another image-specific
 	// validation function may be needed.
 	if err := p.impl.ValidateOptions(opts); err != nil {

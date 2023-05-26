@@ -81,7 +81,7 @@ func (di *DefaultPromoterImplementation) getMirrors() ([]string, error) {
 	urls := []string{}
 	iurls := map[string]string{}
 	manifest, err := http.NewAgent().Get(
-		"https://github.com/kubernetes/k8s.io/raw/main/k8s.gcr.io/manifests/k8s-staging-kubernetes/promoter-manifest.yaml",
+		"https://github.com/kubernetes/k8s.io/raw/main/registry.k8s.io/manifests/k8s-staging-kubernetes/promoter-manifest.yaml",
 	)
 	if err != nil {
 		return nil, fmt.Errorf("downloading promoter manifest: %w", err)
@@ -329,7 +329,7 @@ func (di *DefaultPromoterImplementation) signReference(opts *options.Options, re
 	logrus.Infof(" signing %s", refString)
 
 	// Options for the new signer
-	signOpts := defaultSignerOptions()
+	signOpts := defaultSignerOptions(opts)
 
 	// Get the identity token we will use
 	token, err := di.GetIdentityToken(opts, opts.SignerAccount)
@@ -342,10 +342,8 @@ func (di *DefaultPromoterImplementation) signReference(opts *options.Options, re
 
 	// Add an annotation recording the kpromo version to ensure we
 	// get a 2nd signature, otherwise cosign will not resign a signed image:
-	signOpts.Annotations = map[string]interface{}{
-		"org.kubernetes.kpromo.version": fmt.Sprintf(
-			"kpromo-%s", version.GetVersionInfo().GitVersion,
-		),
+	signOpts.Annotations = []string{
+		fmt.Sprintf("org.kubernetes.kpromo.version=kpromo-%s", version.GetVersionInfo().GitVersion),
 	}
 
 	if _, err := di.signer.SignImageWithOptions(signOpts, refString); err != nil {

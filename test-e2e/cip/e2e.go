@@ -195,6 +195,8 @@ func runPromotion(repoRoot string, t *E2ETest) error {
 		// There is no need to use -key-files=... because we already activated
 		// the 1 service account we need during e2e tests with our own -key-file
 		// flag.
+		"--certificate-identity=k8s-infra-promoter-test-signer@k8s-cip-test-prod.iam.gserviceaccount.com",
+		"--certificate-oidc-issuer=https://accounts.google.com",
 	}
 
 	argsFinal := []string{}
