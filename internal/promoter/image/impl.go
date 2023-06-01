@@ -19,6 +19,7 @@ package imagepromoter
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/sirupsen/logrus"
 
@@ -54,8 +55,21 @@ type DefaultPromoterImplementation struct {
 // NewDefaultPromoterImplementation creates a new DefaultPromoterImplementation instance.
 func NewDefaultPromoterImplementation() *DefaultPromoterImplementation {
 	return &DefaultPromoterImplementation{
-		signer: sign.New(sign.Default()),
+		signer: sign.New(defaultSignerOptions()),
 	}
+}
+
+// defaultSignerOptions returns a new *sign.Options with default values applied.
+func defaultSignerOptions() *sign.Options {
+	opts := sign.Default()
+
+	// We want to sign all entities for multi-arch images
+	opts.Recursive = true
+
+	// Recursive signing can take a bit longer than usual
+	opts.Timeout = 15 * time.Minute
+
+	return opts
 }
 
 // ValidateOptions checks an options set
