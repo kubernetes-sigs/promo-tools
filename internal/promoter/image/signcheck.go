@@ -329,7 +329,7 @@ func (di *DefaultPromoterImplementation) signReference(opts *options.Options, re
 	logrus.Infof(" signing %s", refString)
 
 	// Options for the new signer
-	signOpts := sign.Default()
+	signOpts := defaultSignerOptions()
 
 	// Get the identity token we will use
 	token, err := di.GetIdentityToken(opts, opts.SignerAccount)
@@ -337,9 +337,6 @@ func (di *DefaultPromoterImplementation) signReference(opts *options.Options, re
 		return fmt.Errorf("generating identity token: %w", err)
 	}
 	signOpts.IdentityToken = token
-
-	// We want to sign all entities for multi-arch images
-	signOpts.Recursive = true
 
 	di.signer = sign.New(signOpts)
 

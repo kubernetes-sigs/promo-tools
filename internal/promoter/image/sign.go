@@ -105,7 +105,7 @@ func (di *DefaultPromoterImplementation) SignImages(
 	}
 
 	// Options for the new signer
-	signOpts := sign.Default()
+	signOpts := defaultSignerOptions()
 
 	// Get the identity token we will use
 	token, err := di.GetIdentityToken(opts, opts.SignerAccount)
@@ -113,9 +113,6 @@ func (di *DefaultPromoterImplementation) SignImages(
 		return fmt.Errorf("generating identity token: %w", err)
 	}
 	signOpts.IdentityToken = token
-
-	// We want to sign all entities for multi-arch images
-	signOpts.Recursive = true
 
 	// Creating a new Signer after setting the identity token is MANDATORY
 	// because that's the only way to propagate the identity token to the
