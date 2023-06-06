@@ -1,6 +1,5 @@
 registries:
-- name: gcr.io/projectsigstore
-  src: true
-- name: us.gcr.io/k8s-cip-test-prod/canary/sigstore
-- name: us.gcr.io/k8s-cip-test-prod/canary/sigstore-mirror
-
+  - name: gcr.io/projectsigstore
+    src: true
+  - name: us.gcr.io/k8s-cip-test-prod/canary/sigstore
+  - name: us.gcr.io/k8s-cip-test-prod/canary/sigstore-mirror
