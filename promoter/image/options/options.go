@@ -107,11 +107,17 @@ type Options struct {
 	// SignCheckMaxImages limits the number of images to look when verifying
 	SignCheckMaxImages int
 
-	// SignCheckIdentity is the account we expect to sign all imges
+	// SignCheckIdentity is the account we expect to sign all images
 	SignCheckIdentity string
 
-	// SignCheckIssuer is the iisuer of the OIDC tokens used to identify the signer
+	// SignCheckIssuer is the issuer of the OIDC tokens used to identify the signer
 	SignCheckIssuer string
+
+	// SignCheckIdentityRegexp can use a regex to match more than one signer
+	SignCheckIdentityRegexp string
+
+	// SignCheckIssuerRegexp can use a regex to match more than one signer OIDC tokens used to identify the signer
+	SignCheckIssuerRegexp string
 
 	// MaxSignatureCopies maximum number of concurrent signature copies
 	MaxSignatureCopies int
@@ -121,18 +127,20 @@ type Options struct {
 }
 
 var DefaultOptions = &Options{
-	OutputFormat:        "yaml",
-	Threads:             10,
-	SeverityThreshold:   -1,
-	SignImages:          true,
-	SignerAccount:       "krel-trust@k8s-releng-prod.iam.gserviceaccount.com",
-	SignCheckFix:        false,
-	SignCheckReferences: []string{},
-	SignCheckFromDays:   5,
-	SignCheckIdentity:   "krel-trust@k8s-releng-prod.iam.gserviceaccount.com",
-	SignCheckIssuer:     "https://accounts.google.com",
-	MaxSignatureCopies:  50, // Maximum number of concurrent signature copies
-	MaxSignatureOps:     50, // Maximum number of concurrent signature operations
+	OutputFormat:            "yaml",
+	Threads:                 10,
+	SeverityThreshold:       -1,
+	SignImages:              true,
+	SignerAccount:           "krel-trust@k8s-releng-prod.iam.gserviceaccount.com",
+	SignCheckFix:            false,
+	SignCheckReferences:     []string{},
+	SignCheckFromDays:       5,
+	SignCheckIdentity:       "krel-trust@k8s-releng-prod.iam.gserviceaccount.com",
+	SignCheckIssuer:         "https://accounts.google.com",
+	SignCheckIdentityRegexp: "",
+	SignCheckIssuerRegexp:   "",
+	MaxSignatureCopies:      50, // Maximum number of concurrent signature copies
+	MaxSignatureOps:         50, // Maximum number of concurrent signature operations
 }
 
 func (o *Options) Validate() error {

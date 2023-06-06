@@ -209,6 +209,20 @@ network from a registry, it reads from the local manifests only`,
 		"OIDC Issuer that will be used for the signing identity, used for verify the images",
 	)
 
+	CipCmd.PersistentFlags().StringVar(
+		&runOpts.SignCheckIdentityRegexp,
+		"certificate-identity-regexp",
+		"",
+		"A regular expression alternative to --certificate-identity. Accepts the Go regular expression syntax described at https://golang.org/s/re2syntax. Either --certificate-identity or --certificate-identity-regexp must be set for keyless flows.",
+	)
+
+	CipCmd.PersistentFlags().StringVar(
+		&runOpts.SignCheckIssuerRegexp,
+		"certificate-oidc-issuer-regexp",
+		"",
+		"A regular expression alternative to --certificate-oidc-issuer. Accepts the Go regular expression syntax described at https://golang.org/s/re2syntax.",
+	)
+
 	CipCmd.PersistentFlags().BoolVar(
 		&runOpts.SignImages,
 		"sign",
