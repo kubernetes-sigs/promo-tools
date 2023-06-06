@@ -101,5 +101,19 @@ kpromo to the first three images it finds run:
 		"issuer of the OIDC token used to generate the signature certificate",
 	)
 
+	cmd.PersistentFlags().StringVar(
+		&opts.SignCheckIdentityRegexp,
+		"certificate-identity-regexp",
+		"",
+		"A regular expression alternative to --certificate-identity. Accepts the Go regular expression syntax described at https://golang.org/s/re2syntax. Either --certificate-identity or --certificate-identity-regexp must be set for keyless flows.",
+	)
+
+	cmd.PersistentFlags().StringVar(
+		&opts.SignCheckIssuerRegexp,
+		"certificate-oidc-issuer-regexp",
+		"",
+		"A regular expression alternative to --certificate-oidc-issuer. Accepts the Go regular expression syntax described at https://golang.org/s/re2syntax.",
+	)
+
 	parent.AddCommand(cmd)
 }

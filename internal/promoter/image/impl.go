@@ -69,16 +69,17 @@ func defaultSignerOptions(opts *options.Options) *sign.Options {
 	// Recursive signing can take a bit longer than usual
 	signOpts.Timeout = 15 * time.Minute
 
-	// The Certificate Identity to be used to checck the images signatures
+	// The Certificate Identity to be used to check the images signatures
 	signOpts.CertIdentity = opts.SignCheckIdentity
 
-	// The Certificate OICD Issuer to be used to checck the images signatures
+	// The Certificate OICD Issuer to be used to check the images signatures
 	signOpts.CertOidcIssuer = opts.SignCheckIssuer
 
-	// Not used right now but set to empty in the library those have a definition
-	// and we don't want those here.
-	signOpts.CertIdentityRegexp = ""
-	signOpts.CertOidcIssuerRegexp = ""
+	// A regex Certificate Identity to be used to check the images signatures
+	signOpts.CertIdentityRegexp = opts.SignCheckIdentityRegexp
+
+	// A regex to match a Certificate OICD Issuer to be used to check the images signatures
+	signOpts.CertOidcIssuerRegexp = opts.SignCheckIssuerRegexp
 
 	return signOpts
 }
