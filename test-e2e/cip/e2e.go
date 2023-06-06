@@ -196,7 +196,7 @@ func runPromotion(repoRoot string, t *E2ETest) error {
 		// the 1 service account we need during e2e tests with our own -key-file
 		// flag.
 		// `--certificate-identity=""`,
-		"--certificate-identity-regexp=k8s-infra-promoter-test-signer@k8s-cip-test-prod.iam.gserviceaccount.com",
+		"--certificate-identity-regexp=(keyless@projectsigstore.iam.gserviceaccount.com)|(k8s-infra-promoter-test-signer@k8s-cip-test-prod.iam.gserviceaccount.com)",
 		"--certificate-oidc-issuer=https://accounts.google.com",
 	}
 
