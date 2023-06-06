@@ -53,23 +53,34 @@ type DefaultPromoterImplementation struct {
 }
 
 // NewDefaultPromoterImplementation creates a new DefaultPromoterImplementation instance.
-func NewDefaultPromoterImplementation() *DefaultPromoterImplementation {
+func NewDefaultPromoterImplementation(opts *options.Options) *DefaultPromoterImplementation {
 	return &DefaultPromoterImplementation{
-		signer: sign.New(defaultSignerOptions()),
+		signer: sign.New(defaultSignerOptions(opts)),
 	}
 }
 
 // defaultSignerOptions returns a new *sign.Options with default values applied.
-func defaultSignerOptions() *sign.Options {
-	opts := sign.Default()
+func defaultSignerOptions(opts *options.Options) *sign.Options {
+	signOpts := sign.Default()
 
 	// We want to sign all entities for multi-arch images
-	opts.Recursive = true
+	signOpts.Recursive = true
 
 	// Recursive signing can take a bit longer than usual
-	opts.Timeout = 15 * time.Minute
+	signOpts.Timeout = 15 * time.Minute
 
-	return opts
+	// The Certificate Identity to be used to checck the images signatures
+	signOpts.CertIdentity = opts.SignCheckIdentity
+
+	// The Certificate OICD Issuer to be used to checck the images signatures
+	signOpts.CertOidcIssuer = opts.SignCheckIssuer
+
+	// Not used right now but set to empty in the library those have a definition
+	// and we don't want those here.
+	signOpts.CertIdentityRegexp = ""
+	signOpts.CertOidcIssuerRegexp = ""
+
+	return signOpts
 }
 
 // ValidateOptions checks an options set

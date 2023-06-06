@@ -60,7 +60,7 @@ func (h *Hook) Levels() []logrus.Level {
 }
 
 func RunPromoteCmd(opts *options.Options) error {
-	cip := promoter.New()
+	cip := promoter.New(opts)
 
 	logrus.SetFormatter(&logrus.TextFormatter{
 		DisableTimestamp: false,

@@ -105,7 +105,7 @@ func (di *DefaultPromoterImplementation) SignImages(
 	}
 
 	// Options for the new signer
-	signOpts := defaultSignerOptions()
+	signOpts := defaultSignerOptions(opts)
 
 	// Get the identity token we will use
 	token, err := di.GetIdentityToken(opts, opts.SignerAccount)
@@ -159,8 +159,8 @@ func (di *DefaultPromoterImplementation) signAndReplicate(signOpts *sign.Options
 
 	// Add an annotation recording the kpromo version to ensure we
 	// get a 2nd signature, otherwise cosign will not resign a signed image:
-	signOpts.Annotations = map[string]interface{}{
-		"org.kubernetes.kpromo.version": fmt.Sprintf("kpromo-%s", version.GetVersionInfo().GitVersion),
+	signOpts.Annotations = []string{
+		fmt.Sprintf("org.kubernetes.kpromo.version=kpromo-%s", version.GetVersionInfo().GitVersion),
 	}
 
 	logrus.Infof("Signing image %s", imageRef)
