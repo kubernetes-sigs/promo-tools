@@ -69,7 +69,9 @@ func RunPromoteCmd(opts *options.Options) error {
 	})
 	logrus.AddHook(NewHook())
 
-	logrus.Infof("Options for certificates: certificate id: %s | cert id regexp: %s | cert issuer: %s | cert issuer regexp: %s", opts.SignCheckIdentity, opts.SignCheckIdentityRegexp, opts.SignCheckIssuer, opts.SignCheckIssuerRegexp)
+	logrus.Infof("Options to check the Signatures: SignCheckIdentity: %s | SignCheckIdentityRegexp: %s | SignCheckIssuer: %s | SignCheckIssuerRegexp: %s",
+		opts.SignCheckIdentity, opts.SignCheckIdentityRegexp, opts.SignCheckIssuer, opts.SignCheckIssuerRegexp,
+	)
 
 	// Mode 1: Manifest list verification (removed)
 
