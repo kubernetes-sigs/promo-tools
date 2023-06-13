@@ -23,12 +23,12 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	reg "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
-	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/registry"
-	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/schema"
-	impl "sigs.k8s.io/promo-tools/v3/internal/promoter/image"
-	"sigs.k8s.io/promo-tools/v3/promoter/image/checkresults"
-	options "sigs.k8s.io/promo-tools/v3/promoter/image/options"
+	reg "sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry"
+	"sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry/registry"
+	"sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry/schema"
+	impl "sigs.k8s.io/promo-tools/v4/internal/promoter/image"
+	"sigs.k8s.io/promo-tools/v4/promoter/image/checkresults"
+	options "sigs.k8s.io/promo-tools/v4/promoter/image/options"
 )
 
 var AllowedOutputFormats = []string{

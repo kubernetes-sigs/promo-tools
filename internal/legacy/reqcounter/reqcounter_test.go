@@ -23,8 +23,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	rc "sigs.k8s.io/promo-tools/v3/internal/legacy/reqcounter"
-	tw "sigs.k8s.io/promo-tools/v3/internal/legacy/timewrapper"
+	rc "sigs.k8s.io/promo-tools/v4/internal/legacy/reqcounter"
+	tw "sigs.k8s.io/promo-tools/v4/internal/legacy/timewrapper"
 )
 
 // defaultThreshold should be used as a default request counter threshold.

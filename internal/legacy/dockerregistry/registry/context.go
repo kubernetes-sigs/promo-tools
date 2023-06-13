@@ -19,8 +19,8 @@ package registry
 import (
 	"fmt"
 
-	"sigs.k8s.io/promo-tools/v3/internal/legacy/gcloud"
-	"sigs.k8s.io/promo-tools/v3/types/image"
+	"sigs.k8s.io/promo-tools/v4/internal/legacy/gcloud"
+	"sigs.k8s.io/promo-tools/v4/types/image"
 )
 
 // Context holds information about a registry, to be written in a

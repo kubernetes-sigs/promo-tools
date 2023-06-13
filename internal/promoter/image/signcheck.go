@@ -39,9 +39,9 @@ import (
 
 	"github.com/sigstore/sigstore/pkg/cryptoutils"
 
-	checkresults "sigs.k8s.io/promo-tools/v3/promoter/image/checkresults"
-	options "sigs.k8s.io/promo-tools/v3/promoter/image/options"
-	"sigs.k8s.io/promo-tools/v3/types/image"
+	checkresults "sigs.k8s.io/promo-tools/v4/promoter/image/checkresults"
+	options "sigs.k8s.io/promo-tools/v4/promoter/image/options"
+	"sigs.k8s.io/promo-tools/v4/types/image"
 )
 
 var mirrorsList []string

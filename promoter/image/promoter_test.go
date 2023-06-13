@@ -21,10 +21,10 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	reg "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
-	imagepromoter "sigs.k8s.io/promo-tools/v3/promoter/image"
-	imagefakes "sigs.k8s.io/promo-tools/v3/promoter/image/imagefakes"
-	options "sigs.k8s.io/promo-tools/v3/promoter/image/options"
+	reg "sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry"
+	imagepromoter "sigs.k8s.io/promo-tools/v4/promoter/image"
+	imagefakes "sigs.k8s.io/promo-tools/v4/promoter/image/imagefakes"
+	options "sigs.k8s.io/promo-tools/v4/promoter/image/options"
 )
 
 func TestPromoteImages(t *testing.T) {

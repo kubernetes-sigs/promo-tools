@@ -32,8 +32,8 @@ import (
 	"sigs.k8s.io/release-sdk/github"
 	"sigs.k8s.io/release-utils/util"
 
-	"sigs.k8s.io/promo-tools/v3/image"
-	"sigs.k8s.io/promo-tools/v3/image/manifest"
+	"sigs.k8s.io/promo-tools/v4/image"
+	"sigs.k8s.io/promo-tools/v4/image/manifest"
 )
 
 const (

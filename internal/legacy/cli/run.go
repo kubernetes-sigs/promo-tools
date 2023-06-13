@@ -22,8 +22,8 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	promoter "sigs.k8s.io/promo-tools/v3/promoter/image"
-	options "sigs.k8s.io/promo-tools/v3/promoter/image/options"
+	promoter "sigs.k8s.io/promo-tools/v4/promoter/image"
+	options "sigs.k8s.io/promo-tools/v4/promoter/image/options"
 )
 
 const (

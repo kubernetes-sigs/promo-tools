@@ -27,12 +27,12 @@ import (
 	cr "github.com/google/go-containerregistry/pkg/v1/types"
 	"github.com/stretchr/testify/require"
 
-	reg "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
-	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/registry"
-	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/schema"
-	"sigs.k8s.io/promo-tools/v3/internal/legacy/json"
-	"sigs.k8s.io/promo-tools/v3/internal/legacy/stream"
-	"sigs.k8s.io/promo-tools/v3/types/image"
+	reg "sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry"
+	"sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry/registry"
+	"sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry/schema"
+	"sigs.k8s.io/promo-tools/v4/internal/legacy/json"
+	"sigs.k8s.io/promo-tools/v4/internal/legacy/stream"
+	"sigs.k8s.io/promo-tools/v4/types/image"
 )
 
 type ParseJSONStreamResult struct {

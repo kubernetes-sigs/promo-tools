@@ -21,7 +21,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"sigs.k8s.io/promo-tools/v3/internal/legacy/cli"
+	"sigs.k8s.io/promo-tools/v4/internal/legacy/cli"
 )
 
 // auditCmd represents the base command when called without any subcommands

@@ -22,7 +22,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"sigs.k8s.io/promo-tools/v3/promobot"
+	"sigs.k8s.io/promo-tools/v4/promobot"
 )
 
 // filesCmd represents the subcommand for `kpromo run files`

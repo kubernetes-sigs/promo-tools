@@ -22,9 +22,9 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
-	"sigs.k8s.io/promo-tools/v3/internal/legacy/cli"
-	promoter "sigs.k8s.io/promo-tools/v3/promoter/image"
-	options "sigs.k8s.io/promo-tools/v3/promoter/image/options"
+	"sigs.k8s.io/promo-tools/v4/internal/legacy/cli"
+	promoter "sigs.k8s.io/promo-tools/v4/promoter/image"
+	options "sigs.k8s.io/promo-tools/v4/promoter/image/options"
 )
 
 // CipCmd represents the base command when called without any subcommands

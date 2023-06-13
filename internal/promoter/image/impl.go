@@ -23,14 +23,14 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	reg "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
-	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/registry"
-	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/schema"
-	"sigs.k8s.io/promo-tools/v3/internal/legacy/gcloud"
-	"sigs.k8s.io/promo-tools/v3/internal/legacy/stream"
-	"sigs.k8s.io/promo-tools/v3/internal/version"
-	options "sigs.k8s.io/promo-tools/v3/promoter/image/options"
-	"sigs.k8s.io/promo-tools/v3/types/image"
+	reg "sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry"
+	"sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry/registry"
+	"sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry/schema"
+	"sigs.k8s.io/promo-tools/v4/internal/legacy/gcloud"
+	"sigs.k8s.io/promo-tools/v4/internal/legacy/stream"
+	"sigs.k8s.io/promo-tools/v4/internal/version"
+	options "sigs.k8s.io/promo-tools/v4/promoter/image/options"
+	"sigs.k8s.io/promo-tools/v4/types/image"
 	"sigs.k8s.io/release-sdk/sign"
 )
 

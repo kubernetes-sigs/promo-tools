@@ -1,4 +1,4 @@
-module sigs.k8s.io/promo-tools/v3
+module sigs.k8s.io/promo-tools/v4
 
 go 1.20
 

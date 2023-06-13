@@ -32,11 +32,11 @@ import (
 	"github.com/sirupsen/logrus"
 	gopts "google.golang.org/api/option"
 
-	reg "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
-	"sigs.k8s.io/promo-tools/v3/internal/legacy/gcloud"
-	options "sigs.k8s.io/promo-tools/v3/promoter/image/options"
-	"sigs.k8s.io/promo-tools/v3/promoter/image/ratelimit"
-	"sigs.k8s.io/promo-tools/v3/types/image"
+	reg "sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry"
+	"sigs.k8s.io/promo-tools/v4/internal/legacy/gcloud"
+	options "sigs.k8s.io/promo-tools/v4/promoter/image/options"
+	"sigs.k8s.io/promo-tools/v4/promoter/image/ratelimit"
+	"sigs.k8s.io/promo-tools/v4/types/image"
 	"sigs.k8s.io/release-sdk/sign"
 	"sigs.k8s.io/release-utils/version"
 )

@@ -17,8 +17,8 @@ limitations under the License.
 package registry
 
 import (
-	"sigs.k8s.io/promo-tools/v3/internal/legacy/container"
-	"sigs.k8s.io/promo-tools/v3/types/image"
+	"sigs.k8s.io/promo-tools/v4/internal/legacy/container"
+	"sigs.k8s.io/promo-tools/v4/types/image"
 )
 
 // Various set manipulation operations. Some set operations are missing,

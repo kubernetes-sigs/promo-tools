@@ -21,7 +21,7 @@ import (
 	"sort"
 	"strings"
 
-	"sigs.k8s.io/promo-tools/v3/types/image"
+	"sigs.k8s.io/promo-tools/v4/types/image"
 )
 
 // Image holds information about an image. It's like an "Object" in the OOP

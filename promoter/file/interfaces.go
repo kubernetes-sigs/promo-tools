@@ -19,7 +19,7 @@ package file
 import (
 	"context"
 
-	api "sigs.k8s.io/promo-tools/v3/api/files"
+	api "sigs.k8s.io/promo-tools/v4/api/files"
 )
 
 //go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate

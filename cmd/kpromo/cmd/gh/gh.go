@@ -27,7 +27,7 @@ import (
 	"github.com/spf13/pflag"
 	"gopkg.in/yaml.v2"
 
-	"sigs.k8s.io/promo-tools/v3/gh2gcs"
+	"sigs.k8s.io/promo-tools/v4/gh2gcs"
 	"sigs.k8s.io/release-sdk/gcli"
 	"sigs.k8s.io/release-sdk/github"
 )

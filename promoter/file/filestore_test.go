@@ -21,7 +21,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	api "sigs.k8s.io/promo-tools/v3/api/files"
+	api "sigs.k8s.io/promo-tools/v4/api/files"
 )
 
 func Test_useStorageClientAuth(t *testing.T) {

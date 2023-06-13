@@ -24,7 +24,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
-	"sigs.k8s.io/promo-tools/v3/promobot"
+	"sigs.k8s.io/promo-tools/v4/promobot"
 )
 
 // validateCmd takes a set of manifests and checks them

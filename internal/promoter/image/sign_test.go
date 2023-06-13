@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	options "sigs.k8s.io/promo-tools/v3/promoter/image/options"
+	options "sigs.k8s.io/promo-tools/v4/promoter/image/options"
 	"sigs.k8s.io/release-utils/env"
 )
 

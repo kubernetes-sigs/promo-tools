@@ -16,7 +16,7 @@ limitations under the License.
 
 package remotemanifest
 
-import "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/schema"
+import "sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry/schema"
 
 // Fake is a fake remote manifest. It is fake in the sense that it
 // will never fetch anything from any remote.
