@@ -23,9 +23,9 @@ import (
 	guuid "github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 
-	"sigs.k8s.io/promo-tools/v3/internal/legacy/audit"
-	"sigs.k8s.io/promo-tools/v3/internal/legacy/reqcounter"
-	"sigs.k8s.io/promo-tools/v3/internal/legacy/signals"
+	"sigs.k8s.io/promo-tools/v4/internal/legacy/audit"
+	"sigs.k8s.io/promo-tools/v4/internal/legacy/reqcounter"
+	"sigs.k8s.io/promo-tools/v4/internal/legacy/signals"
 )
 
 type AuditOptions struct {

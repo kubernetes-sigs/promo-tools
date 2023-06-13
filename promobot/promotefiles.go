@@ -26,8 +26,8 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	api "sigs.k8s.io/promo-tools/v3/api/files"
-	"sigs.k8s.io/promo-tools/v3/promoter/file"
+	api "sigs.k8s.io/promo-tools/v4/api/files"
+	"sigs.k8s.io/promo-tools/v4/promoter/file"
 )
 
 //go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate

@@ -29,7 +29,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"google.golang.org/api/iterator"
 
-	api "sigs.k8s.io/promo-tools/v3/api/files"
+	api "sigs.k8s.io/promo-tools/v4/api/files"
 )
 
 // GoogleCloudStorage is the provider for Google Cloud Storage (GCS).

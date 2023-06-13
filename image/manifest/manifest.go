@@ -26,10 +26,10 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/xerrors"
 
-	reg "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
-	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/registry"
-	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/schema"
-	"sigs.k8s.io/promo-tools/v3/types/image"
+	reg "sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry"
+	"sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry/registry"
+	"sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry/schema"
+	"sigs.k8s.io/promo-tools/v4/types/image"
 )
 
 const (

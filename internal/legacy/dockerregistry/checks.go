@@ -30,7 +30,7 @@ import (
 	"google.golang.org/api/iterator"
 	grafeaspb "google.golang.org/genproto/googleapis/grafeas/v1"
 
-	"sigs.k8s.io/promo-tools/v3/internal/legacy/stream"
+	"sigs.k8s.io/promo-tools/v4/internal/legacy/stream"
 )
 
 // MKImageVulnCheck returns an instance of ImageVulnCheck which

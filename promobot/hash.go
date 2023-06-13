@@ -25,7 +25,7 @@ import (
 
 	"golang.org/x/xerrors"
 
-	api "sigs.k8s.io/promo-tools/v3/api/files"
+	api "sigs.k8s.io/promo-tools/v4/api/files"
 	"sigs.k8s.io/release-utils/hash"
 )
 

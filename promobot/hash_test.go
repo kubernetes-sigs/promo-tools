@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	"k8s.io/utils/diff"
-	"sigs.k8s.io/promo-tools/v3/promobot"
+	"sigs.k8s.io/promo-tools/v4/promobot"
 	"sigs.k8s.io/yaml"
 )
 

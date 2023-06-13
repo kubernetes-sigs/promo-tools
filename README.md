@@ -1,7 +1,7 @@
 # Artifact Promotion Tooling
 
-[![PkgGoDev](https://pkg.go.dev/badge/sigs.k8s.io/promo-tools/v3)](https://pkg.go.dev/sigs.k8s.io/promo-tools/v3)
-[![Go Report Card](https://goreportcard.com/badge/sigs.k8s.io/promo-tools/v3)](https://goreportcard.com/report/sigs.k8s.io/promo-tools/v3)
+[![PkgGoDev](https://pkg.go.dev/badge/sigs.k8s.io/promo-tools/v4)](https://pkg.go.dev/sigs.k8s.io/promo-tools/v4)
+[![Go Report Card](https://goreportcard.com/badge/sigs.k8s.io/promo-tools/v4)](https://goreportcard.com/report/sigs.k8s.io/promo-tools/v4)
 [![Slack](https://img.shields.io/badge/Slack-%23release--management-blueviolet)](https://kubernetes.slack.com/archives/C2C40FMNF)
 
 This repository contains a suite of tools responsible for artifact promotion
@@ -68,7 +68,7 @@ Requirements:
 If you're interested in installing `kpromo` from a tag:
 
 ```console
-go install sigs.k8s.io/promo-tools/v3/cmd/kpromo@<tag>
+go install sigs.k8s.io/promo-tools/v4/cmd/kpromo@<tag>
 $(go env GOPATH)/bin/kpromo <subcommand>
 ```
 

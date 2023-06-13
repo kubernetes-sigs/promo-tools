@@ -22,7 +22,7 @@ import (
 	"io"
 	"sync"
 
-	"sigs.k8s.io/promo-tools/v3/promoter/file"
+	"sigs.k8s.io/promo-tools/v4/promoter/file"
 )
 
 type FakeSyncFilestore struct {

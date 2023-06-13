@@ -19,8 +19,8 @@ package imagepromoter
 import (
 	"fmt"
 
-	reg "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
-	options "sigs.k8s.io/promo-tools/v3/promoter/image/options"
+	reg "sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry"
+	options "sigs.k8s.io/promo-tools/v4/promoter/image/options"
 )
 
 // ScanEdges runs the vulnerability scans on the new images

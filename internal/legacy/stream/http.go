@@ -24,7 +24,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"sigs.k8s.io/promo-tools/v3/promoter/image/ratelimit"
+	"sigs.k8s.io/promo-tools/v4/promoter/image/ratelimit"
 )
 
 // HTTP is a wrapper around the net/http's Request type.

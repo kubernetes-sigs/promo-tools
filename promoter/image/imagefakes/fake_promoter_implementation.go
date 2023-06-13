@@ -20,11 +20,11 @@ package imagefakes
 import (
 	"sync"
 
-	inventory "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
-	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/registry"
-	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/schema"
-	"sigs.k8s.io/promo-tools/v3/promoter/image/checkresults"
-	imagepromotera "sigs.k8s.io/promo-tools/v3/promoter/image/options"
+	inventory "sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry"
+	"sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry/registry"
+	"sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry/schema"
+	"sigs.k8s.io/promo-tools/v4/promoter/image/checkresults"
+	imagepromotera "sigs.k8s.io/promo-tools/v4/promoter/image/options"
 )
 
 type FakePromoterImplementation struct {

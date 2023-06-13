@@ -20,9 +20,9 @@ import (
 	"errors"
 	"fmt"
 
-	reg "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
-	"sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry/schema"
-	options "sigs.k8s.io/promo-tools/v3/promoter/image/options"
+	reg "sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry"
+	"sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry/schema"
+	options "sigs.k8s.io/promo-tools/v4/promoter/image/options"
 )
 
 // This file has all the promoter implementation functions

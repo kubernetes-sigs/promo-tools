@@ -23,8 +23,8 @@ import (
 	"github.com/stretchr/testify/require"
 	grafeaspb "google.golang.org/genproto/googleapis/grafeas/v1"
 
-	reg "sigs.k8s.io/promo-tools/v3/internal/legacy/dockerregistry"
-	"sigs.k8s.io/promo-tools/v3/types/image"
+	reg "sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry"
+	"sigs.k8s.io/promo-tools/v4/types/image"
 )
 
 // TestImageVulnCheck uses a fake populateRequests function and a fake

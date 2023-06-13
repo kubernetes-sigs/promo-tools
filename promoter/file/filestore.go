@@ -28,7 +28,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"google.golang.org/api/option"
 
-	api "sigs.k8s.io/promo-tools/v3/api/files"
+	api "sigs.k8s.io/promo-tools/v4/api/files"
 )
 
 // FilestorePromoter manages the promotion of files.

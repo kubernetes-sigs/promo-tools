@@ -36,7 +36,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/sirupsen/logrus"
 
-	api "sigs.k8s.io/promo-tools/v3/api/files"
+	api "sigs.k8s.io/promo-tools/v4/api/files"
 )
 
 // S3Storage is the provider for Amazon S3.

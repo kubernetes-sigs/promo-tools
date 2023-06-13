@@ -21,7 +21,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"sigs.k8s.io/promo-tools/v3/image/manifest"
+	"sigs.k8s.io/promo-tools/v4/image/manifest"
 )
 
 // TODO(cip-mm): Remove in the next minor release.
