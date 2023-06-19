@@ -27,19 +27,6 @@ import (
 	"sigs.k8s.io/release-utils/util"
 )
 
-const (
-	// Production registry root URL
-	ProdRegistry = "registry.k8s.io"
-
-	// Staging repository root URL prefix
-	StagingRepoPrefix = "gcr.io/k8s-staging-"
-
-	// The suffix of the default image repository to promote images from
-	// i.e., gcr.io/<staging-prefix>-<staging-suffix>
-	// e.g., gcr.io/k8s-staging-foo
-	StagingRepoSuffix = "kubernetes"
-)
-
 // ManifestList abstracts the manifest used by the image promoter
 type ManifestList []struct {
 	Name string `json:"name"`

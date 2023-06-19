@@ -32,6 +32,7 @@ import (
 	"github.com/sirupsen/logrus"
 	gopts "google.golang.org/api/option"
 
+	"sigs.k8s.io/promo-tools/v4/image/consts"
 	reg "sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry"
 	"sigs.k8s.io/promo-tools/v4/internal/legacy/gcloud"
 	options "sigs.k8s.io/promo-tools/v4/promoter/image/options"
@@ -155,11 +156,18 @@ func (di *DefaultPromoterImplementation) SignImages(
 
 func (di *DefaultPromoterImplementation) signAndReplicate(signOpts *sign.Options, edges []reg.PromotionEdge) error {
 	// Build the reference we will use
-	imageRef := edges[0].DstReference()
+	edge := &edges[0]
+	imageRef := edge.DstReference()
+
+	// Make a shallow copy so we can safely modify the options per go routine
+	signOptsCopy := *signOpts
+
+	// Update the production container identity (".critical.identity.docker-reference")
+	signOptsCopy.SignContainerIdentity = targetIdentity(edge)
 
 	// Add an annotation recording the kpromo version to ensure we
 	// get a 2nd signature, otherwise cosign will not resign a signed image:
-	signOpts.Annotations = []string{
+	signOptsCopy.Annotations = []string{
 		fmt.Sprintf("org.kubernetes.kpromo.version=kpromo-%s", version.GetVersionInfo().GitVersion),
 	}
 
@@ -171,7 +179,7 @@ func (di *DefaultPromoterImplementation) signAndReplicate(signOpts *sign.Options
 	}
 
 	// Sign the first promoted image in the edges list:
-	if _, err := di.signer.SignImageWithOptions(signOpts, imageRef); err != nil {
+	if _, err := di.signer.SignImageWithOptions(&signOptsCopy, imageRef); err != nil {
 		return fmt.Errorf("signing image %s: %w", imageRef, err)
 	}
 
@@ -190,6 +198,32 @@ func (di *DefaultPromoterImplementation) signAndReplicate(signOpts *sign.Options
 		return fmt.Errorf("replicating signatures: %w", err)
 	}
 	return nil
+}
+
+// targetIdentity returns the production identity for a promotion edge.
+//
+// This means we will substitute the .critical.identity.docker-reference within
+// an example signature:
+// 'us-west2-docker.pkg.dev/k8s-artifacts-prod/images/kubernetes/conformance-arm64'
+//
+// to match the production registry:
+// 'registry.k8s.io/kubernetes/conformance-arm64'
+func targetIdentity(edge *reg.PromotionEdge) string {
+	identity := fmt.Sprintf("%s/%s", edge.DstRegistry.Name, edge.DstImageTag.Name)
+
+	if !strings.Contains(string(edge.DstRegistry.Name), productionRepositoryPath) {
+		logrus.Infof(
+			"No production registry path %q used in image, not modifying target signature reference",
+			productionRepositoryPath,
+		)
+		return identity
+	}
+
+	idx := strings.Index(identity, productionRepositoryPath) + len(productionRepositoryPath)
+	newRef := consts.ProdRegistry + identity[idx:]
+	logrus.Infof("Using new production registry reference for image signature: %v", newRef)
+
+	return newRef
 }
 
 // copyAttachedObjects copies any attached signatures from the staging registry to

@@ -33,6 +33,7 @@ import (
 	"sigs.k8s.io/release-utils/util"
 
 	"sigs.k8s.io/promo-tools/v4/image"
+	"sigs.k8s.io/promo-tools/v4/image/consts"
 	"sigs.k8s.io/promo-tools/v4/image/manifest"
 )
 
@@ -40,7 +41,7 @@ const (
 	k8sioRepo             = "k8s.io"
 	k8sioDefaultBranch    = "main"
 	promotionBranchSuffix = "-image-promotion"
-	defaultProject        = image.StagingRepoSuffix
+	defaultProject        = consts.StagingRepoSuffix
 	defaultReviewers      = "@kubernetes/release-engineering"
 )
 
@@ -203,9 +204,9 @@ func runPromote(opts *promoteOptions) error {
 
 	// Path to the promoter image list
 	imagesListPath := filepath.Join(
-		image.ProdRegistry,
+		consts.ProdRegistry,
 		"images",
-		filepath.Base(image.StagingRepoPrefix)+opts.project,
+		filepath.Base(consts.StagingRepoPrefix)+opts.project,
 		"images.yaml",
 	)
 
@@ -224,8 +225,8 @@ func runPromote(opts *promoteOptions) error {
 
 		opt := manifest.GrowOptions{}
 		if err := opt.Populate(
-			filepath.Join(repo.Dir(), image.ProdRegistry),
-			image.StagingRepoPrefix+opts.project, opts.images, opts.digests, opts.tags); err != nil {
+			filepath.Join(repo.Dir(), consts.ProdRegistry),
+			consts.StagingRepoPrefix+opts.project, opts.images, opts.digests, opts.tags); err != nil {
 			return fmt.Errorf("populating image promoter options for tag %s with image filter %s: %w", opts.tags, opts.images, err)
 		}
 
@@ -283,7 +284,7 @@ func runPromote(opts *promoteOptions) error {
 	}
 
 	commitMessage := "Image promotion for " + opts.project + " " + strings.Join(opts.tags, " / ")
-	if opts.project == image.StagingRepoSuffix {
+	if opts.project == consts.StagingRepoSuffix {
 		commitMessage = "releng: " + commitMessage
 	}
 
