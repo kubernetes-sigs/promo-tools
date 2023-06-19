@@ -39,6 +39,7 @@ import (
 
 	"github.com/sigstore/sigstore/pkg/cryptoutils"
 
+	"sigs.k8s.io/promo-tools/v4/image/consts"
 	checkresults "sigs.k8s.io/promo-tools/v4/promoter/image/checkresults"
 	options "sigs.k8s.io/promo-tools/v4/promoter/image/options"
 	"sigs.k8s.io/promo-tools/v4/types/image"
@@ -47,7 +48,8 @@ import (
 var mirrorsList []string
 
 const (
-	repositoryPath = "k8s-artifacts-prod/images"
+	productionImagePath      = "k8s-artifacts-prod"
+	productionRepositoryPath = productionImagePath + "/images"
 
 	// scanRegistry is the one we index to search for images
 	scanRegistry = "us-central1-docker.pkg.dev"
@@ -142,9 +144,9 @@ func (di *DefaultPromoterImplementation) GetSignatureStatus(
 
 		targetImages := []string{}
 		for _, mirror := range mirrors {
-			rpath := repositoryPath
+			rpath := productionRepositoryPath
 			if strings.HasSuffix(mirror, ".gcr.io") {
-				rpath = "k8s-artifacts-prod"
+				rpath = productionImagePath
 			}
 
 			targetImages = append(targetImages, fmt.Sprintf("%s/%s/%s:%s.sig",
@@ -373,7 +375,7 @@ func (di *DefaultPromoterImplementation) readLatestImages(opts *options.Options)
 	)
 	images := []string{}
 
-	repo, err := name.NewRepository(scanRegistry+"/"+repositoryPath, name.WeakValidation)
+	repo, err := name.NewRepository(scanRegistry+"/"+productionRepositoryPath, name.WeakValidation)
 	if err != nil {
 		return nil, fmt.Errorf("creating repo: %w", err)
 	}
@@ -415,7 +417,7 @@ func (di *DefaultPromoterImplementation) readLatestImages(opts *options.Options)
 			mt.Lock()
 			images = append(images, strings.ReplaceAll(
 				fmt.Sprintf("%s:%s", repo, manifest.Tags[0]),
-				scanRegistry+"/"+repositoryPath, "registry.k8s.io"),
+				scanRegistry+"/"+productionRepositoryPath, consts.ProdRegistry),
 			)
 			mt.Unlock()
 		}

@@ -21,6 +21,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	reg "sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry"
+	"sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry/registry"
 	options "sigs.k8s.io/promo-tools/v4/promoter/image/options"
 	"sigs.k8s.io/release-utils/env"
 )
@@ -50,4 +52,57 @@ func TestGetIdentityToken(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotEmpty(t, tok)
+}
+
+func TestTargetIdentity(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name   string
+		edge   *reg.PromotionEdge
+		assert func(string)
+	}{
+		{
+			name: "modified reference with real-world example",
+			edge: &reg.PromotionEdge{
+				DstRegistry: registry.Context{Name: "us-west2-docker.pkg.dev/k8s-artifacts-prod/images/kubernetes"},
+				DstImageTag: reg.ImageTag{Name: "conformance-arm64"},
+				Digest:      "sha256:709e17a9c17018997724ed19afc18dbf576e9af10dfe78c13b34175027916d8f",
+			},
+			assert: func(res string) {
+				require.Equal(t, "registry.k8s.io/kubernetes/conformance-arm64", res)
+			},
+		},
+		{
+			name: "modified reference with simple example",
+			edge: &reg.PromotionEdge{
+				DstRegistry: registry.Context{Name: "registry/k8s-artifacts-prod/images"},
+				DstImageTag: reg.ImageTag{Name: "image"},
+				Digest:      "sha256",
+			},
+			assert: func(res string) {
+				require.Equal(t, "registry.k8s.io/image", res)
+			},
+		},
+		{
+			name: "not modified reference",
+			edge: &reg.PromotionEdge{
+				DstRegistry: registry.Context{Name: "foo-bar"},
+				DstImageTag: reg.ImageTag{Name: "conformance-arm64"},
+				Digest:      "sha256:709e17a9c17018997724ed19afc18dbf576e9af10dfe78c13b34175027916d8f",
+			},
+			assert: func(res string) {
+				require.Equal(t, "foo-bar/conformance-arm64", res)
+			},
+		},
+	} {
+		edge := tc.edge
+		assert := tc.assert
+
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			res := targetIdentity(edge)
+			assert(res)
+		})
+	}
 }
