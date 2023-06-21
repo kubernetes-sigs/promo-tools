@@ -3,7 +3,7 @@ module sigs.k8s.io/promo-tools/v4
 go 1.20
 
 require (
-	cloud.google.com/go/containeranalysis v0.10.0
+	cloud.google.com/go/containeranalysis v0.10.1
 	cloud.google.com/go/errorreporting v0.3.0
 	cloud.google.com/go/iam v1.1.0
 	cloud.google.com/go/logging v1.7.0
@@ -37,7 +37,7 @@ require (
 	cloud.google.com/go v0.110.2 // indirect
 	cloud.google.com/go/compute v1.19.3 // indirect
 	cloud.google.com/go/compute/metadata v0.2.3 // indirect
-	cloud.google.com/go/grafeas v0.2.1 // indirect
+	cloud.google.com/go/grafeas v0.3.0 // indirect
 	cloud.google.com/go/longrunning v0.4.2 // indirect
 	cuelang.org/go v0.5.0 // indirect
 	filippo.io/edwards25519 v1.0.0 // indirect
@@ -145,7 +145,7 @@ require (
 	github.com/google/s2a-go v0.1.4 // indirect
 	github.com/google/trillian v1.5.2 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.2.4 // indirect
-	github.com/googleapis/gax-go/v2 v2.10.0 // indirect
+	github.com/googleapis/gax-go/v2 v2.11.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-retryablehttp v0.7.2 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
