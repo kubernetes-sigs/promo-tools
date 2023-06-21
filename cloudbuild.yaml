@@ -31,7 +31,7 @@ substitutions:
   # vYYYYMMDD-hash, and can be used as a substitution
   _GIT_TAG: '12345'
   _PULL_BASE_REF: 'dev'
-  _IMG_VERSION: 'v4.0.2-0'
+  _IMG_VERSION: 'v4.0.3-0'
 
 tags:
 - 'kpromo'
