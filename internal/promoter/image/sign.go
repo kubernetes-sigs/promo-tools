@@ -121,10 +121,8 @@ func (di *DefaultPromoterImplementation) SignImages(
 	// used at all and images would be signed with a wrong identity.
 	di.signer = sign.New(signOpts)
 
-	// We only sign the first image of each edge. If there are more
-	// than one destination registries for an image, we copy the
-	// signature to avoid varying valid signatures in each registry.
-	sortedEdges := map[image.Digest][]reg.PromotionEdge{}
+	// We only sign the first normalized image of each edge.
+	sortedEdges := map[string][]reg.PromotionEdge{}
 	for edge := range edges {
 		// Skip signing the signature, sbom and attestation layers
 		if strings.HasSuffix(string(edge.DstImageTag.Tag), ".sig") ||
@@ -133,18 +131,19 @@ func (di *DefaultPromoterImplementation) SignImages(
 			continue
 		}
 
-		if _, ok := sortedEdges[edge.Digest]; !ok {
-			sortedEdges[edge.Digest] = []reg.PromotionEdge{}
+		identity := targetIdentity(&edge)
+		if _, ok := sortedEdges[identity]; !ok {
+			sortedEdges[identity] = []reg.PromotionEdge{}
 		}
-		sortedEdges[edge.Digest] = append(sortedEdges[edge.Digest], edge)
+		sortedEdges[identity] = append(sortedEdges[identity], edge)
 	}
 
 	t := throttler.New(opts.MaxSignatureOps, len(sortedEdges))
 	// Sign the required edges
 	for d := range sortedEdges {
 		d := d
-		go func(digest image.Digest) {
-			t.Done(di.signAndReplicate(signOpts, sortedEdges[digest]))
+		go func(identity string) {
+			t.Done(di.signAndReplicate(signOpts, identity, sortedEdges[identity]))
 		}(d)
 		if t.Throttle() > 0 {
 			break
@@ -154,16 +153,17 @@ func (di *DefaultPromoterImplementation) SignImages(
 	return t.Err()
 }
 
-func (di *DefaultPromoterImplementation) signAndReplicate(signOpts *sign.Options, edges []reg.PromotionEdge) error {
+func (di *DefaultPromoterImplementation) signAndReplicate(signOpts *sign.Options, identity string, edges []reg.PromotionEdge) error {
 	// Build the reference we will use
-	edge := &edges[0]
-	imageRef := edge.DstReference()
+	firstEdge := &edges[0]
+	imageRef := firstEdge.DstReference()
 
 	// Make a shallow copy so we can safely modify the options per go routine
 	signOptsCopy := *signOpts
 
 	// Update the production container identity (".critical.identity.docker-reference")
-	signOptsCopy.SignContainerIdentity = targetIdentity(edge)
+	signOptsCopy.SignContainerIdentity = identity
+	logrus.Infof("Using new production registry reference for %s: %v", imageRef, identity)
 
 	// Add an annotation recording the kpromo version to ensure we
 	// get a 2nd signature, otherwise cosign will not resign a signed image:
@@ -174,7 +174,7 @@ func (di *DefaultPromoterImplementation) signAndReplicate(signOpts *sign.Options
 	logrus.Infof("Signing image %s", imageRef)
 
 	// Carry over existing signatures from the staging repo
-	if err := di.copyAttachedObjects(&edges[0]); err != nil {
+	if err := di.copyAttachedObjects(firstEdge); err != nil {
 		return fmt.Errorf("copying staging signatures: %w", err)
 	}
 
@@ -193,7 +193,7 @@ func (di *DefaultPromoterImplementation) signAndReplicate(signOpts *sign.Options
 	}
 
 	if err := di.replicateSignatures(
-		&edges[0], edges[1:],
+		firstEdge, edges[1:],
 	); err != nil {
 		return fmt.Errorf("replicating signatures: %w", err)
 	}
@@ -221,7 +221,6 @@ func targetIdentity(edge *reg.PromotionEdge) string {
 
 	idx := strings.Index(identity, productionRepositoryPath) + len(productionRepositoryPath)
 	newRef := consts.ProdRegistry + identity[idx:]
-	logrus.Infof("Using new production registry reference for image signature: %v", newRef)
 
 	return newRef
 }
