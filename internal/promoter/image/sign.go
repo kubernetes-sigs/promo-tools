@@ -121,8 +121,12 @@ func (di *DefaultPromoterImplementation) SignImages(
 	// used at all and images would be signed with a wrong identity.
 	di.signer = sign.New(signOpts)
 
-	// We only sign the first normalized image of each edge.
-	sortedEdges := map[string][]reg.PromotionEdge{}
+	// We only sign the first normalized image per digest of each edge.
+	type key struct {
+		identity string
+		digest   image.Digest
+	}
+	sortedEdges := map[key][]reg.PromotionEdge{}
 	for edge := range edges {
 		// Skip signing the signature, sbom and attestation layers
 		if strings.HasSuffix(string(edge.DstImageTag.Tag), ".sig") ||
@@ -131,19 +135,19 @@ func (di *DefaultPromoterImplementation) SignImages(
 			continue
 		}
 
-		identity := targetIdentity(&edge)
-		if _, ok := sortedEdges[identity]; !ok {
-			sortedEdges[identity] = []reg.PromotionEdge{}
+		k := key{identity: targetIdentity(&edge), digest: edge.Digest}
+		if _, ok := sortedEdges[k]; !ok {
+			sortedEdges[k] = []reg.PromotionEdge{}
 		}
-		sortedEdges[identity] = append(sortedEdges[identity], edge)
+		sortedEdges[k] = append(sortedEdges[k], edge)
 	}
 
 	t := throttler.New(opts.MaxSignatureOps, len(sortedEdges))
 	// Sign the required edges
 	for d := range sortedEdges {
 		d := d
-		go func(identity string) {
-			t.Done(di.signAndReplicate(signOpts, identity, sortedEdges[identity]))
+		go func(k key) {
+			t.Done(di.signAndReplicate(signOpts, k.identity, sortedEdges[k]))
 		}(d)
 		if t.Throttle() > 0 {
 			break
