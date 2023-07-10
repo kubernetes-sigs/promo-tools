@@ -26,7 +26,6 @@ linters:
     - containedctx
     - contextcheck
     - decorder
-    - depguard
     - dogsled
     - dupl
     - dupword
@@ -202,7 +201,6 @@ linters-settings:
       - syncMapLoadAndDelete
       - timeCmpSimplify
       - timeExprSimplify
-      - todoCommentWithoutDetail
       - tooManyResultsChecker
       - truncateCmp
       - typeAssertChain
