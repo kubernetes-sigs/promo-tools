@@ -5,7 +5,7 @@ go 1.20
 require (
 	cloud.google.com/go/containeranalysis v0.10.1
 	cloud.google.com/go/errorreporting v0.3.0
-	cloud.google.com/go/iam v1.1.1
+	cloud.google.com/go/iam v1.1.2
 	cloud.google.com/go/logging v1.7.0
 	cloud.google.com/go/storage v1.31.0
 	github.com/aws/aws-sdk-go v1.44.319
