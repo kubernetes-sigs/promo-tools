@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/sirupsen/logrus"
@@ -77,7 +78,6 @@ var (
 		orgFlag,
 		repoFlag,
 		bucketFlag,
-		releaseDirFlag,
 	}
 )
 
@@ -121,7 +121,7 @@ func init() {
 		&opts.releaseDir,
 		releaseDirFlag,
 		"",
-		"directory to upload to within the specified GCS bucket",
+		fmt.Sprintf("directory to upload to within the specified GCS bucket, defaults to %q", filepath.Join(orgFlag, repoFlag)),
 	)
 
 	GHCmd.PersistentFlags().StringVar(
@@ -234,6 +234,11 @@ func run(opts *options) error {
 // SetAndValidate sets some default options and verifies if options are valid
 func (o *options) SetAndValidate() error {
 	logrus.Info("Validating gh2gcs options...")
+
+	if o.releaseDir == "" {
+		o.releaseDir = filepath.Join(o.org, o.repo)
+		logrus.Infof("Using default release dir: %s", o.releaseDir)
+	}
 
 	if o.outputDir == "" {
 		if opts.downloadOnly {
