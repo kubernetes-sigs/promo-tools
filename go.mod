@@ -10,7 +10,7 @@ require (
 	cloud.google.com/go/storage v1.33.0
 	github.com/aws/aws-sdk-go v1.45.24
 	github.com/cenkalti/backoff/v4 v4.2.1
-	github.com/google/go-cmp v0.5.9
+	github.com/google/go-cmp v0.6.0
 	github.com/google/go-containerregistry v0.16.1
 	github.com/google/uuid v1.3.1
 	github.com/maxbrunsfeld/counterfeiter/v6 v6.7.0
