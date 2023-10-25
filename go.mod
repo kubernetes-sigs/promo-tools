@@ -30,7 +30,7 @@ require (
 	k8s.io/utils v0.0.0-20230406110748-d93618cff8a2
 	sigs.k8s.io/release-sdk v0.10.3
 	sigs.k8s.io/release-utils v0.7.5
-	sigs.k8s.io/yaml v1.3.0
+	sigs.k8s.io/yaml v1.4.0
 )
 
 require (
