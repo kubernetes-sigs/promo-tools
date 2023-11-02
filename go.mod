@@ -3,7 +3,7 @@ module sigs.k8s.io/promo-tools/v4
 go 1.20
 
 require (
-	cloud.google.com/go/containeranalysis v0.11.2
+	cloud.google.com/go/containeranalysis v0.11.3
 	cloud.google.com/go/errorreporting v0.3.0
 	cloud.google.com/go/iam v1.1.4
 	cloud.google.com/go/logging v1.8.1
