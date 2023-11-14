@@ -14,30 +14,30 @@ dependencies:
 
   # zeitgeist
   - name: "zeitgeist"
-    version: 0.3.0
+    version: 0.4.3
     refPaths:
     - path: hack/verify-dependencies.sh
       match: VERSION=v(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)\.(?P<patch>0|[1-9]\d*)(?:-(?P<prerelease>(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+(?P<buildmetadata>[0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?
 
   - name: "Debian: codename (default)"
-    version: bullseye
+    version: bookworm
     refPaths:
     - path: Dockerfile
-      match: FROM golang:\d+.\d+(alpha|beta|rc)?\.?(\d+)-(bullseye|buster)
+      match: FROM golang:\d+.\d+(alpha|beta|rc)?\.?(\d+)-(bookworm|bullseye)
 
   # golangci-lint
   - name: "golangci-lint"
-    version: 1.53.3
+    version: 1.55.2
     refPaths:
     - path: hack/verify-golangci-lint.sh
       match: VERSION=v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?
 
   # Golang
   - name: "golang"
-    version: 1.20
+    version: 1.21
     refPaths:
     - path: Dockerfile
-      match: FROM golang:\d+.\d+(alpha|beta|rc)?\.?(\d+)-(bullseye|buster)
+      match: FROM golang:\d+.\d+(alpha|beta|rc)?\.?(\d+)-(bookworm|bullseye)
 
   # Golang pre-releases are denoted as `1.y<pre-release stage>.z`
   # Example: go1.17rc1
@@ -45,13 +45,13 @@ dependencies:
   # This entry is a stub of the major version to allow dependency checks to
   # pass when building Kubernetes using a pre-release of Golang.
   - name: "golang: 1.<major>"
-    version: 1.20
+    version: 1.21
     refPaths:
     - path: Dockerfile
-      match: FROM golang:\d+.\d+(alpha|beta|rc)?\.?(\d+)-(bullseye|buster)
+      match: FROM golang:\d+.\d+(alpha|beta|rc)?\.?(\d+)-(bookworm|bullseye)
 
   - name: "golang: go.mod"
-    version: 1.20
+    version: 1.21
     refPaths:
     - path: go.mod
       match: go \d+.\d+
