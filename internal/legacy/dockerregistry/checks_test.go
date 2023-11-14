@@ -27,6 +27,10 @@ import (
 	"sigs.k8s.io/promo-tools/v4/types/image"
 )
 
+const (
+	vulMsg = "VulnerabilityCheck: The following vulnerable images were found:\n"
+)
+
 // TestImageVulnCheck uses a fake populateRequests function and a fake
 // vulnerability producer. The fake vulnerability producer simply returns the
 // vulnerability occurrences that have been mapped to a given PromotionEdge in
@@ -138,7 +142,7 @@ func TestImageVulnCheck(t *testing.T) {
 					},
 				},
 			},
-			fmt.Errorf("VulnerabilityCheck: The following vulnerable images were found:\n" +
+			fmt.Errorf(vulMsg +
 				"    bar@sha256:111 [1 fixable severe vulnerabilities, 1 total]\n" +
 				"    foo@sha256:000 [1 fixable severe vulnerabilities, 1 total]"),
 		},
@@ -179,7 +183,7 @@ func TestImageVulnCheck(t *testing.T) {
 					},
 				},
 			},
-			fmt.Errorf("VulnerabilityCheck: The following vulnerable images were found:\n" +
+			fmt.Errorf(vulMsg +
 				"    bar@sha256:111 [2 fixable severe vulnerabilities, 2 total]\n" +
 				"    foo@sha256:000 [1 fixable severe vulnerabilities, 1 total]"),
 		},
@@ -202,7 +206,7 @@ func TestImageVulnCheck(t *testing.T) {
 					},
 				},
 			},
-			fmt.Errorf("VulnerabilityCheck: The following vulnerable images were found:\n" +
+			fmt.Errorf(vulMsg +
 				"    bar@sha256:111 [1 fixable severe vulnerabilities, 1 total]"),
 		},
 		{

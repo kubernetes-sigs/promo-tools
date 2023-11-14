@@ -159,7 +159,7 @@ func (s *s3SyncFilestore) OpenReader(
 func (s *s3SyncFilestore) UploadFile(ctx context.Context, dest, localFile string) error {
 	key := s.prefix + dest
 
-	s3URL := s.provider.Scheme() + "://" + s.bucket + "/" + key
+	s3URL := s.provider.Scheme() + api.Backslash + s.bucket + "/" + key
 
 	stat, err := os.Stat(localFile)
 	if err != nil {
@@ -230,7 +230,7 @@ func (s *s3SyncFilestore) UploadFile(ctx context.Context, dest, localFile string
 func (s *s3SyncFilestore) ListFiles(
 	ctx context.Context,
 ) (map[string]*SyncFileInfo, error) {
-	prefix := s.provider.Scheme() + "://" + s.bucket + "/" + s.prefix
+	prefix := s.provider.Scheme() + api.Backslash + s.bucket + "/" + s.prefix
 
 	logrus.Infof("listing files under %s", prefix)
 
@@ -251,7 +251,7 @@ func (s *s3SyncFilestore) ListFiles(
 		}
 
 		file := &SyncFileInfo{}
-		file.AbsolutePath = s.provider.Scheme() + "://" + s.bucket + "/" + name
+		file.AbsolutePath = s.provider.Scheme() + api.Backslash + s.bucket + "/" + name
 		file.RelativePath = strings.TrimPrefix(name, s.prefix)
 
 		md5 := aws.StringValue(obj.ETag)

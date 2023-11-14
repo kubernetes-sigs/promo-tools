@@ -70,7 +70,7 @@ func openFilestore(
 ) (syncFilestore, error) {
 	for _, provider := range supportedProviders {
 		scheme := provider.Scheme()
-		if strings.HasPrefix(filestore.Base, scheme+"://") {
+		if strings.HasPrefix(filestore.Base, scheme+api.Backslash) {
 			return provider.OpenFilestore(ctx, filestore, useServiceAccount, confirm)
 		}
 	}
