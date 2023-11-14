@@ -1177,7 +1177,7 @@ func SplitByKnownRegistries(
 				// Remove leading "/" character. This denotes a clean split
 				// along directory boundaries.
 				return rc.Name, image.Name(trimmed[1:]), nil
-			} else {
+			} else { //nolint: revive
 				// This is an unclean split where we cut the string in the
 				// middle of a path name. E.g., if we have
 				//

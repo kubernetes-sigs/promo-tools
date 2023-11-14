@@ -64,7 +64,7 @@ func (s *gcsSyncFilestore) OpenReader(
 func (s *gcsSyncFilestore) UploadFile(ctx context.Context, dest, localFile string) error {
 	absolutePath := s.prefix + dest
 
-	gcsURL := s.provider.Scheme() + "://" + s.bucket + "/" + absolutePath
+	gcsURL := s.provider.Scheme() + api.Backslash + s.bucket + "/" + absolutePath
 
 	in, err := os.Open(localFile)
 	if err != nil {
@@ -142,7 +142,7 @@ func (s *gcsSyncFilestore) ListFiles(
 		}
 
 		file := &SyncFileInfo{}
-		file.AbsolutePath = s.provider.Scheme() + "://" + s.bucket + "/" + obj.Name
+		file.AbsolutePath = s.provider.Scheme() + api.Backslash + s.bucket + "/" + obj.Name
 		file.RelativePath = strings.TrimPrefix(name, s.prefix)
 		if obj.MD5 == nil {
 			return nil, fmt.Errorf("MD5 not set on file %q", file.AbsolutePath)

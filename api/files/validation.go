@@ -22,6 +22,10 @@ import (
 	"strings"
 )
 
+const (
+	Backslash = "://"
+)
+
 // Validate checks for semantic errors in the yaml fields (the structure of the
 // yaml is checked during unmarshaling).
 func (m *Manifest) Validate() error {
@@ -49,9 +53,9 @@ func ValidateFilestores(filestores []Filestore) error {
 		}
 
 		// Currently we support GCS and s3 backends.
-		if strings.HasPrefix(filestore.Base, GCSScheme+"://") { //nolint: revive
+		if strings.HasPrefix(filestore.Base, GCSScheme+Backslash) { //nolint: revive
 			// ok
-		} else if strings.HasPrefix(filestore.Base, S3Scheme+"://") { //nolint: revive
+		} else if strings.HasPrefix(filestore.Base, S3Scheme+Backslash) { //nolint: revive
 			// ok
 		} else {
 			return fmt.Errorf(
