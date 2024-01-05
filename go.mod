@@ -8,7 +8,7 @@ require (
 	cloud.google.com/go/iam v1.1.5
 	cloud.google.com/go/logging v1.9.0
 	cloud.google.com/go/storage v1.36.0
-	github.com/aws/aws-sdk-go v1.49.14
+	github.com/aws/aws-sdk-go v1.49.15
 	github.com/cenkalti/backoff/v4 v4.2.1
 	github.com/google/go-cmp v0.6.0
 	github.com/google/go-containerregistry v0.17.0
@@ -23,8 +23,8 @@ require (
 	golang.org/x/oauth2 v0.15.0
 	golang.org/x/time v0.5.0
 	golang.org/x/xerrors v0.0.0-20231012003039-104605ab7028
-	google.golang.org/api v0.154.0
-	google.golang.org/genproto v0.0.0-20231120223509-83a465c0220f
+	google.golang.org/api v0.155.0
+	google.golang.org/genproto v0.0.0-20231211222908-989df2bf70f3
 	gopkg.in/src-d/go-git.v4 v4.13.1
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/utils v0.0.0-20230726121419-3b25d923346b
@@ -277,9 +277,9 @@ require (
 	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/tools v0.14.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20231120223509-83a465c0220f // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20231127180814-3a041ad873d4 // indirect
-	google.golang.org/grpc v1.59.0 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20231211222908-989df2bf70f3 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20231212172506-995d672761c0 // indirect
+	google.golang.org/grpc v1.60.1 // indirect
 	google.golang.org/protobuf v1.31.0 // indirect
 	gopkg.in/DataDog/dd-trace-go.v1 v1.56.1 // indirect
 	gopkg.in/go-jose/go-jose.v2 v2.6.1 // indirect
