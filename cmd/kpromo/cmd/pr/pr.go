@@ -158,6 +158,8 @@ func init() {
 	}
 }
 
+// Note: whoever made this, it's too complex and hard to read for human and machine,
+// it's better to split it into smaller functions because this go not a python
 func runPromote(opts *promoteOptions) error {
 	// Check the cmd line opts
 	if err := opts.Validate(); err != nil {

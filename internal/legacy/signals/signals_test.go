@@ -1,7 +1,7 @@
 //go:build !windows
 // +build !windows
 
-// Note: this build on unix systems
+// Note: this build on unix/linux systems
 
 /*
 Copyright 2021 The Kubernetes Authors.
