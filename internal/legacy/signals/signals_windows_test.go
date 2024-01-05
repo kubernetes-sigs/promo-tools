@@ -43,6 +43,8 @@ func TestLogSignal(t *testing.T) {
 	// Create multiple tests.
 	// NOTE: We are unable to observe SIGKILL or SIGSTOP, therefore we will not
 	// test with these syscalls.
+	// Another NOTE by @H0llyW00dzZ: SIGIO,SIGSYS,SIGTTOU,SIGCHLD is not available on Windows
+	// System, so we will not test with these syscalls.
 	sigTests := []sigTest{
 		// {
 		// 	signal: syscall.SIGIO,
