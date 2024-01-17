@@ -25,6 +25,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	gogit "github.com/go-git/go-git/v5"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
@@ -62,11 +63,13 @@ kubernetes/k8s.io`,
 }
 
 type promoteOptions struct {
+	updateRepo      bool
+	useSSH          bool
+	interactiveMode bool
 	project         string
 	userFork        string
-	tags            []string
 	reviewers       string
-	interactiveMode bool
+	tags            []string
 	images          []string
 	digests         []string
 }
@@ -151,6 +154,22 @@ func init() {
 		"digests to promote. If not specified, all images matching the tag will be promoted",
 	)
 
+	PRCmd.PersistentFlags().BoolVarP(
+		&promoteOpts.useSSH,
+		"use-ssh",
+		"",
+		true,
+		"use ssh to clone the repository, if false will use https (default: true)",
+	)
+
+	PRCmd.PersistentFlags().BoolVarP(
+		&promoteOpts.updateRepo,
+		"update-repo",
+		"",
+		true,
+		"update the cloned repository to fetch any upstream change (default: true)",
+	)
+
 	for _, flagName := range []string{"tag", "fork"} {
 		if err := PRCmd.MarkPersistentFlagRequired(flagName); err != nil {
 			logrus.Errorf("Marking tag %s as required: %v", flagName, err)
@@ -189,7 +208,9 @@ func runPromote(opts *promoteOptions) error {
 	}
 
 	// Clone k8s.io
-	repo, err := github.PrepareFork(branchname, git.DefaultGithubOrg, k8sioRepo, userForkOrg, userForkRepo)
+	// We might want to set options to pass for the clone, nothing for now
+	gitCloneOpts := &gogit.CloneOptions{}
+	repo, err := github.PrepareFork(branchname, git.DefaultGithubOrg, k8sioRepo, userForkOrg, userForkRepo, opts.useSSH, opts.updateRepo, gitCloneOpts)
 	if err != nil {
 		return fmt.Errorf("while preparing k/k8s.io fork: %w", err)
 	}
