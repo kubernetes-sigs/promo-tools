@@ -1,8 +1,6 @@
 //go:build windows
 // +build windows
 
-// Note: this build on windows systems
-
 /*
 Copyright 2024 The Kubernetes Authors.
 
@@ -43,8 +41,7 @@ func TestLogSignal(t *testing.T) {
 	// Create multiple tests.
 	// NOTE: We are unable to observe SIGKILL or SIGSTOP, therefore we will not
 	// test with these syscalls.
-	// Another NOTE by @H0llyW00dzZ: SIGIO,SIGSYS,SIGTTOU,SIGCHLD is not available on Windows
-	// System, so we will not test with these syscalls.
+	// SIGIO, SIGSYS, SIGTTOU, and SIGCHLD are not available on Windows
 	sigTests := []sigTest{
 		// {
 		// 	signal: syscall.SIGIO,
