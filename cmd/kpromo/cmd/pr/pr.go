@@ -158,7 +158,7 @@ func init() {
 	}
 }
 
-// Another NOTE by @H0llyW00dzZ: This function is overly complex and difficult to read, both for humans and machines.
+// Issue #1177: This function is overly complex and difficult to read, both for humans and machines.
 // It would be better to split it into smaller functions, as this is Go, not Python, and Go
 // encourages simpler, more readable code.
 func runPromote(opts *promoteOptions) error {
