@@ -43,13 +43,6 @@ func TestLogSignal(t *testing.T) {
 	// test with these syscalls.
 	// SIGIO, SIGSYS, SIGTTOU, and SIGCHLD are not available on Windows
 	sigTests := []sigTest{
-		// {
-		// 	signal: syscall.SIGIO,
-		// 	expected: []string{
-		// 		fmt.Sprintf("Encoutered signal: %s", syscall.SIGIO.String()),
-		// 	},
-		// 	terminate: false,
-		// },
 		{
 			signal: syscall.SIGALRM,
 			expected: []string{
@@ -136,8 +129,6 @@ func TestLogSignals(t *testing.T) {
 	// the SignalChannel will block and the test will fail.
 	signals.SignalChannel <- syscall.SIGBUS
 	signals.SignalChannel <- syscall.SIGALRM
-	// signals.SignalChannel <- syscall.SIGSYS
-	// signals.SignalChannel <- syscall.SIGIO
 	// Force exit.
 	signals.Stop()
 	wg.Wait()
@@ -151,8 +142,6 @@ func TestLogSignals(t *testing.T) {
 	go logSignals()
 	// Pass multiple non-exit signals, ensuring LogSignals is consuming each. Otherwise,
 	// the SignalChannel will block and the test will fail.
-	// signals.SignalChannel <- syscall.SIGTTOU
-	// signals.SignalChannel <- syscall.SIGCHLD
 	signals.SignalChannel <- syscall.SIGPIPE
 	// Pass an exit signal.
 	signals.SignalChannel <- syscall.SIGINT
