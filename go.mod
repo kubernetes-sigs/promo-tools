@@ -3,12 +3,12 @@ module sigs.k8s.io/promo-tools/v4
 go 1.21
 
 require (
-	cloud.google.com/go/containeranalysis v0.11.3
+	cloud.google.com/go/containeranalysis v0.11.4
 	cloud.google.com/go/errorreporting v0.3.0
-	cloud.google.com/go/iam v1.1.5
+	cloud.google.com/go/iam v1.1.6
 	cloud.google.com/go/logging v1.9.0
 	cloud.google.com/go/storage v1.37.0
-	github.com/aws/aws-sdk-go v1.50.6
+	github.com/aws/aws-sdk-go v1.50.7
 	github.com/cenkalti/backoff/v4 v4.2.1
 	github.com/go-git/go-git/v5 v5.11.0
 	github.com/google/go-cmp v0.6.0
@@ -38,7 +38,7 @@ require (
 	cloud.google.com/go v0.112.0 // indirect
 	cloud.google.com/go/compute v1.23.3 // indirect
 	cloud.google.com/go/compute/metadata v0.2.3 // indirect
-	cloud.google.com/go/grafeas v0.3.0 // indirect
+	cloud.google.com/go/grafeas v0.3.4 // indirect
 	cloud.google.com/go/longrunning v0.5.4 // indirect
 	cuelang.org/go v0.6.0 // indirect
 	dario.cat/mergo v1.0.0 // indirect
@@ -248,9 +248,9 @@ require (
 	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/tools v0.17.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20240122161410-6c6643bf1457 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20240125205218-1f4bbc51befe // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240116215550-a9fa1716bcac // indirect
-	google.golang.org/grpc v1.60.1 // indirect
+	google.golang.org/grpc v1.61.0 // indirect
 	google.golang.org/protobuf v1.32.0 // indirect
 	gopkg.in/go-jose/go-jose.v2 v2.6.1 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
