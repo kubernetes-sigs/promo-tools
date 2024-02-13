@@ -7,7 +7,7 @@ require (
 	cloud.google.com/go/errorreporting v0.3.0
 	cloud.google.com/go/iam v1.1.6
 	cloud.google.com/go/logging v1.9.0
-	cloud.google.com/go/storage v1.37.0
+	cloud.google.com/go/storage v1.38.0
 	github.com/aws/aws-sdk-go v1.50.16
 	github.com/cenkalti/backoff/v4 v4.2.1
 	github.com/go-git/go-git/v5 v5.11.0
@@ -248,7 +248,7 @@ require (
 	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/tools v0.17.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20240125205218-1f4bbc51befe // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20240205150955-31a09d347014 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240205150955-31a09d347014 // indirect
 	google.golang.org/grpc v1.61.0 // indirect
 	google.golang.org/protobuf v1.32.0 // indirect
