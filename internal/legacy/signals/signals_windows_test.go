@@ -1,10 +1,8 @@
-//go:build !windows
-// +build !windows
-
-// Note: this build on unix/linux systems
+//go:build windows
+// +build windows
 
 /*
-Copyright 2021 The Kubernetes Authors.
+Copyright 2024 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -43,14 +41,8 @@ func TestLogSignal(t *testing.T) {
 	// Create multiple tests.
 	// NOTE: We are unable to observe SIGKILL or SIGSTOP, therefore we will not
 	// test with these syscalls.
+	// SIGIO, SIGSYS, SIGTTOU, and SIGCHLD are not available on Windows
 	sigTests := []sigTest{
-		{
-			signal: syscall.SIGIO,
-			expected: []string{
-				fmt.Sprintf("Encoutered signal: %s", syscall.SIGIO.String()),
-			},
-			terminate: false,
-		},
 		{
 			signal: syscall.SIGALRM,
 			expected: []string{
@@ -137,8 +129,6 @@ func TestLogSignals(t *testing.T) {
 	// the SignalChannel will block and the test will fail.
 	signals.SignalChannel <- syscall.SIGBUS
 	signals.SignalChannel <- syscall.SIGALRM
-	signals.SignalChannel <- syscall.SIGSYS
-	signals.SignalChannel <- syscall.SIGIO
 	// Force exit.
 	signals.Stop()
 	wg.Wait()
@@ -152,8 +142,6 @@ func TestLogSignals(t *testing.T) {
 	go logSignals()
 	// Pass multiple non-exit signals, ensuring LogSignals is consuming each. Otherwise,
 	// the SignalChannel will block and the test will fail.
-	signals.SignalChannel <- syscall.SIGTTOU
-	signals.SignalChannel <- syscall.SIGCHLD
 	signals.SignalChannel <- syscall.SIGPIPE
 	// Pass an exit signal.
 	signals.SignalChannel <- syscall.SIGINT
