@@ -848,7 +848,7 @@ func TestAudit(t *testing.T) {
 		// fakeReadRepo closes over "test" in the outer scope, as a closure
 		// should).
 		test := test
-		fakeReadRepo := func(sc *reg.SyncContext, rc registry.Context) stream.Producer {
+		fakeReadRepo := func(_ *reg.SyncContext, rc registry.Context) stream.Producer {
 			var sr stream.Fake
 
 			_, domain, repoPath := reg.GetTokenKeyDomainRepoPath(rc.Name)
@@ -860,7 +860,7 @@ func TestAudit(t *testing.T) {
 			return &sr
 		}
 
-		fakeReadManifestList := func(sc *reg.SyncContext, gmlc *reg.GCRManifestListContext) stream.Producer {
+		fakeReadManifestList := func(_ *reg.SyncContext, gmlc *reg.GCRManifestListContext) stream.Producer {
 			var sr stream.Fake
 
 			_, domain, repoPath := reg.GetTokenKeyDomainRepoPath(gmlc.RegistryContext.Name)

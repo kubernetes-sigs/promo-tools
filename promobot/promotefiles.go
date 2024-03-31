@@ -182,7 +182,7 @@ func ReadManifests(options PromoteFilesOptions) ([]*api.Manifest, error) {
 	// TODO: Consider using filepath.WalkDir() instead
 	if err := filepath.Walk(
 		filestoresDir,
-		func(p string, info os.FileInfo, err error) error {
+		func(_ string, info os.FileInfo, err error) error {
 			if err != nil {
 				return err
 			}

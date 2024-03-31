@@ -68,7 +68,7 @@ func MaybeUseServiceAccount(
 	useServiceAccount bool,
 	cmd []string,
 ) []string {
-	if useServiceAccount && len(serviceAccount) > 0 {
+	if useServiceAccount && serviceAccount != "" {
 		cmd = append(cmd, "")
 		copy(cmd[2:], cmd[1:])
 		cmd[1] = fmt.Sprintf("--account=%v", serviceAccount)

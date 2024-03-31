@@ -340,15 +340,16 @@ func diffProwFiles(dir string) (digests []string, err error) {
 	}
 
 	var base string
-	if jobType == jobTypePresubmit || jobType == jobTypeBatch {
+	switch jobType {
+	case jobTypePresubmit, jobTypeBatch:
 		pullBaseSHA := os.Getenv(pullBaseSHAEnv)
 		if pullBaseSHA == "" {
 			return nil, fmt.Errorf("%s not set", pullBaseSHAEnv)
 		}
 		base = pullBaseSHA
-	} else if jobType == jobTypePostsubmit {
+	case jobTypePostsubmit:
 		base = "HEAD^"
-	} else {
+	default:
 		return nil, fmt.Errorf("unknown job type: %s", jobType)
 	}
 

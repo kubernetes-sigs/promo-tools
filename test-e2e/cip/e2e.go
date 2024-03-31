@@ -81,7 +81,7 @@ func main() {
 		logrus.Fatal(err)
 	}
 
-	if len(*keyFilePtr) > 0 {
+	if *keyFilePtr != "" {
 		if err := gcloud.ActivateServiceAccount(*keyFilePtr); err != nil {
 			logrus.Fatalf("activating service account from .json: %q", err)
 		}
@@ -240,7 +240,7 @@ func getSnapshot(
 	}
 
 	svcAcc := extractSvcAcc(registryName, rcs)
-	if len(svcAcc) > 0 {
+	if svcAcc != "" {
 		invocation = append(invocation, "--snapshot-service-account="+svcAcc)
 	}
 

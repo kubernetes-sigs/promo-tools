@@ -39,7 +39,7 @@ func TestPromoteImages(t *testing.T) {
 			// No errors
 			shouldErr: false,
 			msg:       "No errors",
-			prepare:   func(fpi *imagefakes.FakePromoterImplementation) {},
+			prepare:   func(_ *imagefakes.FakePromoterImplementation) {},
 		},
 		{
 			// ValidateOptions fails

@@ -56,7 +56,7 @@ This command updates image promoter manifests and creates a PR in
 kubernetes/k8s.io`,
 	SilenceUsage:  true,
 	SilenceErrors: true,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(_ *cobra.Command, _ []string) error {
 		// Run the PR creation function
 		return runPromote(promoteOpts)
 	},

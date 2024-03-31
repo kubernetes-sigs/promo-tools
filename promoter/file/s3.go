@@ -272,7 +272,7 @@ func (s *s3SyncFilestore) ListFiles(
 		files[file.RelativePath] = file
 		return nil
 	}
-	pageCallback := func(page *s3.ListObjectsV2Output, hasNextPage bool) bool {
+	pageCallback := func(page *s3.ListObjectsV2Output, _ bool) bool {
 		for _, obj := range page.Contents {
 			err := objectCallback(obj)
 			if err != nil {

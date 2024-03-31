@@ -111,7 +111,7 @@ func TestFlush(t *testing.T) {
 	requestCounter := NewRequestCounter(33)
 	// Mock the logrus.Debug function.
 	debugCalls := 0
-	rc.Debug = func(args ...interface{}) {
+	rc.Debug = func(_ ...interface{}) {
 		debugCalls++
 	}
 	requestCounter.Flush()
@@ -136,7 +136,7 @@ func TestFlush(t *testing.T) {
 	debugCalls = 0
 	// Mock logrus.Warn.
 	warnCalls := 0
-	rc.Warn = func(args ...interface{}) {
+	rc.Warn = func(_ ...interface{}) {
 		warnCalls++
 	}
 	requestCounter.Flush()

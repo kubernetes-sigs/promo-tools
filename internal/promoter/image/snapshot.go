@@ -62,11 +62,12 @@ func (di *DefaultPromoterImplementation) GetSnapshotSourceRegistry(
 	// The only difference when running from Snapshot or
 	// ManifestBasedSnapshotOf will be the Name property
 	// of the source registry
-	if opts.Snapshot != "" {
+	switch {
+	case opts.Snapshot != "":
 		srcRegistry.Name = image.Registry(opts.Snapshot)
-	} else if opts.ManifestBasedSnapshotOf == "" {
+	case opts.ManifestBasedSnapshotOf == "":
 		srcRegistry.Name = image.Registry(opts.ManifestBasedSnapshotOf)
-	} else {
+	default:
 		return nil, errors.New(
 			"when snapshotting, Snapshot or ManifestBasedSnapshotOf have to be set",
 		)
@@ -136,7 +137,7 @@ func (di *DefaultPromoterImplementation) GetRegistryImageInventory(
 		return nil, fmt.Errorf("creting source registry for image inventory: %w", err)
 	}
 
-	if len(opts.ManifestBasedSnapshotOf) > 0 {
+	if opts.ManifestBasedSnapshotOf != "" {
 		promotionEdges, err := reg.ToPromotionEdges(mfests)
 		if err != nil {
 			return nil, fmt.Errorf("converting list of manifests to edges for promotion: %w", err)
