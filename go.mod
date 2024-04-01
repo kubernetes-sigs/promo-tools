@@ -8,7 +8,7 @@ require (
 	cloud.google.com/go/iam v1.1.7
 	cloud.google.com/go/logging v1.9.0
 	cloud.google.com/go/storage v1.40.0
-	github.com/aws/aws-sdk-go v1.51.10
+	github.com/aws/aws-sdk-go v1.51.11
 	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/go-git/go-git/v5 v5.12.0
 	github.com/google/go-cmp v0.6.0
@@ -16,7 +16,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/maxbrunsfeld/counterfeiter/v6 v6.8.1
 	github.com/nozzle/throttler v0.0.0-20180817012639-2ea982251481
-	github.com/sigstore/sigstore v1.8.2
+	github.com/sigstore/sigstore v1.8.3
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cobra v1.8.0
 	github.com/spf13/pflag v1.0.5
