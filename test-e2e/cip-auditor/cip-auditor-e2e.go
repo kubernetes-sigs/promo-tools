@@ -73,7 +73,7 @@ func main() {
 		logrus.Fatalf("-repo-root=... flag is required")
 	}
 
-	if len(*keyFilePtr) > 0 {
+	if *keyFilePtr != "" {
 		if err := gcloud.ActivateServiceAccount(*keyFilePtr); err != nil {
 			logrus.Fatalf("activating service account from .json: %q", err)
 		}
@@ -919,7 +919,7 @@ func checkLogs(projectID, uuid string, patterns []string) error {
 		}
 
 		// TODO: Is this required?
-		if len(stderr) > 0 {
+		if stderr != "" {
 			return fmt.Errorf(
 				"encountered stderr while searching logs: '%s'",
 				stderr,

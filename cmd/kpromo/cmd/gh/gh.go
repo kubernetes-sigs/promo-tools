@@ -40,7 +40,7 @@ var GHCmd = &cobra.Command{
 	Example:       "gh --org kubernetes --repo release --bucket k8s-staging-release-test --release-dir release --tags v0.0.0,v0.0.1",
 	SilenceUsage:  true,
 	SilenceErrors: true,
-	PreRunE: func(cmd *cobra.Command, args []string) error {
+	PreRunE: func(cmd *cobra.Command, _ []string) error {
 		return checkRequiredFlags(cmd.Flags())
 	},
 	RunE: func(*cobra.Command, []string) error {

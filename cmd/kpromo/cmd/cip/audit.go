@@ -35,7 +35,7 @@ Start an audit server that responds to Pub/Sub push events.
 `,
 	SilenceUsage:  true,
 	SilenceErrors: true,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(_ *cobra.Command, _ []string) error {
 		if err := cli.RunAuditCmd(auditOpts); err != nil {
 			return fmt.Errorf("run `cip audit`: %w", err)
 		}

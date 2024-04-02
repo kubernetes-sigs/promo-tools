@@ -1,7 +1,7 @@
 ---
 run:
   concurrency: 6
-  deadline: 5m
+  timeout: 10m
 issues:
   exclude-rules:
     # counterfeiter fakes are usually named 'fake_<something>.go'
@@ -119,58 +119,36 @@ linters-settings:
     check-blank: true
   gocritic:
     enabled-checks:
-      - appendAssign
       - appendCombine
-      - argOrder
-      - assignOp
-      - badCall
-      - badCond
       - badLock
       - badRegexp
       - badSorting
       - boolExprSimplify
       - builtinShadow
       - builtinShadowDecl
-      - captLocal
-      - caseOrder
-      - codegenComment
-      - commentFormatting
       - commentedOutCode
       - commentedOutImport
-      - defaultCaseOrder
       - deferInLoop
       - deferUnlambda
-      - deprecatedComment
       - docStub
-      - dupArg
-      - dupBranchBody
-      - dupCase
       - dupImport
-      - dupSubExpr
       - dynamicFmtString
-      - elseif
       - emptyDecl
       - emptyFallthrough
       - emptyStringTest
       - equalFold
       - evalOrder
-      - exitAfterDefer
       - externalErrorReassign
-      - flagDeref
-      - flagName
       - hexLiteral
       - httpNoBody
       - hugeParam
       - importShadow
       - indexAlloc
       - initClause
-      - mapKey
       - methodExprCall
       - nestingReduce
-      - newDeref
       - nilValReturn
       - octalLiteral
-      - offBy1
       - paramTypeCombine
       - preferDecodeRune
       - preferFilepathJoin
@@ -181,44 +159,27 @@ linters-settings:
       - rangeExprCopy
       - rangeValCopy
       - redundantSprint
-      - regexpMust
       - regexpPattern
       - regexpSimplify
       - returnAfterHttpError
       - ruleguard
-      - singleCaseSwitch
       - sliceClear
-      - sloppyLen
       - sloppyReassign
-      - sloppyTypeAssert
       - sortSlice
       - sprintfQuotedString
       - sqlQuery
       - stringConcatSimplify
       - stringXbytes
       - stringsCompare
-      - switchTrue
       - syncMapLoadAndDelete
-      - timeCmpSimplify
       - timeExprSimplify
       - tooManyResultsChecker
       - truncateCmp
       - typeAssertChain
-      - typeSwitchVar
       - typeUnparen
-      - underef
       - unlabelStmt
-      - unlambda
       - unnamedResult
       - unnecessaryBlock
       - unnecessaryDefer
-      - unslice
-      - valSwap
       - weakCond
-      - wrapperFunc
       - yodaStyleExpr
-      # - exposedSyncMutex
-      # - filepathJoin
-      # - ifElseChain
-      # - typeDefFirst
-      # - whyNoLint

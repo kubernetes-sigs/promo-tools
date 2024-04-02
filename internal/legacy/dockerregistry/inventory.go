@@ -1063,7 +1063,7 @@ func (sc *SyncContext) ReadGCRManifestLists(
 		sc *SyncContext,
 		reqs chan stream.ExternalRequest,
 		requestResults chan<- RequestResult,
-		wg *sync.WaitGroup,
+		_ *sync.WaitGroup,
 		mutex *sync.Mutex,
 	) {
 		for req := range reqs {
@@ -1166,18 +1166,19 @@ func SplitByKnownRegistries(
 	for _, rc := range rcs {
 		if strings.HasPrefix(string(r), string(rc.Name)) {
 			trimmed := strings.TrimPrefix(string(r), string(rc.Name))
-			if trimmed == "" {
+			switch {
+			case trimmed == "":
 				// The unparsed full image path `r` and rc.Name is the same ---
 				// this happens for images pushed to the root directory. Just
 				// get everything past the last '/' seen in `r` to get the image
 				// name.
 				i := strings.LastIndex(string(r), "/")
 				return rc.Name[:i], image.Name(string(r)[i+1:]), nil
-			} else if trimmed[0] == '/' {
+			case trimmed[0] == '/':
 				// Remove leading "/" character. This denotes a clean split
 				// along directory boundaries.
 				return rc.Name, image.Name(trimmed[1:]), nil
-			} else { //nolint: revive
+			default:
 				// This is an unclean split where we cut the string in the
 				// middle of a path name. E.g., if we have
 				//
@@ -1598,7 +1599,7 @@ func EdgesToRegInvImage(
 				string(edge.DstRegistry.Name),
 				destRegistry)
 
-			if len(prefix) > 0 {
+			if prefix != "" {
 				imgName = prefix + "/" + string(edge.DstImageTag.Name)
 			} else {
 				imgName = string(edge.DstImageTag.Name)
@@ -1695,11 +1696,11 @@ func (sc *SyncContext) Promote(
 
 		processRequest     ProcessRequest
 		processRequestReal ProcessRequest = func(
-			sc *SyncContext,
+			_ *SyncContext,
 			reqs chan stream.ExternalRequest,
 			requestResults chan<- RequestResult,
-			wg *sync.WaitGroup,
-			mutex *sync.Mutex,
+			_ *sync.WaitGroup,
+			_ *sync.Mutex,
 		) {
 			for req := range reqs {
 				reqRes := RequestResult{Context: req}
@@ -1845,10 +1846,10 @@ func (pr *PromotionRequest) PrettyValue() string {
 // captured (slurped out from the reqs channel).
 func MkRequestCapturer(captured *CapturedRequests) ProcessRequest {
 	return func(
-		sc *SyncContext,
+		_ *SyncContext,
 		reqs chan stream.ExternalRequest,
 		requestResults chan<- RequestResult,
-		wg *sync.WaitGroup,
+		_ *sync.WaitGroup,
 		mutex *sync.Mutex,
 	) {
 		for req := range reqs {
@@ -1954,11 +1955,11 @@ func (sc *SyncContext) ClearRepository(
 
 	var processRequest ProcessRequest
 	var processRequestReal ProcessRequest = func(
-		sc *SyncContext,
+		_ *SyncContext,
 		reqs chan stream.ExternalRequest,
 		requestResults chan<- RequestResult,
-		wg *sync.WaitGroup,
-		mutex *sync.Mutex,
+		_ *sync.WaitGroup,
+		_ *sync.Mutex,
 	) {
 		for req := range reqs {
 			reqRes := RequestResult{Context: req}
@@ -2167,7 +2168,7 @@ func (payload *GCRPubSubPayload) matchImage(
 // pieces we would like to use.
 func (payload *GCRPubSubPayload) PopulateExtraFields() error {
 	// Populate digest, if found.
-	if len(payload.FQIN) > 0 {
+	if payload.FQIN != "" {
 		parsed := strings.Split(payload.FQIN, "@")
 		if len(parsed) != 2 {
 			return fmt.Errorf("invalid FQIN: %v", payload.FQIN)
@@ -2177,7 +2178,7 @@ func (payload *GCRPubSubPayload) PopulateExtraFields() error {
 	}
 
 	// Populate tag, if found.
-	if len(payload.PQIN) > 0 {
+	if payload.PQIN != "" {
 		parsed := strings.Split(payload.PQIN, ":")
 		if len(parsed) != 2 {
 			return fmt.Errorf("invalid PQIN: %v", payload.PQIN)

@@ -1106,7 +1106,7 @@ func TestReadRegistries(t *testing.T) {
 		// test is used to pin the "test" variable from the outer "range"
 		// scope (see scopelint).
 		test := test
-		mkFakeStream1 := func(sc *reg.SyncContext, rc registry.Context) stream.Producer {
+		mkFakeStream1 := func(_ *reg.SyncContext, rc registry.Context) stream.Producer {
 			var sr stream.Fake
 
 			_, domain, repoPath := reg.GetTokenKeyDomainRepoPath(rc.Name)
@@ -1195,7 +1195,7 @@ func TestReadGManifestLists(t *testing.T) {
 		// test is used to pin the "test" variable from the outer "range"
 		// scope (see scopelint).
 		test := test
-		mkFakeStream1 := func(sc *reg.SyncContext, gmlc *reg.GCRManifestListContext) stream.Producer {
+		mkFakeStream1 := func(_ *reg.SyncContext, gmlc *reg.GCRManifestListContext) stream.Producer {
 			var sr stream.Fake
 
 			_, domain, repoPath := reg.GetTokenKeyDomainRepoPath(gmlc.RegistryContext.Name)
@@ -2552,11 +2552,11 @@ func TestExecRequests(t *testing.T) {
 	)
 
 	var processRequestSuccess reg.ProcessRequest = func(
-		sc *reg.SyncContext,
+		_ *reg.SyncContext,
 		reqs chan stream.ExternalRequest,
 		requestResults chan<- reg.RequestResult,
-		wg *sync.WaitGroup,
-		mutex *sync.Mutex,
+		_ *sync.WaitGroup,
+		_ *sync.Mutex,
 	) {
 		for req := range reqs {
 			reqRes := reg.RequestResult{Context: req}
@@ -2565,11 +2565,11 @@ func TestExecRequests(t *testing.T) {
 	}
 
 	var processRequestError reg.ProcessRequest = func(
-		sc *reg.SyncContext,
+		_ *reg.SyncContext,
 		reqs chan stream.ExternalRequest,
 		requestResults chan<- reg.RequestResult,
-		wg *sync.WaitGroup,
-		mutex *sync.Mutex,
+		_ *sync.WaitGroup,
+		_ *sync.Mutex,
 	) {
 		for req := range reqs {
 			reqRes := reg.RequestResult{Context: req}

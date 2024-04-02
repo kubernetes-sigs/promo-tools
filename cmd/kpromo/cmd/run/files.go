@@ -31,7 +31,7 @@ var filesCmd = &cobra.Command{
 	Short:         "Promote files from a staging object store to production",
 	SilenceUsage:  true,
 	SilenceErrors: true,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(_ *cobra.Command, _ []string) error {
 		if err := runFilePromotion(filesOpts); err != nil {
 			return fmt.Errorf("run `kpromo run files`: %w", err)
 		}

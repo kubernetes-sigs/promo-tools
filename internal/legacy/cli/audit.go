@@ -90,7 +90,7 @@ func (o *AuditOptions) set() {
 
 	// TODO: Should we allow this to be configurable via the command line?
 	o.UUID = os.Getenv("CIP_AUDIT_TESTCASE_UUID")
-	if len(o.UUID) > 0 {
+	if o.UUID != "" {
 		logrus.Infof("Starting auditor in Test Mode (%s)", o.UUID)
 	} else {
 		o.UUID = guuid.NewString()

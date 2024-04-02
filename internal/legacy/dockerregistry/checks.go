@@ -53,7 +53,7 @@ func MKImageVulnCheck(
 // images to be promoted have any severe vulnerabilities.
 func (check *ImageVulnCheck) Run() error {
 	var populateRequests PopulateRequests = func(
-		sc *SyncContext,
+		_ *SyncContext,
 		reqs chan<- stream.ExternalRequest,
 		wg *sync.WaitGroup,
 	) {
@@ -94,11 +94,11 @@ func (check *ImageVulnCheck) Run() error {
 
 	vulnerableImages := make([]string, 0)
 	var processRequest ProcessRequest = func(
-		sc *SyncContext,
+		_ *SyncContext,
 		reqs chan stream.ExternalRequest,
 		requestResults chan<- RequestResult,
-		wg *sync.WaitGroup,
-		mutex *sync.Mutex,
+		_ *sync.WaitGroup,
+		_ *sync.Mutex,
 	) {
 		for req := range reqs {
 			reqRes := RequestResult{Context: req}

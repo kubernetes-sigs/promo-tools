@@ -381,7 +381,7 @@ func (di *DefaultPromoterImplementation) readLatestImages(opts *options.Options)
 	}
 
 	var mt sync.Mutex
-	walkFn := func(repo name.Repository, tags *google.Tags, err error) error {
+	walkFn := func(repo name.Repository, tags *google.Tags, _ error) error {
 		if tags == nil {
 			return nil
 		}

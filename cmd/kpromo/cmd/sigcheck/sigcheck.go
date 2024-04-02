@@ -49,7 +49,7 @@ kpromo to the first three images it finds run:
     `,
 		SilenceUsage:  true,
 		SilenceErrors: true,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, args []string) error {
 			if len(args) > 0 {
 				opts.SignCheckReferences = args
 			}

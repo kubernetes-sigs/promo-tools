@@ -38,7 +38,7 @@ Promote images from a staging registry to production
 `,
 	SilenceUsage:  true,
 	SilenceErrors: true,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(_ *cobra.Command, _ []string) error {
 		if err := cli.RunPromoteCmd(runOpts); err != nil {
 			return fmt.Errorf("run `cip run`: %w", err)
 		}

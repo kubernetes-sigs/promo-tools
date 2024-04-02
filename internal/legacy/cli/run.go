@@ -76,7 +76,7 @@ func RunPromoteCmd(opts *options.Options) error {
 	// Mode 1: Manifest list verification (removed)
 
 	// Mode 2: Snapshots
-	if len(opts.Snapshot) > 0 || len(opts.ManifestBasedSnapshotOf) > 0 {
+	if opts.Snapshot != "" || opts.ManifestBasedSnapshotOf != "" {
 		return cip.Snapshot(opts)
 	}
 

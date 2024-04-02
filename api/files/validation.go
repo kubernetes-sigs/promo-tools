@@ -53,11 +53,12 @@ func ValidateFilestores(filestores []Filestore) error {
 		}
 
 		// Currently we support GCS and s3 backends.
-		if strings.HasPrefix(filestore.Base, GCSScheme+Backslash) { //nolint: revive
+		switch {
+		case strings.HasPrefix(filestore.Base, GCSScheme+Backslash):
 			// ok
-		} else if strings.HasPrefix(filestore.Base, S3Scheme+Backslash) { //nolint: revive
+		case strings.HasPrefix(filestore.Base, S3Scheme+Backslash):
 			// ok
-		} else {
+		default:
 			return fmt.Errorf(
 				"filestore has unsupported scheme in base %q",
 				filestore.Base)

@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+
 	"sigs.k8s.io/promo-tools/v4/promoter/image/ratelimit"
 )
 
@@ -48,7 +49,6 @@ func (h *HTTP) Produce() (stdOut, stdErr io.Reader, err error) {
 	// TODO: Does Close() need to be handled in a separate method?
 	//nolint:bodyclose // we close the response body in Close().
 	h.Res, err = client.Do(h.Req)
-
 	if err != nil {
 		return nil, nil, err
 	}
