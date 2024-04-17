@@ -91,9 +91,7 @@ Example PRs:
 Once the `kpromo pr` command is done take the following steps to complete image promotion and continue the release process:
 
 - Edit the PR description to add links for GCB jobs for `Mock Stage`, `Mock Release`, and `Official Stage` steps, or a link to the release tracking issue which includes the needed links
-- Once the PR is approved by Release Managers:
-  - If you're cutting Alpha, Beta, or RC release, lift the hold and proceed with the release process
-  - If you're cutting a stable release, ensure that a [Build Admin](https://kubernetes.io/releases/release-managers/#build-admins) is available to cut the packages before lifting the hold and proceeding with the release
+- Once the PR is approved by Release Managers lift the hold and proceed with the release process
 - After the Pull Request is merged and **before** starting the `Official Release` step, we need to watch the following [Prow Job](https://prow.k8s.io/?job=post-k8sio-image-promo) to succeed. When the latest master ran without errors, then we can continue with `Official Release`.
 
 ## Deprecated
