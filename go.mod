@@ -3,9 +3,9 @@ module sigs.k8s.io/promo-tools/v4
 go 1.22
 
 require (
-	cloud.google.com/go/containeranalysis v0.11.5
+	cloud.google.com/go/containeranalysis v0.11.6
 	cloud.google.com/go/errorreporting v0.3.0
-	cloud.google.com/go/iam v1.1.7
+	cloud.google.com/go/iam v1.1.8
 	cloud.google.com/go/logging v1.9.0
 	cloud.google.com/go/storage v1.40.0
 	github.com/aws/aws-sdk-go v1.51.32
@@ -25,7 +25,7 @@ require (
 	golang.org/x/time v0.5.0
 	golang.org/x/xerrors v0.0.0-20231012003039-104605ab7028
 	google.golang.org/api v0.177.0
-	google.golang.org/genproto v0.0.0-20240311173647-c811ad7063a7
+	google.golang.org/genproto v0.0.0-20240401170217-c3f982113cda
 	gopkg.in/src-d/go-git.v4 v4.13.1
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/utils v0.0.0-20230726121419-3b25d923346b
@@ -39,8 +39,8 @@ require (
 	cloud.google.com/go/auth v0.3.0 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.2 // indirect
 	cloud.google.com/go/compute/metadata v0.3.0 // indirect
-	cloud.google.com/go/grafeas v0.3.4 // indirect
-	cloud.google.com/go/longrunning v0.5.5 // indirect
+	cloud.google.com/go/grafeas v0.3.5 // indirect
+	cloud.google.com/go/longrunning v0.5.6 // indirect
 	cuelabs.dev/go/oci/ociregistry v0.0.0-20240314152124-224736b49f2e // indirect
 	cuelang.org/go v0.8.1 // indirect
 	dario.cat/mergo v1.0.0 // indirect
@@ -250,7 +250,7 @@ require (
 	golang.org/x/term v0.19.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/tools v0.19.0 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20240314234333-6e1732d8331c // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20240429193739-8cf5692501f6 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240429193739-8cf5692501f6 // indirect
 	google.golang.org/grpc v1.63.2 // indirect
 	google.golang.org/protobuf v1.34.0 // indirect
