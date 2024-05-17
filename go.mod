@@ -6,7 +6,7 @@ require (
 	cloud.google.com/go/containeranalysis v0.11.6
 	cloud.google.com/go/errorreporting v0.3.0
 	cloud.google.com/go/iam v1.1.8
-	cloud.google.com/go/logging v1.9.0
+	cloud.google.com/go/logging v1.10.0
 	cloud.google.com/go/storage v1.41.0
 	github.com/aws/aws-sdk-go v1.53.3
 	github.com/cenkalti/backoff/v4 v4.3.0
@@ -250,7 +250,7 @@ require (
 	golang.org/x/term v0.20.0 // indirect
 	golang.org/x/text v0.15.0 // indirect
 	golang.org/x/tools v0.21.0 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20240506185236-b8a5c65736ae // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20240513163218-0867130af1f8 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240513163218-0867130af1f8 // indirect
 	google.golang.org/grpc v1.63.2 // indirect
 	google.golang.org/protobuf v1.34.1 // indirect
