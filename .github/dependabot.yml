@@ -10,6 +10,6 @@ updates:
       - "ok-to-test"
     open-pull-requests-limit: 10
     groups:
-      actions:
+      gomod:
         update-types:
           - "patch"

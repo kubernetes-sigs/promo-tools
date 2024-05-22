@@ -18,7 +18,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-VERSION=v0.4.3
+VERSION=v0.5.3
 REPO_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 
 # Ensure that we find the binaries we build before anything else.
