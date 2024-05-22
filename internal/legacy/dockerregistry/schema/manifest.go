@@ -426,7 +426,7 @@ func ParseThinManifestFromFile(filePath string, digestsToCheck []string) (Manife
 	// Get directory name holding this thin manifest.
 	subProject := filepath.Base(filepath.Dir(filePath))
 	imagesPath := filepath.Join(filepath.Dir(filePath),
-		"../../images",
+		"..", "..", "images",
 		subProject,
 		"images.yaml")
 

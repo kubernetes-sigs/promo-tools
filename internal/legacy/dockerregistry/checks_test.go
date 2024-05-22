@@ -17,7 +17,7 @@ limitations under the License.
 package inventory_test
 
 import (
-	"fmt"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -142,7 +142,7 @@ func TestImageVulnCheck(t *testing.T) {
 					},
 				},
 			},
-			fmt.Errorf(vulMsg +
+			errors.New(vulMsg +
 				"    bar@sha256:111 [1 fixable severe vulnerabilities, 1 total]\n" +
 				"    foo@sha256:000 [1 fixable severe vulnerabilities, 1 total]"),
 		},
@@ -183,7 +183,7 @@ func TestImageVulnCheck(t *testing.T) {
 					},
 				},
 			},
-			fmt.Errorf(vulMsg +
+			errors.New(vulMsg +
 				"    bar@sha256:111 [2 fixable severe vulnerabilities, 2 total]\n" +
 				"    foo@sha256:000 [1 fixable severe vulnerabilities, 1 total]"),
 		},
@@ -206,7 +206,7 @@ func TestImageVulnCheck(t *testing.T) {
 					},
 				},
 			},
-			fmt.Errorf(vulMsg +
+			errors.New(vulMsg +
 				"    bar@sha256:111 [1 fixable severe vulnerabilities, 1 total]"),
 		},
 		{

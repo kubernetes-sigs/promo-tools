@@ -18,6 +18,7 @@ package promobot
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -117,11 +118,11 @@ func RunPromoteFiles(ctx context.Context, options PromoteFilesOptions) error {
 	// So that we can support future parallel execution, an error
 	// in one operation does not prevent us attempting the
 	// remaining operations
-	var errors []error
+	var errs []error
 	for _, op := range ops {
 		if _, err := fmt.Fprintf(options.Out, "%v\n", op); err != nil {
-			errors = append(
-				errors,
+			errs = append(
+				errs,
 				fmt.Errorf("error writing to output: %v", err),
 			)
 		}
@@ -129,20 +130,20 @@ func RunPromoteFiles(ctx context.Context, options PromoteFilesOptions) error {
 		if options.Confirm {
 			if err := op.Run(ctx); err != nil {
 				logrus.Warnf("error copying file: %v", err)
-				errors = append(errors, err)
+				errs = append(errs, err)
 			}
 		}
 	}
 
-	if len(errors) != 0 {
+	if len(errs) != 0 {
 		fmt.Fprintf(
 			options.Out,
 			"********** FINISHED WITH ERRORS **********\n")
-		for _, err := range errors {
+		for _, err := range errs {
 			fmt.Fprintf(options.Out, "%v\n", err)
 		}
 
-		return errors[0]
+		return errs[0]
 	}
 
 	if options.Confirm {
@@ -256,7 +257,7 @@ func ReadManifest(options PromoteFilesOptions) (*api.Manifest, error) {
 // readFilestores reads a filestores manifest
 func readFilestores(p string) ([]api.Filestore, error) {
 	if p == "" {
-		return nil, fmt.Errorf("FilestoresPath is required")
+		return nil, errors.New("FilestoresPath is required")
 	}
 
 	b, err := os.ReadFile(p)

@@ -18,6 +18,7 @@ package file
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
@@ -165,13 +166,13 @@ func useStorageClientAuth(
 
 	if confirm {
 		if filestore.ServiceAccount == "" {
-			return withAuth, fmt.Errorf("cannot execute a production file promotion without a service account")
+			return withAuth, errors.New("cannot execute a production file promotion without a service account")
 		}
 
 		withAuth = true
 	} else if useServiceAccount {
 		if filestore.ServiceAccount == "" {
-			return withAuth, fmt.Errorf("requested an authenticated file promotion, but a service account was not specified")
+			return withAuth, errors.New("requested an authenticated file promotion, but a service account was not specified")
 		}
 
 		withAuth = true
@@ -273,7 +274,7 @@ func (p *FilestorePromoter) BuildOperations(
 		return nil, err
 	}
 	if sourceFilestore == nil {
-		return nil, fmt.Errorf("source filestore cannot be nil")
+		return nil, errors.New("source filestore cannot be nil")
 	}
 
 	destFilestore, err := openFilestore(
@@ -286,7 +287,7 @@ func (p *FilestorePromoter) BuildOperations(
 		return nil, err
 	}
 	if destFilestore == nil {
-		return nil, fmt.Errorf("destination filestore cannot be nil")
+		return nil, errors.New("destination filestore cannot be nil")
 	}
 
 	sourceFiles, err := sourceFilestore.ListFiles(ctx)

@@ -19,6 +19,7 @@ package audit_test
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -90,12 +91,12 @@ func TestParsePubSubMessageBody(t *testing.T) {
 		{
 			"malformed JSON",
 			`{`,
-			fmt.Errorf("json.Unmarshal (message data): unexpected end of JSON input"),
+			errors.New("json.Unmarshal (message data): unexpected end of JSON input"),
 		},
 		{
 			"incompatible type (int for string)",
 			`{"action": 1}`,
-			fmt.Errorf("json.Unmarshal (message data): json: cannot unmarshal number into Go struct field GCRPubSubPayload.action of type string"),
+			errors.New("json.Unmarshal (message data): json: cannot unmarshal number into Go struct field GCRPubSubPayload.action of type string"),
 		},
 	}
 
@@ -126,7 +127,6 @@ func TestValidatePayload(t *testing.T) {
 	}
 
 	for _, input := range shouldBeValid {
-		input := input
 		err := audit.ValidatePayload(&input)
 		require.Nil(t, err)
 	}
@@ -139,7 +139,7 @@ func TestValidatePayload(t *testing.T) {
 			reg.GCRPubSubPayload{
 				Action: "INSERT",
 			},
-			fmt.Errorf(
+			errors.New(
 				`{Action: "INSERT", FQIN: "", PQIN: "", Path: "", Digest: "", Tag: ""}: neither 'digest' nor 'tag' was specified`,
 			),
 		},
@@ -147,7 +147,7 @@ func TestValidatePayload(t *testing.T) {
 			reg.GCRPubSubPayload{
 				FQIN: "gcr.io/foo/bar@sha256:0000000000000000000000000000000000000000000000000000000000000000",
 			},
-			fmt.Errorf(
+			errors.New(
 				`{Action: "", FQIN: "gcr.io/foo/bar@sha256:0000000000000000000000000000000000000000000000000000000000000000", PQIN: "", Path: "gcr.io/foo/bar", Digest: "sha256:0000000000000000000000000000000000000000000000000000000000000000", Tag: ""}: Action not specified`,
 			),
 		},
@@ -156,7 +156,7 @@ func TestValidatePayload(t *testing.T) {
 				Action: "DELETE",
 				FQIN:   "gcr.io/foo/bar@sha256:0000000000000000000000000000000000000000000000000000000000000000",
 			},
-			fmt.Errorf(
+			errors.New(
 				`{Action: "DELETE", FQIN: "gcr.io/foo/bar@sha256:0000000000000000000000000000000000000000000000000000000000000000", PQIN: "", Path: "gcr.io/foo/bar", Digest: "sha256:0000000000000000000000000000000000000000000000000000000000000000", Tag: ""}: deletions are prohibited`,
 			),
 		},
@@ -165,7 +165,7 @@ func TestValidatePayload(t *testing.T) {
 				Action: "WOOF",
 				FQIN:   "gcr.io/foo/bar@sha256:0000000000000000000000000000000000000000000000000000000000000000",
 			},
-			fmt.Errorf(
+			errors.New(
 				`{Action: "WOOF", FQIN: "gcr.io/foo/bar@sha256:0000000000000000000000000000000000000000000000000000000000000000", PQIN: "", Path: "gcr.io/foo/bar", Digest: "sha256:0000000000000000000000000000000000000000000000000000000000000000", Tag: ""}: unknown action "WOOF"`,
 			),
 		},
@@ -826,7 +826,7 @@ func TestAudit(t *testing.T) {
 
 		// Create a new Request to pass to the handler, which incorporates the
 		// GCRPubSubPayload.
-		payload, err := json.Marshal(test.payload)
+		payload, err := json.Marshal(test.payload) //nolint: musttag
 		require.Nil(t, err)
 
 		psm := audit.PubSubMessage{
@@ -840,14 +840,13 @@ func TestAudit(t *testing.T) {
 		b, err := json.Marshal(psm)
 		require.Nil(t, err)
 
-		r, err := http.NewRequest("POST", "/", bytes.NewBuffer(b))
+		r, err := http.NewRequest(http.MethodPost, "/", bytes.NewBuffer(b))
 		require.Nil(t, err)
 
 		// test is used to pin the "test" variable from the outer "range" scope
 		// (see scopelint) into the fakeReadRepo (in a sense it ensures that
 		// fakeReadRepo closes over "test" in the outer scope, as a closure
 		// should).
-		test := test
 		fakeReadRepo := func(_ *reg.SyncContext, rc registry.Context) stream.Producer {
 			var sr stream.Fake
 

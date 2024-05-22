@@ -229,7 +229,7 @@ func objectExists(opts *options.Options, refString string) (bool, error) {
 		}
 
 		var b bytes.Buffer
-		b.Write([]byte(certData))
+		b.WriteString(certData)
 
 		certs, err := cryptoutils.LoadCertificatesFromPEM(&b)
 		if err != nil {
@@ -242,6 +242,7 @@ func objectExists(opts *options.Options, refString string) (bool, error) {
 				return true, nil
 			}
 		}
+
 		signedLayers++
 	}
 
@@ -345,7 +346,7 @@ func (di *DefaultPromoterImplementation) signReference(opts *options.Options, re
 	// Add an annotation recording the kpromo version to ensure we
 	// get a 2nd signature, otherwise cosign will not resign a signed image:
 	signOpts.Annotations = []string{
-		fmt.Sprintf("org.kubernetes.kpromo.version=kpromo-%s", version.GetVersionInfo().GitVersion),
+		"org.kubernetes.kpromo.version=kpromo-" + version.GetVersionInfo().GitVersion,
 	}
 
 	if _, err := di.signer.SignImageWithOptions(signOpts, refString); err != nil {
@@ -370,8 +371,8 @@ func (di *DefaultPromoterImplementation) readLatestImages(opts *options.Options)
 		dateCutOffTo = time.Now().AddDate(0, 0, opts.SignCheckToDays*-1)
 	}
 	logrus.Infof("Checking images from %s to %s",
-		dateCutOff.Local().Format(time.RFC822),
-		dateCutOffTo.Local().Format(time.RFC822),
+		dateCutOff.Local().Format(time.RFC822),   //nolint: gosmopolitan
+		dateCutOffTo.Local().Format(time.RFC822), //nolint: gosmopolitan
 	)
 	images := []string{}
 

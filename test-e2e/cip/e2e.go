@@ -165,7 +165,7 @@ func testSetup(repoRoot string, t *E2ETest) error {
 		return fmt.Errorf("cleaning test repository: %w", err)
 	}
 
-	goldenPush := fmt.Sprintf("%s/test-e2e/golden-images/push-golden.sh", repoRoot)
+	goldenPush := repoRoot + "/test-e2e/golden-images/push-golden.sh"
 
 	cmd := command.NewWithWorkDir(
 		repoRoot,
@@ -271,36 +271,6 @@ func getSnapshot(
 	return images, err
 }
 
-func (t *E2ETest) clearRepositories() error {
-	// We need a SyncContext to clear the repos. That's it. The actual
-	// promotions will be done by the cip binary, not this tool.
-	sc, err := reg.MakeSyncContext(
-		[]schema.Manifest{
-			{Registries: t.Registries},
-		},
-		10,
-		true,
-		true)
-	if err != nil {
-		return fmt.Errorf("trying to create sync context: %w", err)
-	}
-
-	sc.ReadRegistries(
-		sc.RegistryContexts,
-		// Read all registries recursively, because we want to delete every
-		// image found in it (clearRepository works by deleting each image found
-		// in sc.Inv).
-		true,
-		reg.MkReadRepositoryCmdReal)
-
-	// Clear ALL registries in the test manifest. Blank slate!
-	for _, rc := range t.Registries {
-		fmt.Println("CLEARING REPO", rc.Name)
-		clearRepository(rc.Name, sc)
-	}
-	return nil
-}
-
 func clearRepository(regName image.Registry, sc *reg.SyncContext) {
 	mkDeletionCmd := func(
 		dest registry.Context,
@@ -339,6 +309,36 @@ type RegistrySnapshot struct {
 	Name   image.Registry  `yaml:"name,omitempty"`
 	Before registry.Images `yaml:"before,omitempty"`
 	After  registry.Images `yaml:"after,omitempty"`
+}
+
+func (t *E2ETest) clearRepositories() error {
+	// We need a SyncContext to clear the repos. That's it. The actual
+	// promotions will be done by the cip binary, not this tool.
+	sc, err := reg.MakeSyncContext(
+		[]schema.Manifest{
+			{Registries: t.Registries},
+		},
+		10,
+		true,
+		true)
+	if err != nil {
+		return fmt.Errorf("trying to create sync context: %w", err)
+	}
+
+	sc.ReadRegistries(
+		sc.RegistryContexts,
+		// Read all registries recursively, because we want to delete every
+		// image found in it (clearRepository works by deleting each image found
+		// in sc.Inv).
+		true,
+		reg.MkReadRepositoryCmdReal)
+
+	// Clear ALL registries in the test manifest. Blank slate!
+	for _, rc := range t.Registries {
+		fmt.Println("CLEARING REPO", rc.Name)
+		clearRepository(rc.Name, sc)
+	}
+	return nil
 }
 
 func readE2ETests(filePath string) (E2ETests, error) {

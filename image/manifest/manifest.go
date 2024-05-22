@@ -185,7 +185,7 @@ func Write(m schema.Manifest, rii registry.RegInvImage) error {
 	logrus.Infoln("RENDER", imagesPath)
 
 	// Write the file.
-	err := os.WriteFile(
+	err := os.WriteFile( //nolint: gosec
 		imagesPath, []byte(rii.ToYAML(registry.YamlMarshalingOpts{})), 0o644)
 	return err
 }

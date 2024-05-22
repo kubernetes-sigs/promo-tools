@@ -218,7 +218,7 @@ func mkRealVulnProducer(client *containeranalysis.Client) ImageVulnProducer {
 		ctx := context.Background()
 
 		req := &grafeaspb.ListOccurrencesRequest{
-			Parent: fmt.Sprintf("projects/%s", projectID),
+			Parent: "projects/" + projectID,
 			Filter: fmt.Sprintf("resourceUrl = %q kind = %q",
 				resourceURL, "VULNERABILITY"),
 		}

@@ -84,7 +84,7 @@ func (di *DefaultPromoterImplementation) GetSnapshotManifests(
 	// Build the source registry:
 	srcRegistry, err := di.GetSnapshotSourceRegistry(opts)
 	if err != nil {
-		return nil, fmt.Errorf("building source registry for snapshot")
+		return nil, errors.New("building source registry for snapshot")
 	}
 
 	// Add it to a new manifest and return it:

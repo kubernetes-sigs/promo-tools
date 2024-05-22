@@ -51,7 +51,6 @@ func TestReadManifests(t *testing.T) {
 	}
 
 	for _, g := range grid {
-		g := g // avoid closure go-tcha
 		t.Run(g.Expected, func(t *testing.T) {
 			manifests, err := promobot.ReadManifests(g.Options)
 			if err != nil {

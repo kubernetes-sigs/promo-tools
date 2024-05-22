@@ -18,6 +18,7 @@ package inventory
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -248,7 +249,7 @@ func (sc *SyncContext) GetPromotionCandidates(edges map[PromotionEdge]interface{
 					// NOP (already promoted).
 					logrus.Infof("edge %v: skipping because it was already promoted (case 2)\n", edge)
 					continue
-				} else { //nolint
+				} else {
 					logrus.Errorf("edge %v: tag %s: ERROR: tag move detected from %s to %s", edge, edge.DstImageTag.Tag, edge.Digest, *sc.getDigestForTag(edge.DstImageTag.Tag))
 					clean = false
 					// We continue instead of returning early, because we want
@@ -377,11 +378,11 @@ func CheckOverlappingEdges(
 	}
 
 	if overlapError {
-		return nil, fmt.Errorf("overlapping edges detected")
+		return nil, errors.New("overlapping edges detected")
 	}
 
 	if emptyEdgeListError {
-		return nil, fmt.Errorf("empty edgeList(s) detected")
+		return nil, errors.New("empty edgeList(s) detected")
 	}
 
 	return checked, nil
@@ -1207,7 +1208,7 @@ func MkReadRepositoryCmdReal(
 	tokenKey, domain, repoPath := GetTokenKeyDomainRepoPath(rc.Name)
 
 	httpReq, err := http.NewRequest(
-		"GET",
+		http.MethodGet,
 		fmt.Sprintf("https://%s/v2/%s/tags/list", domain, repoPath),
 		http.NoBody,
 	)
@@ -1254,7 +1255,7 @@ func MkReadManifestListCmdReal(sc *SyncContext, gmlc *GCRManifestListContext) st
 		gmlc.Digest,
 	)
 
-	httpReq, err := http.NewRequest("GET", endpoint, http.NoBody)
+	httpReq, err := http.NewRequest(http.MethodGet, endpoint, http.NoBody)
 
 	// Without this, GCR responds as we had used the "Accept:
 	// application/vnd.docker.distribution.manifest.v1+prettyjws" header.
@@ -1312,7 +1313,7 @@ func (sc *SyncContext) ExecRequests(
 		for reqRes := range requestResults {
 			if len(reqRes.Errors) > 0 {
 				(*mutex).Lock()
-				err = fmt.Errorf("encountered an error while executing requests")
+				err = errors.New("encountered an error while executing requests")
 				sc.Logs.Errors = append(sc.Logs.Errors, reqRes.Errors...)
 				(*mutex).Unlock()
 
@@ -1333,7 +1334,7 @@ func (sc *SyncContext) ExecRequests(
 			wg.Add(-1)
 		}
 	}()
-	for w := 0; w < MaxConcurrentRequests; w++ {
+	for range MaxConcurrentRequests {
 		go processRequest(sc, reqs, requestResults, wg, mutex)
 	}
 	// This can't be a goroutine, because the semaphore could be 0 by the time
@@ -1783,7 +1784,7 @@ func (sc *SyncContext) PrintCapturedRequests(capReqs *CapturedRequests) {
 	prs := make([]PromotionRequest, 0)
 
 	for req, count := range *capReqs {
-		for i := 0; i < count; i++ {
+		for range count {
 			prs = append(prs, req)
 		}
 	}

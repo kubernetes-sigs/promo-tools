@@ -18,6 +18,7 @@ package files
 
 import (
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -39,7 +40,7 @@ func (m *Manifest) Validate() error {
 // ValidateFilestores validates the Filestores field of the manifest.
 func ValidateFilestores(filestores []Filestore) error {
 	if len(filestores) == 0 {
-		return fmt.Errorf("at least one filestore must be specified")
+		return errors.New("at least one filestore must be specified")
 	}
 
 	var source *Filestore
@@ -49,7 +50,7 @@ func ValidateFilestores(filestores []Filestore) error {
 		filestore := &filestores[i]
 
 		if filestore.Base == "" {
-			return fmt.Errorf("filestore did not have base set")
+			return errors.New("filestore did not have base set")
 		}
 
 		// Currently we support GCS and s3 backends.
@@ -66,7 +67,7 @@ func ValidateFilestores(filestores []Filestore) error {
 
 		if filestore.Src {
 			if source != nil {
-				return fmt.Errorf("found multiple source filestores")
+				return errors.New("found multiple source filestores")
 			}
 			source = filestore
 		} else {
@@ -74,11 +75,11 @@ func ValidateFilestores(filestores []Filestore) error {
 		}
 	}
 	if source == nil {
-		return fmt.Errorf("source filestore not found")
+		return errors.New("source filestore not found")
 	}
 
 	if destinationCount == 0 {
-		return fmt.Errorf("no destination filestores found")
+		return errors.New("no destination filestores found")
 	}
 
 	return nil
@@ -87,18 +88,18 @@ func ValidateFilestores(filestores []Filestore) error {
 // ValidateFiles validates the Files field of the manifest.
 func ValidateFiles(files []File) error {
 	if len(files) == 0 {
-		return fmt.Errorf("at least one file must be specified")
+		return errors.New("at least one file must be specified")
 	}
 
 	for i := range files {
 		f := &files[i]
 
 		if f.Name == "" {
-			return fmt.Errorf("name is required for file")
+			return errors.New("name is required for file")
 		}
 
 		if f.SHA256 == "" {
-			return fmt.Errorf("sha256 is required for file")
+			return errors.New("sha256 is required for file")
 		}
 
 		sha256, err := hex.DecodeString(f.SHA256)

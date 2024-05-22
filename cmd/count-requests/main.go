@@ -77,7 +77,7 @@ func getSubProjects() []string {
 	_, err = cmd.Output()
 	handle(cmd, err)
 	// List the number of sub-projects in the repo.
-	subProjects := fmt.Sprintf("%s/k8s.gcr.io/manifests", tmpDir)
+	subProjects := tmpDir + "/k8s.gcr.io/manifests"
 	cmd = exec.Command("ls", subProjects)
 	out, err = cmd.Output()
 	handle(cmd, err)
@@ -124,7 +124,7 @@ func makeRequest(query string) response {
 
 	// Keep requesting until valid response or too many retries.
 	for retries := 5; retries >= 1; retries-- {
-		resp, err = http.Get(query)
+		resp, err = http.Get(query) //nolint: gosec
 		if err == nil {
 			payload = getPayload(resp)
 		} else if retries == 0 {
