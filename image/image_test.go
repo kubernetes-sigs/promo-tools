@@ -73,8 +73,8 @@ func TestPromoterImageParse(t *testing.T) {
 func TestPromoterImageToYAML(t *testing.T) {
 	imageList := &ManifestList{
 		struct {
-			Name string              "json:\"name\""
-			DMap map[string][]string "json:\"dmap\""
+			Name string              `json:"name"`
+			DMap map[string][]string `json:"dmap"`
 		}{
 			Name: "hyperkube",
 			DMap: map[string][]string{
@@ -84,8 +84,8 @@ func TestPromoterImageToYAML(t *testing.T) {
 			},
 		},
 		struct {
-			Name string              "json:\"name\""
-			DMap map[string][]string "json:\"dmap\""
+			Name string              `json:"name"`
+			DMap map[string][]string `json:"dmap"`
 		}{
 			Name: "conformance",
 			DMap: map[string][]string{
@@ -93,8 +93,8 @@ func TestPromoterImageToYAML(t *testing.T) {
 			},
 		},
 		struct {
-			Name string              "json:\"name\""
-			DMap map[string][]string "json:\"dmap\""
+			Name string              `json:"name"`
+			DMap map[string][]string `json:"dmap"`
 		}{
 			Name: "kube-proxy",
 			DMap: map[string][]string{
@@ -121,8 +121,8 @@ func TestPromoterImageToYAML(t *testing.T) {
 func TestPromoterImageWrite(t *testing.T) {
 	imageList := &ManifestList{
 		struct {
-			Name string              "json:\"name\""
-			DMap map[string][]string "json:\"dmap\""
+			Name string              `json:"name"`
+			DMap map[string][]string `json:"dmap"`
 		}{
 			Name: "kube-controller-manager-s390x",
 			DMap: map[string][]string{
@@ -131,8 +131,8 @@ func TestPromoterImageWrite(t *testing.T) {
 			},
 		},
 		struct {
-			Name string              "json:\"name\""
-			DMap map[string][]string "json:\"dmap\""
+			Name string              `json:"name"`
+			DMap map[string][]string `json:"dmap"`
 		}{
 			Name: "kube-scheduler",
 			DMap: map[string][]string{

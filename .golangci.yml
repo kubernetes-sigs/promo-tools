@@ -23,18 +23,21 @@ linters:
     - asciicheck
     - bidichk
     - bodyclose
-    - containedctx
+    - canonicalheader
     - contextcheck
+    - copyloopvar
     - decorder
     - dogsled
     - dupl
-    - dupword
     - durationcheck
     - errcheck
     - errchkjson
     - errname
-    - execinquery
     - exportloopref
+    - fatcontext
+    - ginkgolinter
+    - gocheckcompilerdirectives
+    - gochecksumtype
     - goconst
     - gocritic
     - gocyclo
@@ -46,38 +49,50 @@ linters:
     - gomoddirectives
     - gomodguard
     - goprintffuncname
+    - gosec
     - gosimple
+    - gosmopolitan
     - govet
     - grouper
     - importas
     - ineffassign
+    - intrange
     - loggercheck
     - makezero
+    - mirror
     - misspell
     - nakedret
-    - nilerr
-    - nilnil
     - nolintlint
     - nosprintfhostport
+    - perfsprint
     - prealloc
     - predeclared
     - promlinter
+    - protogetter
     - reassign
     - revive
     - rowserrcheck
+    - sloglint
+    - spancheck
     - sqlclosecheck
     - staticcheck
     - stylecheck
+    - tagalign
     - tenv
     - testableexamples
-    - tparallel
     - typecheck
     - unconvert
     - unparam
     - unused
+    - usestdlibvars
     - wastedassign
     - whitespace
+    - zerologlint
+    # - containedctx
     # - cyclop
+    # - depguard
+    # - dupword
+    # - err113
     # - errorlint
     # - exhaustive
     # - exhaustruct
@@ -89,26 +104,34 @@ linters:
     # - gochecknoinits
     # - gocognit
     # - godot
-    # - goerr113
-    # - gomnd
-    # - gosec
+    # - inamedparam
     # - interfacebloat
     # - ireturn
     # - lll
     # - maintidx
+    # - mnd
     # - nestif
+    # - nilerr
+    # - nilnil
     # - nlreturn
     # - noctx
     # - nonamedreturns
     # - paralleltest
     # - tagliatelle
+    # - testifylint
     # - testpackage
     # - thelper
-    # - usestdlibvars
+    # - tparallel
     # - varnamelen
     # - wrapcheck
     # - wsl
 linters-settings:
+  revive:
+    rules:
+      - name: unused-parameter
+        disabled: true
+  gocyclo:
+    min-complexity: 40
   godox:
     keywords:
       - BUG
@@ -138,7 +161,9 @@ linters-settings:
       - emptyStringTest
       - equalFold
       - evalOrder
+      - exposedSyncMutex
       - externalErrorReassign
+      - filepathJoin
       - hexLiteral
       - httpNoBody
       - hugeParam
@@ -176,10 +201,22 @@ linters-settings:
       - tooManyResultsChecker
       - truncateCmp
       - typeAssertChain
+      - typeDefFirst
       - typeUnparen
+      - uncheckedInlineErr
       - unlabelStmt
       - unnamedResult
       - unnecessaryBlock
       - unnecessaryDefer
       - weakCond
       - yodaStyleExpr
+  nolintlint:
+    # Enable to ensure that nolint directives are all used. Default is true.
+    allow-unused: false
+    # Exclude following linters from requiring an explanation.  Default is [].
+    allow-no-explanation: []
+    # Enable to require an explanation of nonzero length after each nolint directive. Default is false.
+    # TODO(lint): Enforce explanations for `nolint` directives
+    require-explanation: false
+    # Enable to require nolint directives to mention the specific linter being suppressed. Default is false.
+    require-specific: true

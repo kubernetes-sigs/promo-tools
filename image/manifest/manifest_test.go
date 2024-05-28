@@ -17,6 +17,7 @@ limitations under the License.
 package manifest_test
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -65,8 +66,8 @@ func TestFind(t *testing.T) {
 			schema.Manifest{},
 			&os.PathError{
 				Op:   "stat",
-				Path: filepath.Join(pwd, "empty/images"),
-				Err:  fmt.Errorf("no such file or directory"),
+				Path: filepath.Join(pwd, "empty", "images"),
+				Err:  errors.New("no such file or directory"),
 			},
 		},
 		{
@@ -99,7 +100,7 @@ func TestFind(t *testing.T) {
 						},
 					},
 				},
-				Filepath: filepath.Join(pwd, "singleton/manifests/a/promoter-manifest.yaml"),
+				Filepath: filepath.Join(pwd, "singleton", "manifests", "a", "promoter-manifest.yaml"),
 			},
 			nil,
 		},

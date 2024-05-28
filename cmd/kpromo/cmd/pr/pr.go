@@ -353,7 +353,7 @@ func mustRun(opts *promoteOptions, question string) bool {
 	if !opts.interactiveMode {
 		return true
 	}
-	_, success, err := util.Ask(fmt.Sprintf("%s (Y/n)", question), "y:Y:yes|n:N:no|y", 10)
+	_, success, err := util.Ask(question+" (Y/n)", "y:Y:yes|n:N:no|y", 10)
 	if err != nil {
 		logrus.Error(err)
 		if err.(util.UserInputError).IsCtrlC() {
@@ -369,7 +369,7 @@ func mustRun(opts *promoteOptions, question string) bool {
 
 // generatePRBody creates the body of the Image Promotion Pull Request
 func generatePRBody(opts *promoteOptions) string {
-	args := fmt.Sprintf("--fork %s", opts.userFork)
+	args := "--fork " + opts.userFork
 	if opts.interactiveMode {
 		args += " --interactive"
 	}

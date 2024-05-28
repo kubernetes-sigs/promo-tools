@@ -18,7 +18,7 @@ package file
 
 import (
 	"context"
-	"crypto/md5"
+	"crypto/md5" //nolint: gosec
 	"crypto/sha256"
 	"crypto/sha512"
 	"encoding/base64"
@@ -58,7 +58,7 @@ type s3SyncFilestore struct {
 
 // openS3Filestore opens a filestore backed by Amazon S3 (S3)
 
-func (p *s3Provider) OpenFilestore(ctx context.Context, filestore *api.Filestore, useServiceAccount, config bool) (syncFilestore, error) { //nolint: revive
+func (p *s3Provider) OpenFilestore(ctx context.Context, filestore *api.Filestore, useServiceAccount, config bool) (syncFilestore, error) {
 	u, err := url.Parse(filestore.Base)
 	if err != nil {
 		return nil, fmt.Errorf(
@@ -304,7 +304,7 @@ type Hashes struct {
 func computeHashes(in io.ReadSeeker) (*Hashes, error) {
 	hasherSHA256 := sha256.New()
 	hasherSHA512 := sha512.New()
-	hasherMD5 := md5.New()
+	hasherMD5 := md5.New() //nolint: gosec
 
 	hasher := io.MultiWriter(hasherMD5, hasherSHA256, hasherSHA512)
 

@@ -17,7 +17,7 @@ limitations under the License.
 package registry
 
 import (
-	"fmt"
+	"errors"
 
 	"sigs.k8s.io/promo-tools/v4/internal/legacy/gcloud"
 	"sigs.k8s.io/promo-tools/v4/types/image"
@@ -35,11 +35,10 @@ type Context struct {
 // GetSrcRegistry gets the source registry.
 func GetSrcRegistry(rcs []Context) (*Context, error) {
 	for _, registry := range rcs {
-		registry := registry
 		if registry.Src {
 			return &registry, nil
 		}
 	}
 
-	return nil, fmt.Errorf("could not find source registry")
+	return nil, errors.New("could not find source registry")
 }

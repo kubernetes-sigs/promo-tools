@@ -285,7 +285,7 @@ func testSetup(repoRoot, projectID string, t *E2ETest) error {
 }
 
 func populateGoldenImages(repoRoot string) error {
-	goldenPush := fmt.Sprintf("%s/test-e2e/golden-images/push-golden.sh", repoRoot)
+	goldenPush := repoRoot + "/test-e2e/golden-images/push-golden.sh"
 	cmd := command.NewWithWorkDir(
 		repoRoot,
 		goldenPush,
@@ -323,36 +323,6 @@ func getWorkspaceStatus(repoRoot string) map[string]string {
 	return status
 }
 
-func (t *E2ETest) clearRepositories() error {
-	// We need a SyncContext to clear the repos. That's it. The actual
-	// promotions will be done by the cip binary, not this tool.
-	sc, err := reg.MakeSyncContext(
-		[]schema.Manifest{
-			{Registries: t.Registries},
-		},
-		10,
-		true,
-		true)
-	if err != nil {
-		return err
-	}
-
-	sc.ReadRegistries(
-		sc.RegistryContexts,
-		// Read all registries recursively, because we want to delete every
-		// image found in it (clearRepository works by deleting each image found
-		// in sc.Inv).
-		true,
-		reg.MkReadRepositoryCmdReal)
-
-	// Clear ALL registries in the test manifest. Blank slate!
-	for _, rc := range t.Registries {
-		fmt.Println("CLEARING REPO", rc.Name)
-		clearRepository(rc.Name, sc)
-	}
-	return nil
-}
-
 func getCmdEnableService(projectID, service string) []string {
 	return []string{
 		"gcloud",
@@ -360,7 +330,7 @@ func getCmdEnableService(projectID, service string) []string {
 		"services",
 		"enable",
 		service,
-		fmt.Sprintf("--project=%s", projectID),
+		"--project=" + projectID,
 	}
 }
 
@@ -370,7 +340,7 @@ func getCmdListLogs(projectID string) []string {
 		"logging",
 		"logs",
 		"list",
-		fmt.Sprintf("--project=%s", projectID),
+		"--project=" + projectID,
 	}
 }
 
@@ -382,7 +352,7 @@ func getCmdDeleteLogs(projectID string) []string {
 		"logs",
 		"delete",
 		auditLogName,
-		fmt.Sprintf("--project=%s", projectID),
+		"--project=" + projectID,
 	}
 }
 
@@ -394,7 +364,7 @@ func getCmdDeleteErrorReportingEvents(projectID string) []string {
 		"error-reporting",
 		"events",
 		"delete",
-		fmt.Sprintf("--project=%s", projectID),
+		"--project=" + projectID,
 	}
 }
 
@@ -406,7 +376,7 @@ func getCmdListCloudRunServices(projectID string) []string {
 		"services",
 		"--platform=managed",
 		"list",
-		fmt.Sprintf("--project=%s", projectID),
+		"--project=" + projectID,
 	}
 }
 
@@ -419,7 +389,7 @@ func getCmdDeleteCloudRunServices(projectID string) []string {
 		"--platform=managed",
 		"delete",
 		auditorName,
-		fmt.Sprintf("--project=%s", projectID),
+		"--project=" + projectID,
 		"--region=us-central1",
 	}
 }
@@ -432,7 +402,7 @@ func getCmdListSubscriptions(projectID string) []string {
 		"subscriptions",
 		"list",
 		"--format=value(name)",
-		fmt.Sprintf("--project=%s", projectID),
+		"--project=" + projectID,
 	}
 }
 
@@ -443,7 +413,7 @@ func getCmdDeleteSubscription(projectID string) []string {
 		"subscriptions",
 		"delete",
 		subscriptionName,
-		fmt.Sprintf("--project=%s", projectID),
+		"--project=" + projectID,
 	}
 }
 
@@ -455,7 +425,7 @@ func getCmdListTopics(projectID string) []string {
 		"topics",
 		"list",
 		"--format=value(name)",
-		fmt.Sprintf("--project=%s", projectID),
+		"--project=" + projectID,
 	}
 }
 
@@ -466,7 +436,7 @@ func getCmdDeleteTopic(projectID, topic string) []string {
 		"topics",
 		"delete",
 		topic,
-		fmt.Sprintf("--project=%s", projectID),
+		"--project=" + projectID,
 	}
 }
 
@@ -477,7 +447,7 @@ func getCmdCreateTopic(projectID, topic string) []string {
 		"topics",
 		"create",
 		topic,
-		fmt.Sprintf("--project=%s", projectID),
+		"--project=" + projectID,
 	}
 }
 
@@ -506,10 +476,10 @@ func getCmdEmpowerServiceAccount(
 		"services",
 		"add-iam-policy-binding",
 		auditorName,
-		fmt.Sprintf("--member=serviceAccount:%s", invokerServiceAccount),
+		"--member=serviceAccount:" + invokerServiceAccount,
 		"--role=roles/run.invoker",
 		"--platform=managed",
-		fmt.Sprintf("--project=%s", projectID),
+		"--project=" + projectID,
 		"--region=us-central1",
 	}
 }
@@ -522,7 +492,7 @@ func getCmdPurgePubSubMessages(projectID string) []string {
 		"seek",
 		subscriptionName,
 		"--time=+p1y",
-		fmt.Sprintf("--project=%s", projectID),
+		"--project=" + projectID,
 	}
 }
 
@@ -535,7 +505,7 @@ func getCmdCloudRunPushEndpoint(projectID string) []string {
 		auditorName,
 		"--platform=managed",
 		"--format=value(status.url)",
-		fmt.Sprintf("--project=%s", projectID),
+		"--project=" + projectID,
 		"--region=us-central1",
 	}
 }
@@ -553,9 +523,9 @@ func getCmdCreatePubSubSubscription(
 		subscriptionName,
 		"--topic=gcr",
 		"--expiration-period=never",
-		fmt.Sprintf("--push-auth-service-account=%s", invokerServiceAccount),
-		fmt.Sprintf("--push-endpoint=%s", pushEndpoint),
-		fmt.Sprintf("--project=%s", projectID),
+		"--push-auth-service-account=" + invokerServiceAccount,
+		"--push-endpoint=" + pushEndpoint,
+		"--project=" + projectID,
 	}
 }
 
@@ -568,7 +538,7 @@ func getCmdShowLogs(projectID, uuid, pattern string) []string {
 		"read",
 		"--format=value(textPayload)",
 		fmt.Sprintf("logName=%s resource.labels.project_id=%s %q", fullLogName, projectID, uuidAndPattern),
-		fmt.Sprintf("--project=%s", projectID),
+		"--project=" + projectID,
 	}
 }
 
@@ -598,22 +568,22 @@ func getCmdsDeployCloudRun(
 			"run",
 			"deploy",
 			auditorName,
-			fmt.Sprintf("--image=%s", auditorImg),
+			"--image=" + auditorImg,
 			fmt.Sprintf("--update-env-vars=%s,%s,%s",
-				fmt.Sprintf("CIP_AUDIT_MANIFEST_REPO_MANIFEST_DIR=%s", manifestDir),
-				fmt.Sprintf("CIP_AUDIT_GCP_PROJECT_ID=%s", projectID),
+				"CIP_AUDIT_MANIFEST_REPO_MANIFEST_DIR="+manifestDir,
+				"CIP_AUDIT_GCP_PROJECT_ID="+projectID,
 				// Generate a new UUID for this Cloud Run instance. Although the
 				// Cloud Run instance gets a UUID assigned to it, using that
 				// would require fetching it from within the instance which is
 				// unnecessarily complicated. Instead we just generate one here
 				// and thread it through to the instance.
-				fmt.Sprintf("CIP_AUDIT_TESTCASE_UUID=%s", uuid),
+				"CIP_AUDIT_TESTCASE_UUID="+uuid,
 			),
 			"--platform=managed",
 			"--no-allow-unauthenticated",
 			"--region=us-central1",
-			fmt.Sprintf("--project=%s", projectID),
-			fmt.Sprintf("--service-account=%s", invokerServiceAccount),
+			"--project=" + projectID,
+			"--service-account=" + invokerServiceAccount,
 		},
 	}
 }
@@ -969,6 +939,36 @@ type E2ETest struct {
 
 // E2ETests is an array of E2ETest.
 type E2ETests []*E2ETest
+
+func (t *E2ETest) clearRepositories() error {
+	// We need a SyncContext to clear the repos. That's it. The actual
+	// promotions will be done by the cip binary, not this tool.
+	sc, err := reg.MakeSyncContext(
+		[]schema.Manifest{
+			{Registries: t.Registries},
+		},
+		10,
+		true,
+		true)
+	if err != nil {
+		return err
+	}
+
+	sc.ReadRegistries(
+		sc.RegistryContexts,
+		// Read all registries recursively, because we want to delete every
+		// image found in it (clearRepository works by deleting each image found
+		// in sc.Inv).
+		true,
+		reg.MkReadRepositoryCmdReal)
+
+	// Clear ALL registries in the test manifest. Blank slate!
+	for _, rc := range t.Registries {
+		fmt.Println("CLEARING REPO", rc.Name)
+		clearRepository(rc.Name, sc)
+	}
+	return nil
+}
 
 func readE2ETests(filePath string) (E2ETests, error) {
 	var ts E2ETests

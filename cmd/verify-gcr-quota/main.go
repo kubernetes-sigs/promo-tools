@@ -82,7 +82,7 @@ func main() {
 
 // getRandQuery randomly selects a query from the list of queries.
 func getRandQuery() string {
-	i := rand.Intn(len(queries))
+	i := rand.Intn(len(queries)) //nolint: gosec
 	return queries[i]
 }
 
@@ -98,7 +98,7 @@ func spawnWorkers(n int, c chan message) {
 // response to the given channel.
 func worker(c chan message) {
 	query := getRandQuery()
-	resp, err := http.Get(query)
+	resp, err := http.Get(query) //nolint: gosec
 	if err != nil {
 		fmt.Println("Encountered an error during HTTP GET request: ", err)
 	}

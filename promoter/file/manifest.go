@@ -18,6 +18,7 @@ package file
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/sirupsen/logrus"
@@ -83,13 +84,13 @@ func getSourceFilestore(manifest *api.Manifest) (*api.Filestore, error) {
 		filestore := &manifest.Filestores[i]
 		if filestore.Src {
 			if source != nil {
-				return nil, fmt.Errorf("found multiple source filestores")
+				return nil, errors.New("found multiple source filestores")
 			}
 			source = filestore
 		}
 	}
 	if source == nil {
-		return nil, fmt.Errorf("source filestore not found")
+		return nil, errors.New("source filestore not found")
 	}
 	return source, nil
 }

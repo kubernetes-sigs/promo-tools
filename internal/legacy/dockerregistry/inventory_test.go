@@ -127,7 +127,7 @@ func TestParseRegistryManifest(t *testing.T) {
 			"Empty manifest (invalid)",
 			``,
 			schema.Manifest{},
-			fmt.Errorf(`'registries' field cannot be empty`),
+			errors.New(`'registries' field cannot be empty`),
 		},
 		{
 			"Stub manifest (`images` field is empty)",
@@ -218,7 +218,7 @@ images:
     "sha256:07353f7b26327f0d933515a22b1de587b040d3d85c464ea299c1b9f242529326": [ "1.8.3" ]  # Branches: ['master']
 `,
 			schema.Manifest{},
-			fmt.Errorf("source registry must be set"),
+			errors.New("source registry must be set"),
 		},
 	}
 
@@ -258,8 +258,8 @@ func TestParseThinManifestsFromDir(t *testing.T) {
 			[]schema.Manifest{},
 			&os.PathError{
 				Op:   "stat",
-				Path: filepath.Join(pwd, "empty/images"),
-				Err:  fmt.Errorf("no such file or directory"),
+				Path: filepath.Join(pwd, "empty", "images"),
+				Err:  errors.New("no such file or directory"),
 			},
 		},
 		{
@@ -567,21 +567,21 @@ func TestValidateThinManifestsFromDir(t *testing.T) {
 			"empty",
 			&os.PathError{
 				Op:   "stat",
-				Path: filepath.Join(pwd, "invalid/empty/images"),
-				Err:  fmt.Errorf("no such file or directory"),
+				Path: filepath.Join(pwd, "invalid", "empty", "images"),
+				Err:  errors.New("no such file or directory"),
 			},
 			nil,
 		},
 		{
 			"overlapping-destination-vertices-different-digest",
 			nil,
-			fmt.Errorf("overlapping edges detected"),
+			errors.New("overlapping edges detected"),
 		},
 		{
 			"malformed-directory-tree-structure",
 			fmt.Errorf(
 				"corresponding file %q does not exist",
-				filepath.Join(pwd, "invalid/malformed-directory-tree-structure/images/b/images.yaml"),
+				filepath.Join(pwd, "invalid", "malformed-directory-tree-structure", "images", "b", "images.yaml"),
 			),
 			nil,
 		},
@@ -589,7 +589,7 @@ func TestValidateThinManifestsFromDir(t *testing.T) {
 			"malformed-directory-tree-structure-nested",
 			fmt.Errorf(
 				"unexpected manifest path %q",
-				filepath.Join(pwd, "invalid/malformed-directory-tree-structure-nested/manifests/b/c/promoter-manifest.yaml"),
+				filepath.Join(pwd, "invalid", "malformed-directory-tree-structure-nested", "manifests", "b", "c", "promoter-manifest.yaml"),
 			),
 			nil,
 		},
@@ -1103,9 +1103,6 @@ func TestReadRegistries(t *testing.T) {
 			DigestMediaType:  make(reg.DigestMediaType),
 		}
 
-		// test is used to pin the "test" variable from the outer "range"
-		// scope (see scopelint).
-		test := test
 		mkFakeStream1 := func(_ *reg.SyncContext, rc registry.Context) stream.Producer {
 			var sr stream.Fake
 
@@ -1192,9 +1189,6 @@ func TestReadGManifestLists(t *testing.T) {
 			ParentDigest: make(reg.ParentDigest),
 		}
 
-		// test is used to pin the "test" variable from the outer "range"
-		// scope (see scopelint).
-		test := test
 		mkFakeStream1 := func(_ *reg.SyncContext, gmlc *reg.GCRManifestListContext) stream.Producer {
 			var sr stream.Fake
 
@@ -1229,7 +1223,6 @@ func TestGetTokenKeyDomainRepoPath(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test := test
 		t.Run(
 			test.name,
 			func(t *testing.T) {
@@ -1794,7 +1787,7 @@ func TestCheckOverlappingEdges(t *testing.T) {
 				}: nil,
 			},
 			nil,
-			fmt.Errorf("overlapping edges detected"),
+			errors.New("overlapping edges detected"),
 		},
 		{ //nolint:dupl
 			"Basic case (two tagless edges (different digests, same PQIN), no overlap)",
@@ -1874,7 +1867,7 @@ func (c *FakeCheckAlwaysSucceed) Run() error {
 type FakeCheckAlwaysFail struct{}
 
 func (c *FakeCheckAlwaysFail) Run() error {
-	return fmt.Errorf("there was an error in the pull request check")
+	return errors.New("there was an error in the pull request check")
 }
 
 func TestRunChecks(t *testing.T) {
@@ -1897,7 +1890,7 @@ func TestRunChecks(t *testing.T) {
 			[]reg.PreCheck{
 				&FakeCheckAlwaysFail{},
 			},
-			fmt.Errorf("1 error(s) encountered during the prechecks"),
+			errors.New("1 error(s) encountered during the prechecks"),
 		},
 		{
 			"Checking pull request with successful and unsuccessful checks",
@@ -1906,7 +1899,7 @@ func TestRunChecks(t *testing.T) {
 				&FakeCheckAlwaysFail{},
 				&FakeCheckAlwaysFail{},
 			},
-			fmt.Errorf("2 error(s) encountered during the prechecks"),
+			errors.New("2 error(s) encountered during the prechecks"),
 		},
 	}
 
@@ -2573,12 +2566,12 @@ func TestExecRequests(t *testing.T) {
 	) {
 		for req := range reqs {
 			reqRes := reg.RequestResult{Context: req}
-			errors := make(reg.Errors, 0)
-			errors = append(errors, reg.Error{
+			errs := make(reg.Errors, 0)
+			errs = append(errs, reg.Error{
 				Context: "Running TestExecRequests",
-				Error:   fmt.Errorf("This request results in an error"),
+				Error:   errors.New("This request results in an error"),
 			})
-			reqRes.Errors = errors
+			reqRes.Errors = errs
 			requestResults <- reqRes
 		}
 	}
@@ -2598,7 +2591,7 @@ func TestExecRequests(t *testing.T) {
 			processRequestError,
 			// TODO: We should have a better check here. Checking the exact
 			//       message will throw errors any time we change the copy.
-			fmt.Errorf("encountered an error while executing requests"),
+			errors.New("encountered an error while executing requests"),
 		},
 	}
 
@@ -2730,7 +2723,7 @@ func TestValidateEdges(t *testing.T) {
 					},
 				},
 			},
-			fmt.Errorf("[edge &{{gcr.io/src robot  true} {a 1.0} sha256:222 {gcr.io/dst robot  false} {a 1.0}}: tag '1.0' in dest points to sha256:111, not sha256:222 (as per the manifest), but tag moves are not supported; skipping]"),
+			errors.New("[edge &{{gcr.io/src robot  true} {a 1.0} sha256:222 {gcr.io/dst robot  false} {a 1.0}}: tag '1.0' in dest points to sha256:111, not sha256:222 (as per the manifest), but tag moves are not supported; skipping]"),
 		},
 	}
 
@@ -3105,7 +3098,7 @@ func TestPopulateExtraFields(t *testing.T) {
 				Digest: "",
 				Tag:    "",
 			},
-			fmt.Errorf("invalid FQIN: k8s.gcr.io/subproject/foosha256:000"),
+			errors.New("invalid FQIN: k8s.gcr.io/subproject/foosha256:000"),
 		},
 		{
 			"PQIN missing colon",
@@ -3117,7 +3110,7 @@ func TestPopulateExtraFields(t *testing.T) {
 				Digest: "",
 				Tag:    "",
 			},
-			fmt.Errorf("invalid PQIN: k8s.gcr.io/subproject/foo1.0"),
+			errors.New("invalid PQIN: k8s.gcr.io/subproject/foo1.0"),
 		},
 	}
 

@@ -145,7 +145,6 @@ func (di *DefaultPromoterImplementation) SignImages(
 	t := throttler.New(opts.MaxSignatureOps, len(sortedEdges))
 	// Sign the required edges
 	for d := range sortedEdges {
-		d := d
 		go func(k key) {
 			t.Done(di.signAndReplicate(signOpts, k.identity, sortedEdges[k]))
 		}(d)
@@ -172,7 +171,7 @@ func (di *DefaultPromoterImplementation) signAndReplicate(signOpts *sign.Options
 	// Add an annotation recording the kpromo version to ensure we
 	// get a 2nd signature, otherwise cosign will not resign a signed image:
 	signOptsCopy.Annotations = []string{
-		fmt.Sprintf("org.kubernetes.kpromo.version=kpromo-%s", version.GetVersionInfo().GitVersion),
+		"org.kubernetes.kpromo.version=kpromo-" + version.GetVersionInfo().GitVersion,
 	}
 
 	logrus.Infof("Signing image %s", imageRef)
@@ -372,7 +371,7 @@ func (di *DefaultPromoterImplementation) GetIdentityToken(
 	defer c.Close()
 	logrus.Infof("Signing identity for images will be %s", serviceAccount)
 	req := &credentialspb.GenerateIdTokenRequest{
-		Name:         fmt.Sprintf("projects/-/serviceAccounts/%s", serviceAccount),
+		Name:         "projects/-/serviceAccounts/" + serviceAccount,
 		Audience:     oidcTokenAudience, // Should be set to "sigstore"
 		IncludeEmail: true,
 	}
@@ -382,7 +381,7 @@ func (di *DefaultPromoterImplementation) GetIdentityToken(
 		return tok, fmt.Errorf("getting error account: %w", err)
 	}
 
-	return resp.Token, nil
+	return resp.GetToken(), nil
 }
 
 // PrewarmTUFCache initializes the TUF cache so that threads do not have to compete

@@ -32,7 +32,7 @@ type Subprocess struct {
 // stderr).
 func (sp *Subprocess) Produce() (stdOut, stdErr io.Reader, err error) {
 	invocation := sp.CmdInvocation
-	cmd := exec.Command(invocation[0], invocation[1:]...)
+	cmd := exec.Command(invocation[0], invocation[1:]...) //nolint: gosec
 	stdoutReader, err := cmd.StdoutPipe()
 	if err != nil {
 		return nil, nil, err

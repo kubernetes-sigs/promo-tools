@@ -42,45 +42,45 @@ func TestLogSignal(t *testing.T) {
 		{
 			signal: syscall.SIGIO,
 			expected: []string{
-				fmt.Sprintf("Encoutered signal: %s", syscall.SIGIO.String()),
+				"Encoutered signal: " + syscall.SIGIO.String(),
 			},
 			terminate: false,
 		},
 		{
 			signal: syscall.SIGALRM,
 			expected: []string{
-				fmt.Sprintf("Encoutered signal: %s", syscall.SIGALRM.String()),
+				"Encoutered signal: " + syscall.SIGALRM.String(),
 			},
 			terminate: false,
 		},
 		{
 			signal: syscall.SIGALRM,
 			expected: []string{
-				fmt.Sprintf("Encoutered signal: %s", syscall.SIGALRM.String()),
+				"Encoutered signal: " + syscall.SIGALRM.String(),
 			},
 			terminate: false,
 		},
 		{
 			signal: syscall.SIGQUIT,
 			expected: []string{
-				fmt.Sprintf("Encoutered signal: %s", syscall.SIGQUIT.String()),
-				fmt.Sprintf("Exiting from signal: %s", syscall.SIGQUIT.String()),
+				"Encoutered signal: " + syscall.SIGQUIT.String(),
+				"Exiting from signal: " + syscall.SIGQUIT.String(),
 			},
 			terminate: true,
 		},
 		{
 			signal: syscall.SIGINT,
 			expected: []string{
-				fmt.Sprintf("Encoutered signal: %s", syscall.SIGINT.String()),
-				fmt.Sprintf("Exiting from signal: %s", syscall.SIGINT.String()),
+				"Encoutered signal: " + syscall.SIGINT.String(),
+				"Exiting from signal: " + syscall.SIGINT.String(),
 			},
 			terminate: true,
 		},
 		{
 			signal: syscall.SIGABRT,
 			expected: []string{
-				fmt.Sprintf("Encoutered signal: %s", syscall.SIGABRT.String()),
-				fmt.Sprintf("Exiting from signal: %s", syscall.SIGABRT.String()),
+				"Encoutered signal: " + syscall.SIGABRT.String(),
+				"Exiting from signal: " + syscall.SIGABRT.String(),
 			},
 			terminate: true,
 		},

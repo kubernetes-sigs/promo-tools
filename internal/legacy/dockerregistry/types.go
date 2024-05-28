@@ -70,7 +70,7 @@ type CollectedLogs struct {
 }
 
 // SyncContext is the main data structure for performing the promotion.
-type SyncContext struct {
+type SyncContext struct { //nolint: gocritic
 	sync.Mutex
 	Threads           int
 	Confirm           bool
