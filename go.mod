@@ -3,12 +3,12 @@ module sigs.k8s.io/promo-tools/v4
 go 1.22.4
 
 require (
-	cloud.google.com/go/containeranalysis v0.11.6
+	cloud.google.com/go/containeranalysis v0.11.7
 	cloud.google.com/go/errorreporting v0.3.0
-	cloud.google.com/go/iam v1.1.8
+	cloud.google.com/go/iam v1.1.9
 	cloud.google.com/go/logging v1.10.0
 	cloud.google.com/go/storage v1.42.0
-	github.com/aws/aws-sdk-go v1.54.8
+	github.com/aws/aws-sdk-go v1.54.9
 	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/go-git/go-git/v5 v5.12.0
 	github.com/google/go-cmp v0.6.0
@@ -39,7 +39,7 @@ require (
 	cloud.google.com/go/auth v0.6.0 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.2 // indirect
 	cloud.google.com/go/compute/metadata v0.3.0 // indirect
-	cloud.google.com/go/grafeas v0.3.5 // indirect
+	cloud.google.com/go/grafeas v0.3.6 // indirect
 	cloud.google.com/go/longrunning v0.5.7 // indirect
 	cuelabs.dev/go/oci/ociregistry v0.0.0-20240314152124-224736b49f2e // indirect
 	cuelang.org/go v0.8.1 // indirect
@@ -250,7 +250,7 @@ require (
 	golang.org/x/term v0.21.0 // indirect
 	golang.org/x/text v0.16.0 // indirect
 	golang.org/x/tools v0.21.1-0.20240508182429-e35e4ccd0d2d // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20240610135401-a8a62080eff3 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20240617180043-68d350f18fd4 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240617180043-68d350f18fd4 // indirect
 	google.golang.org/grpc v1.64.0 // indirect
 	google.golang.org/protobuf v1.34.2 // indirect
