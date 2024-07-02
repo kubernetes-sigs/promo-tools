@@ -189,30 +189,9 @@ func runPromote(opts *promoteOptions) error {
 	branchname := opts.project + "-" + opts.tags[0] + promotionBranchSuffix
 
 	// Get the github org and repo from the fork slug
-	userForkOrg, userForkRepo, err := git.ParseRepoSlug(opts.userFork)
+	repo, err := prepareRepository(branchname, opts)
 	if err != nil {
-		return fmt.Errorf("parsing user's fork: %w", err)
-	}
-	if userForkRepo == "" {
-		userForkRepo = k8sioRepo
-	}
-
-	// Check Environment
-	gh := github.New()
-
-	// Verify the repository is a fork of k8s.io
-	if err = github.VerifyFork(
-		branchname, userForkOrg, userForkRepo, git.DefaultGithubOrg, k8sioRepo,
-	); err != nil {
-		return fmt.Errorf("while checking fork of %s/%s: %w ", git.DefaultGithubOrg, k8sioRepo, err)
-	}
-
-	// Clone k8s.io
-	// We might want to set options to pass for the clone, nothing for now
-	gitCloneOpts := &gogit.CloneOptions{}
-	repo, err := github.PrepareFork(branchname, git.DefaultGithubOrg, k8sioRepo, userForkOrg, userForkRepo, opts.useSSH, opts.updateRepo, gitCloneOpts)
-	if err != nil {
-		return fmt.Errorf("while preparing k/k8s.io fork: %w", err)
+		return err
 	}
 
 	defer func() {
@@ -223,6 +202,62 @@ func runPromote(opts *promoteOptions) error {
 		}
 	}()
 
+	// Handle manifests
+	modified, err := handleManifests(ctx, repo, opts)
+	if err != nil {
+		return err
+	}
+
+	if !modified {
+		logrus.Info("No changes detected in the promoter images list, exiting without changes")
+		return nil
+	}
+
+	// Commit and push changes
+	err = commitAndPushChanges(repo, branchname, opts)
+	if err != nil {
+		return err
+	}
+
+	// Create the pull request
+	if mustRun(opts, "Create pull request?") {
+		err = createPullRequest(opts, branchname)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func prepareRepository(branchname string, opts *promoteOptions) (*git.Repo, error) {
+	userForkOrg, userForkRepo, err := git.ParseRepoSlug(opts.userFork)
+	if err != nil {
+		return nil, fmt.Errorf("parsing user's fork: %w", err)
+	}
+	if userForkRepo == "" {
+		userForkRepo = k8sioRepo
+	}
+
+	// Verify the repository is a fork of k8s.io
+	if err = github.VerifyFork(
+		branchname, userForkOrg, userForkRepo, git.DefaultGithubOrg, k8sioRepo,
+	); err != nil {
+		return nil, fmt.Errorf("while checking fork of %s/%s: %w ", git.DefaultGithubOrg, k8sioRepo, err)
+	}
+
+	// Clone k8s.io
+	// We might want to set options to pass for the clone, nothing for now
+	gitCloneOpts := &gogit.CloneOptions{}
+	repo, err := github.PrepareFork(branchname, git.DefaultGithubOrg, k8sioRepo, userForkOrg, userForkRepo, opts.useSSH, opts.updateRepo, gitCloneOpts)
+	if err != nil {
+		return nil, fmt.Errorf("while preparing k/k8s.io fork: %w", err)
+	}
+
+	return repo, nil
+}
+
+func handleManifests(ctx context.Context, repo *git.Repo, opts *promoteOptions) (bool, error) {
 	// Path to the promoter image list
 	imagesListPath := filepath.Join(
 		consts.ProdRegistry,
@@ -232,7 +267,8 @@ func runPromote(opts *promoteOptions) error {
 	)
 
 	// Read the current manifest to check later if new images come up
-	oldlist := make([]byte, 0)
+	var oldlist []byte
+	var err error
 
 	// Run the promoter manifest grower
 	if mustRun(opts, "Grow the manifests to add the new tags?") {
@@ -240,7 +276,7 @@ func runPromote(opts *promoteOptions) error {
 			logrus.Debug("Reading the current image promoter manifest (image list)")
 			oldlist, err = os.ReadFile(filepath.Join(repo.Dir(), imagesListPath))
 			if err != nil {
-				return fmt.Errorf("while reading the current promoter image list: %w", err)
+				return false, fmt.Errorf("while reading the current promoter image list: %w", err)
 			}
 		}
 
@@ -248,62 +284,65 @@ func runPromote(opts *promoteOptions) error {
 		if err := opt.Populate(
 			filepath.Join(repo.Dir(), consts.ProdRegistry),
 			consts.StagingRepoPrefix+opts.project, opts.images, opts.digests, opts.tags); err != nil {
-			return fmt.Errorf("populating image promoter options for tag %s with image filter %s: %w", opts.tags, opts.images, err)
+			return false, fmt.Errorf("populating image promoter options for tag %s with image filter %s: %w", opts.tags, opts.images, err)
 		}
 
 		if err := opt.Validate(); err != nil {
-			return fmt.Errorf("validate promoter options tag %s with image filter %s: %w", opts.tags, opts.images, err)
+			return false, fmt.Errorf("validate promoter options tag %s with image filter %s: %w", opts.tags, opts.images, err)
 		}
 
 		logrus.Infof("Growing manifests for images matching filter %s and matching tag %s", opts.images, opts.tags)
 		if err := manifest.Grow(ctx, &opt); err != nil {
-			return fmt.Errorf("growing manifest with image filter %s and tag %s: %w", opts.images, opts.tags, err)
+			return false, fmt.Errorf("growing manifest with image filter %s and tag %s: %w", opts.images, opts.tags, err)
 		}
-	}
 
-	// Re-write the image list without the mock images
-	rawImageList, err := image.NewManifestListFromFile(filepath.Join(repo.Dir(), imagesListPath))
-	if err != nil {
-		return fmt.Errorf("parsing the current manifest: %w", err)
-	}
-
-	// Create a new imagelist to copy the non-mock images
-	newImageList := &image.ManifestList{}
-
-	// Copy all non mock-images:
-	for _, imageData := range *rawImageList {
-		if !strings.Contains(imageData.Name, "mock/") {
-			*newImageList = append(*newImageList, imageData)
-		}
-	}
-
-	// Write the modified manifest
-	if err := newImageList.Write(filepath.Join(repo.Dir(), imagesListPath)); err != nil {
-		return fmt.Errorf("while writing the promoter image list: %w", err)
-	}
-
-	// Check if the image list was modified
-	if len(oldlist) > 0 {
-		logrus.Debug("Checking if the image list was modified")
-		// read the newly modified manifest
-		newlist, err := os.ReadFile(filepath.Join(repo.Dir(), imagesListPath))
+		// Re-write the image list without the mock images
+		rawImageList, err := image.NewManifestListFromFile(filepath.Join(repo.Dir(), imagesListPath))
 		if err != nil {
-			return fmt.Errorf("while reading the modified manifest images list: %w", err)
+			return false, fmt.Errorf("parsing the current manifest: %w", err)
 		}
 
-		// If the manifest was not modified, exit now
-		if bytes.Equal(newlist, oldlist) {
-			logrus.Info("No changes detected in the promoter images list, exiting without changes")
-			return nil
+		// Create a new imagelist to copy the non-mock images
+		newImageList := &image.ManifestList{}
+
+		// Copy all non mock-images:
+		for _, imageData := range *rawImageList {
+			if !strings.Contains(imageData.Name, "mock/") {
+				*newImageList = append(*newImageList, imageData)
+			}
+		}
+
+		// Write the modified manifest
+		if err := newImageList.Write(filepath.Join(repo.Dir(), imagesListPath)); err != nil {
+			return false, fmt.Errorf("while writing the promoter image list: %w", err)
+		}
+
+		// Check if the image list was modified
+		if len(oldlist) > 0 {
+			logrus.Debug("Checking if the image list was modified")
+			// read the newly modified manifest
+			newlist, err := os.ReadFile(filepath.Join(repo.Dir(), imagesListPath))
+			if err != nil {
+				return false, fmt.Errorf("while reading the modified manifest images list: %w", err)
+			}
+
+			// If the manifest was not modified, exit now
+			if bytes.Equal(newlist, oldlist) {
+				return false, nil
+			}
+		}
+
+		// add the modified manifest to staging
+		logrus.Debugf("Adding %s to staging area", imagesListPath)
+		if err := repo.Add(imagesListPath); err != nil {
+			return false, fmt.Errorf("adding image manifest to staging area: %w", err)
 		}
 	}
 
-	// add the modified manifest to staging
-	logrus.Debugf("Adding %s to staging area", imagesListPath)
-	if err := repo.Add(imagesListPath); err != nil {
-		return fmt.Errorf("adding image manifest to staging area: %w", err)
-	}
+	return true, nil
+}
 
+func commitAndPushChanges(repo *git.Repo, branchname string, opts *promoteOptions) error {
 	commitMessage := "Image promotion for " + opts.project + " " + strings.Join(opts.tags, " / ")
 	if opts.project == consts.StagingRepoSuffix {
 		commitMessage = "releng: " + commitMessage
@@ -316,33 +355,35 @@ func runPromote(opts *promoteOptions) error {
 	}
 
 	// Push to fork
-	if mustRun(opts, fmt.Sprintf("Push changes to user's fork at %s/%s?", userForkOrg, userForkRepo)) {
-		logrus.Infof("Pushing manifest changes to %s/%s", userForkOrg, userForkRepo)
+	if mustRun(opts, fmt.Sprintf("Push changes to user's fork at %s/%s?", opts.userFork, k8sioRepo)) {
+		logrus.Infof("Pushing manifest changes to %s/%s", opts.userFork, k8sioRepo)
 		if err := repo.PushToRemote(github.UserForkName, branchname); err != nil {
-			return fmt.Errorf("pushing %s to %s/%s: %w", github.UserForkName, userForkOrg, userForkRepo, err)
+			return fmt.Errorf("pushing %s to %s/%s: %w", github.UserForkName, opts.userFork, k8sioRepo, err)
 		}
 	} else {
 		// Exit if no push was made
-
-		logrus.Infof("Exiting without creating a PR since changes were not pushed to %s/%s", userForkOrg, userForkRepo)
+		logrus.Infof("Exiting without creating a PR since changes were not pushed to %s/%s", opts.userFork, k8sioRepo)
 		return nil
 	}
 
-	// Create the Pull Request
-	if mustRun(opts, "Create pull request?") {
-		pr, err := gh.CreatePullRequest(
-			git.DefaultGithubOrg, k8sioRepo, k8sioDefaultBranch,
-			fmt.Sprintf("%s:%s", userForkOrg, branchname),
-			commitMessage, generatePRBody(opts),
-		)
-		if err != nil {
-			return fmt.Errorf("creating the pull request in k/k8s.io: %w", err)
-		}
-		logrus.Infof(
-			"Successfully created PR: %s%s/%s/pull/%d",
-			github.GitHubURL, git.DefaultGithubOrg, k8sioRepo, pr.GetNumber(),
-		)
+	return nil
+}
+
+func createPullRequest(opts *promoteOptions, branchname string) error {
+	gh := github.New()
+	pr, err := gh.CreatePullRequest(
+		git.DefaultGithubOrg, k8sioRepo, k8sioDefaultBranch,
+		fmt.Sprintf("%s:%s", opts.userFork, branchname),
+		"Image promotion for "+opts.project+" "+strings.Join(opts.tags, " / "),
+		generatePRBody(opts),
+	)
+	if err != nil {
+		return fmt.Errorf("creating the pull request in k/k8s.io: %w", err)
 	}
+	logrus.Infof(
+		"Successfully created PR: %s%s/%s/pull/%d",
+		github.GitHubURL, git.DefaultGithubOrg, k8sioRepo, pr.GetNumber(),
+	)
 
 	// Success!
 	return nil
