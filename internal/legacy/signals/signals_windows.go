@@ -1,10 +1,8 @@
-//go:build !windows
-// +build !windows
-
-// Note: this build on unix/linux systems
+//go:build windows
+// +build windows
 
 /*
-Copyright 2021 The Kubernetes Authors.
+Copyright 2024 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -39,7 +37,6 @@ var (
 		syscall.SIGQUIT: true,
 		syscall.SIGTERM: true,
 		syscall.SIGSEGV: true,
-		syscall.SIGTSTP: true,
 	}
 	// ExitChannel is for gracefully terminating the LogSignals() function.
 	ExitChannel = make(chan bool, 1)
