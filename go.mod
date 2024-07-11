@@ -5,10 +5,10 @@ go 1.22.4
 require (
 	cloud.google.com/go/containeranalysis v0.11.8
 	cloud.google.com/go/errorreporting v0.3.1
-	cloud.google.com/go/iam v1.1.10
+	cloud.google.com/go/iam v1.1.11
 	cloud.google.com/go/logging v1.10.0
 	cloud.google.com/go/storage v1.43.0
-	github.com/aws/aws-sdk-go v1.54.17
+	github.com/aws/aws-sdk-go v1.54.18
 	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/go-git/go-git/v5 v5.12.0
 	github.com/google/go-cmp v0.6.0
