@@ -7,8 +7,8 @@ cloud.google.com/go/auth/oauth2adapt v0.2.2 h1:+TTV8aXpjeChS9M+aTtN/TjdQnzJvmzKF
 cloud.google.com/go/auth/oauth2adapt v0.2.2/go.mod h1:wcYjgpZI9+Yu7LyYBg4pqSiaRkfEK3GQcpb7C/uyF1Q=
 cloud.google.com/go/compute/metadata v0.4.0 h1:vHzJCWaM4g8XIcm8kopr3XmDA4Gy/lblD3EhhSux05c=
 cloud.google.com/go/compute/metadata v0.4.0/go.mod h1:SIQh1Kkb4ZJ8zJ874fqVkslA29PRXuleyj6vOzlbK7M=
-cloud.google.com/go/containeranalysis v0.11.8 h1:1rkYgK2szbRH311mRw/3lkeEOqrjN+2gOD7AZhMUxZw=
-cloud.google.com/go/containeranalysis v0.11.8/go.mod h1:2ru4oxs6dCcaG3ZsmKAy4yMmG68ukOuS/IRCMEHYpLo=
+cloud.google.com/go/containeranalysis v0.12.0 h1:c5/40le3c4Kxf8cU4yFDPoA2LTjqCPu3sonzRmipicM=
+cloud.google.com/go/containeranalysis v0.12.0/go.mod h1:a3Yo1yk1Dv4nVmlxcJWOJDqsnzy5I1HmETg2UGlERhs=
 cloud.google.com/go/errorreporting v0.3.1 h1:E/gLk+rL7u5JZB9oq72iL1bnhVlLrnfslrgcptjJEUE=
 cloud.google.com/go/errorreporting v0.3.1/go.mod h1:6xVQXU1UuntfAf+bVkFk6nld41+CPyF2NSPCyXE3Ztk=
 cloud.google.com/go/grafeas v0.3.6 h1:7bcA10EBgTsxeAVypJhz2Dv3fhrdlO7Ml8l7ZZA2IkE=
