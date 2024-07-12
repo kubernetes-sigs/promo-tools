@@ -23,7 +23,6 @@ import (
 	"strings"
 
 	"github.com/sirupsen/logrus"
-
 	"sigs.k8s.io/release-utils/command"
 )
 

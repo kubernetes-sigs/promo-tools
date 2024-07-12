@@ -20,7 +20,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// ManifestCmd is a kpromo subcommand which just holds further subcommands
+// ManifestCmd is a kpromo subcommand which just holds further subcommands.
 var ManifestCmd = &cobra.Command{
 	Use:           "manifest",
 	Short:         "Generate/modify a manifest for artifact promotion",

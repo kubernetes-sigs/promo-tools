@@ -20,7 +20,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// RunCmd is a kpromo subcommand which just holds further subcommands
+// RunCmd is a kpromo subcommand which just holds further subcommands.
 var RunCmd = &cobra.Command{
 	Use:           "run",
 	Short:         "Run artifact promotion",

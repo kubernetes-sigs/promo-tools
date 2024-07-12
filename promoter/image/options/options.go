@@ -20,7 +20,7 @@ import (
 	"errors"
 )
 
-// Options capture the switches available to run the image promoter
+// Options capture the switches available to run the image promoter.
 type Options struct {
 	// Threads determines how many promotion threads will run
 	Threads int
@@ -153,7 +153,7 @@ func (o *Options) Validate() error {
 	return nil
 }
 
-// RunOptions capture the options of a run
+// RunOptions capture the options of a run.
 type RunOptions struct {
 	// Confirm
 	Confirm bool

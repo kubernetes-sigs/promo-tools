@@ -16,7 +16,7 @@ limitations under the License.
 
 package image
 
-// UserAgent header to be used in the requests
+// UserAgent header to be used in the requests.
 const UserAgent = "kpromo"
 
 // Name can be just the bare name itself (e.g., "addon-builder" in

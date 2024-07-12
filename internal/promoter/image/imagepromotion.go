@@ -50,7 +50,7 @@ func (di *DefaultPromoterImplementation) ParseManifests(opts *options.Options) (
 }
 
 // MakeSyncContext takes a slice of manifests and creates a sync context
-// object based on them and the promoter options
+// object based on them and the promoter options.
 func (di DefaultPromoterImplementation) MakeSyncContext(
 	opts *options.Options, mfests []schema.Manifest,
 ) (*reg.SyncContext, error) {
@@ -88,7 +88,7 @@ func (di *DefaultPromoterImplementation) GetPromotionEdges(
 	return promotionEdges, nil
 }
 
-// PromoteImages starts an image promotion of a set of edges
+// PromoteImages starts an image promotion of a set of edges.
 func (di *DefaultPromoterImplementation) PromoteImages(
 	sc *reg.SyncContext,
 	promotionEdges map[reg.PromotionEdge]interface{},

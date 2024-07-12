@@ -30,7 +30,7 @@ import (
 	"sigs.k8s.io/promo-tools/v4/types/image"
 )
 
-// Run a snapshot
+// Run a snapshot.
 func (di *DefaultPromoterImplementation) Snapshot(opts *options.Options, rii registry.RegInvImage) error {
 	// Run the snapshot
 	var snapshot string
@@ -77,7 +77,7 @@ func (di *DefaultPromoterImplementation) GetSnapshotSourceRegistry(
 }
 
 // GetSnapshotManifest creates the manifest list from the
-// specified snapshot source
+// specified snapshot source.
 func (di *DefaultPromoterImplementation) GetSnapshotManifests(
 	opts *options.Options,
 ) ([]schema.Manifest, error) {
@@ -101,7 +101,7 @@ func (di *DefaultPromoterImplementation) GetSnapshotManifests(
 // AppendManifestToSnapshot checks if a manifest was specified in the
 // options passed to the promoter. If one is found, we parse it and
 // append it to the list of manifests generated for the snapshot
-// during GetSnapshotManifests()
+// during GetSnapshotManifests().
 func (di *DefaultPromoterImplementation) AppendManifestToSnapshot(
 	opts *options.Options, mfests []schema.Manifest,
 ) ([]schema.Manifest, error) {

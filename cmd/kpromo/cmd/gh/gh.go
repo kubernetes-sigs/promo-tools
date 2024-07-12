@@ -27,13 +27,13 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"gopkg.in/yaml.v2"
-
-	"sigs.k8s.io/promo-tools/v4/gh2gcs"
 	"sigs.k8s.io/release-sdk/gcli"
 	"sigs.k8s.io/release-sdk/github"
+
+	"sigs.k8s.io/promo-tools/v4/gh2gcs"
 )
 
-// GHCmd represents the base command when called without any subcommands
+// GHCmd represents the base command when called without any subcommands.
 var GHCmd = &cobra.Command{
 	Use:           "gh --org kubernetes --repo release --bucket <bucket> --release-dir <release-dir> [--tags v0.0.0] [--include-prereleases] [--output-dir <temp-dir>] [--download-only] [--config <config-file>]",
 	Short:         "Uploads GitHub releases to Google Cloud Storage",
@@ -73,7 +73,7 @@ var (
 	outputDirFlag          = "output-dir"
 	downloadOnlyFlag       = "download-only"
 
-	// requiredFlags only if the config flag is not set
+	// requiredFlags only if the config flag is not set.
 	requiredFlags = []string{
 		orgFlag,
 		repoFlag,
@@ -231,7 +231,7 @@ func run(opts *options) error {
 	return nil
 }
 
-// SetAndValidate sets some default options and verifies if options are valid
+// SetAndValidate sets some default options and verifies if options are valid.
 func (o *options) SetAndValidate() error {
 	logrus.Info("Validating gh2gcs options...")
 

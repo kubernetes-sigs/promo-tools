@@ -48,7 +48,7 @@ type ExternalRequest struct {
 // - Factor:   2
 // - Jitter:   0.1
 // - Steps:    45
-// - Cap:      time.Second * 60
+// - Cap:      time.Second * 60.
 func BackoffDefault() *backoff.ExponentialBackOff {
 	b := backoff.NewExponentialBackOff()
 	b.InitialInterval = time.Second

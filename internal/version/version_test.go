@@ -29,6 +29,6 @@ func TestVersionText(t *testing.T) {
 
 func TestVersionJSON(t *testing.T) {
 	sut, err := Get().JSONString()
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.NotEmpty(t, sut)
 }

@@ -25,7 +25,7 @@ import (
 	"sigs.k8s.io/promo-tools/v4/promobot"
 )
 
-// filesCmd represents the subcommand for `kpromo run files`
+// filesCmd represents the subcommand for `kpromo run files`.
 var filesCmd = &cobra.Command{
 	Use:           "files",
 	Short:         "Promote files from a staging object store to production",

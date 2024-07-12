@@ -22,8 +22,9 @@ import (
 	"testing"
 
 	"k8s.io/utils/diff"
-	"sigs.k8s.io/promo-tools/v4/promobot"
 	"sigs.k8s.io/yaml"
+
+	"sigs.k8s.io/promo-tools/v4/promobot"
 )
 
 func TestHash(t *testing.T) {

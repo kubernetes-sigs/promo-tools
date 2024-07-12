@@ -21,7 +21,6 @@ import (
 	"strings"
 
 	"github.com/sirupsen/logrus"
-
 	"sigs.k8s.io/release-sdk/github"
 	"sigs.k8s.io/release-sdk/object"
 )

@@ -18,6 +18,7 @@ package sigcheck
 
 import (
 	"github.com/spf13/cobra"
+
 	imagepromoter "sigs.k8s.io/promo-tools/v4/promoter/image"
 	promoteropts "sigs.k8s.io/promo-tools/v4/promoter/image/options"
 )

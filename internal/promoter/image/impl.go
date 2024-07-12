@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"sigs.k8s.io/release-sdk/sign"
 
 	reg "sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry"
 	"sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry/registry"
@@ -31,7 +32,6 @@ import (
 	"sigs.k8s.io/promo-tools/v4/internal/version"
 	options "sigs.k8s.io/promo-tools/v4/promoter/image/options"
 	"sigs.k8s.io/promo-tools/v4/types/image"
-	"sigs.k8s.io/release-sdk/sign"
 )
 
 const vulnerabilityDiscalimer = `DISCLAIMER: Vulnerabilities are found as issues with package
@@ -41,7 +41,7 @@ example, even though a fixed version of the binary is available, it doesn't
 necessarily mean that a new version of the image layer is available.`
 
 // streamProducerFunc is a function that gets the required fields to
-// construct a promotion stream producer
+// construct a promotion stream producer.
 type StreamProducerFunc func(
 	srcRegistry image.Registry, srcImageName image.Name,
 	destRC registry.Context, imageName image.Name,
@@ -84,7 +84,7 @@ func defaultSignerOptions(opts *options.Options) *sign.Options {
 	return signOpts
 }
 
-// ValidateOptions checks an options set
+// ValidateOptions checks an options set.
 func (di *DefaultPromoterImplementation) ValidateOptions(opts *options.Options) error {
 	if opts.Snapshot == "" && opts.ManifestBasedSnapshotOf == "" {
 		if opts.Manifest == "" && opts.ThinManifestDir == "" {
@@ -94,7 +94,7 @@ func (di *DefaultPromoterImplementation) ValidateOptions(opts *options.Options) 
 	return nil
 }
 
-// ActivateServiceAccounts gets key files and activates service accounts
+// ActivateServiceAccounts gets key files and activates service accounts.
 func (di *DefaultPromoterImplementation) ActivateServiceAccounts(opts *options.Options) error {
 	if !opts.UseServiceAcct {
 		logrus.Warn("Not setting a service account")
@@ -107,7 +107,7 @@ func (di *DefaultPromoterImplementation) ActivateServiceAccounts(opts *options.O
 }
 
 // PrecheckAndExit run simple prechecks to exit before promotions
-// or security scans
+// or security scans.
 func (di *DefaultPromoterImplementation) PrecheckAndExit(
 	opts *options.Options, mfests []schema.Manifest,
 ) error {
@@ -130,7 +130,7 @@ func (di *DefaultPromoterImplementation) PrintVersion() {
 }
 
 // printSection handles the start/finish labels in the
-// former legacy cli/run code
+// former legacy cli/run code.
 func (di *DefaultPromoterImplementation) PrintSection(message string, confirm bool) {
 	dryRunLabel := ""
 	if !confirm {

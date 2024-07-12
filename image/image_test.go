@@ -31,17 +31,17 @@ func TestNewManifestListFromFile(t *testing.T) {
 	listYAML += "    \"sha256:a319ac2280eb7e3a59e252e54b76327cb4a33cf8389053b0d78277f22bbca2fa\": [\"3.3\"]\n"
 
 	tempFile, err := os.CreateTemp("", "release-test")
-	require.Nil(t, err, "creating temp file")
+	require.NoError(t, err, "creating temp file")
 	defer os.Remove(tempFile.Name())
 
 	_, err = tempFile.WriteString(listYAML)
-	require.Nil(t, err, "wrinting temporary promoter image list")
+	require.NoError(t, err, "wrinting temporary promoter image list")
 
 	imageList, err := NewManifestListFromFile(tempFile.Name())
-	require.Nil(t, err)
+	require.NoError(t, err)
 
-	require.Equal(t, 1, len(*imageList))
-	require.Equal(t, 2, len((*imageList)[0].DMap))
+	require.Len(t, *imageList, 1)
+	require.Len(t, (*imageList)[0].DMap, 2)
 }
 
 func TestPromoterImageParse(t *testing.T) {
@@ -59,11 +59,11 @@ func TestPromoterImageParse(t *testing.T) {
 
 	imageList := &ManifestList{}
 	err := imageList.Parse([]byte(listYAML))
-	require.Nil(t, err, "parsing image list yaml")
+	require.NoError(t, err, "parsing image list yaml")
 
-	require.Equal(t, 2, len(*imageList))
-	require.Equal(t, 7, len((*imageList)[0].DMap))
-	require.Equal(t, 2, len((*imageList)[1].DMap))
+	require.Len(t, *imageList, 2)
+	require.Len(t, (*imageList)[0].DMap, 7)
+	require.Len(t, (*imageList)[1].DMap, 2)
 	require.Equal(t, "kube-apiserver-amd64", (*imageList)[0].Name)
 	require.Equal(t, "pause", (*imageList)[1].Name)
 	require.Equal(t, "v1.19.0", (*imageList)[0].DMap["sha256:6257f45b4908eed0a4b84d8efeaf2751096ce516006daf74690b321b785e6cc4"][0])
@@ -114,7 +114,7 @@ func TestPromoterImageToYAML(t *testing.T) {
 	expectedYAML += "    \"sha256:c752ecbd04bc4517168a19323bb60fb45324eee1e480b2b97d3fd6ea0a54f42d\": [\"v1.18.8\",\"v1.19.0\"]\n"
 
 	yamlCode, err := imageList.ToYAML()
-	require.Nil(t, err, "serilizing imagelist to yaml")
+	require.NoError(t, err, "serilizing imagelist to yaml")
 	require.Equal(t, expectedYAML, string(yamlCode), "checking promoter image list yaml output")
 }
 
@@ -149,15 +149,15 @@ func TestPromoterImageWrite(t *testing.T) {
 	expectedFile += "    \"sha256:022b81d70447014f63fdc734df48cb9e3a2854c48f65acdca67aac5c1974fc22\": [\"v1.19.0-rc.2\"]\n"
 
 	tempFileSorted, err := os.CreateTemp("", "release-test")
-	require.Nil(t, err, "creating temp file")
+	require.NoError(t, err, "creating temp file")
 	defer os.Remove(tempFileSorted.Name())
 
 	err = imageList.Write(tempFileSorted.Name())
-	require.Nil(t, err, "writing data to disk")
+	require.NoError(t, err, "writing data to disk")
 
 	// Read back the file to see if it correct
 	fileContents, err := os.ReadFile(tempFileSorted.Name())
-	require.Nil(t, err, "reading temporary file")
+	require.NoError(t, err, "reading temporary file")
 
 	require.Equal(t, expectedFile, string(fileContents))
 }

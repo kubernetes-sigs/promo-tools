@@ -29,18 +29,21 @@ linters:
     - decorder
     - dogsled
     - dupl
+    - dupword
     - durationcheck
     - errcheck
     - errchkjson
     - errname
     - exportloopref
     - fatcontext
+    - gci
     - ginkgolinter
     - gocheckcompilerdirectives
     - gochecksumtype
     - goconst
     - gocritic
     - gocyclo
+    - godot
     - godox
     - gofmt
     - gofumpt
@@ -80,6 +83,8 @@ linters:
     - tagalign
     - tenv
     - testableexamples
+    - testifylint
+    - tparallel
     - typecheck
     - unconvert
     - unparam
@@ -91,7 +96,6 @@ linters:
     # - containedctx
     # - cyclop
     # - depguard
-    # - dupword
     # - err113
     # - errorlint
     # - exhaustive
@@ -99,17 +103,16 @@ linters:
     # - forbidigo
     # - forcetypeassert
     # - funlen
-    # - gci
     # - gochecknoglobals
     # - gochecknoinits
     # - gocognit
-    # - godot
     # - inamedparam
     # - interfacebloat
     # - ireturn
     # - lll
     # - maintidx
     # - mnd
+    # - musttag
     # - nestif
     # - nilerr
     # - nilnil
@@ -118,14 +121,17 @@ linters:
     # - nonamedreturns
     # - paralleltest
     # - tagliatelle
-    # - testifylint
     # - testpackage
     # - thelper
-    # - tparallel
     # - varnamelen
     # - wrapcheck
     # - wsl
 linters-settings:
+  gci:
+    sections:
+      - standard
+      - default
+      - localmodule
   revive:
     rules:
       - name: unused-parameter
@@ -210,6 +216,9 @@ linters-settings:
       - unnecessaryDefer
       - weakCond
       - yodaStyleExpr
+      - badSyncOnceFunc
+      - todoCommentWithoutDetail
+      # - whyNoLint
   nolintlint:
     # Enable to ensure that nolint directives are all used. Default is true.
     allow-unused: false

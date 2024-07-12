@@ -442,7 +442,7 @@ func (edge *PromotionEdge) VertexPropsFor(
 	return p
 }
 
-// SrcReference returns a reference pointing to the source image
+// SrcReference returns a reference pointing to the source image.
 func (edge *PromotionEdge) SrcReference() string {
 	if edge.SrcRegistry.Name == "" || edge.SrcImageTag.Name == "" || edge.Digest == "" {
 		return ""
@@ -456,7 +456,7 @@ func (edge *PromotionEdge) SrcReference() string {
 	)
 }
 
-// DstReference returns a reference pointing to the destination image
+// DstReference returns a reference pointing to the destination image.
 func (edge *PromotionEdge) DstReference() string {
 	if edge.DstRegistry.Name == "" || edge.DstImageTag.Name == "" || edge.Digest == "" {
 		return ""
@@ -779,7 +779,7 @@ func (sc *SyncContext) ReadRegistriesGGCR(
 }
 
 // recordFoundTags registers a list of tags read from a registry
-// into the sync context
+// into the sync context.
 func (sc *SyncContext) recordFoundTags(
 	repo name.Repository, tags *ggcrV1Google.Tags, err error,
 ) error {
@@ -1481,7 +1481,7 @@ func (sc *SyncContext) ValidateEdge(edge *PromotionEdge) error {
 
 // MKPopulateRequestsForPromotionEdges takes in a map of PromotionEdges to promote
 // and a PromotionContext and returns a PopulateRequests which can generate
-// requests to be processed
+// requests to be processed.
 func MKPopulateRequestsForPromotionEdges(
 	toPromote map[PromotionEdge]interface{},
 ) PopulateRequests {
