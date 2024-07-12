@@ -23,9 +23,9 @@ import (
 	"os"
 
 	"github.com/sirupsen/logrus"
+	"sigs.k8s.io/release-utils/hash"
 
 	api "sigs.k8s.io/promo-tools/v4/api/files"
-	"sigs.k8s.io/release-utils/hash"
 )
 
 // SyncFileInfo tracks a file during the synchronization operation.
@@ -51,7 +51,7 @@ type copyFileOp struct {
 	ManifestFile *api.File
 }
 
-// Run implements SyncFileOp.Run
+// Run implements SyncFileOp.Run.
 func (o *copyFileOp) Run(ctx context.Context) error {
 	// Download to our temp file
 	f, err := os.CreateTemp("", "promoter")

@@ -32,7 +32,7 @@ import (
 	"sigs.k8s.io/promo-tools/v4/types/image"
 )
 
-// TODO: Consider merging this with bazelTestPath() from inventory
+// TODO: Consider merging this with bazelTestPath() from inventory.
 func testPath(paths ...string) string {
 	prefix := []string{
 		os.Getenv("PWD"),

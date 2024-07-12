@@ -28,7 +28,6 @@ import (
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-
 	"sigs.k8s.io/release-sdk/git"
 	"sigs.k8s.io/release-sdk/github"
 	"sigs.k8s.io/release-utils/util"
@@ -46,7 +45,7 @@ const (
 	defaultReviewers      = "@kubernetes/release-engineering"
 )
 
-// PRCmd is the kpromo subcommand to promote container images
+// PRCmd is the kpromo subcommand to promote container images.
 var PRCmd = &cobra.Command{
 	Use:   "pr",
 	Short: "Starts an image promotion for a given image tag",
@@ -348,7 +347,7 @@ func runPromote(opts *promoteOptions) error {
 	return nil
 }
 
-// mustRun avoids running when a users chooses n in interactive mode
+// mustRun avoids running when a users chooses n in interactive mode.
 func mustRun(opts *promoteOptions, question string) bool {
 	if !opts.interactiveMode {
 		return true
@@ -367,7 +366,7 @@ func mustRun(opts *promoteOptions, question string) bool {
 	return false
 }
 
-// generatePRBody creates the body of the Image Promotion Pull Request
+// generatePRBody creates the body of the Image Promotion Pull Request.
 func generatePRBody(opts *promoteOptions) string {
 	args := "--fork " + opts.userFork
 	if opts.interactiveMode {

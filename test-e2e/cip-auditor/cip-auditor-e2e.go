@@ -26,7 +26,6 @@ import (
 	guuid "github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 	yaml "gopkg.in/yaml.v2"
-
 	"sigs.k8s.io/release-utils/command"
 
 	"sigs.k8s.io/promo-tools/v4/internal/legacy/audit"
@@ -300,7 +299,7 @@ func populateGoldenImages(repoRoot string) error {
 	return err
 }
 
-// TODO: De-dupe with other e2e functions
+// TODO: De-dupe with other e2e functions.
 func getWorkspaceStatus(repoRoot string) map[string]string {
 	fmt.Println("Reading workspace variables")
 

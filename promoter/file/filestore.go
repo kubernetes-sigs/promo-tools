@@ -88,7 +88,7 @@ func openFilestore(
 	)
 }
 
-// openGCSFilestore opens a filestore backed by Google Cloud Storage (GCS)
+// openGCSFilestore opens a filestore backed by Google Cloud Storage (GCS).
 func (p *gcsProvider) OpenFilestore(
 	ctx context.Context,
 	filestore *api.Filestore,
@@ -181,7 +181,7 @@ func useStorageClientAuth(
 	return withAuth, nil
 }
 
-// computeNeededOperations determines the list of files that need to be copied
+// computeNeededOperations determines the list of files that need to be copied.
 func (p *FilestorePromoter) computeNeededOperations(
 	source, dest map[string]*SyncFileInfo,
 	destFilestore syncFilestore,

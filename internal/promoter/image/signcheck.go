@@ -25,19 +25,17 @@ import (
 	"sync"
 	"time"
 
-	yaml "gopkg.in/yaml.v2"
-	"sigs.k8s.io/release-sdk/sign"
-	"sigs.k8s.io/release-utils/http"
-	"sigs.k8s.io/release-utils/version"
-
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/crane"
 	"github.com/google/go-containerregistry/pkg/gcrane"
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1/google"
-	"github.com/sirupsen/logrus"
-
 	"github.com/sigstore/sigstore/pkg/cryptoutils"
+	"github.com/sirupsen/logrus"
+	yaml "gopkg.in/yaml.v2"
+	"sigs.k8s.io/release-sdk/sign"
+	"sigs.k8s.io/release-utils/http"
+	"sigs.k8s.io/release-utils/version"
 
 	"sigs.k8s.io/promo-tools/v4/image/consts"
 	checkresults "sigs.k8s.io/promo-tools/v4/promoter/image/checkresults"
@@ -51,7 +49,7 @@ const (
 	productionImagePath      = "k8s-artifacts-prod"
 	productionRepositoryPath = productionImagePath + "/images"
 
-	// scanRegistry is the one we index to search for images
+	// scanRegistry is the one we index to search for images.
 	scanRegistry = "us-central1-docker.pkg.dev"
 )
 
@@ -168,7 +166,7 @@ func (di *DefaultPromoterImplementation) GetSignatureStatus(
 	return results, nil
 }
 
-// miniManifest is a minimal representation of the sigstore signature manifest
+// miniManifest is a minimal representation of the sigstore signature manifest.
 type miniManifest struct {
 	Layers []struct {
 		MediaType   string
@@ -176,7 +174,7 @@ type miniManifest struct {
 	} `json:"layers"`
 }
 
-// CheckSignatureLayers checks a list of signature layers to ensure
+// CheckSignatureLayers checks a list of signature layers to ensure.
 func (di *DefaultPromoterImplementation) CheckSignatureLayers(opts *options.Options, oList []string) (existing, missing []string, err error) {
 	// TODO: Parallelize this check
 	existing = []string{}
@@ -255,7 +253,7 @@ func objectExists(opts *options.Options, refString string) (bool, error) {
 	return false, nil
 }
 
-// FixMissingSignatures signs an image that has no signatures at all
+// FixMissingSignatures signs an image that has no signatures at all.
 func (di *DefaultPromoterImplementation) FixMissingSignatures(opts *options.Options, results checkresults.Signature) error {
 	for mainImg, res := range results {
 		if len(res.Signed) > 0 {
@@ -281,7 +279,7 @@ func (di *DefaultPromoterImplementation) FixMissingSignatures(opts *options.Opti
 }
 
 // FixPartialSignatures fixes images that had some signatures but some mirrors
-// are missing some signatures
+// are missing some signatures.
 func (di *DefaultPromoterImplementation) FixPartialSignatures(opts *options.Options, results checkresults.Signature) error {
 	for mainImg, res := range results {
 		if len(res.Missing) == 0 || len(res.Signed) == 0 {
@@ -301,7 +299,7 @@ func (di *DefaultPromoterImplementation) FixPartialSignatures(opts *options.Opti
 	return nil
 }
 
-// replicateReference copies an image reference to another mirror
+// replicateReference copies an image reference to another mirror.
 func (di *DefaultPromoterImplementation) replicateReference(opts *options.Options, srcRef, dstRef string) error {
 	craneOpts := []crane.Option{
 		crane.WithAuthFromKeychain(gcrane.Keychain),
@@ -323,7 +321,7 @@ func (di *DefaultPromoterImplementation) replicateReference(opts *options.Option
 	return nil
 }
 
-// signReference takes a reference and signs it
+// signReference takes a reference and signs it.
 func (di *DefaultPromoterImplementation) signReference(opts *options.Options, refString string) error {
 	if !opts.SignCheckFix {
 		logrus.Infof(" (NOOP) signing %s", refString)

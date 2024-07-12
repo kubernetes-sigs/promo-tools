@@ -28,7 +28,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/sirupsen/logrus"
 	yaml "gopkg.in/yaml.v2"
-
 	"sigs.k8s.io/release-utils/command"
 
 	reg "sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry"
@@ -116,7 +115,7 @@ func main() {
 	}
 }
 
-// removeSignatureLayers removes the signature layers from a snapshot
+// removeSignatureLayers removes the signature layers from a snapshot.
 func removeSignatureLayers(snapshot *[]registry.Image) {
 	var remove []image.Digest
 	for i := range *snapshot {

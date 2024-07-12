@@ -96,7 +96,7 @@ func TestReadJSONStream(t *testing.T) {
 
 		// The fake should never error out when producing a stdout stream for
 		// us.
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		jsons, err := json.Consume(stdout)
 		_ = sr.Close()
@@ -552,10 +552,10 @@ func TestValidateThinManifestsFromDir(t *testing.T) {
 		fixtureDir := filepath.Join(pwd, "valid", testInput)
 
 		mfests, errParse := schema.ParseThinManifestsFromDir(fixtureDir, false)
-		require.Nil(t, errParse)
+		require.NoError(t, errParse)
 
 		_, edgeErr := reg.ToPromotionEdges(mfests)
-		require.Nil(t, edgeErr)
+		require.NoError(t, edgeErr)
 	}
 
 	shouldBeInvalid := []struct {
@@ -631,7 +631,7 @@ func TestParseImageDigest(t *testing.T) {
 	for _, testInput := range shouldBeValid {
 		d := image.Digest(testInput)
 		got := schema.ValidateDigest(d)
-		require.Nil(t, got)
+		require.NoError(t, got)
 	}
 
 	shouldBeInvalid := []string{
@@ -669,7 +669,7 @@ func TestParseImageTag(t *testing.T) {
 	for _, testInput := range shouldBeValid {
 		tag := image.Tag(testInput)
 		got := schema.ValidateTag(tag)
-		require.Nil(t, got)
+		require.NoError(t, got)
 	}
 
 	shouldBeInvalid := []string{
@@ -705,7 +705,7 @@ func TestValidateRegistryImagePath(t *testing.T) {
 	for _, testInput := range shouldBeValid {
 		rip := reg.RegistryImagePath(testInput)
 		got := reg.ValidateRegistryImagePath(rip)
-		require.Nil(t, got)
+		require.NoError(t, got)
 	}
 
 	shouldBeInvalid := []string{
@@ -2472,7 +2472,7 @@ func TestPromotion(t *testing.T) {
 		captured = make(reg.CapturedRequests)
 		srcReg, err := registry.GetSrcRegistry(registries)
 
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		tests[i].inputSc.SrcRegistry = srcReg
 
@@ -2484,7 +2484,7 @@ func TestPromotion(t *testing.T) {
 		}
 
 		edges, err := reg.ToPromotionEdges([]schema.Manifest{tests[i].inputM})
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		filteredEdges, gotClean, err := tests[i].inputSc.FilterPromotionEdges(
 			edges, false,
@@ -2496,7 +2496,7 @@ func TestPromotion(t *testing.T) {
 			filteredEdges,
 			&processRequestFake,
 		)
-		require.Nil(t, err)
+		require.NoError(t, err)
 		require.Equal(t, tests[i].expectedReqs, captured)
 	}
 }
@@ -2538,7 +2538,7 @@ func TestExecRequests(t *testing.T) {
 			},
 		},
 	)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	populateRequests := reg.MKPopulateRequestsForPromotionEdges(
 		edges,
@@ -2729,7 +2729,7 @@ func TestValidateEdges(t *testing.T) {
 
 	for i := range tests {
 		edges, err := reg.ToPromotionEdges([]schema.Manifest{tests[i].inputM})
-		require.Nil(t, err)
+		require.NoError(t, err)
 		got := tests[i].inputSc.ValidateEdges(edges)
 		require.Equal(t, tests[i].expected, got)
 	}
@@ -3004,7 +3004,7 @@ func TestMatch(t *testing.T) {
 
 	for _, test := range tests {
 		err := test.gcrPayload.PopulateExtraFields()
-		require.Nil(t, err)
+		require.NoError(t, err)
 		got := test.gcrPayload.Match(&test.mfest)
 		require.Equal(t, test.expectedMatch, got)
 	}
@@ -3077,7 +3077,7 @@ func TestPopulateExtraFields(t *testing.T) {
 
 	for _, test := range shouldBeValid {
 		err := test.input.PopulateExtraFields()
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		got := test.input
 		require.Equal(t, test.expected, got)

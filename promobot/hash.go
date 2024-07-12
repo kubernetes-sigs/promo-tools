@@ -24,9 +24,9 @@ import (
 	"strings"
 
 	"golang.org/x/xerrors"
+	"sigs.k8s.io/release-utils/hash"
 
 	api "sigs.k8s.io/promo-tools/v4/api/files"
-	"sigs.k8s.io/release-utils/hash"
 )
 
 // GenerateManifestOptions holds the parameters for a hash-files operation.
@@ -48,7 +48,7 @@ func (o *GenerateManifestOptions) PopulateDefaults() {
 	// (but we still want to follow the PopulateDefaults pattern)
 }
 
-// GenerateManifest generates a manifest containing the files in options.BaseDir
+// GenerateManifest generates a manifest containing the files in options.BaseDir.
 func GenerateManifest(_ context.Context, options GenerateManifestOptions) (*api.Manifest, error) {
 	manifest := &api.Manifest{}
 

@@ -30,7 +30,7 @@ func TestParseThinManifestsFromDirPostsubmit(t *testing.T) {
 	t.Setenv("JOB_TYPE", "postsubmit")
 
 	tmpDir, err := os.MkdirTemp("", "k8s.io-")
-	require.Nil(t, err)
+	require.NoError(t, err)
 	testDir := filepath.Join(tmpDir, "test")
 	defer os.RemoveAll(tmpDir)
 
@@ -40,15 +40,15 @@ func TestParseThinManifestsFromDirPostsubmit(t *testing.T) {
 		commit = "86b8f390aac2e6c244868143ea03c8326c9064a0"
 	)
 
-	require.Nil(t, command.New(git, "clone", repo, testDir).RunSilentSuccess())
-	require.Nil(t, command.NewWithWorkDir(testDir, git, "checkout", commit).RunSilentSuccess())
+	require.NoError(t, command.New(git, "clone", repo, testDir).RunSilentSuccess())
+	require.NoError(t, command.NewWithWorkDir(testDir, git, "checkout", commit).RunSilentSuccess())
 
 	for _, onlyProwDiff := range []bool{true, false} {
 		manifests, err := ParseThinManifestsFromDir(
 			filepath.Join(testDir, "k8s.gcr.io"), onlyProwDiff,
 		)
 
-		require.Nil(t, err)
+		require.NoError(t, err)
 		require.Len(t, manifests, 76)
 
 		var digestCount, imageCount int

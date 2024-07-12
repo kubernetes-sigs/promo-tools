@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+
 	rc "sigs.k8s.io/promo-tools/v4/internal/legacy/reqcounter"
 	tw "sigs.k8s.io/promo-tools/v4/internal/legacy/timewrapper"
 )
@@ -51,7 +52,7 @@ func TestInit(t *testing.T) {
 	// Ensure request counting is enabled.
 	require.True(t, rc.EnableCounting, "Init did not enable counting.")
 	// Ensure request counters are created.
-	require.Greater(t, len(rc.NetMonitor.RequestCounters), 0, "Init did not create any request counters within the global Monitor.")
+	require.NotEmpty(t, rc.NetMonitor.RequestCounters, "Init did not create any request counters within the global Monitor.")
 	// Ensure at least one request counter uses the QuotaWindowShort.
 	foundQuotaWindowShort, foundQuotaWindowLong := false, false
 	for _, requestCounter := range rc.NetMonitor.RequestCounters {

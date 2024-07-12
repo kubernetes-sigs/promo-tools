@@ -33,7 +33,7 @@ import (
 
 //go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate
 
-// PromoteFilesOptions holds the flag-values for a file promotion
+// PromoteFilesOptions holds the flag-values for a file promotion.
 type PromoteFilesOptions struct {
 	// FilestoresPath is the path to the manifest file containing the filestores section
 	FilestoresPath string
@@ -73,14 +73,14 @@ type PromoteFilesOptions struct {
 	Out io.Writer
 }
 
-// PopulateDefaults sets the default values for PromoteFilesOptions
+// PopulateDefaults sets the default values for PromoteFilesOptions.
 func (o *PromoteFilesOptions) PopulateDefaults() {
 	o.Confirm = false
 	o.UseServiceAccount = false
 	o.Out = os.Stdout
 }
 
-// RunPromoteFiles executes a file promotion command
+// RunPromoteFiles executes a file promotion command.
 func RunPromoteFiles(ctx context.Context, options PromoteFilesOptions) error {
 	manifests, err := ReadManifests(options)
 	if err != nil {
@@ -254,7 +254,7 @@ func ReadManifest(options PromoteFilesOptions) (*api.Manifest, error) {
 	return merged, nil
 }
 
-// readFilestores reads a filestores manifest
+// readFilestores reads a filestores manifest.
 func readFilestores(p string) ([]api.Filestore, error) {
 	if p == "" {
 		return nil, errors.New("FilestoresPath is required")
@@ -279,7 +279,7 @@ func readFilestores(p string) ([]api.Filestore, error) {
 	return manifest.Filestores, nil
 }
 
-// readFiles reads and merges the file manifests from the file or directory filesPath
+// readFiles reads and merges the file manifests from the file or directory filesPath.
 func readFiles(filesPath string) ([]api.File, error) {
 	// We first list and sort the paths, for a consistent ordering
 	var paths []string

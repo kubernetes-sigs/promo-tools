@@ -27,7 +27,7 @@ import (
 	"sigs.k8s.io/promo-tools/v4/promobot"
 )
 
-// validateCmd takes a set of manifests and checks them
+// validateCmd takes a set of manifests and checks them.
 var validateCmd = &cobra.Command{
 	Use:   "validate",
 	Short: "Validate a promotion manifest",
@@ -87,7 +87,7 @@ func init() {
 	ManifestCmd.AddCommand(validateCmd)
 }
 
-// runValidate checks one or more promoter manifest files
+// runValidate checks one or more promoter manifest files.
 func runValidate(manifestPaths []string) error {
 	// If we only got one argument, we assume it is a directory
 	if len(manifestPaths) == 1 {
@@ -98,7 +98,7 @@ func runValidate(manifestPaths []string) error {
 	return validateSingle(manifestPaths[0], manifestPaths[1])
 }
 
-// validateSingle takes a filestores manifest and a path to read files from
+// validateSingle takes a filestores manifest and a path to read files from.
 func validateSingle(filestoresPath, filesPath string) error {
 	i, err := os.Stat(filestoresPath)
 	if err != nil {
@@ -123,7 +123,7 @@ func validateSingle(filestoresPath, filesPath string) error {
 	return nil
 }
 
-// validateDirectory validates a directory containing multiple projects
+// validateDirectory validates a directory containing multiple projects.
 func validateDirectory(mPath string) error {
 	i, err := os.Stat(mPath)
 	if err != nil {

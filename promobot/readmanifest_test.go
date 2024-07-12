@@ -19,8 +19,9 @@ package promobot_test
 import (
 	"testing"
 
-	"sigs.k8s.io/promo-tools/v4/promobot"
 	"sigs.k8s.io/yaml"
+
+	"sigs.k8s.io/promo-tools/v4/promobot"
 )
 
 func TestReadManifests(t *testing.T) {

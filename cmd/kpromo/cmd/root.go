@@ -19,6 +19,8 @@ package cmd
 import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"sigs.k8s.io/release-utils/log"
+	"sigs.k8s.io/release-utils/version"
 
 	"sigs.k8s.io/promo-tools/v4/cmd/kpromo/cmd/cip"
 	"sigs.k8s.io/promo-tools/v4/cmd/kpromo/cmd/gh"
@@ -27,12 +29,10 @@ import (
 	"sigs.k8s.io/promo-tools/v4/cmd/kpromo/cmd/pr"
 	"sigs.k8s.io/promo-tools/v4/cmd/kpromo/cmd/run"
 	"sigs.k8s.io/promo-tools/v4/cmd/kpromo/cmd/sigcheck"
-	"sigs.k8s.io/release-utils/log"
-	"sigs.k8s.io/release-utils/version"
 )
 
 // rootCmd represents the base command when called without any subcommands
-// TODO: Update command description
+// TODO: Update command description.
 var rootCmd = &cobra.Command{
 	Use:   "kpromo",
 	Short: "Kubernetes project artifact promoter",

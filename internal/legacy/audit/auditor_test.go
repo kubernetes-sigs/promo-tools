@@ -80,7 +80,7 @@ func TestParsePubSubMessageBody(t *testing.T) {
 		}
 
 		_, gotErr := audit.ParsePubSubMessageBody(psmBytes)
-		require.Nil(t, gotErr)
+		require.NoError(t, gotErr)
 	}
 
 	shouldBeInvalid := []struct {
@@ -128,7 +128,7 @@ func TestValidatePayload(t *testing.T) {
 
 	for _, input := range shouldBeValid {
 		err := audit.ValidatePayload(&input)
-		require.Nil(t, err)
+		require.NoError(t, err)
 	}
 
 	shouldBeInValid := []struct {
@@ -827,7 +827,7 @@ func TestAudit(t *testing.T) {
 		// Create a new Request to pass to the handler, which incorporates the
 		// GCRPubSubPayload.
 		payload, err := json.Marshal(test.payload) //nolint: musttag
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		psm := audit.PubSubMessage{
 			Message: audit.PubSubMessageInner{
@@ -838,10 +838,10 @@ func TestAudit(t *testing.T) {
 		}
 
 		b, err := json.Marshal(psm)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		r, err := http.NewRequest(http.MethodPost, "/", bytes.NewBuffer(b))
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		// test is used to pin the "test" variable from the outer "range" scope
 		// (see scopelint) into the fakeReadRepo (in a sense it ensures that

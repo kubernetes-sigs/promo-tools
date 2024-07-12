@@ -21,17 +21,18 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"sigs.k8s.io/release-utils/env"
+
 	reg "sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry"
 	"sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry/registry"
 	options "sigs.k8s.io/promo-tools/v4/promoter/image/options"
-	"sigs.k8s.io/release-utils/env"
 )
 
 // TestGetIdentityToken tests the identity token generation logic. By default
 // it will test using the testSigningAccount defined in sign.go. For local testing
 // purposes you can override the target account with another one setting
 // TEST_SERVICE_ACCOUNT and accessing it with an identity set in a credentials
-// file in CIP_E2E_KEY_FILE
+// file in CIP_E2E_KEY_FILE.
 func TestGetIdentityToken(t *testing.T) {
 	// This unit needs a valid credentials to run
 	if os.Getenv("CIP_E2E_KEY_FILE") == "" {

@@ -29,7 +29,7 @@ type Time interface {
 // RealTime is a wrapper for actual time functions.
 type RealTime struct{}
 
-// Now simply calls time.Now()
+// Now simply calls time.Now().
 func (RealTime) Now() time.Time { return time.Now() }
 
 // Sleep simply calls time.Sleep(d), using the given duration.

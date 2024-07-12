@@ -26,10 +26,10 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
+	"sigs.k8s.io/release-utils/command"
 
 	"sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry/registry"
 	"sigs.k8s.io/promo-tools/v4/types/image"
-	"sigs.k8s.io/release-utils/command"
 )
 
 // Manifest stores the information in a manifest file (describing the

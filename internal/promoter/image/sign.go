@@ -31,6 +31,8 @@ import (
 	"github.com/sigstore/sigstore/pkg/tuf"
 	"github.com/sirupsen/logrus"
 	gopts "google.golang.org/api/option"
+	"sigs.k8s.io/release-sdk/sign"
+	"sigs.k8s.io/release-utils/version"
 
 	"sigs.k8s.io/promo-tools/v4/image/consts"
 	reg "sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry"
@@ -38,8 +40,6 @@ import (
 	options "sigs.k8s.io/promo-tools/v4/promoter/image/options"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/ratelimit"
 	"sigs.k8s.io/promo-tools/v4/types/image"
-	"sigs.k8s.io/release-sdk/sign"
-	"sigs.k8s.io/release-utils/version"
 )
 
 const (
@@ -92,7 +92,7 @@ func (di *DefaultPromoterImplementation) ValidateStagingSignatures(
 }
 
 // SignImages signs the promoted images and stores their signatures in
-// the registry
+// the registry.
 func (di *DefaultPromoterImplementation) SignImages(
 	opts *options.Options, _ *reg.SyncContext, edges map[reg.PromotionEdge]interface{},
 ) error {
@@ -210,7 +210,7 @@ func (di *DefaultPromoterImplementation) signAndReplicate(signOpts *sign.Options
 // 'us-west2-docker.pkg.dev/k8s-artifacts-prod/images/kubernetes/conformance-arm64'
 //
 // to match the production registry:
-// 'registry.k8s.io/kubernetes/conformance-arm64'
+// 'registry.k8s.io/kubernetes/conformance-arm64'.
 func targetIdentity(edge *reg.PromotionEdge) string {
 	identity := fmt.Sprintf("%s/%s", edge.DstRegistry.Name, edge.DstImageTag.Name)
 
@@ -271,13 +271,13 @@ func (di *DefaultPromoterImplementation) copyAttachedObjects(edge *reg.Promotion
 }
 
 // digestToSignatureTag takes a digest and infers the tag name where
-// its signature can be found
+// its signature can be found.
 func digestToSignatureTag(dg image.Digest) string {
 	return strings.ReplaceAll(string(dg), "sha256:", "sha256-") + signatureTagSuffix
 }
 
 // replicateSignatures takes a source edge (an image) and a list of destinations
-// and copies the signature to all of them
+// and copies the signature to all of them.
 func (di *DefaultPromoterImplementation) replicateSignatures(
 	src *reg.PromotionEdge, dsts []reg.PromotionEdge,
 ) error {
@@ -329,7 +329,7 @@ func (di *DefaultPromoterImplementation) replicateSignatures(
 }
 
 // WriteSBOMs writes SBOMs to each of the newly promoted images and stores
-// them along the signatures in the registry
+// them along the signatures in the registry.
 func (di *DefaultPromoterImplementation) WriteSBOMs(
 	_ *options.Options, _ *reg.SyncContext, _ map[reg.PromotionEdge]interface{},
 ) error {
@@ -338,7 +338,7 @@ func (di *DefaultPromoterImplementation) WriteSBOMs(
 
 // GetIdentityToken returns an identity token for the selected service account
 // in order for this function to work, an account has to be already logged. This
-// can be achieved using the
+// can be achieved using the.
 func (di *DefaultPromoterImplementation) GetIdentityToken(
 	opts *options.Options, serviceAccount string,
 ) (tok string, err error) {

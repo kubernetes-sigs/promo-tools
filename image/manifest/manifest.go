@@ -297,7 +297,7 @@ func FilterByImages(rii registry.RegInvImage, filterImages []image.Name) registr
 
 // FilterByTags removes all images in RegInvImage that do not match the
 // filterTag.
-// TODO(manifest): Dedupe with `FilterByTag` in legacy/dockerregistry/inventory.go
+// TODO(manifest): Dedupe with `FilterByTag` in legacy/dockerregistry/inventory.go.
 func FilterByTags(rii registry.RegInvImage, filterTags []image.Tag) registry.RegInvImage {
 	filtered := make(registry.RegInvImage)
 

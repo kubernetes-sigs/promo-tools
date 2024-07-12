@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+
 	tw "sigs.k8s.io/promo-tools/v4/internal/legacy/timewrapper"
 )
 

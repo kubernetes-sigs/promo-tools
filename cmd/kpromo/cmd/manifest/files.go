@@ -23,12 +23,12 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/cobra"
+	"sigs.k8s.io/yaml"
 
 	"sigs.k8s.io/promo-tools/v4/promobot"
-	"sigs.k8s.io/yaml"
 )
 
-// filesCmd represents the subcommand for `kpromo manifest files`
+// filesCmd represents the subcommand for `kpromo manifest files`.
 var filesCmd = &cobra.Command{
 	Use:           "files",
 	Short:         "Promote files from a staging object store to production",

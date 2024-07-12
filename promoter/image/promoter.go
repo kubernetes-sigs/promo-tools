@@ -173,7 +173,7 @@ func (p *Promoter) PromoteImages(opts *options.Options) (err error) {
 	return nil
 }
 
-// Snapshot runs the steps to output a representation in json or yaml of a registry
+// Snapshot runs the steps to output a representation in json or yaml of a registry.
 func (p *Promoter) Snapshot(opts *options.Options) (err error) {
 	if err := p.impl.ValidateOptions(opts); err != nil {
 		return fmt.Errorf("validating options: %w", err)
@@ -209,7 +209,7 @@ func (p *Promoter) Snapshot(opts *options.Options) (err error) {
 
 // SecurityScan runs just like an image promotion, but instead of
 // actually copying the new detected images, it will run a vulnerability
-// scan on them
+// scan on them.
 func (p *Promoter) SecurityScan(opts *options.Options) error {
 	if err := p.impl.ValidateOptions(opts); err != nil {
 		return fmt.Errorf("validating options: %w", err)
@@ -255,7 +255,7 @@ func (p *Promoter) SecurityScan(opts *options.Options) error {
 	return nil
 }
 
-// CheckSignatures checks the consistency of a set of images
+// CheckSignatures checks the consistency of a set of images.
 func (p *Promoter) CheckSignatures(opts *options.Options) error {
 	logrus.Info("Fetching latest promoted images")
 	images, err := p.impl.GetLatestImages(opts)

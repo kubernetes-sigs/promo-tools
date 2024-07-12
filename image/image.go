@@ -23,11 +23,10 @@ import (
 	"sort"
 
 	"gopkg.in/yaml.v2"
-
 	"sigs.k8s.io/release-utils/util"
 )
 
-// ManifestList abstracts the manifest used by the image promoter
+// ManifestList abstracts the manifest used by the image promoter.
 type ManifestList []struct {
 	Name string `json:"name"`
 
@@ -36,7 +35,7 @@ type ManifestList []struct {
 	DMap map[string][]string `json:"dmap"`
 }
 
-// NewManifestListFromFile parses an image promoter manifest file
+// NewManifestListFromFile parses an image promoter manifest file.
 func NewManifestListFromFile(manifestPath string) (imagesList *ManifestList, err error) {
 	if !util.Exists(manifestPath) {
 		return nil, errors.New("could not find image promoter manifest")
@@ -54,7 +53,7 @@ func NewManifestListFromFile(manifestPath string) (imagesList *ManifestList, err
 	return imagesList, nil
 }
 
-// Parse reads yaml code into an ImagePromoterManifest object
+// Parse reads yaml code into an ImagePromoterManifest object.
 func (imagesList *ManifestList) Parse(yamlCode []byte) error {
 	return yaml.Unmarshal(yamlCode, imagesList)
 }
@@ -74,7 +73,7 @@ func (imagesList *ManifestList) Write(filePath string) error {
 }
 
 // ToYAML serializes an image list into an YAML file.
-// We serialize the data by hand to emulate the way it's done by the image promoter
+// We serialize the data by hand to emulate the way it's done by the image promoter.
 func (imagesList *ManifestList) ToYAML() ([]byte, error) {
 	// Images are sorted by:
 	//	  1. Name 2. Tag

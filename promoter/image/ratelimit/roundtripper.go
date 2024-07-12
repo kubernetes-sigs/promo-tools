@@ -35,7 +35,7 @@ const (
 	MaxEvents = 50
 )
 
-// RoundTripper wraps an http.RoundTripper with rate limiting
+// RoundTripper wraps an http.RoundTripper with rate limiting.
 type RoundTripper struct {
 	rateLimiter  *rate.Limiter
 	roundTripper http.RoundTripper
