@@ -1,10 +1,8 @@
-//go:build !windows
-// +build !windows
-
-// Note: this build on unix/linux systems
+//go:build windows
+// +build windows
 
 /*
-Copyright 2021 The Kubernetes Authors.
+Copyright 2024 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -43,49 +41,43 @@ func TestLogSignal(t *testing.T) {
 	// Create multiple tests.
 	// NOTE: We are unable to observe SIGKILL or SIGSTOP, therefore we will not
 	// test with these syscalls.
+	// SIGIO, SIGSYS, SIGTTOU, and SIGCHLD are not available on Windows
 	sigTests := []sigTest{
 		{
-			signal: syscall.SIGIO,
+			signal: syscall.SIGALRM,
 			expected: []string{
-				"Encoutered signal: " + syscall.SIGIO.String(),
+				fmt.Sprintf("Encoutered signal: %s", syscall.SIGALRM.String()),
 			},
 			terminate: false,
 		},
 		{
 			signal: syscall.SIGALRM,
 			expected: []string{
-				"Encoutered signal: " + syscall.SIGALRM.String(),
-			},
-			terminate: false,
-		},
-		{
-			signal: syscall.SIGALRM,
-			expected: []string{
-				"Encoutered signal: " + syscall.SIGALRM.String(),
+				fmt.Sprintf("Encoutered signal: %s", syscall.SIGALRM.String()),
 			},
 			terminate: false,
 		},
 		{
 			signal: syscall.SIGQUIT,
 			expected: []string{
-				"Encoutered signal: " + syscall.SIGQUIT.String(),
-				"Exiting from signal: " + syscall.SIGQUIT.String(),
+				fmt.Sprintf("Encoutered signal: %s", syscall.SIGQUIT.String()),
+				fmt.Sprintf("Exiting from signal: %s", syscall.SIGQUIT.String()),
 			},
 			terminate: true,
 		},
 		{
 			signal: syscall.SIGINT,
 			expected: []string{
-				"Encoutered signal: " + syscall.SIGINT.String(),
-				"Exiting from signal: " + syscall.SIGINT.String(),
+				fmt.Sprintf("Encoutered signal: %s", syscall.SIGINT.String()),
+				fmt.Sprintf("Exiting from signal: %s", syscall.SIGINT.String()),
 			},
 			terminate: true,
 		},
 		{
 			signal: syscall.SIGABRT,
 			expected: []string{
-				"Encoutered signal: " + syscall.SIGABRT.String(),
-				"Exiting from signal: " + syscall.SIGABRT.String(),
+				fmt.Sprintf("Encoutered signal: %s", syscall.SIGABRT.String()),
+				fmt.Sprintf("Exiting from signal: %s", syscall.SIGABRT.String()),
 			},
 			terminate: true,
 		},
@@ -137,8 +129,6 @@ func TestLogSignals(t *testing.T) {
 	// the SignalChannel will block and the test will fail.
 	signals.SignalChannel <- syscall.SIGBUS
 	signals.SignalChannel <- syscall.SIGALRM
-	signals.SignalChannel <- syscall.SIGSYS
-	signals.SignalChannel <- syscall.SIGIO
 	// Force exit.
 	signals.Stop()
 	wg.Wait()
@@ -152,8 +142,6 @@ func TestLogSignals(t *testing.T) {
 	go logSignals()
 	// Pass multiple non-exit signals, ensuring LogSignals is consuming each. Otherwise,
 	// the SignalChannel will block and the test will fail.
-	signals.SignalChannel <- syscall.SIGTTOU
-	signals.SignalChannel <- syscall.SIGCHLD
 	signals.SignalChannel <- syscall.SIGPIPE
 	// Pass an exit signal.
 	signals.SignalChannel <- syscall.SIGINT
