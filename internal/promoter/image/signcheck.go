@@ -212,7 +212,7 @@ func objectExists(opts *options.Options, refString string) (bool, error) {
 	}
 
 	// Get the certificate
-	if manifest.Layers == nil || len(manifest.Layers) == 0 {
+	if len(manifest.Layers) == 0 {
 		return false, nil
 	}
 	signedLayers := 0
