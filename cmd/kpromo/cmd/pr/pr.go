@@ -207,8 +207,10 @@ func runPromote(opts *promoteOptions) error {
 	}
 
 	// Clone k8s.io
-	// We might want to set options to pass for the clone, nothing for now
-	gitCloneOpts := &gogit.CloneOptions{}
+	gitCloneOpts := &gogit.CloneOptions{
+		// Set a minimal depth to prevent downloading the whole repository.
+		Depth: 1,
+	}
 	repo, err := github.PrepareFork(branchname, git.DefaultGithubOrg, k8sioRepo, userForkOrg, userForkRepo, opts.useSSH, opts.updateRepo, gitCloneOpts)
 	if err != nil {
 		return fmt.Errorf("while preparing k/k8s.io fork: %w", err)
