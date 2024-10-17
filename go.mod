@@ -6,7 +6,7 @@ require (
 	cloud.google.com/go/containeranalysis v0.13.1
 	cloud.google.com/go/errorreporting v0.3.1
 	cloud.google.com/go/iam v1.2.1
-	cloud.google.com/go/logging v1.11.0
+	cloud.google.com/go/logging v1.12.0
 	cloud.google.com/go/storage v1.44.0
 	github.com/aws/aws-sdk-go v1.55.5
 	github.com/cenkalti/backoff/v4 v4.3.0
