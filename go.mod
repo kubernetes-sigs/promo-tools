@@ -24,8 +24,8 @@ require (
 	golang.org/x/oauth2 v0.23.0
 	golang.org/x/time v0.7.0
 	golang.org/x/xerrors v0.0.0-20231012003039-104605ab7028
-	google.golang.org/api v0.201.0
-	google.golang.org/genproto v0.0.0-20241007155032-5fefd90f89a9
+	google.golang.org/api v0.202.0
+	google.golang.org/genproto v0.0.0-20241015192408-796eee8c2d53
 	gopkg.in/src-d/go-git.v4 v4.13.1
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/utils v0.0.0-20240502163921-fe8a2dddb1d0
@@ -261,8 +261,8 @@ require (
 	golang.org/x/term v0.25.0 // indirect
 	golang.org/x/text v0.19.0 // indirect
 	golang.org/x/tools v0.26.0 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20240930140551-af27646dc61f // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20241007155032-5fefd90f89a9 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20241007155032-5fefd90f89a9 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20241015192408-796eee8c2d53 // indirect
 	google.golang.org/grpc v1.67.1 // indirect
 	google.golang.org/grpc/stats/opentelemetry v0.0.0-20240907200651-3ffb98b2c93a // indirect
 	google.golang.org/protobuf v1.35.1 // indirect
