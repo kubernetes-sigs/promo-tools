@@ -24,7 +24,7 @@ require (
 	golang.org/x/oauth2 v0.23.0
 	golang.org/x/time v0.7.0
 	golang.org/x/xerrors v0.0.0-20231012003039-104605ab7028
-	google.golang.org/api v0.204.0
+	google.golang.org/api v0.205.0
 	google.golang.org/genproto v0.0.0-20241021214115-324edc3d5d38
 	gopkg.in/src-d/go-git.v4 v4.13.1
 	gopkg.in/yaml.v2 v2.4.0
@@ -37,7 +37,7 @@ require (
 require (
 	cel.dev/expr v0.16.1 // indirect
 	cloud.google.com/go v0.116.0 // indirect
-	cloud.google.com/go/auth v0.10.0 // indirect
+	cloud.google.com/go/auth v0.10.1 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.5 // indirect
 	cloud.google.com/go/compute/metadata v0.5.2 // indirect
 	cloud.google.com/go/grafeas v0.3.11 // indirect
