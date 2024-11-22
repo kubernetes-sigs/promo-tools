@@ -29,11 +29,11 @@ import (
 	"os"
 	"strings"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	s3manager "github.com/aws/aws-sdk-go-v2/feature/s3/manager"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/sirupsen/logrus"
 
 	api "sigs.k8s.io/promo-tools/v4/api/files"
@@ -51,14 +51,14 @@ func (p *s3Provider) Scheme() string {
 type s3SyncFilestore struct {
 	provider  *s3Provider
 	filestore *api.Filestore
-	client    *s3.S3
+	client    *s3.Client
 	bucket    string
 	prefix    string
 }
 
 // openS3Filestore opens a filestore backed by Amazon S3 (S3)
 
-func (p *s3Provider) OpenFilestore(ctx context.Context, filestore *api.Filestore, useServiceAccount, config bool) (syncFilestore, error) {
+func (p *s3Provider) OpenFilestore(ctx context.Context, filestore *api.Filestore, useServiceAccount, confirm bool) (syncFilestore, error) {
 	u, err := url.Parse(filestore.Base)
 	if err != nil {
 		return nil, fmt.Errorf(
@@ -80,19 +80,14 @@ func (p *s3Provider) OpenFilestore(ctx context.Context, filestore *api.Filestore
 		return nil, fmt.Errorf("finding region for bucket: %w", err)
 	}
 
-	awsConfig := aws.NewConfig()
-	awsConfig = awsConfig.WithRegion(bucketRegion)
-	if !useServiceAccount {
-		awsConfig = awsConfig.WithCredentials(credentials.AnonymousCredentials)
-	}
-	awsConfig = awsConfig.WithCredentialsChainVerboseErrors(true)
-
-	awsSession, err := session.NewSession(awsConfig)
+	cfg, err := config.LoadDefaultConfig(ctx,
+		config.WithRegion(bucketRegion),
+	)
 	if err != nil {
-		return nil, fmt.Errorf("error building S3 session: %w", err)
+		return nil, fmt.Errorf("error loading the config: %w", err)
 	}
 
-	client := s3.New(awsSession)
+	client := s3.NewFromConfig(cfg)
 
 	prefix := strings.TrimPrefix(u.Path, "/")
 	if prefix != "" && !strings.HasSuffix(prefix, "/") {
@@ -118,19 +113,15 @@ func (p *s3Provider) findRegionForBucket(ctx context.Context, bucket string) (st
 		lookupRegion = "us-east-2"
 	}
 
-	// This is an unauthenticated request (it just does a HEAD on the bucket),
-	// but we still force anonymous credentials to be safe.
-	awsConfig := aws.NewConfig()
-	awsConfig = awsConfig.WithRegion(lookupRegion)
-	awsConfig = awsConfig.WithCredentials(credentials.AnonymousCredentials)
-	awsConfig = awsConfig.WithCredentialsChainVerboseErrors(true)
-
-	awsSession, err := session.NewSession(awsConfig)
+	cfg, err := config.LoadDefaultConfig(ctx,
+		config.WithRegion(lookupRegion),
+	)
 	if err != nil {
-		return "", fmt.Errorf("error creating AWS session: %w", err)
+		return "", fmt.Errorf("error loading the config: %w", err)
 	}
 
-	bucketRegion, err := s3manager.GetBucketRegion(ctx, awsSession, bucket, lookupRegion)
+	client := s3.NewFromConfig(cfg)
+	bucketRegion, err := s3manager.GetBucketRegion(ctx, client, bucket)
 	if err != nil {
 		return "", fmt.Errorf("error finding s3 region for bucket %q: %w", bucket, err)
 	}
@@ -148,7 +139,7 @@ func (s *s3SyncFilestore) OpenReader(
 		Bucket: &s.bucket,
 		Key:    &key,
 	}
-	obj, err := s.client.GetObjectWithContext(ctx, req)
+	obj, err := s.client.GetObject(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("error reading object %q: %w", key, err)
 	}
@@ -182,7 +173,7 @@ func (s *s3SyncFilestore) UploadFile(ctx context.Context, dest, localFile string
 		Bucket:        &s.bucket,
 		Key:           &key,
 		ContentLength: &contentLength,
-		Metadata:      make(map[string]*string),
+		Metadata:      make(map[string]string),
 	}
 
 	// Compute hashes for upload integrity and for metadata
@@ -194,9 +185,9 @@ func (s *s3SyncFilestore) UploadFile(ctx context.Context, dest, localFile string
 	req.ChecksumSHA256 = aws.String(base64.StdEncoding.EncodeToString(hashes.SHA256))
 
 	// TODO: Any more hashes?  Very cheap to compute now...
-	req.Metadata["content-hash-md5"] = aws.String(hex.EncodeToString(hashes.MD5))
-	req.Metadata["content-hash-sha256"] = aws.String(hex.EncodeToString(hashes.SHA256))
-	req.Metadata["content-hash-sha512"] = aws.String(hex.EncodeToString(hashes.SHA512))
+	req.Metadata["content-hash-md5"] = hex.EncodeToString(hashes.MD5)
+	req.Metadata["content-hash-sha256"] = hex.EncodeToString(hashes.SHA256)
+	req.Metadata["content-hash-sha512"] = hex.EncodeToString(hashes.SHA512)
 
 	if _, err := f.Seek(0, 0); err != nil {
 		return fmt.Errorf("error rewinding file: %w", err)
@@ -205,20 +196,20 @@ func (s *s3SyncFilestore) UploadFile(ctx context.Context, dest, localFile string
 
 	logrus.Infof("uploading to %s", s3URL)
 
-	response, err := s.client.PutObjectWithContext(ctx, req)
+	response, err := s.client.PutObject(ctx, req)
 	if err != nil {
 		return fmt.Errorf("error uploading %q: %w", s3URL, err)
 	}
 
 	logrus.Debugf("uploaded to %s %v", s3URL, response)
 
-	if got, want := aws.StringValue(response.ChecksumSHA256), base64.StdEncoding.EncodeToString(hashes.SHA256); got != want {
+	if got, want := aws.ToString(response.ChecksumSHA256), base64.StdEncoding.EncodeToString(hashes.SHA256); got != want {
 		// AWS should check this for us, but we double check it here.
 		return fmt.Errorf("checksum mismatch on upload of %q: got %q, want %q", s3URL, got, want)
 	}
 
 	expectedETag := "\"" + hex.EncodeToString(hashes.MD5) + "\""
-	if got, want := aws.StringValue(response.ETag), expectedETag; got != want {
+	if got, want := aws.ToString(response.ETag), expectedETag; got != want {
 		// We do a simple upload so that the etag is the md5, but we double check that it worked here
 		return fmt.Errorf("unexpected etag after upload of %q: got %q, want %q", s3URL, got, want)
 	}
@@ -242,8 +233,8 @@ func (s *s3SyncFilestore) ListFiles(
 	}
 
 	var errors []error
-	objectCallback := func(obj *s3.Object) error {
-		name := aws.StringValue(obj.Key)
+	objectCallback := func(obj types.Object) error {
+		name := aws.ToString(obj.Key)
 		if !strings.HasPrefix(name, s.prefix) {
 			return fmt.Errorf(
 				"found object %q without prefix %q",
@@ -254,7 +245,7 @@ func (s *s3SyncFilestore) ListFiles(
 		file.AbsolutePath = s.provider.Scheme() + api.Backslash + s.bucket + "/" + name
 		file.RelativePath = strings.TrimPrefix(name, s.prefix)
 
-		md5 := aws.StringValue(obj.ETag)
+		md5 := aws.ToString(obj.ETag)
 		md5 = strings.Trim(md5, "\"")
 		if md5 == "" {
 			return fmt.Errorf("MD5 not set on file %q", file.AbsolutePath)
@@ -266,25 +257,25 @@ func (s *s3SyncFilestore) ListFiles(
 		}
 
 		file.MD5 = md5
-		file.Size = aws.Int64Value(obj.Size)
+		file.Size = aws.ToInt64(obj.Size)
 		file.filestore = s
 
 		files[file.RelativePath] = file
 		return nil
 	}
-	pageCallback := func(page *s3.ListObjectsV2Output, _ bool) bool {
-		for _, obj := range page.Contents {
-			err := objectCallback(obj)
-			if err != nil {
-				errors = append(errors, err)
-				// stop iteration immediately on error
-				return false
-			}
-		}
-		return true
-	}
-	if err := s.client.ListObjectsV2PagesWithContext(ctx, req, pageCallback); err != nil {
+
+	page, err := s.client.ListObjectsV2(ctx, req)
+	if err != nil {
 		return nil, fmt.Errorf("error listing objects: %w", err)
+	}
+
+	for _, obj := range page.Contents {
+		err := objectCallback(obj)
+		if err != nil {
+			errors = append(errors, err)
+			// stop iteration immediately on error
+			break
+		}
 	}
 
 	if len(errors) != 0 {
