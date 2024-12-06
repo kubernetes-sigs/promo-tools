@@ -7,7 +7,7 @@ require (
 	cloud.google.com/go/errorreporting v0.3.1
 	cloud.google.com/go/iam v1.3.0
 	cloud.google.com/go/logging v1.12.0
-	cloud.google.com/go/storage v1.47.0
+	cloud.google.com/go/storage v1.48.0
 	github.com/aws/aws-sdk-go-v2 v1.32.6
 	github.com/aws/aws-sdk-go-v2/config v1.28.6
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.17.43
@@ -268,7 +268,7 @@ require (
 	golang.org/x/tools v0.26.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20241113202542-65e8d215514f // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20241118233622-e639e219e697 // indirect
-	google.golang.org/grpc v1.67.1 // indirect
+	google.golang.org/grpc v1.67.2 // indirect
 	google.golang.org/grpc/stats/opentelemetry v0.0.0-20240907200651-3ffb98b2c93a // indirect
 	google.golang.org/protobuf v1.35.2 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
