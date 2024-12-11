@@ -4,7 +4,7 @@ go 1.23
 
 require (
 	cloud.google.com/go/containeranalysis v0.13.2
-	cloud.google.com/go/errorreporting v0.3.1
+	cloud.google.com/go/errorreporting v0.3.2
 	cloud.google.com/go/iam v1.3.0
 	cloud.google.com/go/logging v1.12.0
 	cloud.google.com/go/storage v1.48.0
