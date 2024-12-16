@@ -668,8 +668,8 @@ github.com/sigstore/fulcio v1.4.5 h1:WWNnrOknD0DbruuZWCbN+86WRROpEl3Xts+WT2Ek1yc
 github.com/sigstore/fulcio v1.4.5/go.mod h1:oz3Qwlma8dWcSS/IENR/6SjbW4ipN0cxpRVfgdsjMU8=
 github.com/sigstore/rekor v1.3.6 h1:QvpMMJVWAp69a3CHzdrLelqEqpTM3ByQRt5B5Kspbi8=
 github.com/sigstore/rekor v1.3.6/go.mod h1:JDTSNNMdQ/PxdsS49DJkJ+pRJCO/83nbR5p3aZQteXc=
-github.com/sigstore/sigstore v1.8.10 h1:r4t+TYzJlG9JdFxMy+um9GZhZ2N1hBTyTex0AHEZxFs=
-github.com/sigstore/sigstore v1.8.10/go.mod h1:BekjqxS5ZtHNJC4u3Q3Stvfx2eyisbW/lUZzmPU2u4A=
+github.com/sigstore/sigstore v1.8.11 h1:tEqeQqbT+awtM87ec9KEeSUxT/AFvJNawneYJyAkFrQ=
+github.com/sigstore/sigstore v1.8.11/go.mod h1:fdrFQosxCQ4wTL5H1NrZcQkqQ72AQbPjtpcL2QOGKV0=
 github.com/sigstore/sigstore/pkg/signature/kms/aws v1.8.3 h1:LTfPadUAo+PDRUbbdqbeSl2OuoFQwUFTnJ4stu+nwWw=
 github.com/sigstore/sigstore/pkg/signature/kms/aws v1.8.3/go.mod h1:QV/Lxlxm0POyhfyBtIbTWxNeF18clMlkkyL9mu45y18=
 github.com/sigstore/sigstore/pkg/signature/kms/azure v1.8.3 h1:xgbPRCr2npmmsuVVteJqi/ERw9+I13Wou7kq0Yk4D8g=
@@ -827,8 +827,8 @@ golang.org/x/crypto v0.6.0/go.mod h1:OFC/31mSvZgRz0V1QTNCzfAI1aIRzbiufJtkMIlEp58
 golang.org/x/crypto v0.7.0/go.mod h1:pYwdfH91IfpZVANVyUOhSIPZaFoJGxTFbZhFTx+dXZU=
 golang.org/x/crypto v0.10.0/go.mod h1:o4eNf7Ede1fv+hwOwZsTHl9EsPFO6q6ZvYR8vYfY45I=
 golang.org/x/crypto v0.19.0/go.mod h1:Iy9bg/ha4yyC70EfRS8jz+B6ybOBKMaSxLj6P6oBDfU=
-golang.org/x/crypto v0.30.0 h1:RwoQn3GkWiMkzlX562cLB7OxWvjH1L8xutO2WoJcRoY=
-golang.org/x/crypto v0.30.0/go.mod h1:kDsLvtWBEx7MV9tJOj9bnXsPbxwJQ6csT/x4KIN4Ssk=
+golang.org/x/crypto v0.31.0 h1:ihbySMvVjLAeSH1IbfcRTkD/iNscyz8rGzjF/E5hV6U=
+golang.org/x/crypto v0.31.0/go.mod h1:kDsLvtWBEx7MV9tJOj9bnXsPbxwJQ6csT/x4KIN4Ssk=
 golang.org/x/exp v0.0.0-20190121172915-509febef88a4/go.mod h1:CJ0aWSM057203Lf6IL+f9T1iT9GByDxfZKAQTCR3kQA=
 golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56 h1:2dVuKD2vS7b0QIHQbpyTISPd0LeHDbnYEryqj5Q1ug8=
 golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56/go.mod h1:M4RDyNAINzryxdtnbRXRL/OHtkFuWGRjvuhBJpk2IlY=
