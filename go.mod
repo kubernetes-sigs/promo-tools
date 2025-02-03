@@ -8,7 +8,7 @@ require (
 	cloud.google.com/go/iam v1.3.1
 	cloud.google.com/go/logging v1.13.0
 	cloud.google.com/go/storage v1.50.0
-	github.com/aws/aws-sdk-go-v2 v1.35.0
+	github.com/aws/aws-sdk-go-v2 v1.36.0
 	github.com/aws/aws-sdk-go-v2/config v1.29.3
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.17.56
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.75.1
