@@ -334,7 +334,7 @@ func runPromote(opts *promoteOptions) error {
 		pr, err := gh.CreatePullRequest(
 			git.DefaultGithubOrg, k8sioRepo, k8sioDefaultBranch,
 			fmt.Sprintf("%s:%s", userForkOrg, branchname),
-			commitMessage, generatePRBody(opts),
+			commitMessage, generatePRBody(opts), false,
 		)
 		if err != nil {
 			return fmt.Errorf("creating the pull request in k/k8s.io: %w", err)
