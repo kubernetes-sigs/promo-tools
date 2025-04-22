@@ -68,7 +68,7 @@ kpromo pr -i --fork=<your-github-username> --tag=v1.20.0-rc.0 --tag=v1.21.0-alph
 
 - Alpha or Beta release: promote the images for the release you're cutting (e.g. `v1.20.0-beta.1`)
 - The first RC (e.g. `v1.20.0-rc.0`): promote the images for the RC and for the next minor alpha release (e.g. `v1.21.0-alpha.0`)
-- The subsequent RCs (e.g. `v1.20.0-rc.1`): promote the images for the RC you're cutting (e.g. `v1.20.0-rc.0`)
+- The subsequent RCs (e.g. `v1.20.0-rc.1`): promote the images for the RC you're cutting (e.g. `v1.20.0-rc.1`)
 - A stable release (e.g. `v1.20.0`): promote the images for the release you're cutting and for the RC of the next patch release (e.g. `v1.20.1-rc.0`)
 
 The following steps are taken by the `kpromo pr` command:
