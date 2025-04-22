@@ -1,15 +1,11 @@
 # Creating Promotion Pull Requests
 
-**DISCLAIMER:** This document was originally written for Release Managers, but can be adapted to be used for any subproject.
-
-Please feel free to propose PRs to adjust the language as needed.
+> [!TIP]
+> Disclaimer: This document was originally written for Release Managers, but can be adapted to be used for any subproject.
 
 - [Preparing Environment](#preparing-environment)
 - [Promoting Images](#promoting-images)
 - [Completing the Image Promotion](#completing-the-image-promotion)
-- [Deprecated](#deprecated)
-  - [`cip-mm`](#cip-mm)
-    - [Examples](#examples)
 
 When cutting a new Kubernetes release, we need to publish images to the `k8s-staging-kubernetes` GCS Bucket and then promote them to the production.
 
