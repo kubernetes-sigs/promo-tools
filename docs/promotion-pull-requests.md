@@ -66,10 +66,15 @@ kpromo pr -i --fork=<your-github-username> --tag=v1.20.0-rc.0 --tag=v1.21.0-alph
 > [!NOTE]  
 > The images that are promoted depend on the release you're cutting. In case of multiple cuts needed, due to resource restriction on Prow, please open two separate PRs (which means running two separate `kpromo` commands).
 
+> [!CAUTION]  
+> For Stable Kubernetes releases (1.x) **DO NOT** cut the next patch `1.x.1-rc.0`
+
 - Alpha or Beta release: promote the images for the release you're cutting (e.g. `v1.20.0-beta.1`)
 - The first RC (e.g. `v1.20.0-rc.0`): promote the images for the RC and for the next minor alpha release (e.g. `v1.21.0-alpha.0`)
 - The subsequent RCs (e.g. `v1.20.0-rc.1`): promote the images for the RC you're cutting (e.g. `v1.20.0-rc.1`)
-- A stable release (e.g. `v1.20.0`): promote the images for the release you're cutting and for the RC of the next patch release (e.g. `v1.20.1-rc.0`)
+
+- A stable Kubernetes release (e.g. `v1.20.0`): only promote the images for the release you're cutting (e.g. `v1.20.0`)
+- A stable release of other projects (e.g. `v1.20.0`): promote the images for the release you're cutting and for the RC of the next patch release (e.g. `v1.20.1-rc.0`)
 
 The following steps are taken by the `kpromo pr` command:
 
