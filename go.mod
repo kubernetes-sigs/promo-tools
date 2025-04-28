@@ -5,7 +5,7 @@ go 1.23.4
 require (
 	cloud.google.com/go/containeranalysis v0.13.4
 	cloud.google.com/go/errorreporting v0.3.2
-	cloud.google.com/go/iam v1.5.0
+	cloud.google.com/go/iam v1.5.2
 	cloud.google.com/go/logging v1.13.0
 	cloud.google.com/go/storage v1.52.0
 	github.com/aws/aws-sdk-go-v2 v1.36.3
