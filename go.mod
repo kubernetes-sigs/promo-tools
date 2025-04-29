@@ -10,8 +10,8 @@ require (
 	cloud.google.com/go/storage v1.52.0
 	github.com/aws/aws-sdk-go-v2 v1.36.3
 	github.com/aws/aws-sdk-go-v2/config v1.29.14
-	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.17.73
-	github.com/aws/aws-sdk-go-v2/service/s3 v1.79.2
+	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.17.74
+	github.com/aws/aws-sdk-go-v2/service/s3 v1.79.3
 	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/go-git/go-git/v5 v5.16.0
 	github.com/google/go-cmp v0.7.0
@@ -91,7 +91,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ecr v1.20.2 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ecrpublic v1.18.2 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.12.3 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.7.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.7.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.12.15 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.18.15 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sso v1.25.3 // indirect
