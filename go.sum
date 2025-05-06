@@ -9,12 +9,12 @@ cloud.google.com/go/auth/oauth2adapt v0.2.8 h1:keo8NaayQZ6wimpNSmW5OPc283g65QNIi
 cloud.google.com/go/auth/oauth2adapt v0.2.8/go.mod h1:XQ9y31RkqZCcwJWNSx2Xvric3RrU88hAYYbjDWYDL+c=
 cloud.google.com/go/compute/metadata v0.6.0 h1:A6hENjEsCDtC1k8byVsgwvVcioamEHvZ4j01OwKxG9I=
 cloud.google.com/go/compute/metadata v0.6.0/go.mod h1:FjyFAW1MW0C203CEOMDTu3Dk1FlqW3Rga40jzHL4hfg=
-cloud.google.com/go/containeranalysis v0.13.4 h1:HC+6o00uA3XdFvGJ7/4VT4e+CC/UkPt3KJHozFNwKhU=
-cloud.google.com/go/containeranalysis v0.13.4/go.mod h1:rOJDmPja/8tbTSJ/Lo0bFGpP+HipCbkytpPjugAIWjI=
+cloud.google.com/go/containeranalysis v0.14.1 h1:1SoHlNqL3XrhqcoozB+3eoHif2sRUFtp/JeASQTtGKo=
+cloud.google.com/go/containeranalysis v0.14.1/go.mod h1:28e+tlZgauWGHmEbnI5UfIsjMmrkoR1tFN0K2i71jBI=
 cloud.google.com/go/errorreporting v0.3.2 h1:isaoPwWX8kbAOea4qahcmttoS79+gQhvKsfg5L5AgH8=
 cloud.google.com/go/errorreporting v0.3.2/go.mod h1:s5kjs5r3l6A8UUyIsgvAhGq6tkqyBCUss0FRpsoVTww=
-cloud.google.com/go/grafeas v0.3.14 h1:3Wu2vypaHPytyeOno3WX4i6nSo4/DxmxutaZTVVZPCo=
-cloud.google.com/go/grafeas v0.3.14/go.mod h1:Y1a3zCMg/5oj78rHHZEF0UiUGt9P87RVvYY+Z5jzQys=
+cloud.google.com/go/grafeas v0.3.15 h1:lBjwKmhpiqOAFaE0xdqF8CqO74a99s8tUT5mCkBBxPs=
+cloud.google.com/go/grafeas v0.3.15/go.mod h1:irwcwIQOBlLBotGdMwme8PipnloOPqILfIvMwlmu8Pk=
 cloud.google.com/go/iam v1.5.2 h1:qgFRAGEmd8z6dJ/qyEchAuL9jpswyODjA2lS+w234g8=
 cloud.google.com/go/iam v1.5.2/go.mod h1:SE1vg0N81zQqLzQEwxL2WI6yhetBdbNQuTvIKCSkUHE=
 cloud.google.com/go/kms v1.21.0 h1:x3EeWKuYwdlo2HLse/876ZrKjk2L5r7Uexfm8+p6mSI=
