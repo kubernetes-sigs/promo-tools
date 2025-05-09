@@ -55,7 +55,11 @@ type DigestTags map[image.Digest]TagSlice
 type TagSlice []image.Tag
 
 // TagSet is a set of Tags.
-type TagSet map[image.Tag]interface{}
+// type TagSet container.Set[image.Tag]
+
+// func NewTagSet(tags ...image.Tag) TagSet {
+// 	return TagSet(container.NewSet(tags...))
+// }
 
 // ToYAML displays a RegInvImage as YAML, but with the map items sorted
 // alphabetically.
