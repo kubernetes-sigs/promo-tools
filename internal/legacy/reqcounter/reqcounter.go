@@ -28,52 +28,62 @@ import (
 
 // RequestCounter records the number of HTTP requests to GCR.
 type RequestCounter struct {
-	Mutex     sync.Mutex    // Lock to prevent race-conditions with concurrent processes.
-	Requests  uint64        // Number of HTTP requests since recording started.
-	Since     time.Time     // When the current request counter began recording requests.
-	Interval  time.Duration // The duration of time between each log.
-	Threshold uint64        // When to warn of a high request count during a logging cycle. Setting a
+	// Lock to prevent race-conditions with concurrent processes.
+	mutex sync.Mutex
+
+	// Number of HTTP requests since recording started.
+	requests uint64
+
+	// When the current request counter began recording requests.
+	since time.Time
+
+	// The duration of time between each log.
+	interval time.Duration
+
+	// When to warn of a high request count during a logging cycle. Setting a
 	// non-zero threshold allows the request counter to reset each interval. If left uninitialized,
 	// the request counter will be persistent and never warn or reset.
+	threshold uint64
 }
 
 // increment adds 1 to the request counter, signifying another call to GCR.
 func (rc *RequestCounter) Increment() {
-	rc.Mutex.Lock()
-	rc.Requests++
-	rc.Mutex.Unlock()
+	rc.mutex.Lock()
+	rc.requests++
+	rc.mutex.Unlock()
 }
 
 // Flush records the number of HTTP requests found and resets the request counter.
-func (rc *RequestCounter) Flush() {
+func (rc *RequestCounter) flush() {
 	// Hold onto the lock when reading & writing the request counter.
-	rc.Mutex.Lock()
-	defer rc.Mutex.Unlock()
+	rc.mutex.Lock()
+	defer rc.mutex.Unlock()
 
 	rc.log()
 
 	// Only allow request counters wi
-	if rc.Threshold > 0 {
+	if rc.threshold > 0 {
 		// Reset the request counter.
-		rc.reset()
+		rc.resetWithLockHeld()
 	}
 }
 
 // log the number of HTTP requests found. If the number of requests exceeds the
 // threshold, log an additional warning message.
 func (rc *RequestCounter) log() {
-	msg := fmt.Sprintf("From %s to %s [%d min] there have been %d requests to GCR.", rc.Since.Format(TimestampFormat), Clock.Now().Format(TimestampFormat), rc.Interval/time.Minute, rc.Requests)
+	msg := fmt.Sprintf("From %s to %s [%d min] there have been %d requests to GCR.", rc.since.Format(TimestampFormat), Clock.Now().Format(TimestampFormat), rc.interval/time.Minute, rc.requests)
 	Debug(msg)
-	if rc.Threshold > 0 && rc.Requests > rc.Threshold {
-		msg = fmt.Sprintf("The threshold of %d requests has been surpassed.", rc.Threshold)
+	if rc.threshold > 0 && rc.requests > rc.threshold {
+		msg = fmt.Sprintf("The threshold of %d requests has been surpassed.", rc.threshold)
 		Warn(msg)
 	}
 }
 
 // reset clears the request counter and stamps the current time of reset.
-func (rc *RequestCounter) reset() {
-	rc.Requests = 0
-	rc.Since = Clock.Now()
+// this function should be called with the mutex held.
+func (rc *RequestCounter) resetWithLockHeld() {
+	rc.requests = 0
+	rc.since = Clock.Now()
 }
 
 // watch indefinitely performs repeated sleep/log cycles.
@@ -81,15 +91,15 @@ func (rc *RequestCounter) watch() {
 	// TODO: @tylerferrara create a way to cleanly terminate this goroutine.
 	go func() {
 		for {
-			rc.Cycle()
+			rc.cycle()
 		}
 	}()
 }
 
-// Cycle sleeps for the request counter's interval and flushes itself.
-func (rc *RequestCounter) Cycle() {
-	Clock.Sleep(rc.Interval)
-	rc.Flush()
+// cycle sleeps for the request counter's interval and flushes itself.
+func (rc *RequestCounter) cycle() {
+	Clock.Sleep(rc.interval)
+	rc.flush()
 }
 
 // RequestCounters holds multiple request counters.
@@ -108,7 +118,7 @@ func (nm *NetworkMonitor) increment() {
 }
 
 // Log begins logging each request counter at their specified intervals.
-func (nm *NetworkMonitor) Log() {
+func (nm *NetworkMonitor) log() {
 	for _, rc := range nm.RequestCounters {
 		rc.watch()
 	}
@@ -151,24 +161,21 @@ func Init() {
 	// GCR quota, but acts as a rough estimation of this quota, indicating when throttling may occur.
 	requestCounters := RequestCounters{
 		{
-			Mutex:     sync.Mutex{},
-			Requests:  0,
-			Since:     Clock.Now(),
-			Interval:  QuotaWindowShort,
-			Threshold: 50000,
+			requests:  0,
+			since:     Clock.Now(),
+			interval:  QuotaWindowShort,
+			threshold: 50000,
 		},
 		{
-			Mutex:     sync.Mutex{},
-			Requests:  0,
-			Since:     Clock.Now(),
-			Interval:  QuotaWindowLong,
-			Threshold: 1000000,
+			requests:  0,
+			since:     Clock.Now(),
+			interval:  QuotaWindowLong,
+			threshold: 1000000,
 		},
 		{
-			Mutex:    sync.Mutex{},
-			Requests: 0,
-			Since:    Clock.Now(),
-			Interval: QuotaWindowShort,
+			requests: 0,
+			since:    Clock.Now(),
+			interval: QuotaWindowShort,
 		},
 	}
 
@@ -178,7 +185,7 @@ func Init() {
 	}
 
 	// Begin logging network traffic.
-	NetMonitor.Log()
+	NetMonitor.log()
 }
 
 // Increment increases the all request counters by 1, signifying an HTTP
