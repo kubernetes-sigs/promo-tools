@@ -907,6 +907,7 @@ func (sc *SyncContext) ReadRegistries(
 				// "foo" from a destination registry, do not bother trying to
 				// promote it for all registries
 				mutex.Lock()
+				//nolint:errcheck // TODO: make RequestParams a type parameter
 				sc.IgnoreFromPromotion(req.RequestParams.(registry.Context).Name)
 				mutex.Unlock()
 
@@ -914,6 +915,7 @@ func (sc *SyncContext) ReadRegistries(
 			}
 
 			// Process the current repo.
+			//nolint:errcheck // TODO: make RequestParams a type parameter
 			rName := req.RequestParams.(registry.Context).Name
 			digestTags := make(registry.DigestTags)
 
