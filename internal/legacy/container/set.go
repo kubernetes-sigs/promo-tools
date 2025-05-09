@@ -17,14 +17,25 @@ limitations under the License.
 package container
 
 // Set is a basic set-like data structure.
-type Set map[Element]interface{}
+type Set[K comparable] map[K]struct{}
 
-// Element is a singleton item that goes with Set.
-type Element interface{}
+// NewSet contructs a Set with the specified items.
+func NewSet[K comparable](items ...K) Set[K] {
+	s := make(Set[K])
+	for _, item := range items {
+		s[item] = struct{}{}
+	}
+	return s
+}
+
+// Insert inserts an item into the set.
+func (s Set[K]) Insert(item K) {
+	s[item] = struct{}{}
+}
 
 // Minus returns a new set, by subtracting everything in b from a.
-func (a Set) Minus(b Set) Set {
-	c := make(Set)
+func (a Set[K]) Minus(b Set[K]) Set[K] {
+	c := make(Set[K])
 	for k, v := range a {
 		c[k] = v
 	}
@@ -35,8 +46,8 @@ func (a Set) Minus(b Set) Set {
 }
 
 // Union takes two sets and returns their union in a new set.
-func (a Set) Union(b Set) Set {
-	c := make(Set)
+func (a Set[K]) Union(b Set[K]) Set[K] {
+	c := make(Set[K])
 	for k, v := range a {
 		c[k] = v
 	}
@@ -48,8 +59,8 @@ func (a Set) Union(b Set) Set {
 
 // Intersection takes two sets and returns elements common to both. Note that we
 // throw away information about the values of the elements in b.
-func (a Set) Intersection(b Set) Set {
-	c := make(Set)
+func (a Set[K]) Intersection(b Set[K]) Set[K] {
+	c := make(Set[K])
 	for k, v := range a {
 		if _, ok := b[k]; ok {
 			c[k] = v
