@@ -357,7 +357,7 @@ func mustRun(opts *promoteOptions, question string) bool {
 	_, success, err := util.Ask(question+" (Y/n)", "y:Y:yes|n:N:no|y", 10)
 	if err != nil {
 		logrus.Error(err)
-		if err.(util.UserInputError).IsCtrlC() {
+		if userInputErr, ok := err.(util.UserInputError); ok && userInputErr.IsCtrlC() {
 			os.Exit(1)
 		}
 		return false
