@@ -27,6 +27,7 @@ import (
 	cr "github.com/google/go-containerregistry/pkg/v1/types"
 	"github.com/stretchr/testify/require"
 
+	"sigs.k8s.io/promo-tools/v4/internal/legacy/container"
 	reg "sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry"
 	"sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry/registry"
 	"sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry/schema"
@@ -1238,161 +1239,92 @@ func TestGetTokenKeyDomainRepoPath(t *testing.T) {
 	}
 }
 
-func TestSetManipulationsRegistryInventories(t *testing.T) {
-	tests := []struct {
-		name           string
-		input1         registry.RegInvImage
-		input2         registry.RegInvImage
-		op             func(a, b registry.RegInvImage) registry.RegInvImage
-		expectedOutput registry.RegInvImage
-	}{
-		{
-			"Set Minus",
-			registry.RegInvImage{
-				"foo": {
-					"sha256:abc": {"1.0", "latest"},
-				},
-				"bar": {
-					"sha256:def": {"0.9"},
-				},
-			},
-			registry.RegInvImage{
-				"foo": {
-					"sha256:abc": {"1.0", "latest"},
-				},
-				"bar": {
-					"sha256:def": {"0.9"},
-				},
-			},
-			registry.RegInvImage.Minus,
-			registry.RegInvImage{},
-		},
-		{
-			"Set Union",
-			registry.RegInvImage{
-				"foo": {
-					"sha256:abc": {"1.0", "latest"},
-				},
-				"bar": {
-					"sha256:def": {"0.9"},
-				},
-			},
-			registry.RegInvImage{
-				"apple": {
-					"sha256:abc": {"1.0", "latest"},
-				},
-				"banana": {
-					"sha256:def": {"0.9"},
-				},
-			},
-			registry.RegInvImage.Union,
-			registry.RegInvImage{
-				"foo": {
-					"sha256:abc": {"1.0", "latest"},
-				},
-				"bar": {
-					"sha256:def": {"0.9"},
-				},
-				"apple": {
-					"sha256:abc": {"1.0", "latest"},
-				},
-				"banana": {
-					"sha256:def": {"0.9"},
-				},
-			},
-		},
-	}
-
-	for _, test := range tests {
-		got := test.op(test.input1, test.input2)
-		expected := test.expectedOutput
-		require.Equal(t, expected, got)
-	}
-}
-
 func TestSetManipulationsTags(t *testing.T) {
 	tests := []struct {
 		name           string
 		input1         registry.TagSlice
 		input2         registry.TagSlice
-		op             func(a, b registry.TagSlice) registry.TagSet
-		expectedOutput registry.TagSet
+		op             func(a, b registry.TagSlice) container.Set[image.Tag]
+		expectedOutput []string
 	}{
 		{
 			"Set Minus (both blank)",
 			registry.TagSlice{},
 			registry.TagSlice{},
 			registry.TagSlice.Minus,
-			registry.TagSet{},
+			[]string{},
 		},
 		{
 			"Set Minus (first blank)",
 			registry.TagSlice{},
 			registry.TagSlice{"a"},
 			registry.TagSlice.Minus,
-			registry.TagSet{},
+			[]string{},
 		},
 		{
 			"Set Minus (second blank)",
 			registry.TagSlice{"a", "b"},
 			registry.TagSlice{},
 			registry.TagSlice.Minus,
-			registry.TagSet{"a": nil, "b": nil},
+			[]string{"a", "b"},
 		},
 		{
 			"Set Minus",
 			registry.TagSlice{"a", "b"},
 			registry.TagSlice{"b"},
 			registry.TagSlice.Minus,
-			registry.TagSet{"a": nil},
+			[]string{"a"},
 		},
 		{
 			"Set Union (both blank)",
 			registry.TagSlice{},
 			registry.TagSlice{},
 			registry.TagSlice.Union,
-			registry.TagSet{},
+			[]string{},
 		},
 		{
 			"Set Union (first blank)",
 			registry.TagSlice{},
 			registry.TagSlice{"a"},
 			registry.TagSlice.Union,
-			registry.TagSet{"a": nil},
+			[]string{"a"},
 		},
 		{
 			"Set Union (second blank)",
 			registry.TagSlice{"a"},
 			registry.TagSlice{},
 			registry.TagSlice.Union,
-			registry.TagSet{"a": nil},
+			[]string{"a"},
 		},
 		{
 			"Set Union",
 			registry.TagSlice{"a", "c"},
 			registry.TagSlice{"b", "d"},
 			registry.TagSlice.Union,
-			registry.TagSet{"a": nil, "b": nil, "c": nil, "d": nil},
+			[]string{"a", "b", "c", "d"},
 		},
 		{
 			"Set Intersection (no intersection)",
 			registry.TagSlice{"a"},
 			registry.TagSlice{"b"},
 			registry.TagSlice.Intersection,
-			registry.TagSet{},
+			[]string{},
 		},
 		{
 			"Set Intersection (some intersection)",
 			registry.TagSlice{"a", "b"},
 			registry.TagSlice{"b", "c"},
 			registry.TagSlice.Intersection,
-			registry.TagSet{"b": nil},
+			[]string{"b"},
 		},
 	}
 
 	for _, test := range tests {
 		got := test.op(test.input1, test.input2)
-		expected := test.expectedOutput
+		expected := container.NewSet[image.Tag]()
+		for _, tag := range test.expectedOutput {
+			expected.Insert(image.Tag(tag))
+		}
 		require.Equal(t, expected, got)
 	}
 }
