@@ -220,7 +220,7 @@ func (sc *SyncContext) GetPromotionCandidates(edges map[PromotionEdge]interface{
 
 		// If dst vertex exists, NOP.
 		if dp.PqinDigestMatch {
-			logrus.Infof("edge %v: skipping because it was already promoted (case 1)\n", edge)
+			logrus.Debugf("edge %v: skipping because it was already promoted (case 1)\n", edge)
 			continue
 		}
 
@@ -247,7 +247,7 @@ func (sc *SyncContext) GetPromotionCandidates(edges map[PromotionEdge]interface{
 				// a different tag, then it's an error.
 				if dp.PqinDigestMatch {
 					// NOP (already promoted).
-					logrus.Infof("edge %v: skipping because it was already promoted (case 2)\n", edge)
+					logrus.Debugf("edge %v: skipping because it was already promoted (case 2)\n", edge)
 					continue
 				} else {
 					logrus.Errorf("edge %v: tag %s: ERROR: tag move detected from %s to %s", edge, edge.DstImageTag.Tag, edge.Digest, *sc.getDigestForTag(edge.DstImageTag.Tag))
@@ -792,7 +792,7 @@ func (sc *SyncContext) recordFoundTags(
 	if err != nil {
 		return fmt.Errorf("splitting repo and image name: %w", err)
 	}
-	logrus.Infof("Registry: %s Image: %s Got: %s", regName, imageName, repo.Name())
+	logrus.Debugf("Registry: %s Image: %s Got: %s", regName, imageName, repo.Name())
 	digestTags := make(registry.DigestTags)
 	if tags != nil && tags.Manifests != nil {
 		for digest, manifest := range tags.Manifests {
@@ -1564,7 +1564,7 @@ func (sc *SyncContext) FilterPromotionEdges(
 	if readRepos {
 		regs := getRegistriesToRead(edges)
 		for _, reg := range regs {
-			logrus.Infof("reading registry %s (src=%v)", reg.Name, reg.Src)
+			logrus.Debugf("reading registry %s (src=%v)", reg.Name, reg.Src)
 		}
 
 		// Do not read these registries recursively, because we already know
