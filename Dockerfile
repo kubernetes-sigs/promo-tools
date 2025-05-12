@@ -24,7 +24,7 @@
 ARG variant
 ARG GO_VERSION
 ARG OS_CODENAME
-FROM golang:1.23-bookworm AS builder
+FROM golang:1.24-bookworm AS builder
 
 # Copy the sources
 WORKDIR /go/src/app
