@@ -116,7 +116,7 @@ func (a TagSet) ToSet() container.Set {
 func setToTagSet(a container.Set) TagSet {
 	b := make(TagSet)
 	for k := range a {
-		b[k.(image.Tag)] = nil
+		b[k.(image.Tag)] = nil //nolint: errcheck
 	}
 
 	return b

@@ -907,14 +907,14 @@ func (sc *SyncContext) ReadRegistries(
 				// "foo" from a destination registry, do not bother trying to
 				// promote it for all registries
 				mutex.Lock()
-				sc.IgnoreFromPromotion(req.RequestParams.(registry.Context).Name)
+				sc.IgnoreFromPromotion(req.RequestParams.(registry.Context).Name) //nolint: errcheck
 				mutex.Unlock()
 
 				continue
 			}
 
 			// Process the current repo.
-			rName := req.RequestParams.(registry.Context).Name
+			rName := req.RequestParams.(registry.Context).Name //nolint: errcheck
 			digestTags := make(registry.DigestTags)
 
 			for digest, mfestInfo := range tagsStruct.Manifests {
