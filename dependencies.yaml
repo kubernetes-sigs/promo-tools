@@ -27,7 +27,7 @@ dependencies:
 
   # golangci-lint
   - name: "golangci-lint"
-    version: 1.61.0
+    version: 2.1.6
     refPaths:
     - path: hack/verify-golangci-lint.sh
       match: VERSION=v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?
@@ -38,7 +38,7 @@ dependencies:
   # This entry is a stub of the major version to allow dependency checks to
   # pass when building Kubernetes using a pre-release of Golang.
   - name: "golang: 1.<major>"
-    version: 1.23
+    version: 1.24
     refPaths:
     - path: Dockerfile
       match: FROM golang:\d+.\d+(alpha|beta|rc)?\.?(\d+)-(bookworm)

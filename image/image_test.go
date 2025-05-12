@@ -115,7 +115,7 @@ func TestPromoterImageToYAML(t *testing.T) {
 
 	yamlCode, err := imageList.ToYAML()
 	require.NoError(t, err, "serilizing imagelist to yaml")
-	require.Equal(t, expectedYAML, string(yamlCode), "checking promoter image list yaml output")
+	require.YAMLEq(t, expectedYAML, string(yamlCode), "checking promoter image list yaml output")
 }
 
 func TestPromoterImageWrite(t *testing.T) {

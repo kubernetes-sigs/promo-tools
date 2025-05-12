@@ -56,9 +56,10 @@ func TestInit(t *testing.T) {
 	// Ensure at least one request counter uses the QuotaWindowShort.
 	foundQuotaWindowShort, foundQuotaWindowLong := false, false
 	for _, requestCounter := range rc.NetMonitor.RequestCounters {
-		if requestCounter.Interval == rc.QuotaWindowShort {
+		switch requestCounter.Interval {
+		case rc.QuotaWindowShort:
 			foundQuotaWindowShort = true
-		} else if requestCounter.Interval == rc.QuotaWindowLong {
+		case rc.QuotaWindowLong:
 			foundQuotaWindowLong = true
 		}
 	}
@@ -100,11 +101,11 @@ func TestIncrement(t *testing.T) {
 	// the global network monitor should not be mutated with this call to Increment.
 	rc.EnableCounting = false
 	rc.Increment()
-	require.EqualValues(t, netMonitor, rc.NetMonitor, "Request counters were modified while counting was disabled.")
+	require.Equal(t, netMonitor, rc.NetMonitor, "Request counters were modified while counting was disabled.")
 	// Ensure the Increment function actually increments each request counter's requests field.
 	rc.EnableCounting = true
 	rc.Increment()
-	require.EqualValues(t, expectedNetMonitor, rc.NetMonitor, "Request counters were not incremented correctly.")
+	require.Equal(t, expectedNetMonitor, rc.NetMonitor, "Request counters were not incremented correctly.")
 }
 
 func TestFlush(t *testing.T) {
@@ -154,7 +155,7 @@ func TestRequestCounterIncrement(t *testing.T) {
 	// Increment the counter.
 	requestCounter.Increment()
 	// Ensure the request counter was incremented.
-	require.EqualValues(t, &expected, &requestCounter, "The request counter failed to increment its request field.")
+	require.Equal(t, &expected, &requestCounter, "The request counter failed to increment its request field.")
 }
 
 func TestCycle(t *testing.T) {
@@ -248,6 +249,6 @@ func TestCycle(t *testing.T) {
 			requestCounter.Cycle()
 		}
 		// Ensure the correct logs were produced.
-		require.EqualValues(t, expected, logs, "The request counter produced malformed logs.")
+		require.Equal(t, expected, logs, "The request counter produced malformed logs.")
 	}
 }

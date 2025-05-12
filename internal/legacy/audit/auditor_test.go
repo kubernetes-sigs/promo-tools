@@ -906,7 +906,7 @@ func TestAudit(t *testing.T) {
 				require.Regexp(t, re, reportBuffer.String())
 			}
 		} else {
-			require.Equal(t, "", reportBuffer.String())
+			require.Empty(t, reportBuffer.String())
 		}
 
 		if len(test.expectedPatterns.info) > 0 {
@@ -915,7 +915,7 @@ func TestAudit(t *testing.T) {
 				require.Regexp(t, re, infoLogBuffer.String())
 			}
 		} else {
-			require.Equal(t, "", infoLogBuffer.String())
+			require.Empty(t, infoLogBuffer.String())
 		}
 
 		if len(test.expectedPatterns.error) > 0 {
@@ -924,7 +924,7 @@ func TestAudit(t *testing.T) {
 				require.Regexp(t, re, errorLogBuffer.String())
 			}
 		} else {
-			require.Equal(t, "", errorLogBuffer.String())
+			require.Empty(t, errorLogBuffer.String())
 		}
 
 		if len(test.expectedPatterns.alert) > 0 {
@@ -933,7 +933,7 @@ func TestAudit(t *testing.T) {
 				require.Regexp(t, re, alertLogBuffer.String())
 			}
 		} else {
-			require.Equal(t, "", alertLogBuffer.String())
+			require.Empty(t, alertLogBuffer.String())
 		}
 	}
 }

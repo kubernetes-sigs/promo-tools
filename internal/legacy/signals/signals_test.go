@@ -105,7 +105,7 @@ func TestLogSignal(t *testing.T) {
 		// Log the test signal.
 		signals.LogSignal(st.signal)
 		// Ensure the logs are correct.
-		require.EqualValues(t, st.expected, logs, "Unexpected signal observation logs.")
+		require.Equal(t, st.expected, logs, "Unexpected signal observation logs.")
 		if st.terminate {
 			// Ensure Stop() was invoked if the test specifies.
 			require.True(t, terminated(), "LogSignal did not terminate on exit signal.")
