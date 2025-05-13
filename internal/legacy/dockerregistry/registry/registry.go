@@ -54,9 +54,6 @@ type DigestTags map[image.Digest]TagSlice
 // TagSlice is a slice of Tags.
 type TagSlice []image.Tag
 
-// TagSet is a set of Tags.
-type TagSet map[image.Tag]interface{}
-
 // ToYAML displays a RegInvImage as YAML, but with the map items sorted
 // alphabetically.
 func (a *RegInvImage) ToYAML(o YamlMarshalingOpts) string {
