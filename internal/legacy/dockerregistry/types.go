@@ -216,12 +216,16 @@ type PopulateRequests func(
 // ictual implementation (e.g. in ReadDigestsAndTags()) it closes over some
 // other local variables to record the change of state in the Docker Registry
 // that was touched by processing the request.
+// Deprecated: Prefer ProcessRequestFunc and ForkJoin
 type ProcessRequest func(
 	*SyncContext,
 	chan stream.ExternalRequest,
 	chan<- RequestResult,
 	*sync.WaitGroup,
 	*sync.Mutex)
+
+// ProcessRequestFunc is a simplified version of ProcessRequest, used with ForkJoin
+type ProcessRequestFunc func(req stream.ExternalRequest) (RequestResult, error)
 
 // PromotionContext holds all info required to create a stream that would
 // produce a stream.Producer, as it relates to an intent to promote an image.
