@@ -114,8 +114,10 @@ func TestPromoterImageToYAML(t *testing.T) {
 	expectedYAML += "    \"sha256:c752ecbd04bc4517168a19323bb60fb45324eee1e480b2b97d3fd6ea0a54f42d\": [\"v1.18.8\",\"v1.19.0\"]\n"
 
 	yamlCode, err := imageList.ToYAML()
-	require.NoError(t, err, "serilizing imagelist to yaml")
-	require.YAMLEq(t, expectedYAML, string(yamlCode), "checking promoter image list yaml output")
+	require.NoError(t, err, "serializing imagelist to yaml")
+
+	//nolint:testifylint // The point of this test is to check the output is stable, to keep diffs short.
+	require.Equal(t, expectedYAML, string(yamlCode), "checking promoter image list yaml output")
 }
 
 func TestPromoterImageWrite(t *testing.T) {
