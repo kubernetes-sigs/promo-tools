@@ -1695,7 +1695,7 @@ func TestCheckOverlappingEdges(t *testing.T) {
 			},
 			nil,
 		},
-		{ //nolint:dupl
+		{
 			"Basic case (two edges, no overlapping edges)",
 			map[PromotionEdge]interface{}{
 				{
@@ -1788,7 +1788,7 @@ func TestCheckOverlappingEdges(t *testing.T) {
 			nil,
 			errors.New("overlapping edges detected"),
 		},
-		{ //nolint:dupl
+		{
 			"Basic case (two tagless edges (different digests, same PQIN), no overlap)",
 			map[PromotionEdge]interface{}{
 				{
