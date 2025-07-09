@@ -42,7 +42,7 @@ export CGO_ENABLED=1
 kpromo:
 	go build \
 		-trimpath \
-		-ldflags '-s -w -buildid= -linkmode=external -extldflags=-static $(LDFLAGS)' \
+		-ldflags '-s -w -buildid= -linkmode=external $(LDFLAGS)' \
 		-tags osusergo \
 		-o ./bin/kpromo \
 		./cmd/kpromo
