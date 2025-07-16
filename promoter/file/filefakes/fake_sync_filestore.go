@@ -265,12 +265,6 @@ func (fake *FakeSyncFilestore) UploadFileReturnsOnCall(i int, result1 error) {
 func (fake *FakeSyncFilestore) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
-	fake.listFilesMutex.RLock()
-	defer fake.listFilesMutex.RUnlock()
-	fake.openReaderMutex.RLock()
-	defer fake.openReaderMutex.RUnlock()
-	fake.uploadFileMutex.RLock()
-	defer fake.uploadFileMutex.RUnlock()
 	copiedInvocations := map[string][][]interface{}{}
 	for key, value := range fake.invocations {
 		copiedInvocations[key] = value
