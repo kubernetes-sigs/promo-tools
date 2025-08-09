@@ -23,7 +23,7 @@ import (
 	"sort"
 
 	"gopkg.in/yaml.v2"
-	"sigs.k8s.io/release-utils/util"
+	"sigs.k8s.io/release-utils/helpers"
 )
 
 // ManifestList abstracts the manifest used by the image promoter.
@@ -37,7 +37,7 @@ type ManifestList []struct {
 
 // NewManifestListFromFile parses an image promoter manifest file.
 func NewManifestListFromFile(manifestPath string) (imagesList *ManifestList, err error) {
-	if !util.Exists(manifestPath) {
+	if !helpers.Exists(manifestPath) {
 		return nil, errors.New("could not find image promoter manifest")
 	}
 	yamlCode, err := os.ReadFile(manifestPath)
