@@ -30,7 +30,7 @@ import (
 	"github.com/spf13/cobra"
 	"sigs.k8s.io/release-sdk/git"
 	"sigs.k8s.io/release-sdk/github"
-	"sigs.k8s.io/release-utils/util"
+	"sigs.k8s.io/release-utils/helpers"
 
 	"sigs.k8s.io/promo-tools/v4/image"
 	"sigs.k8s.io/promo-tools/v4/image/consts"
@@ -237,7 +237,7 @@ func runPromote(opts *promoteOptions) error {
 
 	// Run the promoter manifest grower
 	if mustRun(opts, "Grow the manifests to add the new tags?") {
-		if util.Exists(filepath.Join(repo.Dir(), imagesListPath)) {
+		if helpers.Exists(filepath.Join(repo.Dir(), imagesListPath)) {
 			logrus.Debug("Reading the current image promoter manifest (image list)")
 			oldlist, err = os.ReadFile(filepath.Join(repo.Dir(), imagesListPath))
 			if err != nil {
@@ -354,10 +354,10 @@ func mustRun(opts *promoteOptions, question string) bool {
 	if !opts.interactiveMode {
 		return true
 	}
-	_, success, err := util.Ask(question+" (Y/n)", "y:Y:yes|n:N:no|y", 10)
+	_, success, err := helpers.Ask(question+" (Y/n)", "y:Y:yes|n:N:no|y", 10)
 	if err != nil {
 		logrus.Error(err)
-		if userInputErr, ok := err.(util.UserInputError); ok && userInputErr.IsCtrlC() {
+		if userInputErr, ok := err.(helpers.UserInputError); ok && userInputErr.IsCtrlC() {
 			os.Exit(1)
 		}
 		return false
