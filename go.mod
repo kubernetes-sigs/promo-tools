@@ -33,7 +33,7 @@ require (
 	google.golang.org/genproto v0.0.0-20250603155806-513f23925822
 	gopkg.in/src-d/go-git.v4 v4.13.1
 	gopkg.in/yaml.v2 v2.4.0
-	k8s.io/utils v0.0.0-20241210054802-24370beab758
+	k8s.io/utils v0.0.0-20250820121507-0af2bda4dd1d
 	sigs.k8s.io/release-sdk v0.12.4
 	sigs.k8s.io/release-utils v0.12.1
 	sigs.k8s.io/yaml v1.6.0
