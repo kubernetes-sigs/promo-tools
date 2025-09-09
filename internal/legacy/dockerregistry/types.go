@@ -19,9 +19,9 @@ package inventory
 import (
 	"sync"
 
+	"github.com/go-git/go-git/v5/plumbing"
 	cr "github.com/google/go-containerregistry/pkg/v1/types"
 	grafeaspb "google.golang.org/genproto/googleapis/grafeas/v1"
-	"gopkg.in/src-d/go-git.v4/plumbing"
 
 	"sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry/registry"
 	"sigs.k8s.io/promo-tools/v4/internal/legacy/gcloud"
