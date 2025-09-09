@@ -22,9 +22,9 @@ import (
 	"os"
 	"path/filepath"
 
+	gogit "github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/sirupsen/logrus"
-	gogit "gopkg.in/src-d/go-git.v4"
-	"gopkg.in/src-d/go-git.v4/plumbing"
 
 	"sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry/schema"
 )
