@@ -9,7 +9,7 @@ require (
 	cloud.google.com/go/errorreporting v0.3.2
 	cloud.google.com/go/iam v1.5.2
 	cloud.google.com/go/logging v1.13.0
-	cloud.google.com/go/storage v1.56.1
+	cloud.google.com/go/storage v1.56.2
 	github.com/aws/aws-sdk-go-v2 v1.39.0
 	github.com/aws/aws-sdk-go-v2/config v1.31.8
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.19.6
