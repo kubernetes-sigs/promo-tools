@@ -5,7 +5,7 @@ go 1.24.2
 toolchain go1.24.6
 
 require (
-	cloud.google.com/go/containeranalysis v0.14.1
+	cloud.google.com/go/containeranalysis v0.14.2
 	cloud.google.com/go/errorreporting v0.3.2
 	cloud.google.com/go/iam v1.5.3
 	cloud.google.com/go/logging v1.13.0
@@ -44,7 +44,7 @@ require (
 	cloud.google.com/go/auth v0.17.0 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.8 // indirect
 	cloud.google.com/go/compute/metadata v0.9.0 // indirect
-	cloud.google.com/go/grafeas v0.3.15 // indirect
+	cloud.google.com/go/grafeas v0.3.16 // indirect
 	cloud.google.com/go/longrunning v0.6.7 // indirect
 	cloud.google.com/go/monitoring v1.24.2 // indirect
 	cuelabs.dev/go/oci/ociregistry v0.0.0-20250224124241-b27552d3e05c // indirect
