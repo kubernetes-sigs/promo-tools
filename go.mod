@@ -10,8 +10,8 @@ require (
 	cloud.google.com/go/storage v1.57.1
 	github.com/aws/aws-sdk-go-v2 v1.39.6
 	github.com/aws/aws-sdk-go-v2/config v1.31.17
-	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.20.3
-	github.com/aws/aws-sdk-go-v2/service/s3 v1.89.2
+	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.20.4
+	github.com/aws/aws-sdk-go-v2/service/s3 v1.90.0
 	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/go-git/go-git/v5 v5.16.3
 	github.com/google/go-cmp v0.7.0
