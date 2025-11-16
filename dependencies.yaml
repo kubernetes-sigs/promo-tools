@@ -38,13 +38,13 @@ dependencies:
   # This entry is a stub of the major version to allow dependency checks to
   # pass when building Kubernetes using a pre-release of Golang.
   - name: "golang: 1.<major>"
-    version: 1.24
+    version: 1.25
     refPaths:
     - path: Dockerfile
       match: FROM golang:\d+.\d+(alpha|beta|rc)?\.?(\d+)-(bookworm)
 
   - name: "golang: go.mod"
-    version: 1.24
+    version: 1.25
     refPaths:
     - path: go.mod
       match: go \d+.\d+
