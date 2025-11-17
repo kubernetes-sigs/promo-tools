@@ -383,15 +383,19 @@ func generatePRBody(opts *promoteOptions) string {
 		args += " --reviewers \"" + opts.reviewers + "\""
 	}
 
+	var tagString strings.Builder
 	for _, tag := range opts.tags {
-		args += " --tag " + tag
+		tagString.WriteString(" --tag " + tag)
 	}
+	args += tagString.String()
 
+	var imageString strings.Builder
 	for _, filterImage := range opts.images {
 		if filterImage != "" {
-			args += " --image " + filterImage
+			imageString.WriteString(" --image " + filterImage)
 		}
 	}
+	args += imageString.String()
 
 	prBody := fmt.Sprintf("Image promotion for %s %s\n", opts.project, strings.Join(opts.tags, " / "))
 	prBody += "This is an automated PR generated from `kpromo`\n"

@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"strings"
 
 	"gopkg.in/yaml.v2"
 	"sigs.k8s.io/release-utils/helpers"
@@ -86,29 +87,29 @@ func (imagesList *ManifestList) ToYAML() ([]byte, error) {
 	})
 
 	// Let's build the YAML code
-	yamlCode := ""
+	var yamlCode strings.Builder
 	for _, imgData := range *imagesList {
 		// Add the new name key (it is not sorted in the promoter code)
-		yamlCode += fmt.Sprintf("- name: %s\n", imgData.Name)
-		yamlCode += "  dmap:\n"
+		yamlCode.WriteString(fmt.Sprintf("- name: %s\n", imgData.Name))
+		yamlCode.WriteString("  dmap:\n")
 
 		sortedDigests := sortImageDigestMapByTag(imgData.DMap)
 
 		for _, digestSHA := range sortedDigests {
 			tags := imgData.DMap[digestSHA]
 			sort.Strings(tags)
-			yamlCode += fmt.Sprintf("    %q: [", digestSHA)
+			yamlCode.WriteString(fmt.Sprintf("    %q: [", digestSHA))
 			for i, tag := range tags {
 				if i > 0 {
-					yamlCode += ","
+					yamlCode.WriteString(",")
 				}
-				yamlCode += fmt.Sprintf("%q", tag)
+				yamlCode.WriteString(fmt.Sprintf("%q", tag))
 			}
-			yamlCode += "]\n"
+			yamlCode.WriteString("]\n")
 		}
 	}
 
-	return []byte(yamlCode), nil
+	return []byte(yamlCode.String()), nil
 }
 
 func sortImageDigestMapByTag(imageDMap map[string][]string) []string {
