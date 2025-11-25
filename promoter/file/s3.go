@@ -232,7 +232,6 @@ func (s *s3SyncFilestore) ListFiles(
 		Prefix: &s.prefix,
 	}
 
-	var errors []error
 	objectCallback := func(obj types.Object) error {
 		name := aws.ToString(obj.Key)
 		if !strings.HasPrefix(name, s.prefix) {
@@ -272,14 +271,9 @@ func (s *s3SyncFilestore) ListFiles(
 	for _, obj := range page.Contents {
 		err := objectCallback(obj)
 		if err != nil {
-			errors = append(errors, err)
 			// stop iteration immediately on error
-			break
+			return nil, err
 		}
-	}
-
-	if len(errors) != 0 {
-		return nil, errors[0]
 	}
 
 	return files, nil
