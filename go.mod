@@ -4,7 +4,7 @@ go 1.25.0
 
 require (
 	cloud.google.com/go/containeranalysis v0.14.2
-	cloud.google.com/go/errorreporting v0.3.2
+	cloud.google.com/go/errorreporting v0.4.0
 	cloud.google.com/go/iam v1.5.3
 	cloud.google.com/go/logging v1.13.1
 	cloud.google.com/go/storage v1.59.1
