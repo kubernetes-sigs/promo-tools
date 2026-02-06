@@ -349,6 +349,7 @@ func (di *DefaultPromoterImplementation) GetIdentityToken(
 		// ... and also use the e2e signing identity
 		serviceAccount = TestSigningAccount
 		credOptions = []gopts.ClientOption{
+			//nolint:staticcheck // These are the credentials for the e2e tests.
 			gopts.WithCredentialsFile(os.Getenv("CIP_E2E_KEY_FILE")),
 		}
 	}
@@ -358,6 +359,11 @@ func (di *DefaultPromoterImplementation) GetIdentityToken(
 	if opts.SignerInitCredentials != "" {
 		logrus.Infof("Using credentials from %s", opts.SignerInitCredentials)
 		credOptions = []gopts.ClientOption{
+			// This next line is throwing warnings in the staticcheck linter.
+			// We should handle this entirely with token exchanges from the
+			// workload identity. But, for now, we'll leave this as is as
+			// the promoter is supposed to be getting a revamp soon.
+			//nolint:staticcheck
 			gopts.WithCredentialsFile(opts.SignerInitCredentials),
 		}
 	}
