@@ -27,7 +27,7 @@ require (
 	golang.org/x/oauth2 v0.35.0
 	golang.org/x/time v0.14.0
 	golang.org/x/xerrors v0.0.0-20240716161551-93cc26a95ae9
-	google.golang.org/api v0.266.0
+	google.golang.org/api v0.267.0
 	google.golang.org/genproto v0.0.0-20260128011058-8636f8732409
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/utils v0.0.0-20250820121507-0af2bda4dd1d
