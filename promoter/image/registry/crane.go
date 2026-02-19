@@ -1,0 +1,205 @@
+/*
+Copyright 2026 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package registry
+
+import (
+	"context"
+	"fmt"
+	"net/http"
+	"sync"
+
+	"github.com/google/go-containerregistry/pkg/crane"
+	"github.com/google/go-containerregistry/pkg/gcrane"
+	"github.com/google/go-containerregistry/pkg/name"
+	ggcrV1Google "github.com/google/go-containerregistry/pkg/v1/google"
+	cr "github.com/google/go-containerregistry/pkg/v1/types"
+	"github.com/sirupsen/logrus"
+
+	legacyreg "sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry/registry"
+	"sigs.k8s.io/promo-tools/v4/types/image"
+)
+
+// CraneProvider implements Provider using go-containerregistry/crane and the
+// Google-specific extensions for optimized registry walking.
+type CraneProvider struct {
+	transport http.RoundTripper
+}
+
+// CraneOption configures a CraneProvider.
+type CraneOption func(*CraneProvider)
+
+// WithTransport sets the HTTP transport for registry operations.
+func WithTransport(rt http.RoundTripper) CraneOption {
+	return func(p *CraneProvider) {
+		p.transport = rt
+	}
+}
+
+// NewCraneProvider creates a new CraneProvider with the given options.
+func NewCraneProvider(opts ...CraneOption) *CraneProvider {
+	p := &CraneProvider{}
+	for _, o := range opts {
+		o(p)
+	}
+	return p
+}
+
+// ReadRegistries reads the image inventory from one or more registries using
+// google.Walk (recursive) or google.List (non-recursive).
+func (p *CraneProvider) ReadRegistries(
+	ctx context.Context, registries []RegistryConfig, recurse bool,
+) (*Inventory, error) {
+	logrus.Infof("Reading %d registries (recursive: %v)", len(registries), recurse)
+
+	inv := NewInventory()
+	var mu sync.Mutex
+
+	walkOpts := []ggcrV1Google.Option{
+		ggcrV1Google.WithAuthFromKeychain(gcrane.Keychain),
+		ggcrV1Google.WithContext(ctx),
+	}
+
+	for _, r := range registries {
+		repo, err := name.NewRepository(string(r.Name))
+		if err != nil {
+			return nil, fmt.Errorf("parsing repo name %s: %w", r.Name, err)
+		}
+
+		recordTags := makeTagRecorder(inv, &mu, registries)
+
+		if recurse {
+			if err := ggcrV1Google.Walk(repo, recordTags, walkOpts...); err != nil {
+				return nil, fmt.Errorf("walking repo %s: %w", r.Name, err)
+			}
+		} else {
+			tags, err := ggcrV1Google.List(repo, walkOpts...)
+			if err != nil {
+				return nil, fmt.Errorf("listing repo %s: %w", r.Name, err)
+			}
+			if err := recordTags(repo, tags, nil); err != nil {
+				return nil, fmt.Errorf("recording tags for %s: %w", r.Name, err)
+			}
+		}
+	}
+	return inv, nil
+}
+
+// CopyImage copies a container image from src to dst using crane.
+func (p *CraneProvider) CopyImage(_ context.Context, src, dst string) error {
+	opts := []crane.Option{
+		crane.WithAuthFromKeychain(gcrane.Keychain),
+		crane.WithUserAgent(image.UserAgent),
+	}
+	if p.transport != nil {
+		opts = append(opts, crane.WithTransport(p.transport))
+	}
+	return crane.Copy(src, dst, opts...)
+}
+
+// makeTagRecorder creates a callback function for google.Walk that records
+// found tags into the inventory.
+func makeTagRecorder(
+	inv *Inventory, mu *sync.Mutex, registries []RegistryConfig,
+) func(name.Repository, *ggcrV1Google.Tags, error) error {
+	return func(repo name.Repository, tags *ggcrV1Google.Tags, walkErr error) error {
+		if walkErr != nil {
+			return fmt.Errorf("walking registry: %w", walkErr)
+		}
+
+		regName, imageName, err := splitByKnownRegistries(
+			image.Registry(repo.Name()), registries,
+		)
+		if err != nil {
+			return fmt.Errorf("splitting repo and image name: %w", err)
+		}
+
+		logrus.Debugf("Registry: %s Image: %s Got: %s", regName, imageName, repo.Name())
+
+		digestTags := make(legacyreg.DigestTags)
+		if tags != nil && tags.Manifests != nil {
+			for digest, manifest := range tags.Manifests {
+				tagSlice := legacyreg.TagSlice{}
+				for _, tag := range manifest.Tags {
+					tagSlice = append(tagSlice, image.Tag(tag))
+				}
+				digestTags[image.Digest(digest)] = tagSlice
+
+				mediaType, err := supportedMediaType(manifest.MediaType)
+				if err != nil {
+					logrus.Errorf("Processing digest %s: %v", digest, err)
+				}
+
+				mu.Lock()
+				inv.MediaTypes[image.Digest(digest)] = mediaType
+				mu.Unlock()
+			}
+		}
+
+		logrus.Debugf("%d tags found", len(digestTags))
+
+		mu.Lock()
+		if _, ok := inv.Images[regName]; !ok {
+			inv.Images[regName] = make(legacyreg.RegInvImage)
+		}
+		if len(digestTags) > 0 {
+			inv.Images[regName][imageName] = digestTags
+		}
+		mu.Unlock()
+
+		return nil
+	}
+}
+
+// splitByKnownRegistries splits a full image path into the registry name
+// and image name components based on known registries.
+func splitByKnownRegistries(
+	fullName image.Registry, registries []RegistryConfig,
+) (image.Registry, image.Name, error) {
+	for _, r := range registries {
+		rn := string(r.Name)
+		fn := string(fullName)
+		if len(fn) > len(rn) && fn[:len(rn)] == rn && fn[len(rn)] == '/' {
+			return r.Name, image.Name(fn[len(rn)+1:]), nil
+		}
+		if fn == rn {
+			return r.Name, "", nil
+		}
+	}
+	return "", "", fmt.Errorf("could not determine registry for %s", fullName)
+}
+
+// supportedMediaType returns the appropriate MediaType, or an error if
+// the media type is not supported.
+func supportedMediaType(mediaType string) (cr.MediaType, error) {
+	switch cr.MediaType(mediaType) {
+	case cr.DockerManifestSchema2:
+		return cr.DockerManifestSchema2, nil
+	case cr.DockerManifestList:
+		return cr.DockerManifestList, nil
+	case cr.OCIManifestSchema1:
+		return cr.OCIManifestSchema1, nil
+	case cr.OCIImageIndex:
+		return cr.OCIImageIndex, nil
+	default:
+		// Default to DockerManifestSchema2 for backwards compatibility.
+		if mediaType == "" {
+			return cr.DockerManifestSchema2, nil
+		}
+		return cr.MediaType(mediaType),
+			fmt.Errorf("unsupported media type %q", mediaType)
+	}
+}
