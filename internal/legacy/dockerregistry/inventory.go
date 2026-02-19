@@ -59,7 +59,7 @@ func MakeSyncContext(
 		UseServiceAccount: useSvcAcc,
 		Inv:               make(MasterInventory),
 		InvIgnore:         []image.Name{},
-		Tokens:            make(map[RootRepo]gcloud.Token),
+		Tokens:            make(map[RootRepo]string),
 		RegistryContexts:  make([]registry.Context, 0),
 		DigestMediaType:   make(DigestMediaType),
 		ParentDigest:      make(ParentDigest),
@@ -719,7 +719,7 @@ func (sc *SyncContext) PopulateTokens() error {
 		}
 
 		tokenKey, _, _ := GetTokenKeyDomainRepoPath(rc.Name)
-		sc.Tokens[RootRepo(tokenKey)] = token
+		sc.Tokens[RootRepo(tokenKey)] = string(token)
 	}
 
 	return nil
@@ -1226,7 +1226,7 @@ func MkReadRepositoryCmdReal(
 		}
 
 		rc.Token = token
-		bearer := "Bearer " + string(rc.Token)
+		bearer := "Bearer " + rc.Token
 
 		httpReq.Header.Add("Authorization", bearer)
 	}
@@ -1277,7 +1277,7 @@ func MkReadManifestListCmdReal(sc *SyncContext, gmlc *GCRManifestListContext) st
 			logrus.Fatalf("access token for key '%s' not found\n", tokenKey)
 		}
 
-		bearer := "Bearer " + string(token)
+		bearer := "Bearer " + token
 		httpReq.Header.Add("Authorization", bearer)
 	}
 

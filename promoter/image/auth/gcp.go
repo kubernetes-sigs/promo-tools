@@ -18,15 +18,17 @@ package auth
 
 import (
 	"context"
+	"encoding/csv"
+	"errors"
 	"fmt"
+	"io"
 	"strings"
 
 	credentials "cloud.google.com/go/iam/credentials/apiv1"
 	"cloud.google.com/go/iam/credentials/apiv1/credentialspb"
 	"github.com/sirupsen/logrus"
 	gopts "google.golang.org/api/option"
-
-	"sigs.k8s.io/promo-tools/v4/internal/legacy/gcloud"
+	"sigs.k8s.io/release-utils/command"
 )
 
 // GCPIdentityTokenProvider implements IdentityTokenProvider using the
@@ -79,5 +81,27 @@ type GCPServiceActivator struct{}
 
 // ActivateServiceAccounts activates service accounts via gcloud.
 func (g *GCPServiceActivator) ActivateServiceAccounts(_ context.Context, keyFilePaths string) error {
-	return gcloud.ActivateServiceAccounts(keyFilePaths)
+	r := csv.NewReader(strings.NewReader(keyFilePaths))
+	for {
+		record, err := r.Read()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("reading key file paths: %w", err)
+		}
+
+		for _, keyFilePath := range record {
+			cmd := command.New(
+				"gcloud",
+				"auth",
+				"activate-service-account",
+				"--key-file="+keyFilePath,
+			)
+			if err := cmd.RunSuccess(); err != nil {
+				return fmt.Errorf("activating service account from %s: %w", keyFilePath, err)
+			}
+		}
+	}
+	return nil
 }

@@ -25,7 +25,6 @@ import (
 	grafeaspb "google.golang.org/genproto/googleapis/grafeas/v1"
 
 	"sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry/registry"
-	"sigs.k8s.io/promo-tools/v4/internal/legacy/gcloud"
 	"sigs.k8s.io/promo-tools/v4/internal/legacy/stream"
 	"sigs.k8s.io/promo-tools/v4/types/image"
 )
@@ -80,7 +79,7 @@ type SyncContext struct { //nolint: gocritic
 	InvIgnore         []image.Name
 	RegistryContexts  []registry.Context
 	SrcRegistry       *registry.Context
-	Tokens            map[RootRepo]gcloud.Token
+	Tokens            map[RootRepo]string
 	DigestMediaType   DigestMediaType
 	ParentDigest      ParentDigest
 	Logs              CollectedLogs

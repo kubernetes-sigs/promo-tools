@@ -19,16 +19,13 @@ package imagepromoter
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
+	"github.com/google/go-containerregistry/pkg/crane"
+	"github.com/google/go-containerregistry/pkg/gcrane"
 	"github.com/sirupsen/logrus"
 	"sigs.k8s.io/release-sdk/sign"
 
-	reg "sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry"
-	"sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry/registry"
-	"sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry/schema"
-	"sigs.k8s.io/promo-tools/v4/internal/legacy/stream"
 	"sigs.k8s.io/promo-tools/v4/internal/version"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/auth"
 	options "sigs.k8s.io/promo-tools/v4/promoter/image/options"
@@ -43,14 +40,6 @@ binaries within image layers, not necessarily with the image layers themselves.
 So a 'fixable' vulnerability may not necessarily be immediately actionable. For
 example, even though a fixed version of the binary is available, it doesn't
 necessarily mean that a new version of the image layer is available.`
-
-// streamProducerFunc is a function that gets the required fields to
-// construct a promotion stream producer.
-type StreamProducerFunc func(
-	srcRegistry image.Registry, srcImageName image.Name,
-	destRC registry.Context, imageName image.Name,
-	digest image.Digest, tag image.Tag, tp reg.TagOp,
-) stream.Producer
 
 type DefaultPromoterImplementation struct {
 	signer *sign.Signer
@@ -152,7 +141,7 @@ func defaultSignerOptions(opts *options.Options) *sign.Options {
 func (di *DefaultPromoterImplementation) ValidateOptions(opts *options.Options) error {
 	if opts.Snapshot == "" && opts.ManifestBasedSnapshotOf == "" {
 		if opts.Manifest == "" && opts.ThinManifestDir == "" {
-			return errors.New("either a manifest ot a thin manifest dir have to be set")
+			return errors.New("either a manifest or a thin manifest dir have to be set")
 		}
 	}
 	return nil
@@ -164,25 +153,6 @@ func (di *DefaultPromoterImplementation) ActivateServiceAccounts(opts *options.O
 		logrus.Warn("Not setting a service account")
 	}
 	return di.serviceActivator.ActivateServiceAccounts(context.Background(), opts.KeyFiles)
-}
-
-// PrecheckAndExit run simple prechecks to exit before promotions
-// or security scans.
-func (di *DefaultPromoterImplementation) PrecheckAndExit(
-	opts *options.Options, mfests []schema.Manifest,
-) error {
-	// Make the sync context tu run the prechecks:
-	sc, err := di.MakeSyncContext(opts, mfests)
-	if err != nil {
-		return fmt.Errorf("generatinng sync context for prechecks: %w", err)
-	}
-
-	// Run the prechecks, these will be run and the calling
-	// mode of operation should exit.
-	if err := sc.RunChecks([]reg.PreCheck{}); err != nil {
-		return fmt.Errorf("running prechecks before promotion: %w", err)
-	}
-	return nil
 }
 
 func (di *DefaultPromoterImplementation) PrintVersion() {
@@ -200,7 +170,20 @@ func (di *DefaultPromoterImplementation) PrintSection(message string, confirm bo
 }
 
 // printSecDisclaimer prints a disclaimer about false positives
-// that may be found in container image lauyers.
+// that may be found in container image layers.
 func (di *DefaultPromoterImplementation) PrintSecDisclaimer() {
 	logrus.Info(vulnerabilityDiscalimer)
+}
+
+// craneOptions returns common crane options for registry operations,
+// including authentication and rate-limited transport.
+func (di *DefaultPromoterImplementation) craneOptions() []crane.Option {
+	opts := []crane.Option{
+		crane.WithAuthFromKeychain(gcrane.Keychain),
+		crane.WithUserAgent(image.UserAgent),
+	}
+	if di.promotionTransport != nil {
+		opts = append(opts, crane.WithTransport(di.promotionTransport))
+	}
+	return opts
 }

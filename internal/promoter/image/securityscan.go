@@ -22,17 +22,16 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	reg "sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry"
 	options "sigs.k8s.io/promo-tools/v4/promoter/image/options"
+	"sigs.k8s.io/promo-tools/v4/promoter/image/promotion"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/vuln"
 )
 
 // ScanEdges runs vulnerability scans on the new images detected by the
 // promoter using the configured vuln.Scanner.
-// TODO: Remove *reg.SyncContext parameter when legacy types are deleted.
 func (di *DefaultPromoterImplementation) ScanEdges(
-	opts *options.Options, _ *reg.SyncContext,
-	promotionEdges map[reg.PromotionEdge]interface{},
+	opts *options.Options,
+	promotionEdges map[promotion.Edge]interface{},
 ) error {
 	if opts.SeverityThreshold <= 0 {
 		logrus.Info("Vulnerability scanning disabled (threshold <= 0)")

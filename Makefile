@@ -53,8 +53,6 @@ cip-mm: kpromo
 ##@ Build
 .PHONY: build
 build: kpromo ## Build go tools within the repository
-	${REPO_ROOT}/go_with_version.sh build -o ./bin/cip-auditor-e2e ${REPO_ROOT}/test-e2e/cip-auditor/cip-auditor-e2e.go
-	${REPO_ROOT}/go_with_version.sh build -o ./bin/cip-e2e ${REPO_ROOT}/test-e2e/cip/e2e.go
 
 .PHONY: install
 install: build ## Install
@@ -62,21 +60,13 @@ install: build ## Install
 
 ##@ Images
 
-.PHONY: image-build ## Build auditor and cip images
-image-build:
+.PHONY: image-build
+image-build: ## Build kpromo image
 	./hack/cip-image.sh build
 
-.PHONY: image-build-cip-auditor-e2e
-image-build-cip-auditor-e2e: ## Build auditor e2e images
-	./hack/cip-image.sh build --audit
-
 .PHONY: image-push
-image-push: image-build ## Build and push auditor and cip images
+image-push: image-build ## Build and push kpromo image
 	./hack/cip-image.sh push
-
-.PHONY: image-push-cip-auditor-e2e
-image-push-cip-auditor-e2e: image-build-cip-auditor-e2e ## Build and push auditor e2e images
-	./hack/cip-image.sh push --audit
 
 ##@ Lints
 
@@ -102,20 +92,6 @@ test-go-unit: ## Runs Golang unit tests
 .PHONY: test-ci
 test-ci: download
 	make test
-
-.PHONY: test-e2e-cip
-test-e2e-cip:
-	${REPO_ROOT}/go_with_version.sh run ${REPO_ROOT}/test-e2e/cip/e2e.go \
-		-tests=${REPO_ROOT}/test-e2e/cip/tests.yaml \
-		-repo-root=${REPO_ROOT} \
-		-key-file=${CIP_E2E_KEY_FILE}
-
-.PHONY: test-e2e-cip-auditor
-test-e2e-cip-auditor:
-	${REPO_ROOT}/go_with_version.sh run ${REPO_ROOT}/test-e2e/cip-auditor/cip-auditor-e2e.go \
-		-tests=${REPO_ROOT}/test-e2e/cip-auditor/tests.yaml \
-		-repo-root=${REPO_ROOT} \
-		-key-file=${CIP_E2E_KEY_FILE}
 
 ##@ Dependencies
 
@@ -156,9 +132,6 @@ verify-go-mod: ## Runs the go module linter
 
 verify-golangci-lint: ## Runs all golang linters
 	./hack/verify-golangci-lint.sh
-
-verify-archives: ### Check golden image archives
-	./hack/verify-archives.sh $(REPO_ROOT)
 
 verify-mocks: ## Verify that mocks do not require updates
 	./hack/verify-mocks.sh

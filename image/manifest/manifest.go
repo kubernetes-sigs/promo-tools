@@ -26,9 +26,9 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/xerrors"
 
-	reg "sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry"
 	"sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry/registry"
 	"sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry/schema"
+	imgregistry "sigs.k8s.io/promo-tools/v4/promoter/image/registry"
 	"sigs.k8s.io/promo-tools/v4/types/image"
 )
 
@@ -136,7 +136,7 @@ func containsTag(tags []image.Tag, check string) bool {
 
 // Grow modifies a manifest by adding images into it.
 func Grow(
-	_ context.Context,
+	ctx context.Context,
 	o *GrowOptions,
 ) error {
 	var err error
@@ -150,7 +150,7 @@ func Grow(
 
 	// (2) Scan the StagingRepo, and whittle the read results down with some
 	// filters (Filter* fields in GrowOptions).
-	riiUnfiltered, err := ReadStagingRepo(o)
+	riiUnfiltered, err := ReadStagingRepo(ctx, o)
 	if err != nil {
 		return err
 	}
@@ -213,37 +213,20 @@ func Find(o *GrowOptions) (schema.Manifest, error) {
 // available to the resulting RegInvImage. This RegInvImage is what we want to
 // inject into the "images.yaml" of a thin schema.
 func ReadStagingRepo(
+	ctx context.Context,
 	o *GrowOptions,
 ) (registry.RegInvImage, error) {
-	stagingRepoRC := registry.Context{
-		Name: o.StagingRepo,
-	}
-
-	manifests := []schema.Manifest{
-		{
-			Registries: []registry.Context{
-				stagingRepoRC,
-			},
-			Images: []registry.Image{},
-		},
-	}
-
-	sc, err := reg.MakeSyncContext(
-		manifests,
-		10,
-		true,
-		false)
+	provider := imgregistry.NewCraneProvider()
+	inv, err := provider.ReadRegistries(
+		ctx,
+		[]imgregistry.RegistryConfig{{Name: o.StagingRepo}},
+		true, // recursive
+	)
 	if err != nil {
 		return registry.RegInvImage{}, err
 	}
-	sc.ReadRegistries(
-		[]registry.Context{stagingRepoRC},
-		// Read all registries recursively, because we want to produce a
-		// complete snapshot.
-		true,
-		reg.MkReadRepositoryCmdReal)
 
-	return sc.Inv[manifests[0].Registries[0].Name], nil
+	return inv.Images[o.StagingRepo], nil
 }
 
 // ApplyFilters applies the filters in the options to whittle down the given

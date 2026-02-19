@@ -17,12 +17,12 @@ limitations under the License.
 package file
 
 import (
+	"strings"
 	"sync"
 
 	"github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
-
-	"sigs.k8s.io/promo-tools/v4/internal/legacy/gcloud"
+	"sigs.k8s.io/release-utils/command"
 )
 
 // gcloudTokenSource implements oauth2.TokenSource.
@@ -38,13 +38,23 @@ func (s *gcloudTokenSource) Token() (*oauth2.Token, error) {
 
 	logrus.Infof("getting service-account-token for %q", s.ServiceAccount)
 
-	token, err := gcloud.GetServiceAccountToken(s.ServiceAccount, true)
+	args := []string{
+		"auth",
+		"print-access-token",
+	}
+	if s.ServiceAccount != "" {
+		args = append(args, "--account="+s.ServiceAccount)
+	}
+
+	cmd := command.New("gcloud", args...)
+	std, err := cmd.RunSilentSuccessOutput()
 	if err != nil {
 		logrus.Warnf("failed to get service-account-token for %q: %v",
 			s.ServiceAccount, err)
 		return nil, err
 	}
+
 	return &oauth2.Token{
-		AccessToken: string(token),
+		AccessToken: strings.TrimSpace(std.Output()),
 	}, nil
 }

@@ -24,7 +24,6 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	reg "sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry"
 	"sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry/registry"
 	"sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry/schema"
 	impl "sigs.k8s.io/promo-tools/v4/internal/promoter/image"
@@ -32,8 +31,10 @@ import (
 	"sigs.k8s.io/promo-tools/v4/promoter/image/checkresults"
 	options "sigs.k8s.io/promo-tools/v4/promoter/image/options"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/pipeline"
+	"sigs.k8s.io/promo-tools/v4/promoter/image/promotion"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/provenance"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/ratelimit"
+	imgregistry "sigs.k8s.io/promo-tools/v4/promoter/image/registry"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/vuln"
 )
 
@@ -61,6 +62,9 @@ func New(opts *options.Options) *Promoter {
 	di := impl.NewDefaultPromoterImplementation(opts)
 	di.SetPromotionTransport(promoRT)
 	di.SetSigningTransport(signRT)
+	di.SetRegistryProvider(imgregistry.NewCraneProvider(
+		imgregistry.WithTransport(promoRT),
+	))
 	di.SetServiceActivator(&auth.GCPServiceActivator{})
 	di.SetIdentityTokenProvider(&auth.GCPIdentityTokenProvider{
 		CredentialsFile: opts.SignerInitCredentials,
@@ -102,14 +106,12 @@ type promoterImplementation interface {
 	// General methods common to all modes of the promoter
 	ValidateOptions(*options.Options) error
 	ActivateServiceAccounts(*options.Options) error
-	PrecheckAndExit(*options.Options, []schema.Manifest) error
 
 	// Methods for promotion mode:
 	ParseManifests(*options.Options) ([]schema.Manifest, error)
-	MakeSyncContext(*options.Options, []schema.Manifest) (*reg.SyncContext, error)
-	GetPromotionEdges(*reg.SyncContext, []schema.Manifest) (map[reg.PromotionEdge]interface{}, error)
-	EdgesFromManifests([]schema.Manifest) (map[reg.PromotionEdge]interface{}, error)
-	PromoteImages(*reg.SyncContext, map[reg.PromotionEdge]interface{}) error
+	GetPromotionEdges(*options.Options, []schema.Manifest) (map[promotion.Edge]interface{}, error)
+	EdgesFromManifests([]schema.Manifest) (map[promotion.Edge]interface{}, error)
+	PromoteImages(*options.Options, map[promotion.Edge]interface{}) error
 
 	// Methods for snapshot mode:
 	GetSnapshotSourceRegistry(*options.Options) (*registry.Context, error)
@@ -119,15 +121,15 @@ type promoterImplementation interface {
 	Snapshot(*options.Options, registry.RegInvImage) error
 
 	// Methods for image vulnerability scans:
-	ScanEdges(*options.Options, *reg.SyncContext, map[reg.PromotionEdge]interface{}) error
+	ScanEdges(*options.Options, map[promotion.Edge]interface{}) error
 
 	// Methods for image signing and replication
 	PrewarmTUFCache() error
-	ValidateStagingSignatures(map[reg.PromotionEdge]interface{}) (map[reg.PromotionEdge]interface{}, error)
-	SignImages(*options.Options, *reg.SyncContext, map[reg.PromotionEdge]interface{}) error
-	ReplicateSignatures(*options.Options, *reg.SyncContext, map[reg.PromotionEdge]interface{}) error
-	WriteSBOMs(*options.Options, *reg.SyncContext, map[reg.PromotionEdge]interface{}) error
-	WriteProvenanceAttestations(*options.Options, *reg.SyncContext, map[reg.PromotionEdge]interface{}, provenance.Generator) error
+	ValidateStagingSignatures(map[promotion.Edge]interface{}) (map[promotion.Edge]interface{}, error)
+	SignImages(*options.Options, map[promotion.Edge]interface{}) error
+	ReplicateSignatures(*options.Options, map[promotion.Edge]interface{}) error
+	WriteSBOMs(*options.Options, map[promotion.Edge]interface{}) error
+	WriteProvenanceAttestations(*options.Options, map[promotion.Edge]interface{}, provenance.Generator) error
 
 	// Methods for checking signatures
 	GetLatestImages(*options.Options) ([]string, error)
@@ -147,8 +149,7 @@ func (p *Promoter) PromoteImages(ctx context.Context, opts *options.Options) err
 	// Shared state between pipeline phases, captured by closures.
 	var (
 		mfests         []schema.Manifest
-		sc             *reg.SyncContext
-		promotionEdges map[reg.PromotionEdge]interface{}
+		promotionEdges map[promotion.Edge]interface{}
 	)
 
 	pipe := pipeline.New()
@@ -167,7 +168,7 @@ func (p *Promoter) PromoteImages(ctx context.Context, opts *options.Options) err
 		return nil
 	}))
 
-	// Plan phase: parse manifests, build sync context, compute edges.
+	// Plan phase: parse manifests and compute edges.
 	pipe.AddPhase(pipeline.NewPhase("plan", func(_ context.Context) error {
 		var err error
 		mfests, err = p.impl.ParseManifests(opts)
@@ -178,12 +179,7 @@ func (p *Promoter) PromoteImages(ctx context.Context, opts *options.Options) err
 		p.impl.PrintVersion()
 		p.impl.PrintSection("START (PROMOTION)", opts.Confirm)
 
-		sc, err = p.impl.MakeSyncContext(opts, mfests)
-		if err != nil {
-			return fmt.Errorf("creating sync context: %w", err)
-		}
-
-		promotionEdges, err = p.impl.GetPromotionEdges(sc, mfests)
+		promotionEdges, err = p.impl.GetPromotionEdges(opts, mfests)
 		if err != nil {
 			return fmt.Errorf("computing promotion edges: %w", err)
 		}
@@ -231,9 +227,7 @@ func (p *Promoter) PromoteImages(ctx context.Context, opts *options.Options) err
 		}
 
 		if !opts.Confirm {
-			if err := p.impl.PrecheckAndExit(opts, mfests); err != nil {
-				return err
-			}
+			logrus.Info("Dry run complete, exiting before promotion")
 			return pipeline.ErrStopPipeline
 		}
 		return nil
@@ -241,7 +235,7 @@ func (p *Promoter) PromoteImages(ctx context.Context, opts *options.Options) err
 
 	// Promote phase: copy images.
 	pipe.AddPhase(pipeline.NewPhase("promote", func(_ context.Context) error {
-		if err := p.impl.PromoteImages(sc, promotionEdges); err != nil {
+		if err := p.impl.PromoteImages(opts, promotionEdges); err != nil {
 			return fmt.Errorf("running promotion: %w", err)
 		}
 
@@ -256,7 +250,7 @@ func (p *Promoter) PromoteImages(ctx context.Context, opts *options.Options) err
 
 	// Sign phase: sign promoted images (primary registry only).
 	pipe.AddPhase(pipeline.NewPhase("sign", func(_ context.Context) error {
-		if err := p.impl.SignImages(opts, sc, promotionEdges); err != nil {
+		if err := p.impl.SignImages(opts, promotionEdges); err != nil {
 			return fmt.Errorf("signing images: %w", err)
 		}
 		return nil
@@ -264,7 +258,7 @@ func (p *Promoter) PromoteImages(ctx context.Context, opts *options.Options) err
 
 	// Replicate phase: copy signatures to mirror registries.
 	pipe.AddPhase(pipeline.NewPhase("replicate", func(_ context.Context) error {
-		if err := p.impl.ReplicateSignatures(opts, sc, promotionEdges); err != nil {
+		if err := p.impl.ReplicateSignatures(opts, promotionEdges); err != nil {
 			return fmt.Errorf("replicating signatures: %w", err)
 		}
 		return nil
@@ -272,12 +266,12 @@ func (p *Promoter) PromoteImages(ctx context.Context, opts *options.Options) err
 
 	// Attest phase: write SBOMs and provenance attestations.
 	pipe.AddPhase(pipeline.NewPhase("attest", func(_ context.Context) error {
-		if err := p.impl.WriteSBOMs(opts, sc, promotionEdges); err != nil {
+		if err := p.impl.WriteSBOMs(opts, promotionEdges); err != nil {
 			return fmt.Errorf("writing SBOMs: %w", err)
 		}
 
 		if opts.GeneratePromotionProvenance && p.provenanceGenerator != nil {
-			if err := p.impl.WriteProvenanceAttestations(opts, sc, promotionEdges, p.provenanceGenerator); err != nil {
+			if err := p.impl.WriteProvenanceAttestations(opts, promotionEdges, p.provenanceGenerator); err != nil {
 				return fmt.Errorf("writing provenance attestations: %w", err)
 			}
 		}
@@ -342,12 +336,7 @@ func (p *Promoter) SecurityScan(opts *options.Options) error {
 	p.impl.PrintSection("START (VULN CHECK)", opts.Confirm)
 	p.impl.PrintSecDisclaimer()
 
-	sc, err := p.impl.MakeSyncContext(opts, mfests)
-	if err != nil {
-		return fmt.Errorf("creating sync context: %w", err)
-	}
-
-	promotionEdges, err := p.impl.GetPromotionEdges(sc, mfests)
+	promotionEdges, err := p.impl.GetPromotionEdges(opts, mfests)
 	if err != nil {
 		return fmt.Errorf("filtering edges: %w", err)
 	}
@@ -358,12 +347,12 @@ func (p *Promoter) SecurityScan(opts *options.Options) error {
 		return nil
 	}
 
-	// Check the pull request
 	if !opts.Confirm {
-		return p.impl.PrecheckAndExit(opts, mfests)
+		logrus.Info("Dry run complete, exiting before vulnerability scan")
+		return nil
 	}
 
-	if err := p.impl.ScanEdges(opts, sc, promotionEdges); err != nil {
+	if err := p.impl.ScanEdges(opts, promotionEdges); err != nil {
 		return fmt.Errorf("running vulnerability scan: %w", err)
 	}
 	return nil
@@ -407,7 +396,7 @@ func (p *Promoter) CheckSignatures(opts *options.Options) error {
 // ALL edges from manifests (not just unsynced ones) so it can run
 // independently of the promotion job.
 func (p *Promoter) ReplicateSignatures(ctx context.Context, opts *options.Options) error {
-	var promotionEdges map[reg.PromotionEdge]interface{}
+	var promotionEdges map[promotion.Edge]interface{}
 
 	pipe := pipeline.New()
 
@@ -448,7 +437,7 @@ func (p *Promoter) ReplicateSignatures(ctx context.Context, opts *options.Option
 
 	// Replicate phase: copy signatures to mirror registries.
 	pipe.AddPhase(pipeline.NewPhase("replicate", func(_ context.Context) error {
-		if err := p.impl.ReplicateSignatures(opts, nil, promotionEdges); err != nil {
+		if err := p.impl.ReplicateSignatures(opts, promotionEdges); err != nil {
 			return fmt.Errorf("replicating signatures: %w", err)
 		}
 		return nil

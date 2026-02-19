@@ -14,36 +14,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# About: This script can either build or push the cip and auditor container images. Providing the '--audit' flag
-# handles test images used in the e2e auditor.
+# About: This script can either build or push the kpromo container image.
 
-# Usage: cip-image.sh <command> [--audit]
+# Usage: cip-image.sh <command>
 # Commands:
-#   build     docker build images from the project's Dockerfile
-#   push      docker push images to their tagged location
-#
-# Optional Flag:
-#   --audit   handle images for e2e test auditor
+#   build     docker build image from the project's Dockerfile
+#   push      docker push image to its tagged location
 
 set -o errexit
 set -o nounset
 set -o pipefail
 
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
-# Specify what group of images should be handled.
-variant="cip"
 # Determine what to do with the images (build or push).
 operation=""
 
 printUsage() {
     >&2 cat << EOF
-Usage: $0 <command> [--audit]
+Usage: $0 <command>
 Commands:
-  build     docker build images from the project's Dockerfile
-  push      docker push images to their tagged location
-
-Optional Flag:
-  --audit   handle images for e2e test auditor
+  build     docker build image from the project's Dockerfile
+  push      docker push image to its tagged location
 EOF
 }
 
@@ -52,9 +43,6 @@ for arg in "$@"; do
     case $arg in
         build|push)
             operation=$arg
-            ;;
-        --audit)
-            variant=auditor
             ;;
         *)
             >&2 echo "ERROR: Unknown runtime argument \"$arg\""
@@ -79,19 +67,10 @@ pushImages() {
     done
 }
 
-# Builds either auditor or cip container image from repo_root. Also adds
-# tags, given by an array of tags.
+# Builds the kpromo container image from repo_root.
 buildImage() {
-    # Add build variant argument.
-    local variant
-    if [[ "$1" == "auditor" ]]; then
-        variant="test"
-    else
-        variant="prod"
-    fi
-    local cmd="docker build --build-arg variant=$variant "
+    local cmd="docker build "
     # Concatenate tags.
-    shift
     local tags="${*}"
     for tag in $tags; do
         cmd+="-t $tag "
@@ -103,12 +82,10 @@ buildImage() {
     $cmd
 }
 
-# Either builds or pushes the image variant with provided tags.
+# Either builds or pushes the image with provided tags.
 handleVariant() {
-    local variant=$1
-    shift
     if [[ "$operation" == "build" ]]; then
-        buildImage "$variant" "${*}"
+        buildImage "${*}"
     else
         pushImages "${*}"
     fi
@@ -124,34 +101,14 @@ main() {
         IMG_REPOSITORY=${CLOUDBUILD_REPO}
     fi
 
-    # Assemble image tag prefixes.
+    # Assemble image tag prefix.
     local tag_prefix=${IMG_REGISTRY}/${IMG_REPOSITORY}/${IMG_NAME}
-    local test_tag_prefix=${TEST_AUDIT_STAGING_IMG_REPOSITORY}/${IMG_NAME}
 
-    # NOTE: Both cip and auditor variants build an auditor image. Although they are named differently,
-    # the image contents are the exact same.
-
-    if [[ "$variant" == "auditor" ]]; then
-        # Only build and push the auditor image.
-        handleVariant "auditor" \
-            "${test_tag_prefix}-auditor-test:latest" \
-            "${test_tag_prefix}-auditor-test:latest-canary" \
-            "${test_tag_prefix}-auditor-test:${IMG_TAG}" \
-            "${test_tag_prefix}-auditor-test:${IMG_VERSION}"
-    else
-        # Build and push auditor and cip images.
-        handleVariant "auditor" \
-            "${tag_prefix}-auditor:latest" \
-            "${tag_prefix}-auditor:latest-canary" \
-            "${tag_prefix}-auditor:${IMG_TAG}" \
-            "${tag_prefix}-auditor:${IMG_VERSION}"
-
-        handleVariant "cip" \
-            "${tag_prefix}:latest" \
-            "${tag_prefix}:latest-canary" \
-            "${tag_prefix}:${IMG_TAG}" \
-            "${tag_prefix}:${IMG_VERSION}"
-    fi
+    handleVariant \
+        "${tag_prefix}:latest" \
+        "${tag_prefix}:latest-canary" \
+        "${tag_prefix}:${IMG_TAG}" \
+        "${tag_prefix}:${IMG_VERSION}"
 
     >&2 echo "$0" finished.
 }

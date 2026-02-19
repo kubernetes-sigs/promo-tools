@@ -42,9 +42,9 @@ import (
 	"sigs.k8s.io/release-utils/version"
 
 	"sigs.k8s.io/promo-tools/v4/image/consts"
-	reg "sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry"
 	internalversion "sigs.k8s.io/promo-tools/v4/internal/version"
 	options "sigs.k8s.io/promo-tools/v4/promoter/image/options"
+	"sigs.k8s.io/promo-tools/v4/promoter/image/promotion"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/provenance"
 	"sigs.k8s.io/promo-tools/v4/types/image"
 )
@@ -65,9 +65,9 @@ const (
 // applied during its staging run. If they do it verifies them and
 // returns an error if they are not valid.
 func (di *DefaultPromoterImplementation) ValidateStagingSignatures(
-	edges map[reg.PromotionEdge]interface{},
-) (map[reg.PromotionEdge]interface{}, error) {
-	refsToEdges := map[string]reg.PromotionEdge{}
+	edges map[promotion.Edge]interface{},
+) (map[promotion.Edge]interface{}, error) {
+	refsToEdges := map[string]promotion.Edge{}
 	for edge := range edges {
 		ref := edge.SrcReference()
 		refsToEdges[ref] = edge
@@ -83,7 +83,7 @@ func (di *DefaultPromoterImplementation) ValidateStagingSignatures(
 		return nil, fmt.Errorf("verify images: %w", err)
 	}
 
-	signedEdges := map[reg.PromotionEdge]interface{}{}
+	signedEdges := map[promotion.Edge]interface{}{}
 	res.Range(func(key, _ any) bool {
 		ref, ok := key.(string)
 		if !ok {
@@ -106,7 +106,7 @@ func (di *DefaultPromoterImplementation) ValidateStagingSignatures(
 // SignImages signs the promoted images and stores their signatures in
 // the registry.
 func (di *DefaultPromoterImplementation) SignImages(
-	opts *options.Options, _ *reg.SyncContext, edges map[reg.PromotionEdge]interface{},
+	opts *options.Options, edges map[promotion.Edge]interface{},
 ) error {
 	if !opts.SignImages {
 		logrus.Info("Not signing images (--sign=false)")
@@ -139,7 +139,7 @@ func (di *DefaultPromoterImplementation) SignImages(
 	t := throttler.New(opts.MaxSignatureOps, len(grouped))
 	// Sign the required edges
 	for _, group := range grouped {
-		go func(edges []reg.PromotionEdge) {
+		go func(edges []promotion.Edge) {
 			t.Done(di.signFirst(signOpts, targetIdentity(&edges[0]), &edges[0]))
 		}(group)
 		if t.Throttle() > 0 {
@@ -153,7 +153,7 @@ func (di *DefaultPromoterImplementation) SignImages(
 // signFirst signs the first (primary) image for a given identity+digest group.
 // Signature replication to additional registries is handled separately by
 // ReplicateSignatures.
-func (di *DefaultPromoterImplementation) signFirst(signOpts *sign.Options, identity string, edge *reg.PromotionEdge) error {
+func (di *DefaultPromoterImplementation) signFirst(signOpts *sign.Options, identity string, edge *promotion.Edge) error {
 	imageRef := edge.DstReference()
 
 	// Make a shallow copy so we can safely modify the options per go routine
@@ -188,7 +188,7 @@ func (di *DefaultPromoterImplementation) signFirst(signOpts *sign.Options, ident
 // to all additional destination registries for images that were promoted to
 // multiple registries.
 func (di *DefaultPromoterImplementation) ReplicateSignatures(
-	opts *options.Options, _ *reg.SyncContext, edges map[reg.PromotionEdge]interface{},
+	opts *options.Options, edges map[promotion.Edge]interface{},
 ) error {
 	if !opts.SignImages {
 		logrus.Info("Signing disabled, skipping signature replication")
@@ -206,7 +206,7 @@ func (di *DefaultPromoterImplementation) ReplicateSignatures(
 		if len(group) <= 1 {
 			continue
 		}
-		go func(edges []reg.PromotionEdge) {
+		go func(edges []promotion.Edge) {
 			t.Done(di.replicateSignatures(&edges[0], edges[1:]))
 		}(group)
 		if t.Throttle() > 0 {
@@ -225,7 +225,7 @@ func (di *DefaultPromoterImplementation) ReplicateSignatures(
 //
 // to match the production registry:
 // 'registry.k8s.io/kubernetes/conformance-arm64'.
-func targetIdentity(edge *reg.PromotionEdge) string {
+func targetIdentity(edge *promotion.Edge) string {
 	identity := fmt.Sprintf("%s/%s", edge.DstRegistry.Name, edge.DstImageTag.Name)
 
 	if !strings.Contains(string(edge.DstRegistry.Name), productionRepositoryPath) {
@@ -246,12 +246,12 @@ func targetIdentity(edge *reg.PromotionEdge) string {
 // and digest. Within each group, edges are sorted by destination registry name
 // to ensure deterministic ordering across calls. The first edge in each group
 // is used as the primary for signing and as the source for replication.
-func groupEdgesByIdentityDigest(edges map[reg.PromotionEdge]interface{}) [][]reg.PromotionEdge {
+func groupEdgesByIdentityDigest(edges map[promotion.Edge]interface{}) [][]promotion.Edge {
 	type key struct {
 		identity string
 		digest   image.Digest
 	}
-	grouped := map[key][]reg.PromotionEdge{}
+	grouped := map[key][]promotion.Edge{}
 	for edge := range edges {
 		// Skip metadata layers
 		if strings.HasSuffix(string(edge.DstImageTag.Tag), ".sig") ||
@@ -266,7 +266,7 @@ func groupEdgesByIdentityDigest(edges map[reg.PromotionEdge]interface{}) [][]reg
 
 	// Sort edges within each group by destination registry name so that
 	// SignImages and ReplicateSignatures agree on which edge is primary.
-	result := make([][]reg.PromotionEdge, 0, len(grouped))
+	result := make([][]promotion.Edge, 0, len(grouped))
 	for _, group := range grouped {
 		sort.Slice(group, func(i, j int) bool {
 			return string(group[i].DstRegistry.Name) < string(group[j].DstRegistry.Name)
@@ -279,7 +279,7 @@ func groupEdgesByIdentityDigest(edges map[reg.PromotionEdge]interface{}) [][]reg
 // copyAttachedObjects copies any attached signatures from the staging registry to
 // the production registry. The function is called copyAttachedObjects as it will
 // move attestations and SBOMs too once we stabilize the signing code.
-func (di *DefaultPromoterImplementation) copyAttachedObjects(edge *reg.PromotionEdge) error {
+func (di *DefaultPromoterImplementation) copyAttachedObjects(edge *promotion.Edge) error {
 	sigTag := digestToSignatureTag(edge.Digest)
 	srcRefString := fmt.Sprintf(
 		"%s/%s:%s", edge.SrcRegistry.Name, edge.SrcImageTag.Name, sigTag,
@@ -328,7 +328,7 @@ func digestToSignatureTag(dg image.Digest) string {
 // replicateSignatures takes a source edge (an image) and a list of destinations
 // and copies the signature to all of them.
 func (di *DefaultPromoterImplementation) replicateSignatures(
-	src *reg.PromotionEdge, dsts []reg.PromotionEdge,
+	src *promotion.Edge, dsts []promotion.Edge,
 ) error {
 	sigTag := digestToSignatureTag(src.Digest)
 	sourceRefStr := fmt.Sprintf(
@@ -347,7 +347,7 @@ func (di *DefaultPromoterImplementation) replicateSignatures(
 			"%s/%s:%s", dsts[i].DstRegistry.Name, dsts[i].DstImageTag.Name, sigTag,
 		))
 		if err != nil {
-			return fmt.Errorf("parsing signature destination referece: %w", err)
+			return fmt.Errorf("parsing signature destination reference: %w", err)
 		}
 		dstRefs = append(dstRefs, ref)
 	}
@@ -385,7 +385,7 @@ func (di *DefaultPromoterImplementation) replicateSignatures(
 // attached in staging (e.g., by the build system) and are identified by
 // the cosign SBOM tag convention (sha256-<hash>.sbom).
 func (di *DefaultPromoterImplementation) WriteSBOMs(
-	_ *options.Options, _ *reg.SyncContext, edges map[reg.PromotionEdge]interface{},
+	_ *options.Options, edges map[promotion.Edge]interface{},
 ) error {
 	if len(edges) == 0 {
 		logrus.Info("No images were promoted. No SBOMs to copy.")
@@ -411,7 +411,7 @@ func (di *DefaultPromoterImplementation) WriteSBOMs(
 
 // copySBOM copies an SBOM from the staging registry to the production registry
 // for a single promotion edge. If no SBOM exists in staging, this is not an error.
-func (di *DefaultPromoterImplementation) copySBOM(edge *reg.PromotionEdge) error {
+func (di *DefaultPromoterImplementation) copySBOM(edge *promotion.Edge) error {
 	sbomTag := digestToSBOMTag(edge.Digest)
 	srcRefString := fmt.Sprintf(
 		"%s/%s:%s", edge.SrcRegistry.Name, edge.SrcImageTag.Name, sbomTag,
@@ -464,8 +464,8 @@ func (di *DefaultPromoterImplementation) GetIdentityToken(
 // WriteProvenanceAttestations generates SLSA provenance attestations for
 // promoted images and pushes them as .att tags to the destination registry.
 func (di *DefaultPromoterImplementation) WriteProvenanceAttestations(
-	_ *options.Options, _ *reg.SyncContext,
-	edges map[reg.PromotionEdge]interface{},
+	_ *options.Options,
+	edges map[promotion.Edge]interface{},
 	generator provenance.Generator,
 ) error {
 	if len(edges) == 0 {
@@ -511,7 +511,7 @@ func (di *DefaultPromoterImplementation) WriteProvenanceAttestations(
 // OCI image with an .att tag.
 func (di *DefaultPromoterImplementation) pushAttestation(
 	ctx context.Context,
-	edge *reg.PromotionEdge,
+	edge *promotion.Edge,
 	generator provenance.Generator,
 	record *provenance.PromotionRecord,
 ) error {

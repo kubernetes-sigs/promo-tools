@@ -23,9 +23,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"sigs.k8s.io/release-utils/env"
 
-	reg "sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry"
 	"sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry/registry"
 	options "sigs.k8s.io/promo-tools/v4/promoter/image/options"
+	"sigs.k8s.io/promo-tools/v4/promoter/image/promotion"
 	"sigs.k8s.io/promo-tools/v4/types/image"
 )
 
@@ -113,14 +113,14 @@ func TestTargetIdentity(t *testing.T) {
 
 	for _, tc := range []struct {
 		name   string
-		edge   *reg.PromotionEdge
+		edge   *promotion.Edge
 		assert func(string)
 	}{
 		{
 			name: "modified reference with real-world example",
-			edge: &reg.PromotionEdge{
+			edge: &promotion.Edge{
 				DstRegistry: registry.Context{Name: "us-west2-docker.pkg.dev/k8s-artifacts-prod/images/kubernetes"},
-				DstImageTag: reg.ImageTag{Name: "conformance-arm64"},
+				DstImageTag: promotion.ImageTag{Name: "conformance-arm64"},
 				Digest:      "sha256:709e17a9c17018997724ed19afc18dbf576e9af10dfe78c13b34175027916d8f",
 			},
 			assert: func(res string) {
@@ -129,9 +129,9 @@ func TestTargetIdentity(t *testing.T) {
 		},
 		{
 			name: "modified reference with simple example",
-			edge: &reg.PromotionEdge{
+			edge: &promotion.Edge{
 				DstRegistry: registry.Context{Name: "registry/k8s-artifacts-prod/images"},
-				DstImageTag: reg.ImageTag{Name: "image"},
+				DstImageTag: promotion.ImageTag{Name: "image"},
 				Digest:      "sha256",
 			},
 			assert: func(res string) {
@@ -140,9 +140,9 @@ func TestTargetIdentity(t *testing.T) {
 		},
 		{
 			name: "not modified reference",
-			edge: &reg.PromotionEdge{
+			edge: &promotion.Edge{
 				DstRegistry: registry.Context{Name: "foo-bar"},
-				DstImageTag: reg.ImageTag{Name: "conformance-arm64"},
+				DstImageTag: promotion.ImageTag{Name: "conformance-arm64"},
 				Digest:      "sha256:709e17a9c17018997724ed19afc18dbf576e9af10dfe78c13b34175027916d8f",
 			},
 			assert: func(res string) {
