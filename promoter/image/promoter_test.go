@@ -32,8 +32,7 @@ import (
 	"sigs.k8s.io/promo-tools/v4/types/image"
 )
 
-// promoteImagesErrorCases returns the common error injection test cases
-// used by both pipeline and legacy path tests.
+// promoteImagesErrorCases returns the common error injection test cases.
 func promoteImagesErrorCases() []struct {
 	shouldErr bool
 	msg       string
@@ -135,7 +134,7 @@ func promoteImagesErrorCases() []struct {
 	}
 }
 
-func TestPromoteImagesPipeline(t *testing.T) {
+func TestPromoteImages(t *testing.T) {
 	for _, tc := range promoteImagesErrorCases() {
 		t.Run(tc.msg, func(t *testing.T) {
 			sut := imagepromoter.Promoter{}
@@ -152,32 +151,12 @@ func TestPromoteImagesPipeline(t *testing.T) {
 	}
 }
 
-func TestPromoteImagesLegacy(t *testing.T) {
-	for _, tc := range promoteImagesErrorCases() {
-		t.Run(tc.msg, func(t *testing.T) {
-			sut := imagepromoter.Promoter{}
-			mock := imagefakes.FakePromoterImplementation{}
-			tc.prepare(&mock)
-			sut.SetImplementation(&mock)
-			err := sut.PromoteImages(context.Background(), &options.Options{
-				Confirm:           true,
-				UseLegacyPipeline: true,
-			})
-			if tc.shouldErr {
-				require.Error(t, err, tc.msg)
-			} else {
-				require.NoError(t, err, tc.msg)
-			}
-		})
-	}
-}
-
-func TestPromoteImagesPipelineParseOnly(t *testing.T) {
+func TestPromoteImagesParseOnly(t *testing.T) {
 	sut := imagepromoter.Promoter{}
 	mock := imagefakes.FakePromoterImplementation{}
 	sut.SetImplementation(&mock)
 
-	// Pipeline path: ParseOnly should stop after plan phase with no error
+	// ParseOnly should stop after plan phase with no error
 	opts := &options.Options{Confirm: true, ParseOnly: true}
 	require.NoError(t, sut.PromoteImages(context.Background(), opts))
 
@@ -187,28 +166,12 @@ func TestPromoteImagesPipelineParseOnly(t *testing.T) {
 	require.Equal(t, 0, mock.PromoteImagesCallCount())
 }
 
-func TestPromoteImagesLegacyParseOnly(t *testing.T) {
+func TestPromoteImagesNonConfirm(t *testing.T) {
 	sut := imagepromoter.Promoter{}
 	mock := imagefakes.FakePromoterImplementation{}
 	sut.SetImplementation(&mock)
 
-	// Legacy path: ParseOnly should stop after parsing with no error
-	opts := &options.Options{
-		Confirm:           true,
-		ParseOnly:         true,
-		UseLegacyPipeline: true,
-	}
-	require.NoError(t, sut.PromoteImages(context.Background(), opts))
-	require.Equal(t, 1, mock.ParseManifestsCallCount())
-	require.Equal(t, 0, mock.PromoteImagesCallCount())
-}
-
-func TestPromoteImagesPipelineDryRun(t *testing.T) {
-	sut := imagepromoter.Promoter{}
-	mock := imagefakes.FakePromoterImplementation{}
-	sut.SetImplementation(&mock)
-
-	// Pipeline path: non-Confirm should stop after validate (precheck)
+	// non-Confirm should stop after validate (precheck)
 	opts := &options.Options{Confirm: false}
 	require.NoError(t, sut.PromoteImages(context.Background(), opts))
 
@@ -217,19 +180,6 @@ func TestPromoteImagesPipelineDryRun(t *testing.T) {
 	// PrecheckAndExit should have been called
 	require.Equal(t, 1, mock.PrecheckAndExitCallCount())
 	// PromoteImages should NOT have been called
-	require.Equal(t, 0, mock.PromoteImagesCallCount())
-}
-
-func TestPromoteImagesLegacyDryRun(t *testing.T) {
-	sut := imagepromoter.Promoter{}
-	mock := imagefakes.FakePromoterImplementation{}
-	sut.SetImplementation(&mock)
-
-	// Legacy path: non-Confirm should stop after precheck
-	opts := &options.Options{Confirm: false, UseLegacyPipeline: true}
-	require.NoError(t, sut.PromoteImages(context.Background(), opts))
-
-	require.Equal(t, 1, mock.PrecheckAndExitCallCount())
 	require.Equal(t, 0, mock.PromoteImagesCallCount())
 }
 

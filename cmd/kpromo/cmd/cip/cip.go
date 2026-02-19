@@ -255,13 +255,6 @@ vulnerability check failing [severity levels between 0 and 5; 0 - UNSPECIFIED,
 	)
 
 	CipCmd.PersistentFlags().BoolVar(
-		&runOpts.UseLegacyPipeline, //nolint:staticcheck // intentional deprecated flag
-		"use-legacy-pipeline",
-		options.DefaultOptions.UseLegacyPipeline, //nolint:staticcheck // intentional deprecated flag
-		"use the legacy sequential promotion code path instead of the new pipeline engine",
-	)
-
-	CipCmd.PersistentFlags().BoolVar(
 		&runOpts.RequireProvenance,
 		"require-provenance",
 		options.DefaultOptions.RequireProvenance,
@@ -280,5 +273,12 @@ vulnerability check failing [severity levels between 0 and 5; 0 - UNSPECIFIED,
 		"allowed-source-repos",
 		options.DefaultOptions.AllowedSourceRepos,
 		"comma-separated list of acceptable source repository URLs for provenance verification",
+	)
+
+	CipCmd.PersistentFlags().BoolVar(
+		&runOpts.GeneratePromotionProvenance,
+		"generate-promotion-provenance",
+		options.DefaultOptions.GeneratePromotionProvenance,
+		"generate SLSA provenance attestations for promoted images",
 	)
 }

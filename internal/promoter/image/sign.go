@@ -24,31 +24,39 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"time"
 
-	credentials "cloud.google.com/go/iam/credentials/apiv1"
-	"cloud.google.com/go/iam/credentials/apiv1/credentialspb"
 	"github.com/google/go-containerregistry/pkg/crane"
 	"github.com/google/go-containerregistry/pkg/gcrane"
 	"github.com/google/go-containerregistry/pkg/name"
+	"github.com/google/go-containerregistry/pkg/v1/empty"
+	"github.com/google/go-containerregistry/pkg/v1/mutate"
+	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/google/go-containerregistry/pkg/v1/remote/transport"
+	"github.com/google/go-containerregistry/pkg/v1/static"
+	"github.com/google/go-containerregistry/pkg/v1/types"
 	"github.com/nozzle/throttler"
 	"github.com/sigstore/sigstore/pkg/tuf"
 	"github.com/sirupsen/logrus"
-	gopts "google.golang.org/api/option"
 	"sigs.k8s.io/release-sdk/sign"
 	"sigs.k8s.io/release-utils/version"
 
 	"sigs.k8s.io/promo-tools/v4/image/consts"
 	reg "sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry"
-	"sigs.k8s.io/promo-tools/v4/internal/legacy/gcloud"
+	internalversion "sigs.k8s.io/promo-tools/v4/internal/version"
 	options "sigs.k8s.io/promo-tools/v4/promoter/image/options"
+	"sigs.k8s.io/promo-tools/v4/promoter/image/provenance"
 	"sigs.k8s.io/promo-tools/v4/types/image"
 )
 
 const (
-	oidcTokenAudience  = "sigstore"
-	signatureTagSuffix = ".sig"
-	sbomTagSuffix      = ".sbom"
+	oidcTokenAudience    = "sigstore"
+	signatureTagSuffix   = ".sig"
+	sbomTagSuffix        = ".sbom"
+	attestationTagSuffix = ".att"
+
+	// intotoMediaType is the media type for in-toto attestation layers.
+	intotoMediaType = "application/vnd.dsse.envelope.v1+json"
 
 	TestSigningAccount = "k8s-infra-promoter-test-signer@k8s-cip-test-prod.iam.gserviceaccount.com"
 )
@@ -332,10 +340,7 @@ func (di *DefaultPromoterImplementation) replicateSignatures(
 		return fmt.Errorf("parsing reference %q: %w", sourceRefStr, err)
 	}
 
-	dstRefs := []struct {
-		reference name.Reference
-		token     gcloud.Token
-	}{}
+	dstRefs := []name.Reference{}
 
 	for i := range dsts {
 		ref, err := name.ParseReference(fmt.Sprintf(
@@ -344,24 +349,21 @@ func (di *DefaultPromoterImplementation) replicateSignatures(
 		if err != nil {
 			return fmt.Errorf("parsing signature destination referece: %w", err)
 		}
-		dstRefs = append(dstRefs, struct {
-			reference name.Reference
-			token     gcloud.Token
-		}{ref, dsts[i].DstRegistry.Token})
+		dstRefs = append(dstRefs, ref)
 	}
 
 	// Copy the signatures to the missing registries
 	for _, dstRef := range dstRefs {
-		logrus.WithField("src", srcRef.String()).Infof("replication > %s", dstRef.reference.String())
+		logrus.WithField("src", srcRef.String()).Infof("replication > %s", dstRef.String())
 		opts := []crane.Option{
 			crane.WithAuthFromKeychain(gcrane.Keychain),
 			crane.WithUserAgent(image.UserAgent),
 			crane.WithTransport(di.getSigningTransport()),
 		}
-		if err := crane.Copy(srcRef.String(), dstRef.reference.String(), opts...); err != nil {
+		if err := crane.Copy(srcRef.String(), dstRef.String(), opts...); err != nil {
 			return fmt.Errorf(
 				"copying signature %s to %s: %w",
-				srcRef.String(), dstRef.reference.String(), err,
+				srcRef.String(), dstRef.String(), err,
 			)
 		}
 	}
@@ -435,61 +437,123 @@ func digestToSBOMTag(dg image.Digest) string {
 }
 
 // GetIdentityToken returns an identity token for the selected service account
-// in order for this function to work, an account has to be already logged. This
-// can be achieved using the.
+// in order for this function to work, an account has to be already logged.
 func (di *DefaultPromoterImplementation) GetIdentityToken(
-	opts *options.Options, serviceAccount string,
-) (tok string, err error) {
+	_ *options.Options, serviceAccount string,
+) (string, error) {
 	// If the test signer file is found switch to test credentials
 	if os.Getenv("CIP_E2E_KEY_FILE") != "" {
 		logrus.Info("Test keyfile set using e2e test credentials")
 		serviceAccount = TestSigningAccount
 	}
 
-	// Use the identity token provider interface when available.
-	if di.identityTokenProvider != nil {
-		return di.identityTokenProvider.GetIdentityToken(
-			context.Background(), serviceAccount, oidcTokenAudience,
-		)
-	}
-
-	// Legacy path: direct GCP IAM API calls.
-	credOptions := []gopts.ClientOption{}
-	if os.Getenv("CIP_E2E_KEY_FILE") != "" {
-		credOptions = []gopts.ClientOption{
-			//nolint:staticcheck // These are the credentials for the e2e tests.
-			gopts.WithCredentialsFile(os.Getenv("CIP_E2E_KEY_FILE")),
-		}
-	}
-
-	if opts.SignerInitCredentials != "" {
-		logrus.Infof("Using credentials from %s", opts.SignerInitCredentials)
-		credOptions = []gopts.ClientOption{
-			//nolint:staticcheck
-			gopts.WithCredentialsFile(opts.SignerInitCredentials),
-		}
-	}
-	ctx := context.Background()
-	c, err := credentials.NewIamCredentialsClient(
-		ctx, credOptions...,
+	return di.identityTokenProvider.GetIdentityToken(
+		context.Background(), serviceAccount, oidcTokenAudience,
 	)
-	if err != nil {
-		return tok, fmt.Errorf("creating credentials token: %w", err)
-	}
-	defer c.Close()
-	logrus.Infof("Signing identity for images will be %s", serviceAccount)
-	req := &credentialspb.GenerateIdTokenRequest{
-		Name:         "projects/-/serviceAccounts/" + serviceAccount,
-		Audience:     oidcTokenAudience, // Should be set to "sigstore"
-		IncludeEmail: true,
+}
+
+// WriteProvenanceAttestations generates SLSA provenance attestations for
+// promoted images and pushes them as .att tags to the destination registry.
+func (di *DefaultPromoterImplementation) WriteProvenanceAttestations(
+	_ *options.Options, _ *reg.SyncContext,
+	edges map[reg.PromotionEdge]interface{},
+	generator provenance.Generator,
+) error {
+	if len(edges) == 0 {
+		logrus.Info("No images were promoted. No provenance to generate.")
+		return nil
 	}
 
-	resp, err := c.GenerateIdToken(ctx, req)
-	if err != nil {
-		return tok, fmt.Errorf("generating identity token: %w", err)
+	builderID := "https://k8s.io/promo-tools"
+	if v := internalversion.Get().GitVersion; v != "" {
+		builderID += "@" + v
 	}
 
-	return resp.GetToken(), nil
+	ctx := context.Background()
+	now := time.Now()
+
+	for edge := range edges {
+		// Skip metadata layers
+		tag := string(edge.DstImageTag.Tag)
+		if strings.HasSuffix(tag, ".sig") ||
+			strings.HasSuffix(tag, ".att") ||
+			strings.HasSuffix(tag, ".sbom") ||
+			tag == "" {
+			continue
+		}
+
+		record := provenance.PromotionRecord{
+			SrcRef:    edge.SrcReference(),
+			DstRef:    edge.DstReference(),
+			Digest:    string(edge.Digest),
+			Timestamp: now,
+			BuilderID: builderID,
+		}
+
+		if err := di.pushAttestation(ctx, &edge, generator, &record); err != nil {
+			return fmt.Errorf("writing provenance for %s: %w", edge.DstReference(), err)
+		}
+	}
+
+	return nil
+}
+
+// pushAttestation generates and pushes a provenance attestation as an
+// OCI image with an .att tag.
+func (di *DefaultPromoterImplementation) pushAttestation(
+	ctx context.Context,
+	edge *reg.PromotionEdge,
+	generator provenance.Generator,
+	record *provenance.PromotionRecord,
+) error {
+	attestation, err := generator.Generate(ctx, record)
+	if err != nil {
+		return fmt.Errorf("generating attestation: %w", err)
+	}
+
+	attTag := digestToAttestationTag(edge.Digest)
+	dstRefString := fmt.Sprintf(
+		"%s/%s:%s", edge.DstRegistry.Name, edge.DstImageTag.Name, attTag,
+	)
+
+	ref, err := name.ParseReference(dstRefString)
+	if err != nil {
+		return fmt.Errorf("parsing attestation reference %s: %w", dstRefString, err)
+	}
+
+	// Check if attestation already exists (idempotent)
+	if _, err := remote.Head(ref, remote.WithAuthFromKeychain(gcrane.Keychain)); err == nil {
+		logrus.Debugf("Attestation %s already exists, skipping", dstRefString)
+		return nil
+	}
+
+	// Create an OCI image with the attestation as a single layer
+	layer := static.NewLayer(attestation, types.MediaType(intotoMediaType))
+	img, err := mutate.AppendLayers(empty.Image, layer)
+	if err != nil {
+		return fmt.Errorf("creating attestation image: %w", err)
+	}
+
+	// Set the config media type to mark this as an attestation
+	img = mutate.MediaType(img, types.OCIManifestSchema1)
+	img = mutate.ConfigMediaType(img, types.MediaType("application/vnd.oci.image.config.v1+json"))
+
+	logrus.Infof("Provenance attestation: pushing %s", dstRefString)
+	if err := remote.Write(ref, img,
+		remote.WithAuthFromKeychain(gcrane.Keychain),
+		remote.WithUserAgent(image.UserAgent),
+		remote.WithTransport(di.getSigningTransport()),
+	); err != nil {
+		return fmt.Errorf("pushing attestation %s: %w", dstRefString, err)
+	}
+
+	return nil
+}
+
+// digestToAttestationTag takes a digest and infers the tag name where
+// its attestation can be found.
+func digestToAttestationTag(dg image.Digest) string {
+	return strings.ReplaceAll(string(dg), "sha256:", "sha256-") + attestationTagSuffix
 }
 
 // PrewarmTUFCache initializes the TUF cache so that threads do not have to compete

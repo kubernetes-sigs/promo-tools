@@ -28,13 +28,13 @@ import (
 	reg "sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry"
 	"sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry/registry"
 	"sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry/schema"
-	"sigs.k8s.io/promo-tools/v4/internal/legacy/gcloud"
 	"sigs.k8s.io/promo-tools/v4/internal/legacy/stream"
 	"sigs.k8s.io/promo-tools/v4/internal/version"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/auth"
 	options "sigs.k8s.io/promo-tools/v4/promoter/image/options"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/ratelimit"
 	imgregistry "sigs.k8s.io/promo-tools/v4/promoter/image/registry"
+	"sigs.k8s.io/promo-tools/v4/promoter/image/vuln"
 	"sigs.k8s.io/promo-tools/v4/types/image"
 )
 
@@ -64,16 +64,16 @@ type DefaultPromoterImplementation struct {
 	signingTransport *ratelimit.RoundTripper
 
 	// registryProvider abstracts registry operations (read inventory, copy images).
-	// If nil, the legacy SyncContext-based code path is used.
 	registryProvider imgregistry.Provider
 
 	// identityTokenProvider abstracts OIDC token generation for signing.
-	// If nil, falls back to direct GCP IAM API calls.
 	identityTokenProvider auth.IdentityTokenProvider
 
 	// serviceActivator abstracts service account activation.
-	// If nil, falls back to gcloud CLI calls.
 	serviceActivator auth.ServiceActivator
+
+	// vulnScanner abstracts vulnerability scanning of container images.
+	vulnScanner vuln.Scanner
 }
 
 // NewDefaultPromoterImplementation creates a new DefaultPromoterImplementation instance.
@@ -118,6 +118,11 @@ func (di *DefaultPromoterImplementation) SetServiceActivator(a auth.ServiceActiv
 	di.serviceActivator = a
 }
 
+// SetVulnScanner sets the vulnerability scanner.
+func (di *DefaultPromoterImplementation) SetVulnScanner(s vuln.Scanner) {
+	di.vulnScanner = s
+}
+
 // defaultSignerOptions returns a new *sign.Options with default values applied.
 func defaultSignerOptions(opts *options.Options) *sign.Options {
 	signOpts := sign.Default()
@@ -158,15 +163,7 @@ func (di *DefaultPromoterImplementation) ActivateServiceAccounts(opts *options.O
 	if !opts.UseServiceAcct {
 		logrus.Warn("Not setting a service account")
 	}
-	if di.serviceActivator != nil {
-		return di.serviceActivator.ActivateServiceAccounts(
-			context.Background(), opts.KeyFiles,
-		)
-	}
-	if err := gcloud.ActivateServiceAccounts(opts.KeyFiles); err != nil {
-		return fmt.Errorf("activating service accounts: %w", err)
-	}
-	return nil
+	return di.serviceActivator.ActivateServiceAccounts(context.Background(), opts.KeyFiles)
 }
 
 // PrecheckAndExit run simple prechecks to exit before promotions

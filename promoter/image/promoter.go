@@ -28,11 +28,13 @@ import (
 	"sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry/registry"
 	"sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry/schema"
 	impl "sigs.k8s.io/promo-tools/v4/internal/promoter/image"
+	"sigs.k8s.io/promo-tools/v4/promoter/image/auth"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/checkresults"
 	options "sigs.k8s.io/promo-tools/v4/promoter/image/options"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/pipeline"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/provenance"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/ratelimit"
+	"sigs.k8s.io/promo-tools/v4/promoter/image/vuln"
 )
 
 var AllowedOutputFormats = []string{
@@ -41,10 +43,11 @@ var AllowedOutputFormats = []string{
 }
 
 type Promoter struct {
-	Options            *options.Options
-	impl               promoterImplementation
-	budget             *ratelimit.BudgetAllocator
-	provenanceVerifier provenance.Verifier
+	Options             *options.Options
+	impl                promoterImplementation
+	budget              *ratelimit.BudgetAllocator
+	provenanceVerifier  provenance.Verifier
+	provenanceGenerator provenance.Generator
 }
 
 func New(opts *options.Options) *Promoter {
@@ -58,12 +61,23 @@ func New(opts *options.Options) *Promoter {
 	di := impl.NewDefaultPromoterImplementation(opts)
 	di.SetPromotionTransport(promoRT)
 	di.SetSigningTransport(signRT)
+	di.SetServiceActivator(&auth.GCPServiceActivator{})
+	di.SetIdentityTokenProvider(&auth.GCPIdentityTokenProvider{
+		CredentialsFile: opts.SignerInitCredentials,
+	})
+	di.SetVulnScanner(&vuln.GrafeasScanner{FixableOnly: true})
 
-	return &Promoter{
+	p := &Promoter{
 		Options: opts,
 		impl:    di,
 		budget:  budget,
 	}
+
+	if opts.GeneratePromotionProvenance {
+		p.provenanceGenerator = &provenance.PromotionGenerator{}
+	}
+
+	return p
 }
 
 func (p *Promoter) SetImplementation(pi promoterImplementation) {
@@ -73,6 +87,11 @@ func (p *Promoter) SetImplementation(pi promoterImplementation) {
 // SetProvenanceVerifier sets the provenance verifier used during promotion.
 func (p *Promoter) SetProvenanceVerifier(v provenance.Verifier) {
 	p.provenanceVerifier = v
+}
+
+// SetProvenanceGenerator sets the provenance generator used during attestation.
+func (p *Promoter) SetProvenanceGenerator(g provenance.Generator) {
+	p.provenanceGenerator = g
 }
 
 //counterfeiter:generate . promoterImplementation
@@ -107,6 +126,7 @@ type promoterImplementation interface {
 	SignImages(*options.Options, *reg.SyncContext, map[reg.PromotionEdge]interface{}) error
 	ReplicateSignatures(*options.Options, *reg.SyncContext, map[reg.PromotionEdge]interface{}) error
 	WriteSBOMs(*options.Options, *reg.SyncContext, map[reg.PromotionEdge]interface{}) error
+	WriteProvenanceAttestations(*options.Options, *reg.SyncContext, map[reg.PromotionEdge]interface{}, provenance.Generator) error
 
 	// Methods for checking signatures
 	GetLatestImages(*options.Options) ([]string, error)
@@ -123,14 +143,6 @@ type promoterImplementation interface {
 // PromoteImages is the main method for image promotion.
 // It runs by taking all its parameters from a set of options.
 func (p *Promoter) PromoteImages(ctx context.Context, opts *options.Options) error {
-	if opts.UseLegacyPipeline { //nolint:staticcheck // intentional legacy routing
-		return p.promoteImagesLegacy(opts)
-	}
-	return p.promoteImagesPipeline(ctx, opts)
-}
-
-// promoteImagesPipeline runs image promotion using the new pipeline engine.
-func (p *Promoter) promoteImagesPipeline(ctx context.Context, opts *options.Options) error {
 	// Shared state between pipeline phases, captured by closures.
 	var (
 		mfests         []schema.Manifest
@@ -257,89 +269,21 @@ func (p *Promoter) promoteImagesPipeline(ctx context.Context, opts *options.Opti
 		return nil
 	}))
 
-	// Attest phase: write SBOMs and attestations.
+	// Attest phase: write SBOMs and provenance attestations.
 	pipe.AddPhase(pipeline.NewPhase("attest", func(_ context.Context) error {
 		if err := p.impl.WriteSBOMs(opts, sc, promotionEdges); err != nil {
 			return fmt.Errorf("writing SBOMs: %w", err)
+		}
+
+		if opts.GeneratePromotionProvenance && p.provenanceGenerator != nil {
+			if err := p.impl.WriteProvenanceAttestations(opts, sc, promotionEdges, p.provenanceGenerator); err != nil {
+				return fmt.Errorf("writing provenance attestations: %w", err)
+			}
 		}
 		return nil
 	}))
 
 	return pipe.Run(ctx)
-}
-
-// Deprecated: promoteImagesLegacy is the original sequential promotion code path.
-// Use the pipeline-based path (--use-legacy-pipeline=false) instead.
-// This will be removed in a future release.
-func (p *Promoter) promoteImagesLegacy(opts *options.Options) error {
-	logrus.Warn("Using deprecated legacy promotion pipeline. " +
-		"Set --use-legacy-pipeline=false to use the new pipeline engine.")
-	if err := p.impl.ValidateOptions(opts); err != nil {
-		return fmt.Errorf("validating options: %w", err)
-	}
-
-	if err := p.impl.ActivateServiceAccounts(opts); err != nil {
-		return fmt.Errorf("activating service accounts: %w", err)
-	}
-
-	if err := p.impl.PrewarmTUFCache(); err != nil {
-		return fmt.Errorf("prewarming TUF cache: %w", err)
-	}
-
-	mfests, err := p.impl.ParseManifests(opts)
-	if err != nil {
-		return fmt.Errorf("parsing manifests: %w", err)
-	}
-
-	p.impl.PrintVersion()
-	p.impl.PrintSection("START (PROMOTION)", opts.Confirm)
-
-	sc, err := p.impl.MakeSyncContext(opts, mfests)
-	if err != nil {
-		return fmt.Errorf("creating sync context: %w", err)
-	}
-
-	promotionEdges, err := p.impl.GetPromotionEdges(sc, mfests)
-	if err != nil {
-		return fmt.Errorf("filtering edges: %w", err)
-	}
-
-	if opts.ParseOnly {
-		logrus.Info("Manifests parsed, exiting as ParseOnly is set")
-		return nil
-	}
-
-	if _, err := p.impl.ValidateStagingSignatures(promotionEdges); err != nil {
-		return fmt.Errorf("checking signatures in staging images: %w", err)
-	}
-
-	if !opts.Confirm {
-		return p.impl.PrecheckAndExit(opts, mfests)
-	}
-
-	if err := p.impl.PromoteImages(sc, promotionEdges); err != nil {
-		return fmt.Errorf("running promotion: %w", err)
-	}
-
-	if p.budget != nil {
-		if err := p.budget.GiveAll("signing"); err != nil {
-			logrus.WithError(err).Warn("Failed to rebalance rate limit budget")
-		}
-	}
-
-	if err := p.impl.SignImages(opts, sc, promotionEdges); err != nil {
-		return fmt.Errorf("signing images: %w", err)
-	}
-
-	if err := p.impl.ReplicateSignatures(opts, sc, promotionEdges); err != nil {
-		return fmt.Errorf("replicating signatures: %w", err)
-	}
-
-	if err := p.impl.WriteSBOMs(opts, sc, promotionEdges); err != nil {
-		return fmt.Errorf("writing SBOMs: %w", err)
-	}
-
-	return nil
 }
 
 // Snapshot runs the steps to output a representation in json or yaml of a registry.

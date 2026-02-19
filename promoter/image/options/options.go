@@ -125,10 +125,6 @@ type Options struct {
 	// MaxSignatureOps maximum number of concurrent signature operations
 	MaxSignatureOps int
 
-	// Deprecated: UseLegacyPipeline uses the legacy sequential promotion
-	// code path instead of the new pipeline engine. Defaults to false.
-	UseLegacyPipeline bool
-
 	// RequireProvenance controls whether provenance verification is required
 	// before promotion. When true, images without valid SLSA attestations
 	// are rejected. Defaults to false for backwards compatibility.
@@ -142,6 +138,11 @@ type Options struct {
 	// AllowedSourceRepos is the list of acceptable source repository URLs
 	// for provenance verification. If empty, any source repo is accepted.
 	AllowedSourceRepos []string
+
+	// GeneratePromotionProvenance controls whether SLSA provenance
+	// attestations are generated for promoted images and pushed as
+	// .att tags. Defaults to false.
+	GeneratePromotionProvenance bool
 }
 
 var DefaultOptions = &Options{
@@ -159,7 +160,6 @@ var DefaultOptions = &Options{
 	SignCheckIssuerRegexp:   "",
 	MaxSignatureCopies:      50, // Maximum number of concurrent signature copies
 	MaxSignatureOps:         50, // Maximum number of concurrent signature operations
-	UseLegacyPipeline:       false,
 }
 
 func (o *Options) Validate() error {
