@@ -1661,6 +1661,17 @@ func getRegistriesToRead(edges map[PromotionEdge]interface{}) []registry.Context
 	return rcsFinal
 }
 
+// getPromotionTransport returns the HTTP transport for image copy operations.
+// If PromotionTransport is set on SyncContext, it is used. Otherwise, falls
+// back to the global ratelimit.Limiter for backwards compatibility.
+func (sc *SyncContext) getPromotionTransport() http.RoundTripper {
+	if sc.PromotionTransport != nil {
+		return sc.PromotionTransport
+	}
+	//nolint:staticcheck // Legacy fallback during transition to BudgetAllocator.
+	return ratelimit.Limiter
+}
+
 // Promote performs container image promotion by realizing the intent in the
 // Manifest.
 func (sc *SyncContext) Promote(
@@ -1738,7 +1749,7 @@ func (sc *SyncContext) Promote(
 					opts := []crane.Option{
 						crane.WithAuthFromKeychain(gcrane.Keychain),
 						crane.WithUserAgent(image.UserAgent),
-						crane.WithTransport(ratelimit.Limiter),
+						crane.WithTransport(sc.getPromotionTransport()),
 					}
 					if err := crane.Copy(srcVertex, dstVertex, opts...); err != nil {
 						logrus.Error(err)

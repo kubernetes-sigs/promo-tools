@@ -42,6 +42,7 @@ const (
 // stderr). In this case we equate the http.Respose "Body" with stdout.
 func (h *HTTP) Produce() (stdOut, stdErr io.Reader, err error) {
 	client := http.Client{
+		//nolint:staticcheck // Legacy fallback during transition to BudgetAllocator.
 		Transport: ratelimit.Limiter,
 		Timeout:   time.Second * requestTimeoutSeconds,
 	}

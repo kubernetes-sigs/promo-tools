@@ -38,7 +38,6 @@ import (
 	reg "sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry"
 	"sigs.k8s.io/promo-tools/v4/internal/legacy/gcloud"
 	options "sigs.k8s.io/promo-tools/v4/promoter/image/options"
-	"sigs.k8s.io/promo-tools/v4/promoter/image/ratelimit"
 	"sigs.k8s.io/promo-tools/v4/types/image"
 )
 
@@ -253,7 +252,7 @@ func (di *DefaultPromoterImplementation) copyAttachedObjects(edge *reg.Promotion
 	craneOpts := []crane.Option{
 		crane.WithAuthFromKeychain(gcrane.Keychain),
 		crane.WithUserAgent(image.UserAgent),
-		crane.WithTransport(ratelimit.Limiter),
+		crane.WithTransport(di.getSigningTransport()),
 	}
 
 	if err := crane.Copy(srcRef.String(), dstRef.String(), craneOpts...); err != nil {
@@ -315,7 +314,7 @@ func (di *DefaultPromoterImplementation) replicateSignatures(
 		opts := []crane.Option{
 			crane.WithAuthFromKeychain(gcrane.Keychain),
 			crane.WithUserAgent(image.UserAgent),
-			crane.WithTransport(ratelimit.Limiter),
+			crane.WithTransport(di.getSigningTransport()),
 		}
 		if err := crane.Copy(srcRef.String(), dstRef.reference.String(), opts...); err != nil {
 			return fmt.Errorf(

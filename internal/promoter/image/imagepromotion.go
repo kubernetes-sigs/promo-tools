@@ -51,7 +51,7 @@ func (di *DefaultPromoterImplementation) ParseManifests(opts *options.Options) (
 
 // MakeSyncContext takes a slice of manifests and creates a sync context
 // object based on them and the promoter options.
-func (di DefaultPromoterImplementation) MakeSyncContext(
+func (di *DefaultPromoterImplementation) MakeSyncContext(
 	opts *options.Options, mfests []schema.Manifest,
 ) (*reg.SyncContext, error) {
 	sc, err := reg.MakeSyncContext(
@@ -60,6 +60,14 @@ func (di DefaultPromoterImplementation) MakeSyncContext(
 	if err != nil {
 		return nil, fmt.Errorf("creating sync context: %w", err)
 	}
+
+	// Propagate the promotion transport to the SyncContext so that
+	// Promote() uses the dedicated rate-limited transport instead of
+	// the global singleton.
+	if di.promotionTransport != nil {
+		sc.PromotionTransport = di.promotionTransport
+	}
+
 	return sc, err
 }
 
