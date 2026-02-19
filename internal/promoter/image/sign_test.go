@@ -23,9 +23,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"sigs.k8s.io/release-utils/env"
 
-	"sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry/registry"
 	options "sigs.k8s.io/promo-tools/v4/promoter/image/options"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/promotion"
+	"sigs.k8s.io/promo-tools/v4/promoter/image/registry"
 	"sigs.k8s.io/promo-tools/v4/types/image"
 )
 

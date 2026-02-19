@@ -24,10 +24,10 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 
-	"sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry/schema"
 	options "sigs.k8s.io/promo-tools/v4/promoter/image/options"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/promotion"
-	imgregistry "sigs.k8s.io/promo-tools/v4/promoter/image/registry"
+	"sigs.k8s.io/promo-tools/v4/promoter/image/registry"
+	"sigs.k8s.io/promo-tools/v4/promoter/image/schema"
 )
 
 // This file has all the promoter implementation functions
@@ -68,7 +68,7 @@ func (di *DefaultPromoterImplementation) GetPromotionEdges(
 
 	// Collect registries we need to read
 	regs := promotion.GetRegistriesToRead(edges)
-	configs := imgregistry.RegistryConfigsFromContexts(regs)
+	configs := registry.RegistryConfigsFromContexts(regs)
 
 	for _, cfg := range configs {
 		logrus.Debugf("reading registry %s (src=%v)", cfg.Name, cfg.Src)

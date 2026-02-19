@@ -26,9 +26,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/xerrors"
 
-	"sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry/registry"
-	"sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry/schema"
-	imgregistry "sigs.k8s.io/promo-tools/v4/promoter/image/registry"
+	"sigs.k8s.io/promo-tools/v4/promoter/image/registry"
+	"sigs.k8s.io/promo-tools/v4/promoter/image/schema"
 	"sigs.k8s.io/promo-tools/v4/types/image"
 )
 
@@ -77,7 +76,7 @@ func (o *GrowOptions) Populate(
 }
 
 func toImageNames(imageStrings []string) []image.Name {
-	imgNames := []image.Name{}
+	imgNames := make([]image.Name, 0, len(imageStrings))
 	for _, imgString := range imageStrings {
 		imgName := image.Name(imgString)
 		imgNames = append(imgNames, imgName)
@@ -87,7 +86,7 @@ func toImageNames(imageStrings []string) []image.Name {
 }
 
 func toTags(tagStrings []string) []image.Tag {
-	tags := []image.Tag{}
+	tags := make([]image.Tag, 0, len(tagStrings))
 	for _, tagString := range tagStrings {
 		tag := image.Tag(tagString)
 		tags = append(tags, tag)
@@ -97,7 +96,7 @@ func toTags(tagStrings []string) []image.Tag {
 }
 
 func toDigests(digestStrings []string) []image.Digest {
-	digests := []image.Digest{}
+	digests := make([]image.Digest, 0, len(digestStrings))
 	for _, digestString := range digestStrings {
 		digest := image.Digest(digestString)
 		digests = append(digests, digest)
@@ -216,10 +215,10 @@ func ReadStagingRepo(
 	ctx context.Context,
 	o *GrowOptions,
 ) (registry.RegInvImage, error) {
-	provider := imgregistry.NewCraneProvider()
+	provider := registry.NewCraneProvider()
 	inv, err := provider.ReadRegistries(
 		ctx,
-		[]imgregistry.RegistryConfig{{Name: o.StagingRepo}},
+		[]registry.RegistryConfig{{Name: o.StagingRepo}},
 		true, // recursive
 	)
 	if err != nil {
@@ -280,7 +279,6 @@ func FilterByImages(rii registry.RegInvImage, filterImages []image.Name) registr
 
 // FilterByTags removes all images in RegInvImage that do not match the
 // filterTag.
-// TODO(manifest): Dedupe with `FilterByTag` in legacy/dockerregistry/inventory.go.
 func FilterByTags(rii registry.RegInvImage, filterTags []image.Tag) registry.RegInvImage {
 	filtered := make(registry.RegInvImage)
 

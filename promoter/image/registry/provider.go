@@ -21,7 +21,6 @@ import (
 
 	cr "github.com/google/go-containerregistry/pkg/v1/types"
 
-	legacyreg "sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry/registry"
 	"sigs.k8s.io/promo-tools/v4/types/image"
 )
 
@@ -53,7 +52,7 @@ type RegistryConfig struct {
 }
 
 // RegistryConfigFromContext converts a legacy registry.Context to a RegistryConfig.
-func RegistryConfigFromContext(rc legacyreg.Context) RegistryConfig {
+func RegistryConfigFromContext(rc Context) RegistryConfig {
 	return RegistryConfig{
 		Name:           rc.Name,
 		ServiceAccount: rc.ServiceAccount,
@@ -62,7 +61,7 @@ func RegistryConfigFromContext(rc legacyreg.Context) RegistryConfig {
 }
 
 // RegistryConfigsFromContexts converts a slice of legacy registry.Context to RegistryConfigs.
-func RegistryConfigsFromContexts(rcs []legacyreg.Context) []RegistryConfig {
+func RegistryConfigsFromContexts(rcs []Context) []RegistryConfig {
 	configs := make([]RegistryConfig, len(rcs))
 	for i, rc := range rcs {
 		configs[i] = RegistryConfigFromContext(rc)
@@ -73,7 +72,7 @@ func RegistryConfigsFromContexts(rcs []legacyreg.Context) []RegistryConfig {
 // Inventory holds the results of reading registry inventories.
 type Inventory struct {
 	// Images maps registry names to their image inventories.
-	Images map[image.Registry]legacyreg.RegInvImage
+	Images map[image.Registry]RegInvImage
 
 	// MediaTypes maps digests to their OCI media types.
 	MediaTypes map[image.Digest]cr.MediaType
@@ -82,7 +81,7 @@ type Inventory struct {
 // NewInventory creates an empty Inventory.
 func NewInventory() *Inventory {
 	return &Inventory{
-		Images:     make(map[image.Registry]legacyreg.RegInvImage),
+		Images:     make(map[image.Registry]RegInvImage),
 		MediaTypes: make(map[image.Digest]cr.MediaType),
 	}
 }

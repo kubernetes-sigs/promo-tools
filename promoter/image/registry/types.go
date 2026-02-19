@@ -130,12 +130,12 @@ func (a *RegInvImage) ToCSV() string {
 
 // ToSorted converts a RegInvImage type to a sorted structure.
 func (a *RegInvImage) ToSorted() []ImageWithDigestSlice {
-	images := make([]ImageWithDigestSlice, 0)
+	images := make([]ImageWithDigestSlice, 0, len(*a))
 
 	for name, dmap := range *a {
-		var digests []Digest
+		digests := make([]Digest, 0, len(dmap))
 		for k, v := range dmap {
-			var tags []string
+			tags := make([]string, 0, len(v))
 			for _, tag := range v {
 				tags = append(tags, string(tag))
 			}

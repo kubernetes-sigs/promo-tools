@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"sync"
 
-	legacyreg "sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry/registry"
 	"sigs.k8s.io/promo-tools/v4/types/image"
 )
 
@@ -63,10 +62,10 @@ func (f *FakeProvider) AddImage(
 	defer f.mu.Unlock()
 
 	if _, ok := f.Inventory.Images[reg]; !ok {
-		f.Inventory.Images[reg] = make(legacyreg.RegInvImage)
+		f.Inventory.Images[reg] = make(RegInvImage)
 	}
 	if _, ok := f.Inventory.Images[reg][name]; !ok {
-		f.Inventory.Images[reg][name] = make(legacyreg.DigestTags)
+		f.Inventory.Images[reg][name] = make(DigestTags)
 	}
 	f.Inventory.Images[reg][name][digest] = tags
 }

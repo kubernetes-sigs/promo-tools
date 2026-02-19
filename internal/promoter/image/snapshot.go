@@ -28,11 +28,10 @@ import (
 	cr "github.com/google/go-containerregistry/pkg/v1/types"
 	"github.com/sirupsen/logrus"
 
-	"sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry/registry"
-	"sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry/schema"
 	options "sigs.k8s.io/promo-tools/v4/promoter/image/options"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/promotion"
-	imgregistry "sigs.k8s.io/promo-tools/v4/promoter/image/registry"
+	"sigs.k8s.io/promo-tools/v4/promoter/image/registry"
+	"sigs.k8s.io/promo-tools/v4/promoter/image/schema"
 	"sigs.k8s.io/promo-tools/v4/types/image"
 )
 
@@ -135,7 +134,7 @@ func (di *DefaultPromoterImplementation) GetRegistryImageInventory(
 		return nil, fmt.Errorf("creating source registry for image inventory: %w", err)
 	}
 
-	registryConfig := imgregistry.RegistryConfigFromContext(*srcRegistry)
+	registryConfig := registry.RegistryConfigFromContext(*srcRegistry)
 
 	if opts.ManifestBasedSnapshotOf != "" {
 		edges, err := promotion.ToEdges(mfests)
@@ -152,7 +151,7 @@ func (di *DefaultPromoterImplementation) GetRegistryImageInventory(
 		if opts.MinimalSnapshot {
 			inv, err := di.registryProvider.ReadRegistries(
 				context.Background(),
-				[]imgregistry.RegistryConfig{registryConfig},
+				[]registry.RegistryConfig{registryConfig},
 				true,
 			)
 			if err != nil {
@@ -168,7 +167,7 @@ func (di *DefaultPromoterImplementation) GetRegistryImageInventory(
 	// Direct snapshot path: read the registry
 	inv, err := di.registryProvider.ReadRegistries(
 		context.Background(),
-		[]imgregistry.RegistryConfig{registryConfig},
+		[]registry.RegistryConfig{registryConfig},
 		true,
 	)
 	if err != nil {
@@ -193,7 +192,7 @@ func (di *DefaultPromoterImplementation) GetRegistryImageInventory(
 // manifest list digests, fetches their manifests to find child digests,
 // and removes tagless children.
 func removeChildDigests(
-	inv *imgregistry.Inventory,
+	inv *registry.Inventory,
 	rii registry.RegInvImage,
 	registryName image.Registry,
 	opts ...crane.Option,
