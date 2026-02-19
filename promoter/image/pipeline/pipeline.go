@@ -106,8 +106,3 @@ func (p *Pipeline) Run(ctx context.Context) error {
 	logrus.Infof("Pipeline completed in %s", time.Since(start))
 	return nil
 }
-
-// Phases returns the list of phases in the pipeline.
-func (p *Pipeline) Phases() []Phase {
-	return p.phases
-}
