@@ -60,7 +60,7 @@ func New(opts *options.Options) *Promoter {
 	di.SetSigningTransport(signRT)
 
 	return &Promoter{
-		Options: options.DefaultOptions,
+		Options: opts,
 		impl:    di,
 		budget:  budget,
 	}
@@ -122,7 +122,7 @@ type promoterImplementation interface {
 // PromoteImages is the main method for image promotion.
 // It runs by taking all its parameters from a set of options.
 func (p *Promoter) PromoteImages(ctx context.Context, opts *options.Options) error {
-	if opts.UseLegacyPipeline {
+	if opts.UseLegacyPipeline { //nolint:staticcheck // intentional legacy routing
 		return p.promoteImagesLegacy(opts)
 	}
 	return p.promoteImagesPipeline(ctx, opts)
@@ -259,9 +259,12 @@ func (p *Promoter) promoteImagesPipeline(ctx context.Context, opts *options.Opti
 	return pipe.Run(ctx)
 }
 
-// promoteImagesLegacy is the original sequential promotion code path.
+// Deprecated: promoteImagesLegacy is the original sequential promotion code path.
+// Use the pipeline-based path (--use-legacy-pipeline=false) instead.
+// This will be removed in a future release.
 func (p *Promoter) promoteImagesLegacy(opts *options.Options) error {
-	logrus.Infof("PromoteImages start (legacy pipeline)")
+	logrus.Warn("Using deprecated legacy promotion pipeline. " +
+		"Set --use-legacy-pipeline=false to use the new pipeline engine.")
 	if err := p.impl.ValidateOptions(opts); err != nil {
 		return fmt.Errorf("validating options: %w", err)
 	}

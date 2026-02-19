@@ -253,4 +253,32 @@ check. Found vulnerabilities at or above this threshold will result in the
 vulnerability check failing [severity levels between 0 and 5; 0 - UNSPECIFIED,
 1 - MINIMAL, 2 - LOW, 3 - MEDIUM, 4 - HIGH, 5 - CRITICAL]`,
 	)
+
+	CipCmd.PersistentFlags().BoolVar(
+		&runOpts.UseLegacyPipeline, //nolint:staticcheck // intentional deprecated flag
+		"use-legacy-pipeline",
+		options.DefaultOptions.UseLegacyPipeline, //nolint:staticcheck // intentional deprecated flag
+		"use the legacy sequential promotion code path instead of the new pipeline engine",
+	)
+
+	CipCmd.PersistentFlags().BoolVar(
+		&runOpts.RequireProvenance,
+		"require-provenance",
+		options.DefaultOptions.RequireProvenance,
+		"require valid SLSA provenance attestations before promotion",
+	)
+
+	CipCmd.PersistentFlags().StringSliceVar(
+		&runOpts.AllowedBuilders,
+		"allowed-builders",
+		options.DefaultOptions.AllowedBuilders,
+		"comma-separated list of acceptable builder identities for provenance verification",
+	)
+
+	CipCmd.PersistentFlags().StringSliceVar(
+		&runOpts.AllowedSourceRepos,
+		"allowed-source-repos",
+		options.DefaultOptions.AllowedSourceRepos,
+		"comma-separated list of acceptable source repository URLs for provenance verification",
+	)
 }

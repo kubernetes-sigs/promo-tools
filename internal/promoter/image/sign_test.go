@@ -26,6 +26,7 @@ import (
 	reg "sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry"
 	"sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry/registry"
 	options "sigs.k8s.io/promo-tools/v4/promoter/image/options"
+	"sigs.k8s.io/promo-tools/v4/types/image"
 )
 
 // TestGetIdentityToken tests the identity token generation logic. By default
@@ -53,6 +54,58 @@ func TestGetIdentityToken(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotEmpty(t, tok)
+}
+
+func TestDigestToSignatureTag(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name   string
+		digest image.Digest
+		want   string
+	}{
+		{
+			name:   "standard sha256 digest",
+			digest: "sha256:709e17a9c17018997724ed19afc18dbf576e9af10dfe78c13b34175027916d8f",
+			want:   "sha256-709e17a9c17018997724ed19afc18dbf576e9af10dfe78c13b34175027916d8f.sig",
+		},
+		{
+			name:   "bare sha256 prefix",
+			digest: "sha256:abc",
+			want:   "sha256-abc.sig",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			require.Equal(t, tc.want, digestToSignatureTag(tc.digest))
+		})
+	}
+}
+
+func TestDigestToSBOMTag(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name   string
+		digest image.Digest
+		want   string
+	}{
+		{
+			name:   "standard sha256 digest",
+			digest: "sha256:709e17a9c17018997724ed19afc18dbf576e9af10dfe78c13b34175027916d8f",
+			want:   "sha256-709e17a9c17018997724ed19afc18dbf576e9af10dfe78c13b34175027916d8f.sbom",
+		},
+		{
+			name:   "bare sha256 prefix",
+			digest: "sha256:abc",
+			want:   "sha256-abc.sbom",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			require.Equal(t, tc.want, digestToSBOMTag(tc.digest))
+		})
+	}
 }
 
 func TestTargetIdentity(t *testing.T) {
