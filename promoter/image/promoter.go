@@ -19,6 +19,7 @@ package imagepromoter
 //go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/sirupsen/logrus"
@@ -29,6 +30,7 @@ import (
 	impl "sigs.k8s.io/promo-tools/v4/internal/promoter/image"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/checkresults"
 	options "sigs.k8s.io/promo-tools/v4/promoter/image/options"
+	"sigs.k8s.io/promo-tools/v4/promoter/image/pipeline"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/ratelimit"
 )
 
@@ -110,12 +112,120 @@ type promoterImplementation interface {
 	PrintSection(string, bool)
 }
 
-// PromoteImages is the main method for image promotion
-// it runs by taking all its parameters from a set of options.
-func (p *Promoter) PromoteImages(opts *options.Options) (err error) {
-	logrus.Infof("PromoteImages start")
-	// Validate the options. Perhaps another image-specific
-	// validation function may be needed.
+// PromoteImages is the main method for image promotion.
+// It runs by taking all its parameters from a set of options.
+func (p *Promoter) PromoteImages(opts *options.Options) error {
+	if opts.UseLegacyPipeline {
+		return p.promoteImagesLegacy(opts)
+	}
+	return p.promoteImagesPipeline(opts)
+}
+
+// promoteImagesPipeline runs image promotion using the new pipeline engine.
+func (p *Promoter) promoteImagesPipeline(opts *options.Options) error {
+	// Shared state between pipeline phases, captured by closures.
+	var (
+		mfests         []schema.Manifest
+		sc             *reg.SyncContext
+		promotionEdges map[reg.PromotionEdge]interface{}
+	)
+
+	pipe := pipeline.New()
+
+	// Setup phase: validate, activate accounts, prewarm caches.
+	pipe.AddPhase(pipeline.NewPhase("setup", func(_ context.Context) error {
+		if err := p.impl.ValidateOptions(opts); err != nil {
+			return fmt.Errorf("validating options: %w", err)
+		}
+		if err := p.impl.ActivateServiceAccounts(opts); err != nil {
+			return fmt.Errorf("activating service accounts: %w", err)
+		}
+		if err := p.impl.PrewarmTUFCache(); err != nil {
+			return fmt.Errorf("prewarming TUF cache: %w", err)
+		}
+		return nil
+	}))
+
+	// Plan phase: parse manifests, build sync context, compute edges.
+	pipe.AddPhase(pipeline.NewPhase("plan", func(_ context.Context) error {
+		var err error
+		mfests, err = p.impl.ParseManifests(opts)
+		if err != nil {
+			return fmt.Errorf("parsing manifests: %w", err)
+		}
+
+		p.impl.PrintVersion()
+		p.impl.PrintSection("START (PROMOTION)", opts.Confirm)
+
+		sc, err = p.impl.MakeSyncContext(opts, mfests)
+		if err != nil {
+			return fmt.Errorf("creating sync context: %w", err)
+		}
+
+		promotionEdges, err = p.impl.GetPromotionEdges(sc, mfests)
+		if err != nil {
+			return fmt.Errorf("computing promotion edges: %w", err)
+		}
+
+		if opts.ParseOnly {
+			logrus.Info("Manifests parsed, exiting as ParseOnly is set")
+			return pipeline.ErrStopPipeline
+		}
+		return nil
+	}))
+
+	// Validate phase: check staging signatures.
+	pipe.AddPhase(pipeline.NewPhase("validate", func(_ context.Context) error {
+		if _, err := p.impl.ValidateStagingSignatures(promotionEdges); err != nil {
+			return fmt.Errorf("checking signatures in staging images: %w", err)
+		}
+
+		if !opts.Confirm {
+			if err := p.impl.PrecheckAndExit(opts, mfests); err != nil {
+				return err
+			}
+			return pipeline.ErrStopPipeline
+		}
+		return nil
+	}))
+
+	// Promote phase: copy images.
+	pipe.AddPhase(pipeline.NewPhase("promote", func(_ context.Context) error {
+		if err := p.impl.PromoteImages(sc, promotionEdges); err != nil {
+			return fmt.Errorf("running promotion: %w", err)
+		}
+
+		// Rebalance rate limit budget: give signing the full capacity.
+		if p.budget != nil {
+			if err := p.budget.GiveAll("signing"); err != nil {
+				logrus.WithError(err).Warn("Failed to rebalance rate limit budget")
+			}
+		}
+		return nil
+	}))
+
+	// Sign phase: sign promoted images.
+	pipe.AddPhase(pipeline.NewPhase("sign", func(_ context.Context) error {
+		if err := p.impl.SignImages(opts, sc, promotionEdges); err != nil {
+			return fmt.Errorf("signing images: %w", err)
+		}
+		return nil
+	}))
+
+	// Attest phase: write SBOMs and attestations.
+	pipe.AddPhase(pipeline.NewPhase("attest", func(_ context.Context) error {
+		if err := p.impl.WriteSBOMs(opts, sc, promotionEdges); err != nil {
+			return fmt.Errorf("writing SBOMs: %w", err)
+		}
+		return nil
+	}))
+
+	return pipe.Run(context.Background())
+}
+
+// promoteImagesLegacy is the original sequential promotion code path.
+func (p *Promoter) promoteImagesLegacy(opts *options.Options) (err error) {
+	logrus.Infof("PromoteImages start (legacy pipeline)")
 	if err := p.impl.ValidateOptions(opts); err != nil {
 		return fmt.Errorf("validating options: %w", err)
 	}
@@ -124,13 +234,10 @@ func (p *Promoter) PromoteImages(opts *options.Options) (err error) {
 		return fmt.Errorf("activating service accounts: %w", err)
 	}
 
-	// Prewarm the TUF cache with the targets and keys. This is done
-	// to avoid collisions when signing and verifying in parallel
 	if err := p.impl.PrewarmTUFCache(); err != nil {
 		return fmt.Errorf("prewarming TUF cache: %w", err)
 	}
 
-	logrus.Infof("Parsing manifests")
 	mfests, err := p.impl.ParseManifests(opts)
 	if err != nil {
 		return fmt.Errorf("parsing manifests: %w", err)
@@ -139,59 +246,47 @@ func (p *Promoter) PromoteImages(opts *options.Options) (err error) {
 	p.impl.PrintVersion()
 	p.impl.PrintSection("START (PROMOTION)", opts.Confirm)
 
-	logrus.Infof("Creating sync context manifests")
 	sc, err := p.impl.MakeSyncContext(opts, mfests)
 	if err != nil {
 		return fmt.Errorf("creating sync context: %w", err)
 	}
 
-	logrus.Infof("Getting promotion edges")
 	promotionEdges, err := p.impl.GetPromotionEdges(sc, mfests)
 	if err != nil {
 		return fmt.Errorf("filtering edges: %w", err)
 	}
 
-	// TODO: Let's rethink this option
 	if opts.ParseOnly {
 		logrus.Info("Manifests parsed, exiting as ParseOnly is set")
 		return nil
 	}
 
-	// Verify any signatures in staged images
-	logrus.Infof("Validating staging signatures")
 	if _, err := p.impl.ValidateStagingSignatures(promotionEdges); err != nil {
-		return fmt.Errorf("checking signtaures in staging images: %w", err)
+		return fmt.Errorf("checking signatures in staging images: %w", err)
 	}
 
-	// Check the pull request
 	if !opts.Confirm {
 		return p.impl.PrecheckAndExit(opts, mfests)
 	}
 
-	logrus.Infof("Promoting images")
 	if err := p.impl.PromoteImages(sc, promotionEdges); err != nil {
 		return fmt.Errorf("running promotion: %w", err)
 	}
 
-	// Promotion is done — give the full rate limit budget to signing,
-	// which is typically the bottleneck for large image sets.
 	if p.budget != nil {
 		if err := p.budget.GiveAll("signing"); err != nil {
 			logrus.WithError(err).Warn("Failed to rebalance rate limit budget")
 		}
 	}
 
-	logrus.Infof("Signing images")
 	if err := p.impl.SignImages(opts, sc, promotionEdges); err != nil {
 		return fmt.Errorf("signing images: %w", err)
 	}
 
-	logrus.Infof("Writing SBOMs")
 	if err := p.impl.WriteSBOMs(opts, sc, promotionEdges); err != nil {
 		return fmt.Errorf("writing SBOMs: %w", err)
 	}
 
-	logrus.Infof("Finish")
 	return nil
 }
 
