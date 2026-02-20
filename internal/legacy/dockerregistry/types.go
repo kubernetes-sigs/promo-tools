@@ -17,6 +17,7 @@ limitations under the License.
 package inventory
 
 import (
+	"net/http"
 	"sync"
 
 	"github.com/go-git/go-git/v5/plumbing"
@@ -83,6 +84,11 @@ type SyncContext struct { //nolint: gocritic
 	DigestMediaType   DigestMediaType
 	ParentDigest      ParentDigest
 	Logs              CollectedLogs
+
+	// PromotionTransport is the HTTP transport to use for image copy
+	// operations. If nil, falls back to ratelimit.Limiter for backwards
+	// compatibility.
+	PromotionTransport http.RoundTripper
 }
 
 // PreCheck represents a check function to run against a pull request that

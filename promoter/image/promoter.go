@@ -29,6 +29,7 @@ import (
 	impl "sigs.k8s.io/promo-tools/v4/internal/promoter/image"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/checkresults"
 	options "sigs.k8s.io/promo-tools/v4/promoter/image/options"
+	"sigs.k8s.io/promo-tools/v4/promoter/image/ratelimit"
 )
 
 var AllowedOutputFormats = []string{
@@ -39,12 +40,25 @@ var AllowedOutputFormats = []string{
 type Promoter struct {
 	Options *options.Options
 	impl    promoterImplementation
+	budget  *ratelimit.BudgetAllocator
 }
 
 func New(opts *options.Options) *Promoter {
+	// Create a budget allocator that splits the rate limit between
+	// promotion (70%) and signing (30%). After promotion completes,
+	// signing gets the full budget via GiveAll.
+	budget := ratelimit.NewBudgetAllocator(ratelimit.MaxEvents)
+	promoRT := budget.Allocate("promotion", 0.7)
+	signRT := budget.Allocate("signing", 0.3)
+
+	di := impl.NewDefaultPromoterImplementation(opts)
+	di.SetPromotionTransport(promoRT)
+	di.SetSigningTransport(signRT)
+
 	return &Promoter{
 		Options: options.DefaultOptions,
-		impl:    impl.NewDefaultPromoterImplementation(opts),
+		impl:    di,
+		budget:  budget,
 	}
 }
 
@@ -157,6 +171,14 @@ func (p *Promoter) PromoteImages(opts *options.Options) (err error) {
 	logrus.Infof("Promoting images")
 	if err := p.impl.PromoteImages(sc, promotionEdges); err != nil {
 		return fmt.Errorf("running promotion: %w", err)
+	}
+
+	// Promotion is done — give the full rate limit budget to signing,
+	// which is typically the bottleneck for large image sets.
+	if p.budget != nil {
+		if err := p.budget.GiveAll("signing"); err != nil {
+			logrus.WithError(err).Warn("Failed to rebalance rate limit budget")
+		}
 	}
 
 	logrus.Infof("Signing images")

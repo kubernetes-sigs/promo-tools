@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/promo-tools/v4/internal/legacy/stream"
 	"sigs.k8s.io/promo-tools/v4/internal/version"
 	options "sigs.k8s.io/promo-tools/v4/promoter/image/options"
+	"sigs.k8s.io/promo-tools/v4/promoter/image/ratelimit"
 	"sigs.k8s.io/promo-tools/v4/types/image"
 )
 
@@ -50,6 +51,14 @@ type StreamProducerFunc func(
 
 type DefaultPromoterImplementation struct {
 	signer *sign.Signer
+
+	// promotionTransport is the HTTP transport used for image promotion
+	// (crane.Copy). If nil, falls back to the global ratelimit.Limiter.
+	promotionTransport *ratelimit.RoundTripper
+
+	// signingTransport is the HTTP transport used for signature copy and
+	// replication. If nil, falls back to the global ratelimit.Limiter.
+	signingTransport *ratelimit.RoundTripper
 }
 
 // NewDefaultPromoterImplementation creates a new DefaultPromoterImplementation instance.
@@ -57,6 +66,26 @@ func NewDefaultPromoterImplementation(opts *options.Options) *DefaultPromoterImp
 	return &DefaultPromoterImplementation{
 		signer: sign.New(defaultSignerOptions(opts)),
 	}
+}
+
+// SetPromotionTransport sets the HTTP transport used for image promotion.
+func (di *DefaultPromoterImplementation) SetPromotionTransport(rt *ratelimit.RoundTripper) {
+	di.promotionTransport = rt
+}
+
+// SetSigningTransport sets the HTTP transport used for signing operations.
+func (di *DefaultPromoterImplementation) SetSigningTransport(rt *ratelimit.RoundTripper) {
+	di.signingTransport = rt
+}
+
+// getSigningTransport returns the transport for signing, falling back to the
+// global singleton for backwards compatibility.
+func (di *DefaultPromoterImplementation) getSigningTransport() *ratelimit.RoundTripper {
+	if di.signingTransport != nil {
+		return di.signingTransport
+	}
+	//nolint:staticcheck // Legacy fallback during transition to BudgetAllocator.
+	return ratelimit.Limiter
 }
 
 // defaultSignerOptions returns a new *sign.Options with default values applied.
