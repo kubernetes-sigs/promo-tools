@@ -17,6 +17,7 @@ limitations under the License.
 package imagepromoter
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -30,8 +31,10 @@ import (
 	"sigs.k8s.io/promo-tools/v4/internal/legacy/gcloud"
 	"sigs.k8s.io/promo-tools/v4/internal/legacy/stream"
 	"sigs.k8s.io/promo-tools/v4/internal/version"
+	"sigs.k8s.io/promo-tools/v4/promoter/image/auth"
 	options "sigs.k8s.io/promo-tools/v4/promoter/image/options"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/ratelimit"
+	imgregistry "sigs.k8s.io/promo-tools/v4/promoter/image/registry"
 	"sigs.k8s.io/promo-tools/v4/types/image"
 )
 
@@ -59,6 +62,18 @@ type DefaultPromoterImplementation struct {
 	// signingTransport is the HTTP transport used for signature copy and
 	// replication. If nil, falls back to the global ratelimit.Limiter.
 	signingTransport *ratelimit.RoundTripper
+
+	// registryProvider abstracts registry operations (read inventory, copy images).
+	// If nil, the legacy SyncContext-based code path is used.
+	registryProvider imgregistry.Provider
+
+	// identityTokenProvider abstracts OIDC token generation for signing.
+	// If nil, falls back to direct GCP IAM API calls.
+	identityTokenProvider auth.IdentityTokenProvider
+
+	// serviceActivator abstracts service account activation.
+	// If nil, falls back to gcloud CLI calls.
+	serviceActivator auth.ServiceActivator
 }
 
 // NewDefaultPromoterImplementation creates a new DefaultPromoterImplementation instance.
@@ -86,6 +101,21 @@ func (di *DefaultPromoterImplementation) getSigningTransport() *ratelimit.RoundT
 	}
 	//nolint:staticcheck // Legacy fallback during transition to BudgetAllocator.
 	return ratelimit.Limiter
+}
+
+// SetRegistryProvider sets the registry provider for image operations.
+func (di *DefaultPromoterImplementation) SetRegistryProvider(p imgregistry.Provider) {
+	di.registryProvider = p
+}
+
+// SetIdentityTokenProvider sets the OIDC token provider for signing.
+func (di *DefaultPromoterImplementation) SetIdentityTokenProvider(p auth.IdentityTokenProvider) {
+	di.identityTokenProvider = p
+}
+
+// SetServiceActivator sets the service account activator.
+func (di *DefaultPromoterImplementation) SetServiceActivator(a auth.ServiceActivator) {
+	di.serviceActivator = a
 }
 
 // defaultSignerOptions returns a new *sign.Options with default values applied.
@@ -128,10 +158,14 @@ func (di *DefaultPromoterImplementation) ActivateServiceAccounts(opts *options.O
 	if !opts.UseServiceAcct {
 		logrus.Warn("Not setting a service account")
 	}
+	if di.serviceActivator != nil {
+		return di.serviceActivator.ActivateServiceAccounts(
+			context.Background(), opts.KeyFiles,
+		)
+	}
 	if err := gcloud.ActivateServiceAccounts(opts.KeyFiles); err != nil {
 		return fmt.Errorf("activating service accounts: %w", err)
 	}
-	// TODO: Output to log the accout used
 	return nil
 }
 

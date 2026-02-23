@@ -341,27 +341,31 @@ func (di *DefaultPromoterImplementation) WriteSBOMs(
 func (di *DefaultPromoterImplementation) GetIdentityToken(
 	opts *options.Options, serviceAccount string,
 ) (tok string, err error) {
-	credOptions := []gopts.ClientOption{}
 	// If the test signer file is found switch to test credentials
 	if os.Getenv("CIP_E2E_KEY_FILE") != "" {
 		logrus.Info("Test keyfile set using e2e test credentials")
-		// ... and also use the e2e signing identity
 		serviceAccount = TestSigningAccount
+	}
+
+	// Use the identity token provider interface when available.
+	if di.identityTokenProvider != nil {
+		return di.identityTokenProvider.GetIdentityToken(
+			context.Background(), serviceAccount, oidcTokenAudience,
+		)
+	}
+
+	// Legacy path: direct GCP IAM API calls.
+	credOptions := []gopts.ClientOption{}
+	if os.Getenv("CIP_E2E_KEY_FILE") != "" {
 		credOptions = []gopts.ClientOption{
 			//nolint:staticcheck // These are the credentials for the e2e tests.
 			gopts.WithCredentialsFile(os.Getenv("CIP_E2E_KEY_FILE")),
 		}
 	}
 
-	// If SignerInitCredentials, initialize the iam client using
-	// the identityu in that file instead of Default Application Credentials
 	if opts.SignerInitCredentials != "" {
 		logrus.Infof("Using credentials from %s", opts.SignerInitCredentials)
 		credOptions = []gopts.ClientOption{
-			// This next line is throwing warnings in the staticcheck linter.
-			// We should handle this entirely with token exchanges from the
-			// workload identity. But, for now, we'll leave this as is as
-			// the promoter is supposed to be getting a revamp soon.
 			//nolint:staticcheck
 			gopts.WithCredentialsFile(opts.SignerInitCredentials),
 		}
@@ -383,7 +387,7 @@ func (di *DefaultPromoterImplementation) GetIdentityToken(
 
 	resp, err := c.GenerateIdToken(ctx, req)
 	if err != nil {
-		return tok, fmt.Errorf("getting error account: %w", err)
+		return tok, fmt.Errorf("generating identity token: %w", err)
 	}
 
 	return resp.GetToken(), nil
