@@ -17,6 +17,7 @@ limitations under the License.
 package cli
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -90,7 +91,7 @@ func RunPromoteCmd(opts *options.Options) error {
 	}
 
 	// Mode 4: Image promotion
-	if err := cip.PromoteImages(opts); err != nil {
+	if err := cip.PromoteImages(context.Background(), opts); err != nil {
 		return fmt.Errorf("promote images: %w", err)
 	}
 

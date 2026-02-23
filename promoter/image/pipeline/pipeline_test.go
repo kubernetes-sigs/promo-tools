@@ -110,8 +110,8 @@ func TestPipelineChaining(t *testing.T) {
 		AddPhase(NewPhase("a", func(_ context.Context) error { return nil })).
 		AddPhase(NewPhase("b", func(_ context.Context) error { return nil }))
 
-	if len(p.Phases()) != 2 {
-		t.Errorf("expected 2 phases, got %d", len(p.Phases()))
+	if len(p.phases) != 2 {
+		t.Errorf("expected 2 phases, got %d", len(p.phases))
 	}
 }
 

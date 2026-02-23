@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/promo-tools/v4/promoter/image/checkresults"
 	options "sigs.k8s.io/promo-tools/v4/promoter/image/options"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/pipeline"
+	"sigs.k8s.io/promo-tools/v4/promoter/image/provenance"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/ratelimit"
 )
 
@@ -40,9 +41,10 @@ var AllowedOutputFormats = []string{
 }
 
 type Promoter struct {
-	Options *options.Options
-	impl    promoterImplementation
-	budget  *ratelimit.BudgetAllocator
+	Options            *options.Options
+	impl               promoterImplementation
+	budget             *ratelimit.BudgetAllocator
+	provenanceVerifier provenance.Verifier
 }
 
 func New(opts *options.Options) *Promoter {
@@ -66,6 +68,11 @@ func New(opts *options.Options) *Promoter {
 
 func (p *Promoter) SetImplementation(pi promoterImplementation) {
 	p.impl = pi
+}
+
+// SetProvenanceVerifier sets the provenance verifier used during promotion.
+func (p *Promoter) SetProvenanceVerifier(v provenance.Verifier) {
+	p.provenanceVerifier = v
 }
 
 //counterfeiter:generate . promoterImplementation
@@ -114,15 +121,15 @@ type promoterImplementation interface {
 
 // PromoteImages is the main method for image promotion.
 // It runs by taking all its parameters from a set of options.
-func (p *Promoter) PromoteImages(opts *options.Options) error {
+func (p *Promoter) PromoteImages(ctx context.Context, opts *options.Options) error {
 	if opts.UseLegacyPipeline {
 		return p.promoteImagesLegacy(opts)
 	}
-	return p.promoteImagesPipeline(opts)
+	return p.promoteImagesPipeline(ctx, opts)
 }
 
 // promoteImagesPipeline runs image promotion using the new pipeline engine.
-func (p *Promoter) promoteImagesPipeline(opts *options.Options) error {
+func (p *Promoter) promoteImagesPipeline(ctx context.Context, opts *options.Options) error {
 	// Shared state between pipeline phases, captured by closures.
 	var (
 		mfests         []schema.Manifest
@@ -174,6 +181,35 @@ func (p *Promoter) promoteImagesPipeline(opts *options.Options) error {
 		return nil
 	}))
 
+	// Provenance phase: verify image provenance (optional).
+	pipe.AddPhase(pipeline.NewPhase("provenance", func(ctx context.Context) error {
+		if !opts.RequireProvenance {
+			logrus.Debug("Provenance verification disabled (--require-provenance=false)")
+			return nil
+		}
+
+		verifier := p.provenanceVerifier
+		if verifier == nil {
+			verifier = &provenance.NoopVerifier{}
+		}
+
+		for edge := range promotionEdges {
+			ref := edge.SrcReference()
+			if ref == "" {
+				continue
+			}
+			result, err := verifier.Verify(ctx, ref)
+			if err != nil {
+				return fmt.Errorf("verifying provenance for %s: %w", ref, err)
+			}
+			if !result.Verified {
+				return fmt.Errorf("provenance verification failed for %s: %v",
+					ref, result.Errors)
+			}
+		}
+		return nil
+	}))
+
 	// Validate phase: check staging signatures.
 	pipe.AddPhase(pipeline.NewPhase("validate", func(_ context.Context) error {
 		if _, err := p.impl.ValidateStagingSignatures(promotionEdges); err != nil {
@@ -220,11 +256,11 @@ func (p *Promoter) promoteImagesPipeline(opts *options.Options) error {
 		return nil
 	}))
 
-	return pipe.Run(context.Background())
+	return pipe.Run(ctx)
 }
 
 // promoteImagesLegacy is the original sequential promotion code path.
-func (p *Promoter) promoteImagesLegacy(opts *options.Options) (err error) {
+func (p *Promoter) promoteImagesLegacy(opts *options.Options) error {
 	logrus.Infof("PromoteImages start (legacy pipeline)")
 	if err := p.impl.ValidateOptions(opts); err != nil {
 		return fmt.Errorf("validating options: %w", err)
