@@ -17,16 +17,22 @@ limitations under the License.
 package imagepromoter
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
 
+	"github.com/google/go-containerregistry/pkg/crane"
+	v1 "github.com/google/go-containerregistry/pkg/v1"
+	cr "github.com/google/go-containerregistry/pkg/v1/types"
 	"github.com/sirupsen/logrus"
 
-	reg "sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry"
 	"sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry/registry"
 	"sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry/schema"
 	options "sigs.k8s.io/promo-tools/v4/promoter/image/options"
+	"sigs.k8s.io/promo-tools/v4/promoter/image/promotion"
+	imgregistry "sigs.k8s.io/promo-tools/v4/promoter/image/registry"
 	"sigs.k8s.io/promo-tools/v4/types/image"
 )
 
@@ -65,7 +71,7 @@ func (di *DefaultPromoterImplementation) GetSnapshotSourceRegistry(
 	switch {
 	case opts.Snapshot != "":
 		srcRegistry.Name = image.Registry(opts.Snapshot)
-	case opts.ManifestBasedSnapshotOf == "":
+	case opts.ManifestBasedSnapshotOf != "":
 		srcRegistry.Name = image.Registry(opts.ManifestBasedSnapshotOf)
 	default:
 		return nil, errors.New(
@@ -124,61 +130,121 @@ func (di *DefaultPromoterImplementation) AppendManifestToSnapshot(
 func (di *DefaultPromoterImplementation) GetRegistryImageInventory(
 	opts *options.Options, mfests []schema.Manifest,
 ) (registry.RegInvImage, error) {
-	// I'm pretty sure the registry context here can be the same for
-	// both snapshot sources and when running in the original cli/run,
-	// In the 2nd case (Snapshot), it was recreated like we do here.
-	sc, err := di.MakeSyncContext(opts, mfests)
-	if err != nil {
-		return nil, fmt.Errorf("making sync context for registry inventory: %w", err)
-	}
-
 	srcRegistry, err := di.GetSnapshotSourceRegistry(opts)
 	if err != nil {
-		return nil, fmt.Errorf("creting source registry for image inventory: %w", err)
+		return nil, fmt.Errorf("creating source registry for image inventory: %w", err)
 	}
 
+	registryConfig := imgregistry.RegistryConfigFromContext(*srcRegistry)
+
 	if opts.ManifestBasedSnapshotOf != "" {
-		promotionEdges, err := reg.ToPromotionEdges(mfests)
+		edges, err := promotion.ToEdges(mfests)
 		if err != nil {
 			return nil, fmt.Errorf("converting list of manifests to edges for promotion: %w", err)
 		}
 
-		// Create the registry inventory
-		rii := reg.EdgesToRegInvImage(
-			promotionEdges,
+		// Create the registry inventory from manifest edges
+		rii := promotion.EdgesToRegInvImage(
+			edges,
 			opts.ManifestBasedSnapshotOf,
 		)
 
 		if opts.MinimalSnapshot {
-			if err := sc.ReadRegistriesGGCR(
-				[]registry.Context{*srcRegistry},
+			inv, err := di.registryProvider.ReadRegistries(
+				context.Background(),
+				[]imgregistry.RegistryConfig{registryConfig},
 				true,
-			); err != nil {
+			)
+			if err != nil {
 				return nil, fmt.Errorf("reading registry for minimal snapshot: %w", err)
 			}
 
-			sc.ReadGCRManifestLists(reg.MkReadManifestListCmdReal)
-			rii = sc.RemoveChildDigestEntries(rii)
+			rii = removeChildDigests(inv, rii, srcRegistry.Name, di.craneOptions()...)
 		}
 
 		return rii, nil
 	}
 
-	if err := sc.ReadRegistriesGGCR(
-		[]registry.Context{*srcRegistry}, true,
-	); err != nil {
+	// Direct snapshot path: read the registry
+	inv, err := di.registryProvider.ReadRegistries(
+		context.Background(),
+		[]imgregistry.RegistryConfig{registryConfig},
+		true,
+	)
+	if err != nil {
 		return nil, fmt.Errorf("reading registries: %w", err)
 	}
 
-	rii := sc.Inv[mfests[0].Registries[0].Name]
+	rii := inv.Images[mfests[0].Registries[0].Name]
 	if opts.SnapshotTag != "" {
-		rii = reg.FilterByTag(rii, opts.SnapshotTag)
+		rii = promotion.FilterByTag(rii, opts.SnapshotTag)
 	}
 
 	if opts.MinimalSnapshot {
 		logrus.Info("removing tagless child digests of manifest lists")
-		sc.ReadGCRManifestLists(reg.MkReadManifestListCmdReal)
-		rii = sc.RemoveChildDigestEntries(rii)
+		rii = removeChildDigests(inv, rii, mfests[0].Registries[0].Name, di.craneOptions()...)
 	}
+
 	return rii, nil
+}
+
+// removeChildDigests filters out tagless entries from rii that are children
+// of manifest lists. It uses the media types from the inventory to identify
+// manifest list digests, fetches their manifests to find child digests,
+// and removes tagless children.
+func removeChildDigests(
+	inv *imgregistry.Inventory,
+	rii registry.RegInvImage,
+	registryName image.Registry,
+	opts ...crane.Option,
+) registry.RegInvImage {
+	// Build a set of child digests by reading manifest lists from the registry.
+	childDigests := make(map[image.Digest]bool)
+	regInv := inv.Images[registryName]
+
+	for imageName, digestTags := range regInv {
+		for digest := range digestTags {
+			mediaType := inv.MediaTypes[digest]
+			if mediaType != cr.DockerManifestList && mediaType != cr.OCIImageIndex {
+				continue
+			}
+
+			// Fetch the manifest list to get child digests
+			ref := fmt.Sprintf("%s/%s@%s", registryName, imageName, digest)
+			rawManifest, err := crane.Manifest(ref, opts...)
+			if err != nil {
+				logrus.Warnf("failed to read manifest list %s: %v", ref, err)
+				continue
+			}
+
+			var idx v1.IndexManifest
+			if err := json.Unmarshal(rawManifest, &idx); err != nil {
+				logrus.Warnf("failed to parse manifest list %s: %v", ref, err)
+				continue
+			}
+
+			for i := range idx.Manifests {
+				childDigests[image.Digest(idx.Manifests[i].Digest.String())] = true
+			}
+		}
+	}
+
+	// Filter out tagless children
+	filtered := make(registry.RegInvImage)
+	for imageName, digestTags := range rii {
+		for digest, tagSlice := range digestTags {
+			// If this digest is a child of a manifest list and has no tags,
+			// filter it out.
+			if childDigests[digest] && len(tagSlice) == 0 {
+				continue
+			}
+
+			if filtered[imageName] == nil {
+				filtered[imageName] = make(registry.DigestTags)
+			}
+			filtered[imageName][digest] = tagSlice
+		}
+	}
+
+	return filtered
 }

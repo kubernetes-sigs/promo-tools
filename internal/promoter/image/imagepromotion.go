@@ -17,12 +17,17 @@ limitations under the License.
 package imagepromoter
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
-	reg "sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry"
+	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
+
 	"sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry/schema"
 	options "sigs.k8s.io/promo-tools/v4/promoter/image/options"
+	"sigs.k8s.io/promo-tools/v4/promoter/image/promotion"
+	imgregistry "sigs.k8s.io/promo-tools/v4/promoter/image/registry"
 )
 
 // This file has all the promoter implementation functions
@@ -49,51 +54,40 @@ func (di *DefaultPromoterImplementation) ParseManifests(opts *options.Options) (
 	return mfests, nil
 }
 
-// MakeSyncContext takes a slice of manifests and creates a sync context
-// object based on them and the promoter options.
-func (di *DefaultPromoterImplementation) MakeSyncContext(
-	opts *options.Options, mfests []schema.Manifest,
-) (*reg.SyncContext, error) {
-	sc, err := reg.MakeSyncContext(
-		mfests, opts.Threads, opts.Confirm, opts.UseServiceAcct,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("creating sync context: %w", err)
-	}
-
-	// Propagate the promotion transport to the SyncContext so that
-	// Promote() uses the dedicated rate-limited transport instead of
-	// the global singleton.
-	if di.promotionTransport != nil {
-		sc.PromotionTransport = di.promotionTransport
-	}
-
-	return sc, err
-}
-
 // GetPromotionEdges checks the manifests and determines from
 // them the promotion edges, ie the images that need to be
 // promoted.
 func (di *DefaultPromoterImplementation) GetPromotionEdges(
-	sc *reg.SyncContext, mfests []schema.Manifest,
-) (promotionEdges map[reg.PromotionEdge]interface{}, err error) {
-	// First, get the "edges" from the manifests
-	promotionEdges, err = reg.ToPromotionEdges(mfests)
+	opts *options.Options, mfests []schema.Manifest,
+) (map[promotion.Edge]interface{}, error) {
+	// Convert manifests to edges
+	edges, err := promotion.ToEdges(mfests)
 	if err != nil {
-		return nil, fmt.Errorf("converting list of manifests to edges for promotion: %w", err)
+		return nil, fmt.Errorf("converting manifests to edges: %w", err)
 	}
 
-	// Run the promotion edge filtering
-	promotionEdges, ok, err := sc.FilterPromotionEdges(promotionEdges, true)
-	if err != nil {
-		return nil, fmt.Errorf("filtering promotion edges: %w", err)
+	// Collect registries we need to read
+	regs := promotion.GetRegistriesToRead(edges)
+	configs := imgregistry.RegistryConfigsFromContexts(regs)
+
+	for _, cfg := range configs {
+		logrus.Debugf("reading registry %s (src=%v)", cfg.Name, cfg.Src)
 	}
-	if !ok {
-		// If any funny business was detected during a comparison of the manifests
-		// with the state of the registries, then exit immediately.
+
+	// Read registry inventories (non-recursive, specific repos only)
+	ctx := context.Background()
+	inv, err := di.registryProvider.ReadRegistries(ctx, configs, false)
+	if err != nil {
+		return nil, fmt.Errorf("reading registries: %w", err)
+	}
+
+	// Filter to only edges that need promotion
+	filtered, clean := promotion.GetPromotionCandidates(edges, inv.Images)
+	if !clean {
 		return nil, errors.New("encountered errors during edge filtering")
 	}
-	return promotionEdges, nil
+
+	return filtered, nil
 }
 
 // EdgesFromManifests converts manifests directly to promotion edges without
@@ -102,22 +96,72 @@ func (di *DefaultPromoterImplementation) GetPromotionEdges(
 // to ensure signatures exist everywhere.
 func (di *DefaultPromoterImplementation) EdgesFromManifests(
 	mfests []schema.Manifest,
-) (map[reg.PromotionEdge]interface{}, error) {
-	edges, err := reg.ToPromotionEdges(mfests)
+) (map[promotion.Edge]interface{}, error) {
+	edges, err := promotion.ToEdges(mfests)
 	if err != nil {
 		return nil, fmt.Errorf("converting manifests to edges: %w", err)
 	}
 	return edges, nil
 }
 
-// PromoteImages starts an image promotion of a set of edges.
+// PromoteImages copies images for a set of promotion edges.
 func (di *DefaultPromoterImplementation) PromoteImages(
-	sc *reg.SyncContext,
-	promotionEdges map[reg.PromotionEdge]interface{},
+	opts *options.Options,
+	edges map[promotion.Edge]interface{},
 ) error {
-	if err := sc.Promote(promotionEdges, nil); err != nil {
+	if len(edges) == 0 {
+		logrus.Info("Nothing to promote.")
+		return nil
+	}
+
+	logrus.Info("Pending promotions:")
+	for edge := range edges {
+		logrus.Infof(
+			"%s/%s:%s (%s) to %s/%s",
+			edge.SrcRegistry.Name,
+			edge.SrcImageTag.Name,
+			edge.SrcImageTag.Tag,
+			edge.Digest,
+			edge.DstRegistry.Name,
+			edge.DstImageTag.Name,
+		)
+	}
+
+	logrus.Info("---------- BEGIN PROMOTION ----------")
+
+	ctx := context.Background()
+	g, ctx := errgroup.WithContext(ctx)
+	g.SetLimit(opts.Threads)
+
+	for edge := range edges {
+		g.Go(func() error {
+			srcVertex := promotion.ToFQIN(
+				edge.SrcRegistry.Name, edge.SrcImageTag.Name, edge.Digest,
+			)
+
+			var dstVertex string
+			if edge.DstImageTag.Tag != "" {
+				dstVertex = promotion.ToPQIN(
+					edge.DstRegistry.Name, edge.DstImageTag.Name, edge.DstImageTag.Tag,
+				)
+			} else {
+				dstVertex = promotion.ToFQIN(
+					edge.DstRegistry.Name, edge.DstImageTag.Name, edge.Digest,
+				)
+			}
+
+			logrus.Infof("Copying %s to %s", srcVertex, dstVertex)
+			if err := di.registryProvider.CopyImage(ctx, srcVertex, dstVertex); err != nil {
+				return fmt.Errorf("copying %s to %s: %w", srcVertex, dstVertex, err)
+			}
+			return nil
+		})
+	}
+
+	if err := g.Wait(); err != nil {
 		return fmt.Errorf("running image promotion: %w", err)
 	}
+
 	di.PrintSection("END (PROMOTION)", true)
 	return nil
 }

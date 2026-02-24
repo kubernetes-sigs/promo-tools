@@ -17,14 +17,24 @@ limitations under the License.
 package cip
 
 import (
+	"context"
 	"fmt"
+	"sync"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
-	"sigs.k8s.io/promo-tools/v4/internal/legacy/cli"
 	promoter "sigs.k8s.io/promo-tools/v4/promoter/image"
 	options "sigs.k8s.io/promo-tools/v4/promoter/image/options"
+)
+
+const (
+	manifestFlag                = "manifest"
+	thinManifestDirFlag         = "thin-manifest-dir"
+	snapshotFlag                = "snapshot"
+	manifestBasedSnapshotOfFlag = "manifest-based-snapshot-of"
+	outputFlag                  = "output"
 )
 
 // CipCmd represents the base command when called without any subcommands
@@ -39,7 +49,7 @@ Promote images from a staging registry to production
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(_ *cobra.Command, _ []string) error {
-		if err := cli.RunPromoteCmd(runOpts); err != nil {
+		if err := runPromoteCmd(runOpts); err != nil {
 			return fmt.Errorf("run `cip run`: %w", err)
 		}
 		return nil
@@ -62,14 +72,14 @@ func init() {
 	// TODO: Move this into a default options function in pkg/promobot
 	CipCmd.PersistentFlags().StringVar(
 		&runOpts.Manifest,
-		cli.PromoterManifestFlag,
+		manifestFlag,
 		runOpts.Manifest,
 		"the manifest file to load",
 	)
 
 	CipCmd.PersistentFlags().StringVar(
 		&runOpts.ThinManifestDir,
-		cli.PromoterThinManifestDirFlag,
+		thinManifestDirFlag,
 		runOpts.ThinManifestDir,
 		`recursively read in all manifests within a folder, but all manifests
 MUST be 'thin' manifests named 'promoter-manifest.yaml', which are like regular
@@ -109,7 +119,7 @@ promotion (<json-key-file-path>,...)`,
 
 	CipCmd.PersistentFlags().StringVar(
 		&runOpts.Snapshot,
-		cli.PromoterSnapshotFlag,
+		snapshotFlag,
 		runOpts.Snapshot,
 		"read all images in a repository and print to stdout",
 	)
@@ -127,19 +137,19 @@ promotion (<json-key-file-path>,...)`,
 		runOpts.MinimalSnapshot,
 		fmt.Sprintf(`(only works with '--%s' or '--%s') discard tagless images
 from snapshot output if they are referenced by a manifest list`,
-			cli.PromoterSnapshotFlag,
-			cli.PromoterManifestBasedSnapshotOfFlag,
+			snapshotFlag,
+			manifestBasedSnapshotOfFlag,
 		),
 	)
 
 	CipCmd.PersistentFlags().StringVar(
 		&runOpts.OutputFormat,
-		cli.PromoterOutputFlag,
+		outputFlag,
 		options.DefaultOptions.OutputFormat,
 		fmt.Sprintf(`(only works with '--%s' or '--%s') choose output
 format of the snapshot (allowed values: %q)`,
-			cli.PromoterSnapshotFlag,
-			cli.PromoterManifestBasedSnapshotOfFlag,
+			snapshotFlag,
+			manifestBasedSnapshotOfFlag,
 			promoter.AllowedOutputFormats,
 		),
 	)
@@ -150,21 +160,21 @@ format of the snapshot (allowed values: %q)`,
 		runOpts.SnapshotSvcAcct,
 		fmt.Sprintf(
 			"service account to use for '--%s'",
-			cli.PromoterSnapshotFlag,
+			snapshotFlag,
 		),
 	)
 
 	CipCmd.PersistentFlags().StringVar(
 		&runOpts.ManifestBasedSnapshotOf,
-		cli.PromoterManifestBasedSnapshotOfFlag,
+		manifestBasedSnapshotOfFlag,
 		runOpts.ManifestBasedSnapshotOf,
 		fmt.Sprintf(`read all images in either '--%s' or '--%s' and print all
 images that should be promoted to the given registry (assuming the given,
 registry is empty); this is like '--%s', but instead of reading over the
 network from a registry, it reads from the local manifests only`,
-			cli.PromoterManifestFlag,
-			cli.PromoterThinManifestDirFlag,
-			cli.PromoterSnapshotFlag,
+			manifestFlag,
+			thinManifestDirFlag,
+			snapshotFlag,
 		),
 	)
 
@@ -281,4 +291,54 @@ vulnerability check failing [severity levels between 0 and 5; 0 - UNSPECIFIED,
 		options.DefaultOptions.GeneratePromotionProvenance,
 		"generate SLSA provenance attestations for promoted images",
 	)
+}
+
+// logTimingHook is a logrus hook that records elapsed time between log entries.
+type logTimingHook struct {
+	lastTime time.Time
+	mu       sync.RWMutex
+}
+
+func (h *logTimingHook) Fire(e *logrus.Entry) error {
+	h.mu.Lock()
+	e.Data["diff"] = e.Time.Sub(h.lastTime).Round(time.Millisecond)
+	h.lastTime = e.Time
+	h.mu.Unlock()
+	return nil
+}
+
+func (h *logTimingHook) Levels() []logrus.Level {
+	return logrus.AllLevels
+}
+
+func runPromoteCmd(opts *options.Options) error {
+	cip := promoter.New(opts)
+
+	logrus.SetFormatter(&logrus.TextFormatter{
+		DisableTimestamp: false,
+		FullTimestamp:    true,
+		TimestampFormat:  "15:04:05.000",
+	})
+	logrus.AddHook(&logTimingHook{lastTime: time.Now()})
+
+	logrus.Infof("Options to check the Signatures: SignCheckIdentity: %s | SignCheckIdentityRegexp: %s | SignCheckIssuer: %s | SignCheckIssuerRegexp: %s",
+		opts.SignCheckIdentity, opts.SignCheckIdentityRegexp, opts.SignCheckIssuer, opts.SignCheckIssuerRegexp,
+	)
+
+	// Snapshots
+	if opts.Snapshot != "" || opts.ManifestBasedSnapshotOf != "" {
+		return cip.Snapshot(opts)
+	}
+
+	// Security scan
+	if opts.SeverityThreshold >= 0 {
+		return cip.SecurityScan(opts)
+	}
+
+	// Image promotion
+	if err := cip.PromoteImages(context.Background(), opts); err != nil {
+		return fmt.Errorf("promote images: %w", err)
+	}
+
+	return nil
 }

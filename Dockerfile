@@ -12,16 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# About: This dockerfile builds the kpromo binary for auditor tests and production use.
-#
-# Usage: Since there are two variants to build, you must include the variant name during build-time.
-# kpromo production binary:
-#   docker build --build-arg variant=prod /path/to/Dockerfile
-# test auditor:
-#   docker build --build-arg variant=test /path/to/Dockerfile
+# About: This dockerfile builds the kpromo binary for production use.
 
-# Determine final build variant [prod | test].
-ARG variant
 ARG GO_VERSION
 ARG OS_CODENAME
 FROM golang:1.25-trixie AS builder
@@ -52,20 +44,5 @@ COPY --from=builder /go/src/app/docker/config.json /root/.docker/config.json
 
 ENTRYPOINT ["/kpromo"]
 
-# Testing image
-FROM base AS test-variant
-
-# Include auditor testing fixtures.
-COPY --from=builder /go/src/app/test-e2e/cip-auditor/fixture /e2e-fixtures
-
-# Trigger the auditor on startup.
-ENTRYPOINT ["/kpromo", "cip", "audit", "--verbose"]
-
-# Production image
-FROM base AS prod-variant
-
 LABEL maintainers="Kubernetes Authors"
 LABEL description="kpromo: The Kubernetes project artifact promoter"
-
-# Allow the runtime argument to choose the final variant.
-FROM ${variant}-variant AS final

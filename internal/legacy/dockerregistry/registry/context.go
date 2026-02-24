@@ -19,7 +19,6 @@ package registry
 import (
 	"errors"
 
-	"sigs.k8s.io/promo-tools/v4/internal/legacy/gcloud"
 	"sigs.k8s.io/promo-tools/v4/types/image"
 )
 
@@ -28,7 +27,7 @@ import (
 type Context struct {
 	Name           image.Registry `yaml:"name,omitempty"`
 	ServiceAccount string         `yaml:"service-account,omitempty"`
-	Token          gcloud.Token   `yaml:"-"`
+	Token          string         `yaml:"-"`
 	Src            bool           `yaml:"src,omitempty"`
 }
 

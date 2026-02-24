@@ -23,131 +23,110 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	reg "sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry"
 	"sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry/registry"
 	imagepromoter "sigs.k8s.io/promo-tools/v4/promoter/image"
 	imagefakes "sigs.k8s.io/promo-tools/v4/promoter/image/imagefakes"
 	options "sigs.k8s.io/promo-tools/v4/promoter/image/options"
+	"sigs.k8s.io/promo-tools/v4/promoter/image/promotion"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/provenance"
 	"sigs.k8s.io/promo-tools/v4/types/image"
 )
 
-// promoteImagesErrorCases returns the common error injection test cases.
-func promoteImagesErrorCases() []struct {
-	shouldErr bool
-	msg       string
-	prepare   func(*imagefakes.FakePromoterImplementation)
-} {
+func TestPromoteImages(t *testing.T) {
+	sut := imagepromoter.Promoter{}
 	testErr := errors.New("synthetic error")
-	return []struct {
+	for _, tc := range []struct {
 		shouldErr bool
 		msg       string
 		prepare   func(*imagefakes.FakePromoterImplementation)
 	}{
 		{
+			// No errors
 			shouldErr: false,
 			msg:       "No errors",
 			prepare:   func(_ *imagefakes.FakePromoterImplementation) {},
 		},
 		{
+			// ValidateOptions fails
 			shouldErr: true,
-			msg:       "ValidateOptions fails",
 			prepare: func(fpi *imagefakes.FakePromoterImplementation) {
 				fpi.ValidateOptionsReturns(testErr)
 			},
 		},
 		{
+			// ActivateServiceAccounts fails
 			shouldErr: true,
-			msg:       "ActivateServiceAccounts fails",
 			prepare: func(fpi *imagefakes.FakePromoterImplementation) {
 				fpi.ActivateServiceAccountsReturns(testErr)
 			},
 		},
 		{
+			// PrewarmTUFCache fails
 			shouldErr: true,
-			msg:       "PrewarmTUFCache fails",
 			prepare: func(fpi *imagefakes.FakePromoterImplementation) {
 				fpi.PrewarmTUFCacheReturns(testErr)
 			},
 		},
 		{
+			// ParseManifests fails
 			shouldErr: true,
-			msg:       "ParseManifests fails",
 			prepare: func(fpi *imagefakes.FakePromoterImplementation) {
 				fpi.ParseManifestsReturns(nil, testErr)
 			},
 		},
 		{
+			// GetPromotionEdges fails
 			shouldErr: true,
-			msg:       "MakeSyncContext fails",
-			prepare: func(fpi *imagefakes.FakePromoterImplementation) {
-				fpi.MakeSyncContextReturns(nil, testErr)
-			},
-		},
-		{
-			shouldErr: true,
-			msg:       "GetPromotionEdges fails",
 			prepare: func(fpi *imagefakes.FakePromoterImplementation) {
 				fpi.GetPromotionEdgesReturns(nil, testErr)
 			},
 		},
 		{
+			// ValidateStagingSignatures fails
 			shouldErr: true,
-			msg:       "ValidateStagingSignatures fails",
 			prepare: func(fpi *imagefakes.FakePromoterImplementation) {
-				fpi.MakeSyncContextReturns(&reg.SyncContext{UseServiceAccount: true}, nil)
 				fpi.ValidateStagingSignaturesReturns(nil, testErr)
 			},
 		},
 		{
+			// PromoteImages fails
 			shouldErr: true,
-			msg:       "PromoteImages fails",
 			prepare: func(fpi *imagefakes.FakePromoterImplementation) {
-				fpi.MakeSyncContextReturns(&reg.SyncContext{UseServiceAccount: true}, nil)
 				fpi.PromoteImagesReturns(testErr)
 			},
 		},
 		{
+			// SignImages fails
 			shouldErr: true,
-			msg:       "SignImages fails",
 			prepare: func(fpi *imagefakes.FakePromoterImplementation) {
-				fpi.MakeSyncContextReturns(&reg.SyncContext{UseServiceAccount: true}, nil)
 				fpi.SignImagesReturns(testErr)
 			},
 		},
 		{
+			// ReplicateSignatures fails
 			shouldErr: true,
 			msg:       "ReplicateSignatures fails",
 			prepare: func(fpi *imagefakes.FakePromoterImplementation) {
-				fpi.MakeSyncContextReturns(&reg.SyncContext{UseServiceAccount: true}, nil)
 				fpi.ReplicateSignaturesReturns(testErr)
 			},
 		},
 		{
+			// WriteSBOMs fails
 			shouldErr: true,
 			msg:       "WriteSBOMs fails",
 			prepare: func(fpi *imagefakes.FakePromoterImplementation) {
-				fpi.MakeSyncContextReturns(&reg.SyncContext{UseServiceAccount: true}, nil)
 				fpi.WriteSBOMsReturns(testErr)
 			},
 		},
-	}
-}
-
-func TestPromoteImages(t *testing.T) {
-	for _, tc := range promoteImagesErrorCases() {
-		t.Run(tc.msg, func(t *testing.T) {
-			sut := imagepromoter.Promoter{}
-			mock := imagefakes.FakePromoterImplementation{}
-			tc.prepare(&mock)
-			sut.SetImplementation(&mock)
-			err := sut.PromoteImages(context.Background(), &options.Options{Confirm: true})
-			if tc.shouldErr {
-				require.Error(t, err, tc.msg)
-			} else {
-				require.NoError(t, err, tc.msg)
-			}
-		})
+	} {
+		mock := imagefakes.FakePromoterImplementation{}
+		tc.prepare(&mock)
+		sut.SetImplementation(&mock)
+		if tc.shouldErr {
+			require.Error(t, sut.PromoteImages(context.Background(), &options.Options{Confirm: true}), tc.msg)
+		} else {
+			require.NoError(t, sut.PromoteImages(context.Background(), &options.Options{Confirm: true}), tc.msg)
+		}
 	}
 }
 
@@ -171,14 +150,12 @@ func TestPromoteImagesNonConfirm(t *testing.T) {
 	mock := imagefakes.FakePromoterImplementation{}
 	sut.SetImplementation(&mock)
 
-	// non-Confirm should stop after validate (precheck)
+	// non-Confirm should stop after validate phase
 	opts := &options.Options{Confirm: false}
 	require.NoError(t, sut.PromoteImages(context.Background(), opts))
 
 	// ValidateStagingSignatures should have been called
 	require.Equal(t, 1, mock.ValidateStagingSignaturesCallCount())
-	// PrecheckAndExit should have been called
-	require.Equal(t, 1, mock.PrecheckAndExitCallCount())
 	// PromoteImages should NOT have been called
 	require.Equal(t, 0, mock.PromoteImagesCallCount())
 }
@@ -214,12 +191,12 @@ func (f *fakeVerifier) Verify(_ context.Context, _ string) (*provenance.Result, 
 	return f.result, f.err
 }
 
-// testEdge returns a PromotionEdge with non-empty fields so that
+// testEdge returns an Edge with non-empty fields so that
 // SrcReference() returns a valid reference string.
-func testEdge() reg.PromotionEdge {
-	return reg.PromotionEdge{
+func testEdge() promotion.Edge {
+	return promotion.Edge{
 		SrcRegistry: registry.Context{Name: image.Registry("gcr.io/staging")},
-		SrcImageTag: reg.ImageTag{
+		SrcImageTag: promotion.ImageTag{
 			Name: image.Name("test-image"),
 			Tag:  image.Tag("v1"),
 		},
@@ -231,7 +208,7 @@ func TestPromoteImagesProvenanceFails(t *testing.T) {
 	sut := imagepromoter.Promoter{}
 	mock := imagefakes.FakePromoterImplementation{}
 	// Return a non-empty edge set so provenance has something to check
-	mock.GetPromotionEdgesReturns(map[reg.PromotionEdge]interface{}{
+	mock.GetPromotionEdgesReturns(map[promotion.Edge]interface{}{
 		testEdge(): nil,
 	}, nil)
 	sut.SetImplementation(&mock)
@@ -254,7 +231,7 @@ func TestPromoteImagesProvenanceFails(t *testing.T) {
 func TestPromoteImagesProvenanceVerifierError(t *testing.T) {
 	sut := imagepromoter.Promoter{}
 	mock := imagefakes.FakePromoterImplementation{}
-	mock.GetPromotionEdgesReturns(map[reg.PromotionEdge]interface{}{
+	mock.GetPromotionEdgesReturns(map[promotion.Edge]interface{}{
 		testEdge(): nil,
 	}, nil)
 	sut.SetImplementation(&mock)

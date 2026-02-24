@@ -3,7 +3,7 @@
 - [Maintenance](#maintenance)
   - [Linting](#linting)
   - [Testing](#testing)
-    - [Faking http calls and shell processes](#faking-http-calls-and-shell-processes)
+    - [Faking dependencies](#faking-dependencies)
   - [Automated builds](#automated-builds)
     - [Connection with Prow](#connection-with-prow)
 - [Versioning](#versioning)
@@ -29,39 +29,28 @@ Every critical piece has a unit test --- unit tests complete nearly instantly,
 so you should *always* add unit tests where possible, and also run them before
 submitting a new PR.
 
-#### Faking http calls and shell processes
+#### Faking dependencies
 
-As the promoter uses a combination of network API calls and shell-instantiated
-processes, we have to fake them for the unit tests. To make this happen, these
-mechanisms all use a `stream.Producer` [interface](/internal/legacy/stream/types.go). The
-real-world code uses either the [http](/internal/legacy/stream/http.go) or
-[subprocess](/internal/legacy/stream/subprocess.go) implementations of this interface to
-create streams of data (JSON or not) which we can interpret and use.
-
-For tests, the [fake](/internal/legacy/stream/fake.go) implementation is used instead, which
-predefines how that stream will behave, for the purposes of each unit test. A
-good example of this is the [`TestReadRegistries`
-test](/internal/legacy/dockerregistry/inventory_test.go).
+The promoter uses [counterfeiter](https://github.com/maxbrunsfeld/counterfeiter)
+to generate fakes for its core interfaces. The `promoterImplementation` interface
+in `internal/promoter/image/` and the `registry.Provider` interface in
+`promoter/image/registry/` both have generated fakes used by the unit tests.
 
 ### Automated builds
 
 The `gcr.io/k8s-staging-artifact-promoter` GCR is a staging repo for Docker
 image build artifacts from this project. Every update to the default
-development branch of this Github repo results in three images being built in
-the staging GCR repo:
+development branch of this Github repo results in the `kpromo` image being
+built in the staging GCR repo:
 
-1. `gcr.io/k8s-staging-artifact-promoter/cip`
-1. `gcr.io/k8s-staging-artifact-promoter/cip-auditor`
 1. `gcr.io/k8s-staging-artifact-promoter/kpromo`
 
-These images get built and pushed up there by GCB using the [build file
-here][cloudbuild.yaml]. There are also production versions of these images here:
+This image gets built and pushed by GCB using the [build file
+here][cloudbuild.yaml]. There is also a production version:
 
-1. `{asia,eu,us}.gcr.io/k8s-artifacts-prod/artifact-promoter/cip`
-1. `{asia,eu,us}.gcr.io/k8s-artifacts-prod/artifact-promoter/cip-auditor`
 1. `{asia,eu,us}.gcr.io/k8s-artifacts-prod/artifact-promoter/kpromo`
 
-The images from the staging GCR end up in `k8s-artifacts-prod` using the
+The image from the staging GCR ends up in `k8s-artifacts-prod` using the
 promoter image running in
 [Prow](https://github.com/kubernetes/test-infra/tree/master/prow). "Using the
 promoter" here means creating a PR in the [k8s.io Github repo][k8sio-manifests-dir]
@@ -70,20 +59,17 @@ to promote versions from staging to production, such as in
 
 #### Connection with Prow
 
-There are a number of Prow jobs that consume the production container images
-of `cip`, `cip-auditor`, or `kpromo`. These jobs are defined
-[here][cip-prow-integration].
+There are Prow jobs that consume the production `kpromo` container image.
+These jobs are defined [here][cip-prow-integration].
 
-The important thing to note is that ultimately the jobs there are downstream
-consumers of the production `cip` and `cip-auditor` images discussed above. So
-if there is a breaking change where the Docker images don't work any more for
+If there is a breaking change where the Docker image doesn't work any more for
 these Prow jobs, the sequence of events required to fix those Prow jobs are:
 
 1. fix the bug in this codebase
-2. generate new `cip` and `cip-auditor` images in
+2. generate a new `kpromo` image in
    `gcr.io/k8s-staging-artifact-promoter` (automated)
-3. promote images into production
-4. update Prow jobs to use the new images from Step 3
+3. promote the image into production
+4. update Prow jobs to use the new image from Step 3
 
 Step 1 is done in this Github repo. Step 3 is done in [the k8s.io Github
 repo][k/k8s.io].
