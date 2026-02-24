@@ -118,6 +118,14 @@ func promoteImagesErrorCases() []struct {
 		},
 		{
 			shouldErr: true,
+			msg:       "ReplicateSignatures fails",
+			prepare: func(fpi *imagefakes.FakePromoterImplementation) {
+				fpi.MakeSyncContextReturns(&reg.SyncContext{UseServiceAccount: true}, nil)
+				fpi.ReplicateSignaturesReturns(testErr)
+			},
+		},
+		{
+			shouldErr: true,
 			msg:       "WriteSBOMs fails",
 			prepare: func(fpi *imagefakes.FakePromoterImplementation) {
 				fpi.MakeSyncContextReturns(&reg.SyncContext{UseServiceAccount: true}, nil)

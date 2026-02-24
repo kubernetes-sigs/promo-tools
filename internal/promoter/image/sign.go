@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"sort"
 	"strings"
 
 	credentials "cloud.google.com/go/iam/credentials/apiv1"
@@ -125,32 +126,14 @@ func (di *DefaultPromoterImplementation) SignImages(
 	di.signer = sign.New(signOpts)
 
 	// We only sign the first normalized image per digest of each edge.
-	type key struct {
-		identity string
-		digest   image.Digest
-	}
-	sortedEdges := map[key][]reg.PromotionEdge{}
-	for edge := range edges {
-		// Skip signing the signature, sbom and attestation layers
-		if strings.HasSuffix(string(edge.DstImageTag.Tag), ".sig") ||
-			strings.HasSuffix(string(edge.DstImageTag.Tag), ".att") ||
-			edge.DstImageTag.Tag == "" {
-			continue
-		}
+	grouped := groupEdgesByIdentityDigest(edges)
 
-		k := key{identity: targetIdentity(&edge), digest: edge.Digest}
-		if _, ok := sortedEdges[k]; !ok {
-			sortedEdges[k] = []reg.PromotionEdge{}
-		}
-		sortedEdges[k] = append(sortedEdges[k], edge)
-	}
-
-	t := throttler.New(opts.MaxSignatureOps, len(sortedEdges))
+	t := throttler.New(opts.MaxSignatureOps, len(grouped))
 	// Sign the required edges
-	for d := range sortedEdges {
-		go func(k key) {
-			t.Done(di.signAndReplicate(signOpts, k.identity, sortedEdges[k]))
-		}(d)
+	for _, group := range grouped {
+		go func(edges []reg.PromotionEdge) {
+			t.Done(di.signFirst(signOpts, targetIdentity(&edges[0]), &edges[0]))
+		}(group)
 		if t.Throttle() > 0 {
 			break
 		}
@@ -159,10 +142,11 @@ func (di *DefaultPromoterImplementation) SignImages(
 	return t.Err()
 }
 
-func (di *DefaultPromoterImplementation) signAndReplicate(signOpts *sign.Options, identity string, edges []reg.PromotionEdge) error {
-	// Build the reference we will use
-	firstEdge := &edges[0]
-	imageRef := firstEdge.DstReference()
+// signFirst signs the first (primary) image for a given identity+digest group.
+// Signature replication to additional registries is handled separately by
+// ReplicateSignatures.
+func (di *DefaultPromoterImplementation) signFirst(signOpts *sign.Options, identity string, edge *reg.PromotionEdge) error {
+	imageRef := edge.DstReference()
 
 	// Make a shallow copy so we can safely modify the options per go routine
 	signOptsCopy := *signOpts
@@ -180,30 +164,49 @@ func (di *DefaultPromoterImplementation) signAndReplicate(signOpts *sign.Options
 	logrus.Infof("Signing image %s", imageRef)
 
 	// Carry over existing signatures from the staging repo
-	if err := di.copyAttachedObjects(firstEdge); err != nil {
+	if err := di.copyAttachedObjects(edge); err != nil {
 		return fmt.Errorf("copying staging signatures: %w", err)
 	}
 
-	// Sign the first promoted image in the edges list:
+	// Sign the promoted image:
 	if _, err := di.signer.SignImageWithOptions(&signOptsCopy, imageRef); err != nil {
 		return fmt.Errorf("signing image %s: %w", imageRef, err)
 	}
 
-	// If the same digest was promoted to more than one
-	// registry, copy the signature from the first one
-	if len(edges) == 1 {
-		logrus.WithField("image", string(edges[0].Digest)).Debug(
-			"Not replicating signatures, image promoted to single registry",
-		)
+	return nil
+}
+
+// ReplicateSignatures copies signatures from the primary destination registry
+// to all additional destination registries for images that were promoted to
+// multiple registries.
+func (di *DefaultPromoterImplementation) ReplicateSignatures(
+	opts *options.Options, _ *reg.SyncContext, edges map[reg.PromotionEdge]interface{},
+) error {
+	if !opts.SignImages {
+		logrus.Info("Signing disabled, skipping signature replication")
+		return nil
+	}
+	if len(edges) == 0 {
+		logrus.Info("No images were promoted. Nothing to replicate.")
 		return nil
 	}
 
-	if err := di.replicateSignatures(
-		firstEdge, edges[1:],
-	); err != nil {
-		return fmt.Errorf("replicating signatures: %w", err)
+	grouped := groupEdgesByIdentityDigest(edges)
+
+	t := throttler.New(opts.MaxSignatureCopies, len(grouped))
+	for _, group := range grouped {
+		if len(group) <= 1 {
+			continue
+		}
+		go func(edges []reg.PromotionEdge) {
+			t.Done(di.replicateSignatures(&edges[0], edges[1:]))
+		}(group)
+		if t.Throttle() > 0 {
+			break
+		}
 	}
-	return nil
+
+	return t.Err()
 }
 
 // targetIdentity returns the production identity for a promotion edge.
@@ -229,6 +232,40 @@ func targetIdentity(edge *reg.PromotionEdge) string {
 	newRef := consts.ProdRegistry + identity[idx:]
 
 	return newRef
+}
+
+// groupEdgesByIdentityDigest groups promotion edges by their target identity
+// and digest. Within each group, edges are sorted by destination registry name
+// to ensure deterministic ordering across calls. The first edge in each group
+// is used as the primary for signing and as the source for replication.
+func groupEdgesByIdentityDigest(edges map[reg.PromotionEdge]interface{}) [][]reg.PromotionEdge {
+	type key struct {
+		identity string
+		digest   image.Digest
+	}
+	grouped := map[key][]reg.PromotionEdge{}
+	for edge := range edges {
+		// Skip metadata layers
+		if strings.HasSuffix(string(edge.DstImageTag.Tag), ".sig") ||
+			strings.HasSuffix(string(edge.DstImageTag.Tag), ".att") ||
+			edge.DstImageTag.Tag == "" {
+			continue
+		}
+
+		k := key{identity: targetIdentity(&edge), digest: edge.Digest}
+		grouped[k] = append(grouped[k], edge)
+	}
+
+	// Sort edges within each group by destination registry name so that
+	// SignImages and ReplicateSignatures agree on which edge is primary.
+	result := make([][]reg.PromotionEdge, 0, len(grouped))
+	for _, group := range grouped {
+		sort.Slice(group, func(i, j int) bool {
+			return string(group[i].DstRegistry.Name) < string(group[j].DstRegistry.Name)
+		})
+		result = append(result, group)
+	}
+	return result
 }
 
 // copyAttachedObjects copies any attached signatures from the staging registry to
