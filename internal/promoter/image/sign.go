@@ -18,7 +18,9 @@ package imagepromoter
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 
@@ -27,6 +29,7 @@ import (
 	"github.com/google/go-containerregistry/pkg/crane"
 	"github.com/google/go-containerregistry/pkg/gcrane"
 	"github.com/google/go-containerregistry/pkg/name"
+	"github.com/google/go-containerregistry/pkg/v1/remote/transport"
 	"github.com/nozzle/throttler"
 	"github.com/sigstore/sigstore/pkg/tuf"
 	"github.com/sirupsen/logrus"
@@ -44,6 +47,7 @@ import (
 const (
 	oidcTokenAudience  = "sigstore"
 	signatureTagSuffix = ".sig"
+	sbomTagSuffix      = ".sbom"
 
 	TestSigningAccount = "k8s-infra-promoter-test-signer@k8s-cip-test-prod.iam.gserviceaccount.com"
 )
@@ -60,7 +64,7 @@ func (di *DefaultPromoterImplementation) ValidateStagingSignatures(
 		refsToEdges[ref] = edge
 	}
 
-	refs := []string{}
+	refs := make([]string, 0, len(refsToEdges))
 	for ref := range refsToEdges {
 		refs = append(refs, ref)
 	}
@@ -258,7 +262,8 @@ func (di *DefaultPromoterImplementation) copyAttachedObjects(edge *reg.Promotion
 	if err := crane.Copy(srcRef.String(), dstRef.String(), craneOpts...); err != nil {
 		// If the signature layer does not exist it means that the src image
 		// is not signed, so we catch the error and return nil
-		if strings.Contains(err.Error(), "MANIFEST_UNKNOWN") {
+		var terr *transport.Error
+		if errors.As(err, &terr) && terr.StatusCode == http.StatusNotFound {
 			logrus.Debugf("Reference %s is not signed, not copying", srcRef.String())
 			return nil
 		}
@@ -327,12 +332,69 @@ func (di *DefaultPromoterImplementation) replicateSignatures(
 	return nil
 }
 
-// WriteSBOMs writes SBOMs to each of the newly promoted images and stores
-// them along the signatures in the registry.
+// WriteSBOMs copies pre-generated SBOMs from the staging registry to each
+// production registry for the promoted images. SBOMs are expected to be
+// attached in staging (e.g., by the build system) and are identified by
+// the cosign SBOM tag convention (sha256-<hash>.sbom).
 func (di *DefaultPromoterImplementation) WriteSBOMs(
-	_ *options.Options, _ *reg.SyncContext, _ map[reg.PromotionEdge]interface{},
+	_ *options.Options, _ *reg.SyncContext, edges map[reg.PromotionEdge]interface{},
 ) error {
+	if len(edges) == 0 {
+		logrus.Info("No images were promoted. No SBOMs to copy.")
+		return nil
+	}
+
+	for edge := range edges {
+		// Skip signature and attestation layers
+		if strings.HasSuffix(string(edge.DstImageTag.Tag), ".sig") ||
+			strings.HasSuffix(string(edge.DstImageTag.Tag), ".att") ||
+			strings.HasSuffix(string(edge.DstImageTag.Tag), ".sbom") ||
+			edge.DstImageTag.Tag == "" {
+			continue
+		}
+
+		if err := di.copySBOM(&edge); err != nil {
+			return fmt.Errorf("copying SBOM for %s: %w", edge.DstReference(), err)
+		}
+	}
+
 	return nil
+}
+
+// copySBOM copies an SBOM from the staging registry to the production registry
+// for a single promotion edge. If no SBOM exists in staging, this is not an error.
+func (di *DefaultPromoterImplementation) copySBOM(edge *reg.PromotionEdge) error {
+	sbomTag := digestToSBOMTag(edge.Digest)
+	srcRefString := fmt.Sprintf(
+		"%s/%s:%s", edge.SrcRegistry.Name, edge.SrcImageTag.Name, sbomTag,
+	)
+	dstRefString := fmt.Sprintf(
+		"%s/%s:%s", edge.DstRegistry.Name, edge.DstImageTag.Name, sbomTag,
+	)
+
+	craneOpts := []crane.Option{
+		crane.WithAuthFromKeychain(gcrane.Keychain),
+		crane.WithUserAgent(image.UserAgent),
+		crane.WithTransport(di.getSigningTransport()),
+	}
+
+	logrus.Infof("SBOM copy: %s to %s", srcRefString, dstRefString)
+	if err := crane.Copy(srcRefString, dstRefString, craneOpts...); err != nil {
+		// If the SBOM does not exist in staging, skip silently
+		var terr *transport.Error
+		if errors.As(err, &terr) && terr.StatusCode == http.StatusNotFound {
+			logrus.Debugf("No SBOM found for %s, skipping", srcRefString)
+			return nil
+		}
+		return fmt.Errorf("copying SBOM %s to %s: %w", srcRefString, dstRefString, err)
+	}
+	return nil
+}
+
+// digestToSBOMTag takes a digest and infers the tag name where
+// its SBOM can be found.
+func digestToSBOMTag(dg image.Digest) string {
+	return strings.ReplaceAll(string(dg), "sha256:", "sha256-") + sbomTagSuffix
 }
 
 // GetIdentityToken returns an identity token for the selected service account

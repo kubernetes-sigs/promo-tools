@@ -125,8 +125,8 @@ type Options struct {
 	// MaxSignatureOps maximum number of concurrent signature operations
 	MaxSignatureOps int
 
-	// UseLegacyPipeline uses the legacy sequential promotion code path
-	// instead of the new pipeline engine. Defaults to true during transition.
+	// Deprecated: UseLegacyPipeline uses the legacy sequential promotion
+	// code path instead of the new pipeline engine. Defaults to false.
 	UseLegacyPipeline bool
 
 	// RequireProvenance controls whether provenance verification is required
@@ -159,7 +159,7 @@ var DefaultOptions = &Options{
 	SignCheckIssuerRegexp:   "",
 	MaxSignatureCopies:      50, // Maximum number of concurrent signature copies
 	MaxSignatureOps:         50, // Maximum number of concurrent signature operations
-	UseLegacyPipeline:       true,
+	UseLegacyPipeline:       false,
 }
 
 func (o *Options) Validate() error {

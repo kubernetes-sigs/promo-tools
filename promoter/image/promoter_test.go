@@ -169,14 +169,29 @@ func TestPromoteImagesPipelineParseOnly(t *testing.T) {
 	mock := imagefakes.FakePromoterImplementation{}
 	sut.SetImplementation(&mock)
 
-	// ParseOnly should stop the pipeline after the plan phase without error.
-	err := sut.PromoteImages(context.Background(), &options.Options{
-		Confirm:   true,
-		ParseOnly: true,
-	})
-	require.NoError(t, err)
+	// Pipeline path: ParseOnly should stop after plan phase with no error
+	opts := &options.Options{Confirm: true, ParseOnly: true}
+	require.NoError(t, sut.PromoteImages(context.Background(), opts))
 
-	// PromoteImages (on the impl) should never have been called.
+	// ParseManifests should have been called
+	require.Equal(t, 1, mock.ParseManifestsCallCount())
+	// PromoteImages should NOT have been called
+	require.Equal(t, 0, mock.PromoteImagesCallCount())
+}
+
+func TestPromoteImagesLegacyParseOnly(t *testing.T) {
+	sut := imagepromoter.Promoter{}
+	mock := imagefakes.FakePromoterImplementation{}
+	sut.SetImplementation(&mock)
+
+	// Legacy path: ParseOnly should stop after parsing with no error
+	opts := &options.Options{
+		Confirm:           true,
+		ParseOnly:         true,
+		UseLegacyPipeline: true,
+	}
+	require.NoError(t, sut.PromoteImages(context.Background(), opts))
+	require.Equal(t, 1, mock.ParseManifestsCallCount())
 	require.Equal(t, 0, mock.PromoteImagesCallCount())
 }
 
@@ -185,17 +200,50 @@ func TestPromoteImagesPipelineDryRun(t *testing.T) {
 	mock := imagefakes.FakePromoterImplementation{}
 	sut.SetImplementation(&mock)
 
-	// Confirm=false should stop the pipeline after the validate phase without error.
-	err := sut.PromoteImages(context.Background(), &options.Options{
-		Confirm: false,
-	})
-	require.NoError(t, err)
+	// Pipeline path: non-Confirm should stop after validate (precheck)
+	opts := &options.Options{Confirm: false}
+	require.NoError(t, sut.PromoteImages(context.Background(), opts))
 
-	// ValidateStagingSignatures should have been called (validate phase ran).
+	// ValidateStagingSignatures should have been called
 	require.Equal(t, 1, mock.ValidateStagingSignaturesCallCount())
-
-	// PromoteImages (on the impl) should never have been called.
+	// PrecheckAndExit should have been called
+	require.Equal(t, 1, mock.PrecheckAndExitCallCount())
+	// PromoteImages should NOT have been called
 	require.Equal(t, 0, mock.PromoteImagesCallCount())
+}
+
+func TestPromoteImagesLegacyDryRun(t *testing.T) {
+	sut := imagepromoter.Promoter{}
+	mock := imagefakes.FakePromoterImplementation{}
+	sut.SetImplementation(&mock)
+
+	// Legacy path: non-Confirm should stop after precheck
+	opts := &options.Options{Confirm: false, UseLegacyPipeline: true}
+	require.NoError(t, sut.PromoteImages(context.Background(), opts))
+
+	require.Equal(t, 1, mock.PrecheckAndExitCallCount())
+	require.Equal(t, 0, mock.PromoteImagesCallCount())
+}
+
+func TestPromoteImagesProvenanceDisabled(t *testing.T) {
+	sut := imagepromoter.Promoter{}
+	mock := imagefakes.FakePromoterImplementation{}
+	sut.SetImplementation(&mock)
+
+	// Provenance disabled (default): should proceed without calling verifier
+	opts := &options.Options{Confirm: true, RequireProvenance: false}
+	require.NoError(t, sut.PromoteImages(context.Background(), opts))
+}
+
+func TestPromoteImagesProvenanceEnabled(t *testing.T) {
+	sut := imagepromoter.Promoter{}
+	mock := imagefakes.FakePromoterImplementation{}
+	sut.SetImplementation(&mock)
+
+	// When provenance is required but no verifier is set, the noop verifier
+	// is used (always passes).
+	opts := &options.Options{Confirm: true, RequireProvenance: true}
+	require.NoError(t, sut.PromoteImages(context.Background(), opts))
 }
 
 // fakeVerifier implements provenance.Verifier for testing.
@@ -221,28 +269,16 @@ func testEdge() reg.PromotionEdge {
 	}
 }
 
-func TestPromoteImagesPipelineProvenanceNoopFallback(t *testing.T) {
+func TestPromoteImagesProvenanceFails(t *testing.T) {
 	sut := imagepromoter.Promoter{}
 	mock := imagefakes.FakePromoterImplementation{}
-	sut.SetImplementation(&mock)
-
-	// RequireProvenance=true with no verifier set should use the noop
-	// verifier and succeed.
-	err := sut.PromoteImages(context.Background(), &options.Options{
-		Confirm:           true,
-		RequireProvenance: true,
-	})
-	require.NoError(t, err)
-}
-
-func TestPromoteImagesPipelineProvenanceFails(t *testing.T) {
-	sut := imagepromoter.Promoter{}
-	mock := imagefakes.FakePromoterImplementation{}
+	// Return a non-empty edge set so provenance has something to check
 	mock.GetPromotionEdgesReturns(map[reg.PromotionEdge]interface{}{
 		testEdge(): nil,
 	}, nil)
 	sut.SetImplementation(&mock)
 
+	// Set a verifier that returns a verification failure
 	sut.SetProvenanceVerifier(&fakeVerifier{
 		result: &provenance.Result{
 			Verified: false,
@@ -250,17 +286,14 @@ func TestPromoteImagesPipelineProvenanceFails(t *testing.T) {
 		},
 	})
 
-	err := sut.PromoteImages(context.Background(), &options.Options{
-		Confirm:           true,
-		RequireProvenance: true,
-	})
-	require.Error(t, err)
+	opts := &options.Options{Confirm: true, RequireProvenance: true}
+	require.Error(t, sut.PromoteImages(context.Background(), opts))
 
-	// Promotion should not have been called.
+	// Promotion should not have been called
 	require.Equal(t, 0, mock.PromoteImagesCallCount())
 }
 
-func TestPromoteImagesPipelineProvenanceVerifierError(t *testing.T) {
+func TestPromoteImagesProvenanceVerifierError(t *testing.T) {
 	sut := imagepromoter.Promoter{}
 	mock := imagefakes.FakePromoterImplementation{}
 	mock.GetPromotionEdgesReturns(map[reg.PromotionEdge]interface{}{
@@ -272,9 +305,12 @@ func TestPromoteImagesPipelineProvenanceVerifierError(t *testing.T) {
 		err: errors.New("connection refused"),
 	})
 
-	err := sut.PromoteImages(context.Background(), &options.Options{
-		Confirm:           true,
-		RequireProvenance: true,
-	})
-	require.Error(t, err)
+	opts := &options.Options{Confirm: true, RequireProvenance: true}
+	require.Error(t, sut.PromoteImages(context.Background(), opts))
+}
+
+func TestNewPromoter(t *testing.T) {
+	p := imagepromoter.New(options.DefaultOptions)
+	require.NotNil(t, p)
+	require.NotNil(t, p.Options)
 }
