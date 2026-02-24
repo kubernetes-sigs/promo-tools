@@ -108,6 +108,7 @@ type promoterImplementation interface {
 	ParseManifests(*options.Options) ([]schema.Manifest, error)
 	MakeSyncContext(*options.Options, []schema.Manifest) (*reg.SyncContext, error)
 	GetPromotionEdges(*reg.SyncContext, []schema.Manifest) (map[reg.PromotionEdge]interface{}, error)
+	EdgesFromManifests([]schema.Manifest) (map[reg.PromotionEdge]interface{}, error)
 	PromoteImages(*reg.SyncContext, map[reg.PromotionEdge]interface{}) error
 
 	// Methods for snapshot mode:
@@ -398,4 +399,60 @@ func (p *Promoter) CheckSignatures(opts *options.Options) error {
 	}
 
 	return nil
+}
+
+// ReplicateSignatures is a standalone mode that copies image signatures
+// from the primary destination registry to all mirror registries.
+// Unlike the inline replicate phase in PromoteImages, this method reads
+// ALL edges from manifests (not just unsynced ones) so it can run
+// independently of the promotion job.
+func (p *Promoter) ReplicateSignatures(ctx context.Context, opts *options.Options) error {
+	var promotionEdges map[reg.PromotionEdge]interface{}
+
+	pipe := pipeline.New()
+
+	// Setup phase: validate, activate accounts, prewarm caches.
+	pipe.AddPhase(pipeline.NewPhase("setup", func(_ context.Context) error {
+		if err := p.impl.ValidateOptions(opts); err != nil {
+			return fmt.Errorf("validating options: %w", err)
+		}
+		if err := p.impl.ActivateServiceAccounts(opts); err != nil {
+			return fmt.Errorf("activating service accounts: %w", err)
+		}
+		if err := p.impl.PrewarmTUFCache(); err != nil {
+			return fmt.Errorf("prewarming TUF cache: %w", err)
+		}
+		return nil
+	}))
+
+	// Plan phase: parse manifests, compute all edges (unfiltered).
+	pipe.AddPhase(pipeline.NewPhase("plan", func(_ context.Context) error {
+		mfests, err := p.impl.ParseManifests(opts)
+		if err != nil {
+			return fmt.Errorf("parsing manifests: %w", err)
+		}
+
+		promotionEdges, err = p.impl.EdgesFromManifests(mfests)
+		if err != nil {
+			return fmt.Errorf("computing edges from manifests: %w", err)
+		}
+
+		logrus.Infof("Found %d edges for signature replication", len(promotionEdges))
+
+		if !opts.Confirm {
+			logrus.Info("Dry run complete (use --confirm to replicate)")
+			return pipeline.ErrStopPipeline
+		}
+		return nil
+	}))
+
+	// Replicate phase: copy signatures to mirror registries.
+	pipe.AddPhase(pipeline.NewPhase("replicate", func(_ context.Context) error {
+		if err := p.impl.ReplicateSignatures(opts, nil, promotionEdges); err != nil {
+			return fmt.Errorf("replicating signatures: %w", err)
+		}
+		return nil
+	}))
+
+	return pipe.Run(ctx)
 }

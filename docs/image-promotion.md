@@ -16,6 +16,7 @@ and work with any OCI-compliant registry.
   - [Rate limiting](#rate-limiting)
 - [Server-side operations](#server-side-operations)
 - [Signing and attestation](#signing-and-attestation)
+- [Standalone signature replication](#standalone-signature-replication)
 - [Provenance verification](#provenance-verification)
 - [Vulnerability scanning](#vulnerability-scanning)
 - [Grabbing snapshots](#grabbing-snapshots)
@@ -171,8 +172,9 @@ The promotion flow is organized into sequential pipeline phases:
 | 3 | **provenance** | Optional SLSA provenance verification (see [Provenance verification](#provenance-verification)) |
 | 4 | **validate** | Validate staging image signatures |
 | 5 | **promote** | Copy images from staging to production |
-| 6 | **sign** | Sign promoted images with cosign, replicate signatures to mirrors |
-| 7 | **attest** | Copy pre-generated SBOMs from staging to production, generate promotion provenance |
+| 6 | **sign** | Sign promoted images with cosign (primary registry only) |
+| 7 | **replicate** | Copy signatures to mirror registries (see [Standalone signature replication](#standalone-signature-replication)) |
+| 8 | **attest** | Copy pre-generated SBOMs from staging to production, generate promotion provenance |
 
 Without `--confirm`, the pipeline stops after the validate phase (dry-run
 precheck). With `--parse-only`, it stops after parsing manifests.
@@ -212,6 +214,28 @@ Related flags:
 - `--certificate-oidc-issuer` — OIDC issuer for the signing identity
 - `--max-signature-copies` — max concurrent signature copies (default: `50`)
 - `--max-signature-ops` — max concurrent signature operations (default: `50`)
+
+## Standalone signature replication
+
+When images are promoted to multiple mirror registries, signatures must be
+replicated from the primary registry to all mirrors. This normally happens
+inline during promotion (in the sign phase), but can also be run standalone
+via the `replicate-signatures` subcommand:
+
+```console
+kpromo cip replicate-signatures \
+  --thin-manifest-dir=/path/to/manifests \
+  --confirm
+```
+
+Without `--confirm` the command performs a dry run: it parses manifests and
+computes edges, but does not copy any signatures.
+
+The standalone mode reads **all** edges from the manifests (not just unsynced
+ones), so it works even when images were promoted long ago. Each signature copy
+is idempotent -- existing signatures are detected via a HEAD request and
+skipped. This makes it safe to run frequently (e.g. via a periodic Prow job)
+alongside the main promotion pipeline.
 
 ## Provenance verification
 

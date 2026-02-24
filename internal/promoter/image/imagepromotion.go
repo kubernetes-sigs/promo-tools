@@ -96,6 +96,20 @@ func (di *DefaultPromoterImplementation) GetPromotionEdges(
 	return promotionEdges, nil
 }
 
+// EdgesFromManifests converts manifests directly to promotion edges without
+// filtering against live registry state. This is used by the standalone
+// replicate-signatures subcommand which needs ALL edges (not just unsynced ones)
+// to ensure signatures exist everywhere.
+func (di *DefaultPromoterImplementation) EdgesFromManifests(
+	mfests []schema.Manifest,
+) (map[reg.PromotionEdge]interface{}, error) {
+	edges, err := reg.ToPromotionEdges(mfests)
+	if err != nil {
+		return nil, fmt.Errorf("converting manifests to edges: %w", err)
+	}
+	return edges, nil
+}
+
 // PromoteImages starts an image promotion of a set of edges.
 func (di *DefaultPromoterImplementation) PromoteImages(
 	sc *reg.SyncContext,

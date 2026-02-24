@@ -54,6 +54,19 @@ type FakePromoterImplementation struct {
 		result1 []schema.Manifest
 		result2 error
 	}
+	EdgesFromManifestsStub        func([]schema.Manifest) (map[inventory.PromotionEdge]interface{}, error)
+	edgesFromManifestsMutex       sync.RWMutex
+	edgesFromManifestsArgsForCall []struct {
+		arg1 []schema.Manifest
+	}
+	edgesFromManifestsReturns struct {
+		result1 map[inventory.PromotionEdge]interface{}
+		result2 error
+	}
+	edgesFromManifestsReturnsOnCall map[int]struct {
+		result1 map[inventory.PromotionEdge]interface{}
+		result2 error
+	}
 	FixMissingSignaturesStub        func(*imagepromotera.Options, checkresults.Signature) error
 	fixMissingSignaturesMutex       sync.RWMutex
 	fixMissingSignaturesArgsForCall []struct {
@@ -467,6 +480,75 @@ func (fake *FakePromoterImplementation) AppendManifestToSnapshotReturnsOnCall(i 
 	}
 	fake.appendManifestToSnapshotReturnsOnCall[i] = struct {
 		result1 []schema.Manifest
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakePromoterImplementation) EdgesFromManifests(arg1 []schema.Manifest) (map[inventory.PromotionEdge]interface{}, error) {
+	var arg1Copy []schema.Manifest
+	if arg1 != nil {
+		arg1Copy = make([]schema.Manifest, len(arg1))
+		copy(arg1Copy, arg1)
+	}
+	fake.edgesFromManifestsMutex.Lock()
+	ret, specificReturn := fake.edgesFromManifestsReturnsOnCall[len(fake.edgesFromManifestsArgsForCall)]
+	fake.edgesFromManifestsArgsForCall = append(fake.edgesFromManifestsArgsForCall, struct {
+		arg1 []schema.Manifest
+	}{arg1Copy})
+	stub := fake.EdgesFromManifestsStub
+	fakeReturns := fake.edgesFromManifestsReturns
+	fake.recordInvocation("EdgesFromManifests", []interface{}{arg1Copy})
+	fake.edgesFromManifestsMutex.Unlock()
+	if stub != nil {
+		return stub(arg1)
+	}
+	if specificReturn {
+		return ret.result1, ret.result2
+	}
+	return fakeReturns.result1, fakeReturns.result2
+}
+
+func (fake *FakePromoterImplementation) EdgesFromManifestsCallCount() int {
+	fake.edgesFromManifestsMutex.RLock()
+	defer fake.edgesFromManifestsMutex.RUnlock()
+	return len(fake.edgesFromManifestsArgsForCall)
+}
+
+func (fake *FakePromoterImplementation) EdgesFromManifestsCalls(stub func([]schema.Manifest) (map[inventory.PromotionEdge]interface{}, error)) {
+	fake.edgesFromManifestsMutex.Lock()
+	defer fake.edgesFromManifestsMutex.Unlock()
+	fake.EdgesFromManifestsStub = stub
+}
+
+func (fake *FakePromoterImplementation) EdgesFromManifestsArgsForCall(i int) []schema.Manifest {
+	fake.edgesFromManifestsMutex.RLock()
+	defer fake.edgesFromManifestsMutex.RUnlock()
+	argsForCall := fake.edgesFromManifestsArgsForCall[i]
+	return argsForCall.arg1
+}
+
+func (fake *FakePromoterImplementation) EdgesFromManifestsReturns(result1 map[inventory.PromotionEdge]interface{}, result2 error) {
+	fake.edgesFromManifestsMutex.Lock()
+	defer fake.edgesFromManifestsMutex.Unlock()
+	fake.EdgesFromManifestsStub = nil
+	fake.edgesFromManifestsReturns = struct {
+		result1 map[inventory.PromotionEdge]interface{}
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakePromoterImplementation) EdgesFromManifestsReturnsOnCall(i int, result1 map[inventory.PromotionEdge]interface{}, result2 error) {
+	fake.edgesFromManifestsMutex.Lock()
+	defer fake.edgesFromManifestsMutex.Unlock()
+	fake.EdgesFromManifestsStub = nil
+	if fake.edgesFromManifestsReturnsOnCall == nil {
+		fake.edgesFromManifestsReturnsOnCall = make(map[int]struct {
+			result1 map[inventory.PromotionEdge]interface{}
+			result2 error
+		})
+	}
+	fake.edgesFromManifestsReturnsOnCall[i] = struct {
+		result1 map[inventory.PromotionEdge]interface{}
 		result2 error
 	}{result1, result2}
 }
