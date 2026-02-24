@@ -101,10 +101,11 @@ type promoterImplementation interface {
 	// Methods for image vulnerability scans:
 	ScanEdges(*options.Options, *reg.SyncContext, map[reg.PromotionEdge]interface{}) error
 
-	// Methods for image signing
+	// Methods for image signing and replication
 	PrewarmTUFCache() error
 	ValidateStagingSignatures(map[reg.PromotionEdge]interface{}) (map[reg.PromotionEdge]interface{}, error)
 	SignImages(*options.Options, *reg.SyncContext, map[reg.PromotionEdge]interface{}) error
+	ReplicateSignatures(*options.Options, *reg.SyncContext, map[reg.PromotionEdge]interface{}) error
 	WriteSBOMs(*options.Options, *reg.SyncContext, map[reg.PromotionEdge]interface{}) error
 
 	// Methods for checking signatures
@@ -240,10 +241,18 @@ func (p *Promoter) promoteImagesPipeline(ctx context.Context, opts *options.Opti
 		return nil
 	}))
 
-	// Sign phase: sign promoted images.
+	// Sign phase: sign promoted images (primary registry only).
 	pipe.AddPhase(pipeline.NewPhase("sign", func(_ context.Context) error {
 		if err := p.impl.SignImages(opts, sc, promotionEdges); err != nil {
 			return fmt.Errorf("signing images: %w", err)
+		}
+		return nil
+	}))
+
+	// Replicate phase: copy signatures to mirror registries.
+	pipe.AddPhase(pipeline.NewPhase("replicate", func(_ context.Context) error {
+		if err := p.impl.ReplicateSignatures(opts, sc, promotionEdges); err != nil {
+			return fmt.Errorf("replicating signatures: %w", err)
 		}
 		return nil
 	}))
@@ -320,6 +329,10 @@ func (p *Promoter) promoteImagesLegacy(opts *options.Options) error {
 
 	if err := p.impl.SignImages(opts, sc, promotionEdges); err != nil {
 		return fmt.Errorf("signing images: %w", err)
+	}
+
+	if err := p.impl.ReplicateSignatures(opts, sc, promotionEdges); err != nil {
+		return fmt.Errorf("replicating signatures: %w", err)
 	}
 
 	if err := p.impl.WriteSBOMs(opts, sc, promotionEdges); err != nil {
