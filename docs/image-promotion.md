@@ -1,10 +1,10 @@
 # Container Image Promoter
 
-The Container Image Promoter (aka "CIP") promotes Docker images from one
-Registry (src registry) to another (dest registry). The set of images to promote
-are defined by promoter manifests, in YAML.
-
-Currently only Google Container Registry (GCR) is supported.
+The Container Image Promoter promotes OCI images from a source (staging)
+registry to one or more destination (production) registries. The set of images
+to promote is defined by promoter manifests in YAML. Image operations use
+[crane](https://github.com/google/go-containerregistry/tree/main/cmd/crane)
+and work with any OCI-compliant registry.
 
 - [Promoting images](#promoting-images)
   - [Promoter manifests](#promoter-manifests)
@@ -12,19 +12,23 @@ Currently only Google Container Registry (GCR) is supported.
     - [Thin manifests example](#thin-manifests-example)
   - [Registries and service accounts](#registries-and-service-accounts)
 - [How promotion works](#how-promotion-works)
+  - [Pipeline phases](#pipeline-phases)
+  - [Rate limiting](#rate-limiting)
 - [Server-side operations](#server-side-operations)
+- [Signing and attestation](#signing-and-attestation)
+- [Provenance verification](#provenance-verification)
+- [Vulnerability scanning](#vulnerability-scanning)
 - [Grabbing snapshots](#grabbing-snapshots)
   - [Snapshots of promoter manifests](#snapshots-of-promoter-manifests)
-- [Checks Interface](#checks-interface)
 
 ## Promoting images
 
-Using CIP to promote images requires four pieces:
+Using the promoter requires:
 
 1. promoter manifest(s)
 2. source registry
 3. destination registry
-4. service account for writing into destination registry
+4. service account for writing into the destination registry
 
 ### Promoter manifests
 
@@ -33,21 +37,19 @@ A promoter manifest has two sub-fields:
 1. `registries`
 2. `images`
 
-In addition there are 2 types of manifests, *plain* and *thin*. The difference
-is in how they are written, not their content. A plain manifest has both
-`registries` and `images` in one YAML file. On the other hand, a thin manifest
-splits these two fields up into 2 separate YAML files. In practice, thin
-manifests are preferred because they work better when modifying these YAMLs at
-scale; for example, the [k8sio-manifests-dir][k8s.io Github repo] only uses thin
-manifests because it allows `images` to be easily modified in PRs, whereas the
-more sensitive `registries` field remains tightly controlled by a handful of
-owners.
+There are 2 types of manifests, *plain* and *thin*. A plain manifest has both
+`registries` and `images` in one YAML file. A thin manifest splits these into
+2 separate YAML files. In practice, thin manifests are preferred because they
+work better at scale; for example, the [k8s.io repo][k8sio-manifests-dir] only
+uses thin manifests because it allows `images` to be easily modified in PRs,
+whereas the more sensitive `registries` field remains tightly controlled by a
+handful of owners.
 
 #### Plain manifest example
 
 ```yaml
 registries:
-- name: gcr.io/myproject-staging-area # publicly readable, does not need a service account for access
+- name: gcr.io/myproject-staging-area # publicly readable
   src: true # mark it as the source registry (required)
 - name: gcr.io/myproject-production
   service-account: foo@google-containers.iam.gserviceaccount.com
@@ -64,32 +66,26 @@ images:
     "sha256:06fdf10aae2eeeac5a82c213e4693f82ab05b3b09b820fce95a7cac0bbdad534": ["1.2", "latest"]
 ```
 
-Here, the manifest cares about 3 images --- `apple`, `banana`, and `cherry`. The
-`registries` field lists all destination registries and also the source registry
-where the images should be promoted from. To earmark the source registry, it has
-`src: true` as a property. The promoter will then scan
-`gcr.io/myproject-staging-area` and promote the images found under `images` to
-`gcr.io/myproject-production`.
+The `registries` field lists all destination registries and the source registry
+(marked with `src: true`). The promoter scans the source registry and promotes
+matching images to each destination.
 
-The source registry will always be read-only for the promoter. Because of this,
-it's OK to not provide a `service-account` field for it in `registries`. But in
-the event that you are trying to promote from one private registry to another,
-you would still provide a `service-account` for the staging registry.
-
-Given the above manifest, you can run CIP as follows:
+Given the above manifest:
 
 ```console
-cip run --manifest=path/to/manifest.yaml
+kpromo cip --manifest=path/to/manifest.yaml
+```
+
+To actually perform the promotion (not just a dry run), add `--confirm`:
+
+```console
+kpromo cip --manifest=path/to/manifest.yaml --confirm
 ```
 
 #### Thin manifests example
 
-You can use these thin manifests by specifying the `--thin-manifest-dir=<target
-directory>` flag, which forces all promoter manifests to be defined as thin
-manifests within the target directory. This is the only flag that currently
-supports thin manifests.
-
-Assume `foo` is the `<target directory>`. The structure of `foo` must be as follows:
+Use thin manifests by specifying `--thin-manifest-dir=<target directory>`.
+The directory structure must be:
 
 ```console
 foo
@@ -113,27 +109,21 @@ foo
         └── promoter-manifest.yaml
 ```
 
-Here there are 4 thin promoter manifests. The folder names (`images`,
-`manifests`) and filenames (`images.yaml`, `promoter-manifest.yaml`) are
-hardcoded and cannot be changed. The only things that may be changed are the
-folder names `foo` and the subdirectory names (`a`, `b`, `c`, `d`) under
-`images` and `manifests`. That being said, the subdirectory names (`a`, `b`,
-`c`, `d`) must match in `images` and `manifests`; otherwise, CIP will exit with
-an error.
+The folder names (`images`, `manifests`) and filenames (`images.yaml`,
+`promoter-manifest.yaml`) are hardcoded. Subdirectory names (`a`, `b`, `c`,
+`d`) must match between `images` and `manifests`.
 
-Continuing with the example plain manifest in the previous section, let's
-pretend we wanted to convert it into a thin manifest. Let's use subdirectory `a`
-as an example. First, `manifests/a/promoter-manifest.yaml` would look like this:
+`manifests/a/promoter-manifest.yaml`:
 
 ```yaml
 registries:
-- name: gcr.io/myproject-staging-area # publicly readable, does not need a service account for access
-  src: true # mark it as the source registry (required)
+- name: gcr.io/myproject-staging-area
+  src: true
 - name: gcr.io/myproject-production
   service-account: foo@google-containers.iam.gserviceaccount.com
 ```
 
-Second, the images would be put in `images/a/images.yaml` like this:
+`images/a/images.yaml`:
 
 ```yaml
 - name: apple
@@ -148,136 +138,149 @@ Second, the images would be put in `images/a/images.yaml` like this:
     "sha256:06fdf10aae2eeeac5a82c213e4693f82ab05b3b09b820fce95a7cac0bbdad534": ["1.2", "latest"]
 ```
 
-It's important to note that the subdirectory name `a` here could be renamed to
-anything else allowed by the filesystem --- it has no bearing on the substantive
-contents of the promoter manifest. Indeed, the subdirectory name only acts as an
-organizing namespace to separate it from the other subdirectory names that might
-exist (in the example `b`, `c`, and `d`).
-
 ### Registries and service accounts
 
-CIP needs the following access to registries:
+The promoter needs:
 
-- source registry: read access
-- destination registry: read and write access
+- **source registry**: read access
+- **destination registry**: read and write access
 
-In a dry run (default), where CIP does not actually perform any image copies,
-only read access in needed for the destination registry.
-
-For *source registries*, most commonly they are world-readable. Hence, no
-`service-account` field is needed for them. However, if your source registry is
-not world-readable, you would need to define a `service-account` field and
-specify the name of the service account that has read access.
-
-For *destination registries*, most commonly they are world-readable, but not
-world-writable. To allow CIP to write to such registries, they require a
-`service-account` field. This is the case of the examples shown thus far, where
-`foo@google-containers.iam.gserviceaccount.com` presumably has write access to
-`gcr.io/myproject-production`.
-
-When CIP starts up, it associates any defined `service-account`s to the
-registries, and also reads in a temporary service account token, and binds it to
-the corresponding registry. The credentials for these service accounts must
-already be set up in the environment prior to running the promoter.
+In a dry run (default, without `--confirm`), only read access is needed for the
+destination registry. Source registries are typically world-readable and don't
+need a `service-account` field.
 
 ## How promotion works
 
-The promoter's behaviour can be described in terms of mathematical sets (as in Venn diagrams).
-Suppose `S` is the set of images in the source registry, `D` is the set of all images in the destination registry and
-`M` is the set of images to be promoted (these are defined in the promoter manifest). Then:
+The promoter's behaviour can be described in terms of mathematical sets.
+Suppose `S` is the set of images in the source registry, `D` is the set of all
+images in the destination registry, and `M` is the set of images to be promoted
+(defined in the manifest). Then:
 
-- `M ∩ D` = images which do not need promoting since they are already present in the destination registry
+- `M ∩ D` = images already present in the destination (no action needed)
 - `(M ∩ S) \ D` = images that are copied
+- `M \ (S ∪ D)` = images that cannot be found (warnings are printed)
 
-The above statements are true for each destination registry.
+### Pipeline phases
 
-The promoter also prints warnings about images that cannot be promoted:
+The promotion flow is organized into sequential pipeline phases:
 
-- `M \ (S ∪ D)` = images that cannot be found
+| Phase | Name | Description |
+|-------|------|-------------|
+| 1 | **setup** | Validate options, activate service accounts, prewarm TUF cache |
+| 2 | **plan** | Parse manifests, read registry inventories, compute promotion edges |
+| 3 | **provenance** | Optional SLSA provenance verification (see [Provenance verification](#provenance-verification)) |
+| 4 | **validate** | Validate staging image signatures |
+| 5 | **promote** | Copy images from staging to production |
+| 6 | **sign** | Sign promoted images with cosign, replicate signatures to mirrors |
+| 7 | **attest** | Copy pre-generated SBOMs from staging to production, generate promotion provenance |
+
+Without `--confirm`, the pipeline stops after the validate phase (dry-run
+precheck). With `--parse-only`, it stops after parsing manifests.
+
+### Rate limiting
+
+HTTP requests are rate-limited to avoid 429 errors from registry quotas. The
+rate limiter covers all HTTP methods (not just reads) and uses adaptive backoff
+when 429 responses are received.
+
+The total request budget is split between promotion (70%) and signing (30%).
+After the promote phase completes, the full budget is rebalanced to signing.
 
 ## Server-side operations
 
-During the promotion process, all data resides on the server (currently, Google
-Container Registry for images). That is, no images get pulled and pushed back
-up. There are two reasons why it does things entirely server-side:
+During promotion, all data resides on the server. No images are pulled and
+pushed back up. This is important for two reasons:
 
-1. Performance. Images can be gigabytes in size and it would take forever to
-   pull/push images in their entirety for every promotion.
-1. Digest preservation. Pulling/pushing the images can change their digest
-   (sha256sum) because layers might get gzipped differently when they are pushed
-   back up. Doing things entirely server-side preserves the digest, which is
-   important for declaratively recording the images by their digest in the
-   promoter manifest.
+1. **Performance**: Images can be gigabytes in size.
+2. **Digest preservation**: Pulling/pushing can change the digest because layers
+   might get gzipped differently. Server-side operations preserve the digest.
+
+## Signing and attestation
+
+After promotion, images are signed using [cosign](https://github.com/sigstore/cosign)
+with a keyless (OIDC) identity. Signatures are replicated to all mirror
+registries. The signing identity is configured with `--signer-account`.
+
+Pre-generated SBOMs are copied from staging to production using the cosign SBOM
+tag convention (`sha256-<hash>.sbom`). Missing SBOMs are skipped gracefully.
+
+Related flags:
+
+- `--sign` — enable/disable signing (default: `true`)
+- `--signer-account` — service account identity for signing
+- `--certificate-identity` — identity to verify when checking signatures
+- `--certificate-oidc-issuer` — OIDC issuer for the signing identity
+- `--max-signature-copies` — max concurrent signature copies (default: `50`)
+- `--max-signature-ops` — max concurrent signature operations (default: `50`)
+
+## Provenance verification
+
+Optional SLSA provenance verification can be enabled to ensure images were built
+by authorized build systems before promotion. When enabled, the promoter checks
+that a SLSA attestation tag exists on each staging image and verifies the builder
+identity and source repository against configured policies.
+
+Related flags:
+
+- `--require-provenance` — require valid SLSA attestations (default: `false`)
+- `--allowed-builders` — comma-separated list of acceptable builder identities
+- `--allowed-source-repos` — comma-separated list of acceptable source repo URLs
+
+## Provenance generation
+
+The promoter can generate SLSA v1.0 provenance attestations for promoted images.
+When enabled, the promoter pushes an `.att` tag for each promoted image containing
+an in-toto statement with the promotion metadata (source/destination registries,
+digest, builder identity, timestamp).
+
+```console
+kpromo cip --thin-manifest-dir=<dir> --generate-promotion-provenance --confirm
+```
+
+Related flags:
+
+- `--generate-promotion-provenance` — generate SLSA provenance attestations (default: `false`)
+
+## Vulnerability scanning
+
+The promoter supports vulnerability scanning of staging images before promotion.
+The `--vuln-severity-threshold` flag sets the minimum severity level that causes
+the scan to fail (0=UNSPECIFIED through 5=CRITICAL). See [checks](./checks.md)
+for details.
 
 ## Grabbing snapshots
 
-The promoter can also be used to quickly generate textual snapshots of all
-images found in a registry. Such snapshots provide a kind of lightweight
-"fingerprint" of a registry, and are useful in comparing registries. The
-snapshots can also be used to generate the `images` part of a thin manifest, if
-you want to promote *all* images from one registry to another.
+The promoter can generate textual snapshots of all images in a registry. Such
+snapshots provide a lightweight "fingerprint" of a registry and can be used to
+generate the `images` part of a thin manifest.
 
-To snapshot a GCR registry, you can do:
+To snapshot a registry:
 
 ```console
-cip run --snapshot=gcr.io/foo
+kpromo cip --snapshot=gcr.io/foo
 ```
 
-which will output YAML that is compatible with thin manifests' `images.yaml`
-format. You can also force CSV format by specifying the `--output=csv`
-flag:
+This outputs YAML compatible with thin manifests' `images.yaml` format. Use
+`--output=csv` for CSV format:
 
 ```console
-cip run --snapshot=gcr.io/foo --output=csv
+kpromo cip --snapshot=gcr.io/foo --output=csv
 ```
 
-which will output a CSV of image digests and tags found at `gcr.io/foo`.
-
-There is another option, `--minimal-snapshot`, which will discard all tagless
-child images that are referenced by Docker manifest lists (manifest lists are
-Docker images that specify a group of related Docker images, usually one image
-per machine architecture). That is, if there is a Docker manifest list that
-references 10 child images, and these child images are not tagged, then they are
-discarded from the snapshot output with `--minimal-snapshot`. This makes the
-resulting output lighter by removing redundant information.
+The `--minimal-snapshot` flag discards tagless child images that are referenced
+by manifest lists, making the output lighter.
 
 ### Snapshots of promoter manifests
 
-Apart from GCR registries, you can also snapshot a destination registry defined
-in thin manifest directories, with the `--manifest-based-snapshot-of` flag. This
-is useful if for example you want to have a unified look at a particular
-destination registry that is broken up over multiple thin manifests. For
-example, the thin manifests defined [k8sio-manifests-dir][here] all promoter to
-3 registries, `{asia,eu,us}.gcr.io/k8s-artifacts-prod`. But the various
-subdirectories there all promote images into one of these three registries. From
-examining the thin manifests by hand, it can be difficult to answer questions
-such as, "how many total images (counting by unique digests) are we promoting
-into `gcr.io/k8s-artifacts-prod`?"
-
-We can answer the above question with:
+You can snapshot a destination registry defined in thin manifest directories
+with `--manifest-based-snapshot-of`. This is useful for getting a unified view
+of a destination registry that is split across multiple thin manifests:
 
 ```console
-cip \
+kpromo cip \
   --manifest-based-snapshot-of=us.gcr.io/k8s-artifacts-prod \
-  --thin-manifest-dir=<path_to_k8s.gcr.io_thin_manifest_dir> \
+  --thin-manifest-dir=<path_to_thin_manifest_dir> \
   --output=csv | wc -l
 ```
 
-## Checks Interface
-
-Read more [here](./checks.md).
-
-The addition of the checks interface to the Container Image Promoter is meant
-to make it easy to add checks against pull requests affecting the promoter
-manifests. The interface allows engineers to add checks without worrying about
-any pre-existing checks and test their own checks individually, while also
-giving freedom as to what conditionals or tags might be necessary for the
-check to occur.
-
-[cip-prow-integration]: https://git.k8s.io/k8s.io/k8s.gcr.io/Vanity-Domain-Flip.md#prow-integration
-[docker]: https://docs.docker.com/get-docker
-[golang]: https://golang.org/doc/install
-[k/k8s.io]: https://git.k8s.io/k8s.io
-[k/release]: https://git.k8s.io/release
-[k/test-infra]: https://git.k8s.io/test-infra
-[k8sio-manifests-dir]: https://git.k8s.io/k8s.io/k8s.gcr.io
+[k8sio-manifests-dir]: https://git.k8s.io/k8s.io/registry.k8s.io

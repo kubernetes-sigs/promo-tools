@@ -17,30 +17,50 @@ limitations under the License.
 package imagepromoter
 
 import (
+	"context"
 	"fmt"
+
+	"github.com/sirupsen/logrus"
 
 	reg "sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry"
 	options "sigs.k8s.io/promo-tools/v4/promoter/image/options"
+	"sigs.k8s.io/promo-tools/v4/promoter/image/vuln"
 )
 
-// ScanEdges runs the vulnerability scans on the new images
-// detected by the promoter.
+// ScanEdges runs vulnerability scans on the new images detected by the
+// promoter using the configured vuln.Scanner.
+// TODO: Remove *reg.SyncContext parameter when legacy types are deleted.
 func (di *DefaultPromoterImplementation) ScanEdges(
-	opts *options.Options, sc *reg.SyncContext,
+	opts *options.Options, _ *reg.SyncContext,
 	promotionEdges map[reg.PromotionEdge]interface{},
 ) error {
-	if err := sc.RunChecks(
-		[]reg.PreCheck{
-			reg.MKImageVulnCheck(
-				sc,
-				promotionEdges,
-				opts.SeverityThreshold,
-				nil,
-			),
-		},
-	); err != nil {
-		return fmt.Errorf("checking image vulnerabilities: %w", err)
+	if opts.SeverityThreshold <= 0 {
+		logrus.Info("Vulnerability scanning disabled (threshold <= 0)")
+		return nil
 	}
+
+	threshold := vuln.Severity(opts.SeverityThreshold)
+	ctx := context.Background()
+
+	for edge := range promotionEdges {
+		ref := edge.SrcReference()
+		if ref == "" {
+			continue
+		}
+
+		result, err := di.vulnScanner.Scan(ctx, ref)
+		if err != nil {
+			return fmt.Errorf("scanning %s: %w", ref, err)
+		}
+
+		if result.ExceedsSeverity(threshold) {
+			return fmt.Errorf(
+				"image %s has vulnerabilities at or above threshold %d (highest: %d)",
+				ref, threshold, result.HighestSeverity,
+			)
+		}
+	}
+
 	di.PrintSection("END (VULNSCAN)", opts.Confirm)
 	return nil
 }

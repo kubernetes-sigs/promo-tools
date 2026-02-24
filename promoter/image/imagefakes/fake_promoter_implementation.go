@@ -25,6 +25,7 @@ import (
 	"sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry/schema"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/checkresults"
 	imagepromotera "sigs.k8s.io/promo-tools/v4/promoter/image/options"
+	"sigs.k8s.io/promo-tools/v4/promoter/image/provenance"
 )
 
 type FakePromoterImplementation struct {
@@ -307,6 +308,20 @@ type FakePromoterImplementation struct {
 	validateStagingSignaturesReturnsOnCall map[int]struct {
 		result1 map[inventory.PromotionEdge]interface{}
 		result2 error
+	}
+	WriteProvenanceAttestationsStub        func(*imagepromotera.Options, *inventory.SyncContext, map[inventory.PromotionEdge]interface{}, provenance.Generator) error
+	writeProvenanceAttestationsMutex       sync.RWMutex
+	writeProvenanceAttestationsArgsForCall []struct {
+		arg1 *imagepromotera.Options
+		arg2 *inventory.SyncContext
+		arg3 map[inventory.PromotionEdge]interface{}
+		arg4 provenance.Generator
+	}
+	writeProvenanceAttestationsReturns struct {
+		result1 error
+	}
+	writeProvenanceAttestationsReturnsOnCall map[int]struct {
+		result1 error
 	}
 	WriteSBOMsStub        func(*imagepromotera.Options, *inventory.SyncContext, map[inventory.PromotionEdge]interface{}) error
 	writeSBOMsMutex       sync.RWMutex
@@ -1753,6 +1768,70 @@ func (fake *FakePromoterImplementation) ValidateStagingSignaturesReturnsOnCall(i
 		result1 map[inventory.PromotionEdge]interface{}
 		result2 error
 	}{result1, result2}
+}
+
+func (fake *FakePromoterImplementation) WriteProvenanceAttestations(arg1 *imagepromotera.Options, arg2 *inventory.SyncContext, arg3 map[inventory.PromotionEdge]interface{}, arg4 provenance.Generator) error {
+	fake.writeProvenanceAttestationsMutex.Lock()
+	ret, specificReturn := fake.writeProvenanceAttestationsReturnsOnCall[len(fake.writeProvenanceAttestationsArgsForCall)]
+	fake.writeProvenanceAttestationsArgsForCall = append(fake.writeProvenanceAttestationsArgsForCall, struct {
+		arg1 *imagepromotera.Options
+		arg2 *inventory.SyncContext
+		arg3 map[inventory.PromotionEdge]interface{}
+		arg4 provenance.Generator
+	}{arg1, arg2, arg3, arg4})
+	stub := fake.WriteProvenanceAttestationsStub
+	fakeReturns := fake.writeProvenanceAttestationsReturns
+	fake.recordInvocation("WriteProvenanceAttestations", []interface{}{arg1, arg2, arg3, arg4})
+	fake.writeProvenanceAttestationsMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2, arg3, arg4)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakePromoterImplementation) WriteProvenanceAttestationsCallCount() int {
+	fake.writeProvenanceAttestationsMutex.RLock()
+	defer fake.writeProvenanceAttestationsMutex.RUnlock()
+	return len(fake.writeProvenanceAttestationsArgsForCall)
+}
+
+func (fake *FakePromoterImplementation) WriteProvenanceAttestationsCalls(stub func(*imagepromotera.Options, *inventory.SyncContext, map[inventory.PromotionEdge]interface{}, provenance.Generator) error) {
+	fake.writeProvenanceAttestationsMutex.Lock()
+	defer fake.writeProvenanceAttestationsMutex.Unlock()
+	fake.WriteProvenanceAttestationsStub = stub
+}
+
+func (fake *FakePromoterImplementation) WriteProvenanceAttestationsArgsForCall(i int) (*imagepromotera.Options, *inventory.SyncContext, map[inventory.PromotionEdge]interface{}, provenance.Generator) {
+	fake.writeProvenanceAttestationsMutex.RLock()
+	defer fake.writeProvenanceAttestationsMutex.RUnlock()
+	argsForCall := fake.writeProvenanceAttestationsArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4
+}
+
+func (fake *FakePromoterImplementation) WriteProvenanceAttestationsReturns(result1 error) {
+	fake.writeProvenanceAttestationsMutex.Lock()
+	defer fake.writeProvenanceAttestationsMutex.Unlock()
+	fake.WriteProvenanceAttestationsStub = nil
+	fake.writeProvenanceAttestationsReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakePromoterImplementation) WriteProvenanceAttestationsReturnsOnCall(i int, result1 error) {
+	fake.writeProvenanceAttestationsMutex.Lock()
+	defer fake.writeProvenanceAttestationsMutex.Unlock()
+	fake.WriteProvenanceAttestationsStub = nil
+	if fake.writeProvenanceAttestationsReturnsOnCall == nil {
+		fake.writeProvenanceAttestationsReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.writeProvenanceAttestationsReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
 }
 
 func (fake *FakePromoterImplementation) WriteSBOMs(arg1 *imagepromotera.Options, arg2 *inventory.SyncContext, arg3 map[inventory.PromotionEdge]interface{}) error {
