@@ -354,6 +354,15 @@ func (di *DefaultPromoterImplementation) replicateSignatures(
 
 	// Copy the signatures to the missing registries
 	for _, dstRef := range dstRefs {
+		// Skip if the signature tag already exists at the destination.
+		if _, err := remote.Head(dstRef,
+			remote.WithAuthFromKeychain(gcrane.Keychain),
+			remote.WithTransport(di.getSigningTransport()),
+		); err == nil {
+			logrus.WithField("dst", dstRef.String()).Debug("Signature already exists, skipping")
+			continue
+		}
+
 		logrus.WithField("src", srcRef.String()).Infof("replication > %s", dstRef.String())
 		opts := []crane.Option{
 			crane.WithAuthFromKeychain(gcrane.Keychain),
