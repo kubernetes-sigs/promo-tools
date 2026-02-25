@@ -404,13 +404,3 @@ func generatePRBody(opts *promoteOptions) string {
 
 	return prBody
 }
-
-// `cip-mm` functionality
-// Punchlist for `cip-mm` deprecation
-// - TODO(cip-mm): Support local workflow
-//                 - stage changes, but don't commit or push?
-//                 - stage changes and commit, but don't push?
-//                 - point at local directory instead of virtual repo?
-// - TODO(cip-mm): Fix spacing in tag list
-//                 ref: https://github.com/kubernetes/k8s.io/pull/3212/files#r771604521
-// - TODO(cip-mm): Confirm options are validated

@@ -47,9 +47,6 @@ kpromo:
 		-o ./bin/kpromo \
 		./cmd/kpromo
 
-.PHONY: cip-mm
-cip-mm: kpromo
-
 ##@ Build
 .PHONY: build
 build: kpromo ## Build go tools within the repository

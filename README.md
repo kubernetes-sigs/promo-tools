@@ -50,8 +50,6 @@ It wraps and unifies the functionality of multiple tools that have existed in
 the past:
 
 - `cip`
-- `cip-mm`
-- `cip-auditor`
 - `gh2gcs`
 - `krel promote-images`
 - `promobot-files`
