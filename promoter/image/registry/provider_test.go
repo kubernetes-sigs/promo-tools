@@ -21,12 +21,11 @@ import (
 	"errors"
 	"testing"
 
-	legacyreg "sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry/registry"
 	"sigs.k8s.io/promo-tools/v4/types/image"
 )
 
 func TestRegistryConfigFromContext(t *testing.T) {
-	rc := legacyreg.Context{
+	rc := Context{
 		Name:           "gcr.io/k8s-staging-foo",
 		ServiceAccount: "sa@project.iam.gserviceaccount.com",
 		Src:            true,
@@ -46,7 +45,7 @@ func TestRegistryConfigFromContext(t *testing.T) {
 }
 
 func TestRegistryConfigsFromContexts(t *testing.T) {
-	rcs := []legacyreg.Context{
+	rcs := []Context{
 		{Name: "gcr.io/staging", Src: true},
 		{Name: "us-docker.pkg.dev/prod/images", Src: false},
 	}

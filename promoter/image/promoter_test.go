@@ -23,12 +23,12 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry/registry"
 	imagepromoter "sigs.k8s.io/promo-tools/v4/promoter/image"
 	imagefakes "sigs.k8s.io/promo-tools/v4/promoter/image/imagefakes"
 	options "sigs.k8s.io/promo-tools/v4/promoter/image/options"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/promotion"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/provenance"
+	"sigs.k8s.io/promo-tools/v4/promoter/image/registry"
 	"sigs.k8s.io/promo-tools/v4/types/image"
 )
 

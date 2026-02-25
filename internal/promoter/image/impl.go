@@ -30,7 +30,7 @@ import (
 	"sigs.k8s.io/promo-tools/v4/promoter/image/auth"
 	options "sigs.k8s.io/promo-tools/v4/promoter/image/options"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/ratelimit"
-	imgregistry "sigs.k8s.io/promo-tools/v4/promoter/image/registry"
+	"sigs.k8s.io/promo-tools/v4/promoter/image/registry"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/vuln"
 	"sigs.k8s.io/promo-tools/v4/types/image"
 )
@@ -53,7 +53,7 @@ type DefaultPromoterImplementation struct {
 	signingTransport *ratelimit.RoundTripper
 
 	// registryProvider abstracts registry operations (read inventory, copy images).
-	registryProvider imgregistry.Provider
+	registryProvider registry.Provider
 
 	// identityTokenProvider abstracts OIDC token generation for signing.
 	identityTokenProvider auth.IdentityTokenProvider
@@ -93,7 +93,7 @@ func (di *DefaultPromoterImplementation) getSigningTransport() *ratelimit.RoundT
 }
 
 // SetRegistryProvider sets the registry provider for image operations.
-func (di *DefaultPromoterImplementation) SetRegistryProvider(p imgregistry.Provider) {
+func (di *DefaultPromoterImplementation) SetRegistryProvider(p registry.Provider) {
 	di.registryProvider = p
 }
 

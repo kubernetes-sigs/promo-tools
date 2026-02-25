@@ -29,7 +29,6 @@ import (
 	cr "github.com/google/go-containerregistry/pkg/v1/types"
 	"github.com/sirupsen/logrus"
 
-	legacyreg "sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry/registry"
 	"sigs.k8s.io/promo-tools/v4/types/image"
 )
 
@@ -129,10 +128,10 @@ func makeTagRecorder(
 
 		logrus.Debugf("Registry: %s Image: %s Got: %s", regName, imageName, repo.Name())
 
-		digestTags := make(legacyreg.DigestTags)
+		digestTags := make(DigestTags)
 		if tags != nil && tags.Manifests != nil {
 			for digest, manifest := range tags.Manifests {
-				tagSlice := legacyreg.TagSlice{}
+				tagSlice := TagSlice{}
 				for _, tag := range manifest.Tags {
 					tagSlice = append(tagSlice, image.Tag(tag))
 				}
@@ -153,7 +152,7 @@ func makeTagRecorder(
 
 		mu.Lock()
 		if _, ok := inv.Images[regName]; !ok {
-			inv.Images[regName] = make(legacyreg.RegInvImage)
+			inv.Images[regName] = make(RegInvImage)
 		}
 		if len(digestTags) > 0 {
 			inv.Images[regName][imageName] = digestTags

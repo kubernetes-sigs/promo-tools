@@ -24,8 +24,6 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry/registry"
-	"sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry/schema"
 	impl "sigs.k8s.io/promo-tools/v4/internal/promoter/image"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/auth"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/checkresults"
@@ -34,7 +32,8 @@ import (
 	"sigs.k8s.io/promo-tools/v4/promoter/image/promotion"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/provenance"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/ratelimit"
-	imgregistry "sigs.k8s.io/promo-tools/v4/promoter/image/registry"
+	"sigs.k8s.io/promo-tools/v4/promoter/image/registry"
+	"sigs.k8s.io/promo-tools/v4/promoter/image/schema"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/vuln"
 )
 
@@ -62,8 +61,8 @@ func New(opts *options.Options) *Promoter {
 	di := impl.NewDefaultPromoterImplementation(opts)
 	di.SetPromotionTransport(promoRT)
 	di.SetSigningTransport(signRT)
-	di.SetRegistryProvider(imgregistry.NewCraneProvider(
-		imgregistry.WithTransport(promoRT),
+	di.SetRegistryProvider(registry.NewCraneProvider(
+		registry.WithTransport(promoRT),
 	))
 	di.SetServiceActivator(&auth.GCPServiceActivator{})
 	di.SetIdentityTokenProvider(&auth.GCPIdentityTokenProvider{

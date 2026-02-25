@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -41,7 +42,7 @@ func NewManifestListFromFile(manifestPath string) (imagesList *ManifestList, err
 	if !helpers.Exists(manifestPath) {
 		return nil, errors.New("could not find image promoter manifest")
 	}
-	yamlCode, err := os.ReadFile(manifestPath)
+	yamlCode, err := os.ReadFile(filepath.Clean(manifestPath))
 	if err != nil {
 		return nil, fmt.Errorf("reading yaml code from file: %w", err)
 	}
@@ -66,7 +67,7 @@ func (imagesList *ManifestList) Write(filePath string) error {
 		return fmt.Errorf("while marshalling image list: %w", err)
 	}
 	// Write the yaml into the specified file
-	if err := os.WriteFile(filePath, yamlCode, os.FileMode(0o644)); err != nil {
+	if err := os.WriteFile(filepath.Clean(filePath), yamlCode, os.FileMode(0o644)); err != nil {
 		return fmt.Errorf("writing yaml code into file: %w", err)
 	}
 
@@ -90,7 +91,7 @@ func (imagesList *ManifestList) ToYAML() ([]byte, error) {
 	var yamlCode strings.Builder
 	for _, imgData := range *imagesList {
 		// Add the new name key (it is not sorted in the promoter code)
-		yamlCode.WriteString(fmt.Sprintf("- name: %s\n", imgData.Name))
+		fmt.Fprintf(&yamlCode, "- name: %s\n", imgData.Name)
 		yamlCode.WriteString("  dmap:\n")
 
 		sortedDigests := sortImageDigestMapByTag(imgData.DMap)
@@ -98,12 +99,12 @@ func (imagesList *ManifestList) ToYAML() ([]byte, error) {
 		for _, digestSHA := range sortedDigests {
 			tags := imgData.DMap[digestSHA]
 			sort.Strings(tags)
-			yamlCode.WriteString(fmt.Sprintf("    %q: [", digestSHA))
+			fmt.Fprintf(&yamlCode, "    %q: [", digestSHA)
 			for i, tag := range tags {
 				if i > 0 {
 					yamlCode.WriteString(",")
 				}
-				yamlCode.WriteString(fmt.Sprintf("%q", tag))
+				fmt.Fprintf(&yamlCode, "%q", tag)
 			}
 			yamlCode.WriteString("]\n")
 		}
@@ -113,7 +114,7 @@ func (imagesList *ManifestList) ToYAML() ([]byte, error) {
 }
 
 func sortImageDigestMapByTag(imageDMap map[string][]string) []string {
-	var sortedDigests []string
+	sortedDigests := make([]string, 0, len(imageDMap))
 	// we need to sort the map by value (tags)
 	tags := make([]string, 0, len(imageDMap))
 	valuesToKeys := make(map[string][]string)

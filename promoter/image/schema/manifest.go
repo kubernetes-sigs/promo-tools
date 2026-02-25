@@ -28,7 +28,7 @@ import (
 	"gopkg.in/yaml.v2"
 	"sigs.k8s.io/release-utils/command"
 
-	"sigs.k8s.io/promo-tools/v4/internal/legacy/dockerregistry/registry"
+	"sigs.k8s.io/promo-tools/v4/promoter/image/registry"
 	"sigs.k8s.io/promo-tools/v4/types/image"
 )
 

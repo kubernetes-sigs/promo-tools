@@ -10,7 +10,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/config v1.32.10
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.22.3
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.96.1
-	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/go-git/go-git/v5 v5.16.5
 	github.com/google/go-containerregistry v0.21.0
 	github.com/maxbrunsfeld/counterfeiter/v6 v6.12.1
