@@ -334,11 +334,26 @@ func (di *DefaultPromoterImplementation) replicateSignatures(
 	sourceRefStr := fmt.Sprintf(
 		"%s/%s:%s", src.DstRegistry.Name, src.DstImageTag.Name, sigTag,
 	)
-	logrus.WithField("src", sourceRefStr).Infof("Replicating signature to %d images", len(dsts))
 	srcRef, err := name.ParseReference(sourceRefStr)
 	if err != nil {
 		return fmt.Errorf("parsing reference %q: %w", sourceRefStr, err)
 	}
+
+	// Check if the source signature exists before iterating mirrors.
+	// This avoids 20+ unnecessary HEAD requests per unsigned image.
+	if _, err := remote.Head(srcRef,
+		remote.WithAuthFromKeychain(gcrane.Keychain),
+		remote.WithTransport(di.getSigningTransport()),
+	); err != nil {
+		var terr *transport.Error
+		if errors.As(err, &terr) && terr.StatusCode == http.StatusNotFound {
+			logrus.WithField("src", sourceRefStr).Debug("Source signature not found, skipping group")
+			return nil
+		}
+		return fmt.Errorf("checking source signature %s: %w", sourceRefStr, err)
+	}
+
+	logrus.WithField("src", sourceRefStr).Infof("Replicating signature to %d images", len(dsts))
 
 	dstRefs := []name.Reference{}
 

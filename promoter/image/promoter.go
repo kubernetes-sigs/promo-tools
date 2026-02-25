@@ -397,6 +397,14 @@ func (p *Promoter) CheckSignatures(opts *options.Options) error {
 func (p *Promoter) ReplicateSignatures(ctx context.Context, opts *options.Options) error {
 	var promotionEdges map[promotion.Edge]interface{}
 
+	// Give the signing transport the full rate limit budget since
+	// standalone replication has no promotion or signing workload.
+	if p.budget != nil {
+		if err := p.budget.GiveAll("signing"); err != nil {
+			logrus.WithError(err).Warn("Failed to rebalance rate limit budget")
+		}
+	}
+
 	pipe := pipeline.New()
 
 	// Setup phase: validate, activate accounts, prewarm caches.
