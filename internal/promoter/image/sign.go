@@ -370,6 +370,11 @@ func (di *DefaultPromoterImplementation) replicateSignatures(
 			crane.WithTransport(di.getSigningTransport()),
 		}
 		if err := crane.Copy(srcRef.String(), dstRef.String(), opts...); err != nil {
+			var terr *transport.Error
+			if errors.As(err, &terr) && terr.StatusCode == http.StatusNotFound {
+				logrus.Debugf("Signature %s not found, skipping", srcRef.String())
+				continue
+			}
 			return fmt.Errorf(
 				"copying signature %s to %s: %w",
 				srcRef.String(), dstRef.String(), err,
