@@ -173,7 +173,9 @@ func (di *DefaultPromoterImplementation) PromoteImages(
 
 			start := time.Now()
 
-			if err := di.registryProvider.CopyImage(ctx, srcVertex, dstVertex); err != nil {
+			if err := withRetry(func() error {
+				return di.registryProvider.CopyImage(ctx, srcVertex, dstVertex)
+			}); err != nil {
 				return fmt.Errorf("copying %s to %s: %w", srcVertex, dstVertex, err)
 			}
 
