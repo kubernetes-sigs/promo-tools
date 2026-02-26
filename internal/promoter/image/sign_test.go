@@ -17,9 +17,13 @@ limitations under the License.
 package imagepromoter
 
 import (
+	"errors"
+	"fmt"
+	"net/http"
 	"os"
 	"testing"
 
+	"github.com/google/go-containerregistry/pkg/v1/remote/transport"
 	"github.com/stretchr/testify/require"
 	"sigs.k8s.io/release-utils/env"
 
@@ -104,6 +108,67 @@ func TestDigestToSBOMTag(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			require.Equal(t, tc.want, digestToSBOMTag(tc.digest))
+		})
+	}
+}
+
+func TestIsTransient(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{
+			name: "429 Too Many Requests",
+			err:  &transport.Error{StatusCode: http.StatusTooManyRequests},
+			want: true,
+		},
+		{
+			name: "500 Internal Server Error",
+			err:  &transport.Error{StatusCode: http.StatusInternalServerError},
+			want: true,
+		},
+		{
+			name: "502 Bad Gateway",
+			err:  &transport.Error{StatusCode: http.StatusBadGateway},
+			want: true,
+		},
+		{
+			name: "503 Service Unavailable",
+			err:  &transport.Error{StatusCode: http.StatusServiceUnavailable},
+			want: true,
+		},
+		{
+			name: "404 Not Found",
+			err:  &transport.Error{StatusCode: http.StatusNotFound},
+			want: false,
+		},
+		{
+			name: "401 Unauthorized",
+			err:  &transport.Error{StatusCode: http.StatusUnauthorized},
+			want: false,
+		},
+		{
+			name: "403 Forbidden",
+			err:  &transport.Error{StatusCode: http.StatusForbidden},
+			want: false,
+		},
+		{
+			name: "non-transport error",
+			err:  errors.New("network timeout"),
+			want: false,
+		},
+		{
+			name: "wrapped transport 429",
+			err:  fmt.Errorf("copy failed: %w", &transport.Error{StatusCode: http.StatusTooManyRequests}),
+			want: true,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			require.Equal(t, tc.want, isTransient(tc.err))
 		})
 	}
 }
