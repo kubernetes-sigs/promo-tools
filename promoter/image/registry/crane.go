@@ -206,6 +206,8 @@ func supportedMediaType(mediaType string) (cr.MediaType, error) {
 		return cr.OCIManifestSchema1, nil
 	case cr.OCIImageIndex:
 		return cr.OCIImageIndex, nil
+	case cr.DockerManifestSchema1, cr.DockerManifestSchema1Signed:
+		return cr.MediaType(mediaType), nil
 	default:
 		// Default to DockerManifestSchema2 for backwards compatibility.
 		if mediaType == "" {

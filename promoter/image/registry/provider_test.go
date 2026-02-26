@@ -211,6 +211,8 @@ func TestSupportedMediaType(t *testing.T) {
 		{"application/vnd.docker.distribution.manifest.list.v2+json", false},
 		{"application/vnd.oci.image.manifest.v1+json", false},
 		{"application/vnd.oci.image.index.v1+json", false},
+		{"application/vnd.docker.distribution.manifest.v1+json", false},
+		{"application/vnd.docker.distribution.manifest.v1+prettyjws", false},
 		{"", false}, // empty defaults to DockerManifestSchema2
 		{"application/vnd.unknown", true},
 	}
