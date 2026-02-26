@@ -100,6 +100,7 @@ func RunPromoteFiles(ctx context.Context, options PromoteFilesOptions) error {
 	}
 
 	var ops []file.SyncFileOp
+
 	for _, manifest := range manifests {
 		promoter := &file.ManifestPromoter{
 			Manifest:          manifest,
@@ -109,7 +110,7 @@ func RunPromoteFiles(ctx context.Context, options PromoteFilesOptions) error {
 
 		o, err := promoter.BuildOperations(ctx)
 		if err != nil {
-			return fmt.Errorf("error building operations: %v", err)
+			return fmt.Errorf("error building operations: %w", err)
 		}
 
 		ops = append(ops, o...)
@@ -119,11 +120,12 @@ func RunPromoteFiles(ctx context.Context, options PromoteFilesOptions) error {
 	// in one operation does not prevent us attempting the
 	// remaining operations
 	var errs []error
+
 	for _, op := range ops {
 		if _, err := fmt.Fprintf(options.Out, "%v\n", op); err != nil {
 			errs = append(
 				errs,
-				fmt.Errorf("error writing to output: %v", err),
+				fmt.Errorf("error writing to output: %w", err),
 			)
 		}
 
@@ -139,6 +141,7 @@ func RunPromoteFiles(ctx context.Context, options PromoteFilesOptions) error {
 		fmt.Fprintf(
 			options.Out,
 			"********** FINISHED WITH ERRORS **********\n")
+
 		for _, err := range errs {
 			fmt.Fprintf(options.Out, "%v\n", err)
 		}
@@ -164,6 +167,7 @@ func RunPromoteFiles(ctx context.Context, options PromoteFilesOptions) error {
 // ReadManifests reads a set of manifests.
 func ReadManifests(options PromoteFilesOptions) ([]*api.Manifest, error) {
 	manifests := make([]*api.Manifest, 0)
+
 	mPath := options.ManifestsPath
 	if mPath == "" {
 		m, err := ReadManifest(options)
@@ -172,6 +176,7 @@ func ReadManifests(options PromoteFilesOptions) ([]*api.Manifest, error) {
 		}
 
 		manifests = append(manifests, m)
+
 		return manifests, nil
 	}
 
@@ -192,6 +197,7 @@ func ReadManifests(options PromoteFilesOptions) ([]*api.Manifest, error) {
 			}
 
 			projects = append(projects, d.Name())
+
 			return nil
 		},
 	); err != nil {
@@ -237,17 +243,19 @@ func ReadManifest(options PromoteFilesOptions) (*api.Manifest, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	merged.Filestores = filestores
 
 	files, err := readFiles(options.FilesPath)
 	if err != nil {
 		return nil, err
 	}
+
 	merged.Files = files
 
 	// Validate the merged manifest
 	if err := merged.Validate(); err != nil {
-		return nil, fmt.Errorf("error validating merged manifest: %v", err)
+		return nil, fmt.Errorf("error validating merged manifest: %w", err)
 	}
 
 	return merged, nil
@@ -261,12 +269,12 @@ func readFilestores(p string) ([]api.Filestore, error) {
 
 	b, err := os.ReadFile(p)
 	if err != nil {
-		return nil, fmt.Errorf("error reading manifest %q: %v", p, err)
+		return nil, fmt.Errorf("error reading manifest %q: %w", p, err)
 	}
 
 	manifest, err := api.ParseManifest(b)
 	if err != nil {
-		return nil, fmt.Errorf("error parsing manifest %q: %v", p, err)
+		return nil, fmt.Errorf("error parsing manifest %q: %w", p, err)
 	}
 
 	if len(manifest.Files) != 0 {
@@ -282,6 +290,7 @@ func readFilestores(p string) ([]api.Filestore, error) {
 func readFiles(filesPath string) ([]api.File, error) {
 	// We first list and sort the paths, for a consistent ordering
 	var paths []string
+
 	err := filepath.WalkDir(filesPath, func(p string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -292,6 +301,7 @@ func readFiles(filesPath string) ([]api.File, error) {
 		}
 
 		paths = append(paths, p)
+
 		return nil
 	})
 	if err != nil {
@@ -301,6 +311,7 @@ func readFiles(filesPath string) ([]api.File, error) {
 	sort.Strings(paths)
 
 	var files []api.File
+
 	for _, p := range paths {
 		b, err := os.ReadFile(p)
 		if err != nil {
@@ -309,7 +320,7 @@ func readFiles(filesPath string) ([]api.File, error) {
 
 		manifest, err := api.ParseManifest(b)
 		if err != nil {
-			return nil, fmt.Errorf("error parsing manifest %q: %v", p, err)
+			return nil, fmt.Errorf("error parsing manifest %q: %w", p, err)
 		}
 
 		if len(manifest.Filestores) != 0 {

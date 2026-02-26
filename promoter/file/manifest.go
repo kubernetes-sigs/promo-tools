@@ -55,6 +55,7 @@ func (p *ManifestPromoter) BuildOperations(
 		if filestore.Src {
 			continue
 		}
+
 		logrus.Infof("processing destination %q", filestore.Base)
 		fp := &FilestorePromoter{
 			Source:            source,
@@ -63,12 +64,14 @@ func (p *ManifestPromoter) BuildOperations(
 			Confirm:           p.Confirm,
 			UseServiceAccount: p.UseServiceAccount,
 		}
+
 		ops, err := fp.BuildOperations(ctx)
 		if err != nil {
 			return nil, fmt.Errorf(
-				"error building promotion operations for %q: %v",
+				"error building promotion operations for %q: %w",
 				filestore.Base, err)
 		}
+
 		operations = append(operations, ops...)
 	}
 
@@ -80,17 +83,21 @@ func (p *ManifestPromoter) BuildOperations(
 // multiple filestores are marked as the source.
 func getSourceFilestore(manifest *api.Manifest) (*api.Filestore, error) {
 	var source *api.Filestore
+
 	for i := range manifest.Filestores {
 		filestore := &manifest.Filestores[i]
 		if filestore.Src {
 			if source != nil {
 				return nil, errors.New("found multiple source filestores")
 			}
+
 			source = filestore
 		}
 	}
+
 	if source == nil {
 		return nil, errors.New("source filestore not found")
 	}
+
 	return source, nil
 }

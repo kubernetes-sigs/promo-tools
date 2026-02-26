@@ -35,6 +35,7 @@ var filesCmd = &cobra.Command{
 		if err := runFilePromotion(filesOpts); err != nil {
 			return fmt.Errorf("run `kpromo run files`: %w", err)
 		}
+
 		return nil
 	},
 }
@@ -89,7 +90,11 @@ func init() {
 func runFilePromotion(opts *promobot.PromoteFilesOptions) error {
 	ctx := context.Background()
 
-	return promobot.RunPromoteFiles(ctx, *opts)
+	if err := promobot.RunPromoteFiles(ctx, *opts); err != nil {
+		return fmt.Errorf("promoting files: %w", err)
+	}
+
+	return nil
 }
 
 // TODO: Validate options

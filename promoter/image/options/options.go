@@ -169,6 +169,7 @@ func (o *Options) Validate() error {
 			return errors.New("at least a manifest file or thin manifest directory have to be specified")
 		}
 	}
+
 	return nil
 }
 

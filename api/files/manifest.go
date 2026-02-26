@@ -39,7 +39,7 @@ type Filestore struct {
 	// It is everything that is not the actual file name itself.
 	// e.g. "gs://prod-artifacts/myproject"
 	Base           string `json:"base,omitempty"`
-	ServiceAccount string `json:"service-account,omitempty"`
+	ServiceAccount string `json:"service-account,omitempty"` //nolint:tagliatelle // API field
 	Src            bool   `json:"src,omitempty"`
 }
 
@@ -67,7 +67,8 @@ type Manifest struct {
 func ParseManifest(b []byte) (*Manifest, error) {
 	m := &Manifest{}
 	if err := yaml.Unmarshal(b, m); err != nil {
-		return nil, fmt.Errorf("error parsing manifest: %v", err)
+		return nil, fmt.Errorf("error parsing manifest: %w", err)
 	}
+
 	return m, nil
 }

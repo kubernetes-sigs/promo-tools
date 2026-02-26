@@ -74,11 +74,14 @@ the yaml file manifests can be found. For example:
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) == 0 {
 			cmd.Use = "validate [ manifestsPath | filestores.yaml files1.yaml ]"
+
 			return cmd.Help()
 		}
+
 		if err := runValidate(args); err != nil {
 			return fmt.Errorf("validating manifests: %w", err)
 		}
+
 		return nil
 	},
 }
@@ -104,6 +107,7 @@ func validateSingle(filestoresPath, filesPath string) error {
 	if err != nil {
 		return fmt.Errorf("opening filestores manifest file: %w", err)
 	}
+
 	if i.IsDir() {
 		return errors.New("first argument has to be a yaml file defining the filestores")
 	}
@@ -117,9 +121,11 @@ func validateSingle(filestoresPath, filesPath string) error {
 	}
 
 	if err := m.Validate(); err != nil {
-		return err
+		return fmt.Errorf("validating manifest: %w", err)
 	}
+
 	logrus.Infof("Manifest correctly validated from:\n - FileStores: %s\n - Files: %s", filestoresPath, filesPath)
+
 	return nil
 }
 
@@ -129,6 +135,7 @@ func validateDirectory(mPath string) error {
 	if err != nil {
 		return fmt.Errorf("opening manifest path %s: %w", mPath, err)
 	}
+
 	if !i.IsDir() {
 		return fmt.Errorf("path is not a directory: %s", mPath)
 	}
@@ -139,11 +146,14 @@ func validateDirectory(mPath string) error {
 	if err != nil {
 		return fmt.Errorf("reading manifests from %s: %w", mPath, err)
 	}
+
 	for i, m := range manifests {
 		if err := m.Validate(); err != nil {
 			return fmt.Errorf("validating manifest %d from %s: %w", i, mPath, err)
 		}
 	}
+
 	logrus.Infof("%d correct manifests found in %s", len(manifests), mPath)
+
 	return nil
 }

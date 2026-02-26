@@ -67,6 +67,7 @@ func (i *Info) String() string {
 	fmt.Fprintf(w, "Platform:\t%s\n", i.Platform)
 
 	w.Flush()
+
 	return b.String()
 }
 
@@ -74,7 +75,8 @@ func (i *Info) String() string {
 func (i *Info) JSONString() (string, error) {
 	b, err := json.MarshalIndent(i, "", "  ")
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("marshalling version info: %w", err)
 	}
+
 	return string(b), nil
 }

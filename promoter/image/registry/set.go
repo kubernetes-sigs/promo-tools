@@ -29,6 +29,7 @@ func (a TagSlice) ToTagSet() TagSet {
 	for _, tag := range a {
 		s[tag] = struct{}{}
 	}
+
 	return s
 }
 
@@ -37,11 +38,13 @@ func (a TagSlice) Minus(b TagSlice) TagSet {
 	aSet := a.ToTagSet()
 	bSet := b.ToTagSet()
 	result := make(TagSet)
+
 	for k := range aSet {
 		if _, ok := bSet[k]; !ok {
 			result[k] = struct{}{}
 		}
 	}
+
 	return result
 }
 
@@ -51,9 +54,11 @@ func (a TagSlice) Union(b TagSlice) TagSet {
 	for _, tag := range a {
 		result[tag] = struct{}{}
 	}
+
 	for _, tag := range b {
 		result[tag] = struct{}{}
 	}
+
 	return result
 }
 
@@ -62,10 +67,12 @@ func (a TagSlice) Intersection(b TagSlice) TagSet {
 	aSet := a.ToTagSet()
 	bSet := b.ToTagSet()
 	result := make(TagSet)
+
 	for k := range aSet {
 		if _, ok := bSet[k]; ok {
 			result[k] = struct{}{}
 		}
 	}
+
 	return result
 }

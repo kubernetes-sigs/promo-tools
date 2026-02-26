@@ -125,16 +125,11 @@ func TestFind(t *testing.T) {
 
 		require.Equal(t, test.expectedManifest, gotManifest)
 
-		var gotErrStr string
-		var expectedErrStr string
-		if gotErr != nil {
-			gotErrStr = gotErr.Error()
-		}
 		if test.expectedErr != nil {
-			expectedErrStr = test.expectedErr.Error()
+			require.ErrorContains(t, gotErr, test.expectedErr.Error())
+		} else {
+			require.NoError(t, gotErr)
 		}
-
-		require.Equal(t, expectedErrStr, gotErrStr)
 	}
 }
 

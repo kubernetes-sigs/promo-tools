@@ -37,23 +37,28 @@ import (
 
 // ParseManifests reads the manifest file or manifest directory
 // and parses them to return a slice of Manifest objects.
-func (di *DefaultPromoterImplementation) ParseManifests(opts *options.Options) (mfests []schema.Manifest, err error) {
+func (di *DefaultPromoterImplementation) ParseManifests(opts *options.Options) ([]schema.Manifest, error) {
 	// If the options have a manifest file defined, we use that one
 	if opts.Manifest != "" {
 		mfest, err := schema.ParseManifestFromFile(opts.Manifest)
 		if err != nil {
-			return mfests, fmt.Errorf("parsing the manifest file: %w", err)
+			return nil, fmt.Errorf("parsing the manifest file: %w", err)
 		}
 
-		mfests = []schema.Manifest{mfest}
-		// The thin manifests
-	} else if opts.ThinManifestDir != "" {
-		mfests, err = schema.ParseThinManifestsFromDir(opts.ThinManifestDir, opts.UseProwManifestDiff)
+		return []schema.Manifest{mfest}, nil
+	}
+
+	// The thin manifests
+	if opts.ThinManifestDir != "" {
+		mfests, err := schema.ParseThinManifestsFromDir(opts.ThinManifestDir, opts.UseProwManifestDiff)
 		if err != nil {
 			return nil, fmt.Errorf("parsing thin manifest directory: %w", err)
 		}
+
+		return mfests, nil
 	}
-	return mfests, nil
+
+	return nil, nil
 }
 
 // GetPromotionEdges checks the manifests and determines from
@@ -61,7 +66,7 @@ func (di *DefaultPromoterImplementation) ParseManifests(opts *options.Options) (
 // promoted.
 func (di *DefaultPromoterImplementation) GetPromotionEdges(
 	opts *options.Options, mfests []schema.Manifest,
-) (map[promotion.Edge]interface{}, error) {
+) (map[promotion.Edge]any, error) {
 	// Convert manifests to edges
 	edges, err := promotion.ToEdges(mfests)
 	if err != nil {
@@ -83,6 +88,7 @@ func (di *DefaultPromoterImplementation) GetPromotionEdges(
 
 	// Read registry inventories (non-recursive, specific repos only)
 	ctx := context.Background()
+
 	inv, err := di.registryProvider.ReadRegistries(ctx, configs, false, baseConfigs)
 	if err != nil {
 		return nil, fmt.Errorf("reading registries: %w", err)
@@ -103,25 +109,28 @@ func (di *DefaultPromoterImplementation) GetPromotionEdges(
 // to ensure signatures exist everywhere.
 func (di *DefaultPromoterImplementation) EdgesFromManifests(
 	mfests []schema.Manifest,
-) (map[promotion.Edge]interface{}, error) {
+) (map[promotion.Edge]any, error) {
 	edges, err := promotion.ToEdges(mfests)
 	if err != nil {
 		return nil, fmt.Errorf("converting manifests to edges: %w", err)
 	}
+
 	return edges, nil
 }
 
 // PromoteImages copies images for a set of promotion edges.
 func (di *DefaultPromoterImplementation) PromoteImages(
 	opts *options.Options,
-	edges map[promotion.Edge]interface{},
+	edges map[promotion.Edge]any,
 ) error {
 	if len(edges) == 0 {
 		logrus.Info("Nothing to promote.")
+
 		return nil
 	}
 
 	logrus.Info("Pending promotions:")
+
 	for edge := range edges {
 		logrus.Infof(
 			"%s/%s:%s (%s) to %s/%s",
@@ -161,11 +170,15 @@ func (di *DefaultPromoterImplementation) PromoteImages(
 			}
 
 			logrus.Infof("Copying %s to %s", srcVertex, dstVertex)
+
 			start := time.Now()
+
 			if err := di.registryProvider.CopyImage(ctx, srcVertex, dstVertex); err != nil {
 				return fmt.Errorf("copying %s to %s: %w", srcVertex, dstVertex, err)
 			}
+
 			logrus.Infof("Copied %s (%d/%d) in %s", dstVertex, completed.Add(1), total, time.Since(start).Round(time.Millisecond))
+
 			return nil
 		})
 	}

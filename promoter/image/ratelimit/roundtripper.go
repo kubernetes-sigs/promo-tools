@@ -18,6 +18,7 @@ package ratelimit
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"sync"
 	"time"
@@ -88,7 +89,7 @@ func (rt *RoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 
 	// Wait for rate limiter token.
 	if err := rt.rateLimiter.Wait(ctx); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("waiting for rate limiter: %w", err)
 	}
 
 	rt.mu.Lock()
@@ -97,7 +98,7 @@ func (rt *RoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 
 	resp, err := rt.roundTripper.RoundTrip(r)
 	if err != nil {
-		return resp, err
+		return resp, fmt.Errorf("round trip: %w", err)
 	}
 
 	// Adaptive backoff: if we get a 429, temporarily pause all requests
@@ -124,9 +125,10 @@ func (rt *RoundTripper) SetBurst(newBurst int) {
 }
 
 // Stats returns observability data about this rate limiter.
-func (rt *RoundTripper) Stats() (totalRequests int64, totalWaited time.Duration) {
+func (rt *RoundTripper) Stats() (int64, time.Duration) {
 	rt.mu.Lock()
 	defer rt.mu.Unlock()
+
 	return rt.totalRequests, rt.totalWaited
 }
 

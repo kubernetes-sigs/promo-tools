@@ -38,6 +38,7 @@ var filesCmd = &cobra.Command{
 		if err := runFileManifest(filesOpts); err != nil {
 			return fmt.Errorf("run `kpromo manifest files`: %w", err)
 		}
+
 		return nil
 	},
 }
@@ -62,8 +63,7 @@ func init() {
 		"only export files starting with the provided prefix",
 	)
 
-	// TODO: Consider moving this into a validation function
-	//nolint:errcheck
+	//nolint:errcheck // flag is required, error handled by cobra at runtime
 	filesCmd.MarkPersistentFlagRequired("src")
 
 	ManifestCmd.AddCommand(filesCmd)
@@ -81,7 +81,7 @@ func runFileManifest(opts *promobot.GenerateManifestOptions) error {
 
 	manifest, err := promobot.GenerateManifest(ctx, *opts)
 	if err != nil {
-		return err
+		return fmt.Errorf("generating manifest: %w", err)
 	}
 
 	manifestYAML, err := yaml.Marshal(manifest)
@@ -90,7 +90,7 @@ func runFileManifest(opts *promobot.GenerateManifestOptions) error {
 	}
 
 	if _, err := os.Stdout.Write(manifestYAML); err != nil {
-		return err
+		return fmt.Errorf("writing manifest to stdout: %w", err)
 	}
 
 	return nil

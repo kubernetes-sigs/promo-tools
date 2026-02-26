@@ -152,6 +152,7 @@ func checkRequiredFlags(flags *pflag.FlagSet) error {
 	}
 
 	checkRequiredFlags := []string{}
+
 	flags.VisitAll(func(flag *pflag.Flag) {
 		for _, requiredflag := range requiredFlags {
 			if requiredflag == flag.Name && !flag.Changed {
@@ -177,14 +178,17 @@ func run(opts *options) error {
 	}
 
 	releaseCfgs := &gh2gcs.Config{}
+
 	if opts.configFilePath != "" {
 		logrus.Infof("Reading the config file %s...", opts.configFilePath)
+
 		data, err := os.ReadFile(opts.configFilePath)
 		if err != nil {
 			return fmt.Errorf("failed to read the file: %w", err)
 		}
 
 		logrus.Info("Parsing the config...")
+
 		err = yaml.UnmarshalStrict(data, &releaseCfgs)
 		if err != nil {
 			return fmt.Errorf("failed to decode the file: %w", err)
@@ -219,6 +223,7 @@ func run(opts *options) error {
 		if err := gh2gcs.DownloadReleases(&releaseCfg, gh, opts.outputDir); err != nil {
 			return fmt.Errorf("downloading release assets: %w", err)
 		}
+
 		logrus.Infof("Files downloaded to %s directory", opts.outputDir)
 
 		if !opts.downloadOnly {

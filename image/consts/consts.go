@@ -17,13 +17,13 @@ limitations under the License.
 package consts
 
 const (
-	// Production registry root URL.
+	// ProdRegistry is the production registry root URL.
 	ProdRegistry = "registry.k8s.io"
 
-	// Staging repository root URL prefix.
+	// StagingRepoPrefix is the staging repository root URL prefix.
 	StagingRepoPrefix = "gcr.io/k8s-staging-"
 
-	// The suffix of the default image repository to promote images from
+	// StagingRepoSuffix is the suffix of the default image repository to promote images from
 	// i.e., gcr.io/<staging-prefix>-<staging-suffix>
 	// e.g., gcr.io/k8s-staging-foo.
 	StagingRepoSuffix = "kubernetes"

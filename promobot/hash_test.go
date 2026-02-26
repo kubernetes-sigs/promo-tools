@@ -57,6 +57,8 @@ func TestHash(t *testing.T) {
 //	tests is to make the changes explicit, particularly in code
 //	review, not to force manual updates.
 func AssertMatchesFile(t *testing.T, actual, p string) {
+	t.Helper()
+
 	b, err := os.ReadFile(p)
 	if err != nil {
 		if os.Getenv("UPDATE_EXPECTED_OUTPUT") == "" {
@@ -68,10 +70,11 @@ func AssertMatchesFile(t *testing.T, actual, p string) {
 
 	if actual != expected {
 		if os.Getenv("UPDATE_EXPECTED_OUTPUT") != "" {
-			if err := os.WriteFile(p, []byte(actual), 0o644); err != nil { //nolint: gosec
+			if err := os.WriteFile(p, []byte(actual), 0o644); err != nil { //nolint:gosec // test file permissions
 				t.Fatalf("error writing file %q: %v", p, err)
 			}
 		}
+
 		t.Errorf("actual did not match expected; diff=%s", diff.StringDiff(actual, expected))
 	}
 }

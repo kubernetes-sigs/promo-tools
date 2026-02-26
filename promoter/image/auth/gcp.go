@@ -45,6 +45,7 @@ func (g *GCPIdentityTokenProvider) GetIdentityToken(
 	ctx context.Context, serviceAccount, audience string,
 ) (string, error) {
 	var clientOpts []gopts.ClientOption
+
 	if g.CredentialsFile != "" {
 		logrus.Infof("Using credentials from %s", g.CredentialsFile)
 		//nolint:staticcheck // Credentials file is user-provided for service account impersonation.
@@ -87,6 +88,7 @@ func (g *GCPServiceActivator) ActivateServiceAccounts(_ context.Context, keyFile
 		if errors.Is(err, io.EOF) {
 			break
 		}
+
 		if err != nil {
 			return fmt.Errorf("reading key file paths: %w", err)
 		}
@@ -103,5 +105,6 @@ func (g *GCPServiceActivator) ActivateServiceAccounts(_ context.Context, keyFile
 			}
 		}
 	}
+
 	return nil
 }

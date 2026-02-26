@@ -30,9 +30,8 @@ func TestNewManifestListFromFile(t *testing.T) {
 	listYAML += "    \"sha256:927d98197ec1141a368550822d18fa1c60bdae27b78b0c004f705f548c07814f\": [\"3.2\"]\n"
 	listYAML += "    \"sha256:a319ac2280eb7e3a59e252e54b76327cb4a33cf8389053b0d78277f22bbca2fa\": [\"3.3\"]\n"
 
-	tempFile, err := os.CreateTemp("", "release-test")
+	tempFile, err := os.CreateTemp(t.TempDir(), "release-test")
 	require.NoError(t, err, "creating temp file")
-	defer os.Remove(tempFile.Name())
 
 	_, err = tempFile.WriteString(listYAML)
 	require.NoError(t, err, "wrinting temporary promoter image list")
@@ -150,15 +149,14 @@ func TestPromoterImageWrite(t *testing.T) {
 	expectedFile += "- name: kube-scheduler\n  dmap:\n"
 	expectedFile += "    \"sha256:022b81d70447014f63fdc734df48cb9e3a2854c48f65acdca67aac5c1974fc22\": [\"v1.19.0-rc.2\"]\n"
 
-	tempFileSorted, err := os.CreateTemp("", "release-test")
+	tempFileSorted, err := os.CreateTemp(t.TempDir(), "release-test")
 	require.NoError(t, err, "creating temp file")
-	defer os.Remove(tempFileSorted.Name())
 
 	err = imageList.Write(tempFileSorted.Name())
 	require.NoError(t, err, "writing data to disk")
 
 	// Read back the file to see if it correct
-	fileContents, err := os.ReadFile(tempFileSorted.Name())
+	fileContents, err := os.ReadFile(tempFileSorted.Name()) //nolint:gosec // test file from os.CreateTemp
 	require.NoError(t, err, "reading temporary file")
 
 	require.Equal(t, expectedFile, string(fileContents))

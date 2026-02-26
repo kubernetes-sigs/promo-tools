@@ -73,6 +73,7 @@ func New() *Pipeline {
 // for chaining.
 func (p *Pipeline) AddPhase(phase Phase) *Pipeline {
 	p.phases = append(p.phases, phase)
+
 	return p
 }
 
@@ -80,6 +81,7 @@ func (p *Pipeline) AddPhase(phase Phase) *Pipeline {
 // stops and the error is returned.
 func (p *Pipeline) Run(ctx context.Context) error {
 	logrus.Infof("Pipeline starting with %d phases", len(p.phases))
+
 	start := time.Now()
 
 	for i, phase := range p.phases {
@@ -90,13 +92,16 @@ func (p *Pipeline) Run(ctx context.Context) error {
 		}
 
 		logrus.Infof("Phase %d/%d: %s", i+1, len(p.phases), phase.Name())
+
 		phaseStart := time.Now()
 
 		if err := phase.Run(ctx); err != nil {
 			if errors.Is(err, ErrStopPipeline) {
 				logrus.Infof("Phase %q requested pipeline stop", phase.Name())
+
 				return nil
 			}
+
 			return fmt.Errorf("phase %q failed: %w", phase.Name(), err)
 		}
 
@@ -104,5 +109,6 @@ func (p *Pipeline) Run(ctx context.Context) error {
 	}
 
 	logrus.Infof("Pipeline completed in %s", time.Since(start))
+
 	return nil
 }

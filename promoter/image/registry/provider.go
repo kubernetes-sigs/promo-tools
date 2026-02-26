@@ -69,6 +69,7 @@ func RegistryConfigsFromContexts(rcs []Context) []RegistryConfig {
 	for i, rc := range rcs {
 		configs[i] = RegistryConfigFromContext(rc)
 	}
+
 	return configs
 }
 

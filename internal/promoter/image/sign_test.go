@@ -220,6 +220,7 @@ func TestTargetIdentity(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
+
 			res := targetIdentity(edge)
 			assert(res)
 		})

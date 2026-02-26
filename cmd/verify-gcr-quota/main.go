@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"math/rand"
@@ -52,6 +53,7 @@ func main() {
 
 	// Create all the workers.
 	start := time.Now()
+
 	spawnWorkers(numWorkers, c)
 	requests := numWorkers
 
@@ -65,24 +67,28 @@ func main() {
 		if msg.statusCode == targetStatusCode {
 			t := time.Now()
 			elapsed := t.Sub(start)
+
 			fmt.Println("We were throttled by GCR!")
 			fmt.Println("Unique Endpoints: ", len(queries))
 			fmt.Println("Took: ", elapsed.Minutes(), "minutes")
 			fmt.Println("Status Code: ", targetStatusCode)
 			fmt.Println("Body: ", msg.body)
 			fmt.Println("Time to ")
+
 			break
 		}
 
 		// Spawn a new worker.
 		go worker(c)
+
 		requests++
 	}
 }
 
 // getRandQuery randomly selects a query from the list of queries.
 func getRandQuery() string {
-	i := rand.Intn(len(queries)) //nolint: gosec
+	i := rand.Intn(len(queries)) //nolint:gosec // non-cryptographic use
+
 	return queries[i]
 }
 
@@ -90,6 +96,7 @@ func getRandQuery() string {
 func spawnWorkers(n int, c chan message) {
 	for n > 0 {
 		go worker(c)
+
 		n--
 	}
 }
@@ -98,7 +105,15 @@ func spawnWorkers(n int, c chan message) {
 // response to the given channel.
 func worker(c chan message) {
 	query := getRandQuery()
-	resp, err := http.Get(query) //nolint: gosec
+
+	req, reqErr := http.NewRequestWithContext(context.Background(), http.MethodGet, query, http.NoBody)
+	if reqErr != nil {
+		fmt.Println("Encountered an error creating HTTP request: ", reqErr)
+
+		return
+	}
+
+	resp, err := http.DefaultClient.Do(req) //nolint:gosec // URL constructed from trusted config
 	if err != nil {
 		fmt.Println("Encountered an error during HTTP GET request: ", err)
 	}

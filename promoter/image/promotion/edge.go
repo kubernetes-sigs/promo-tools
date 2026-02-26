@@ -88,8 +88,9 @@ func ToPQIN(registryName image.Registry, imageName image.Name, tag image.Tag) st
 
 // ToEdges converts a list of manifests to a set of edges we want to
 // try promoting.
-func ToEdges(mfests []schema.Manifest) (map[Edge]interface{}, error) {
-	edges := make(map[Edge]interface{})
+func ToEdges(mfests []schema.Manifest) (map[Edge]any, error) {
+	edges := make(map[Edge]any)
+
 	for _, mfest := range mfests {
 		for _, img := range mfest.Images {
 			for digest, tagArray := range img.Dmap {
@@ -151,13 +152,15 @@ func mkEdge(
 // CheckOverlappingEdges checks for conflicting promotion edges (different
 // digests targeting the same destination tag).
 func CheckOverlappingEdges(
-	edges map[Edge]interface{},
-) (map[Edge]interface{}, error) {
+	edges map[Edge]any,
+) (map[Edge]any, error) {
 	promotionIntent := make(map[string]map[image.Digest][]Edge)
-	checked := make(map[Edge]interface{})
+	checked := make(map[Edge]any)
+
 	for edge := range edges {
 		if edge.DstImageTag.Tag == "" {
 			checked[edge] = nil
+
 			continue
 		}
 
@@ -180,32 +183,39 @@ func CheckOverlappingEdges(
 
 	overlapError := false
 	emptyEdgeListError := false
+
 	for pqin, digestToEdges := range promotionIntent {
 		if len(digestToEdges) < 2 {
 			for _, edgeList := range digestToEdges {
 				switch len(edgeList) {
 				case 0:
 					logrus.Errorf("no edges for %v", pqin)
+
 					emptyEdgeListError = true
 				case 1:
 					checked[edgeList[0]] = nil
 				default:
 					logrus.Infof("redundant promotion: multiple edges want to promote the same digest to the same destination endpoint %v:", pqin)
+
 					for i := range edgeList {
 						logrus.Infof("%v", edgeList[i])
 					}
+
 					logrus.Infof("using the first one: %v", edgeList[0])
 					checked[edgeList[0]] = nil
 				}
 			}
 		} else {
 			logrus.Errorf("multiple edges want to promote *different* images (digests) to the same destination endpoint %v:", pqin)
+
 			for digest, edgeList := range digestToEdges {
 				logrus.Errorf("  for digest %v:\n", digest)
+
 				for i := range edgeList {
 					logrus.Errorf("%v\n", edgeList[i])
 				}
 			}
+
 			overlapError = true
 		}
 	}
@@ -225,7 +235,7 @@ func CheckOverlappingEdges(
 // their information to a RegInvImage type. It uses only those edges that are
 // trying to promote to the given destination registry.
 func EdgesToRegInvImage(
-	edges map[Edge]interface{},
+	edges map[Edge]any,
 	destRegistry string,
 ) registry.RegInvImage {
 	rii := make(registry.RegInvImage)
@@ -238,10 +248,8 @@ func EdgesToRegInvImage(
 			prefix  string
 		)
 
-		if strings.HasPrefix(string(edge.DstRegistry.Name), destRegistry) {
-			prefix = strings.TrimPrefix(
-				string(edge.DstRegistry.Name),
-				destRegistry)
+		if after, ok := strings.CutPrefix(string(edge.DstRegistry.Name), destRegistry); ok {
+			prefix = after
 
 			if prefix != "" {
 				imgName = prefix + "/" + string(edge.DstImageTag.Name)
@@ -275,8 +283,8 @@ func EdgesToRegInvImage(
 // suffixes) from the edges. These are used by ReadRegistries to correctly
 // key the inventory so that vertexPropsFor can look up digests by the
 // original registry name from the edge.
-func GetBaseRegistries(edges map[Edge]interface{}) []registry.Context {
-	rcs := make(map[registry.Context]interface{})
+func GetBaseRegistries(edges map[Edge]any) []registry.Context {
+	rcs := make(map[registry.Context]any)
 
 	for edge := range edges {
 		rcs[edge.SrcRegistry] = nil
@@ -294,8 +302,8 @@ func GetBaseRegistries(edges map[Edge]interface{}) []registry.Context {
 // GetRegistriesToRead collects all unique Docker repositories we want to read
 // from. This way, we don't have to read the entire Docker registry, but only
 // those paths that we are thinking of modifying.
-func GetRegistriesToRead(edges map[Edge]interface{}) []registry.Context {
-	rcs := make(map[registry.Context]interface{})
+func GetRegistriesToRead(edges map[Edge]any) []registry.Context {
+	rcs := make(map[registry.Context]any)
 
 	for edge := range edges {
 		srcReg := edge.SrcRegistry
@@ -323,6 +331,7 @@ func GetRegistriesToRead(edges map[Edge]interface{}) []registry.Context {
 // have the given tag.
 func FilterByTag(rii registry.RegInvImage, tag string) registry.RegInvImage {
 	filtered := make(registry.RegInvImage)
+
 	for imgName, digestTags := range rii {
 		for digest, tagSlice := range digestTags {
 			for _, t := range tagSlice {
@@ -330,12 +339,15 @@ func FilterByTag(rii registry.RegInvImage, tag string) registry.RegInvImage {
 					if filtered[imgName] == nil {
 						filtered[imgName] = make(registry.DigestTags)
 					}
+
 					filtered[imgName][digest] = tagSlice
+
 					break
 				}
 			}
 		}
 	}
+
 	return filtered
 }
 
@@ -358,7 +370,7 @@ type VertexProperty struct {
 // edge, depending on the state of the world in the inventory.
 func (edge *Edge) VertexProps(
 	inv map[image.Registry]registry.RegInvImage,
-) (srcProps, dstProps VertexProperty) {
+) (VertexProperty, VertexProperty) {
 	return edge.vertexPropsFor(&edge.SrcRegistry, &edge.SrcImageTag, inv),
 		edge.vertexPropsFor(&edge.DstRegistry, &edge.DstImageTag, inv)
 }
@@ -375,6 +387,7 @@ func (edge *Edge) vertexPropsFor(
 	if !ok {
 		return p
 	}
+
 	digestTags, ok := rii[imageTag.Name]
 	if !ok {
 		return p
@@ -405,18 +418,20 @@ func (edge *Edge) vertexPropsFor(
 // GetPromotionCandidates filters edges to only those that need promotion,
 // removing already-promoted edges and detecting errors like tag moves.
 func GetPromotionCandidates(
-	edges map[Edge]interface{},
+	edges map[Edge]any,
 	inv map[image.Registry]registry.RegInvImage,
-) (map[Edge]interface{}, bool) {
+) (map[Edge]any, bool) {
 	clean := true
 
-	toPromote := make(map[Edge]interface{})
+	toPromote := make(map[Edge]any)
+
 	for edge := range edges {
 		sp, dp := edge.VertexProps(inv)
 
 		// If dst vertex already matches, NOP.
 		if dp.PqinDigestMatch {
 			logrus.Debugf("edge %v: skipping because it was already promoted (case 1)", edge)
+
 			continue
 		}
 
@@ -427,6 +442,7 @@ func GetPromotionCandidates(
 				logrus.Errorf("edge %v: skipping %s/%s@%s because it was already promoted, but it is still _LOST_ (can't find it in src registry! please backfill it!)",
 					edge, edge.SrcRegistry.Name, edge.SrcImageTag.Name, edge.Digest)
 			}
+
 			continue
 		}
 
@@ -434,6 +450,7 @@ func GetPromotionCandidates(
 		if !sp.DigestExists {
 			logrus.Errorf("edge %v: skipping %s/%s@%s because it is _LOST_ (can't find it in src registry!)",
 				edge, edge.SrcRegistry.Name, edge.SrcImageTag.Name, edge.Digest)
+
 			continue
 		}
 
@@ -442,19 +459,24 @@ func GetPromotionCandidates(
 				if dp.PqinDigestMatch {
 					// NOP (already promoted).
 					logrus.Debugf("edge %v: skipping because it was already promoted (case 2)", edge)
+
 					continue
 				}
 				// Tag exists pointing to a different digest, and the target
 				// digest also exists separately — this is an error.
 				logrus.Errorf("edge %v: tag %s: tag move detected", edge, edge.DstImageTag.Tag)
+
 				clean = false
+
 				continue
 			}
 			// Tag exists pointing to wrong digest, target digest doesn't
 			// exist — tag move attempt, which is not supported.
 			logrus.Errorf("edge %v: tag '%s' in dest points to %s, not %s; tag moves are not supported",
 				edge, edge.DstImageTag.Tag, dp.BadDigest, edge.Digest)
+
 			clean = false
+
 			continue
 		}
 

@@ -25,20 +25,24 @@ type Signature map[string]CheckList
 
 func (s *Signature) TotalPartial() int {
 	total := 0
+
 	for _, list := range *s {
 		if len(list.Signed) > 0 && len(list.Missing) > 0 {
 			total++
 		}
 	}
+
 	return total
 }
 
 func (s *Signature) TotalUnsigned() int {
 	total := 0
+
 	for _, list := range *s {
 		if len(list.Missing) > 0 && len(list.Signed) == 0 {
 			total++
 		}
 	}
+
 	return total
 }

@@ -17,7 +17,6 @@ limitations under the License.
 package schema
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -29,10 +28,8 @@ import (
 func TestParseThinManifestsFromDirPostsubmit(t *testing.T) {
 	t.Setenv("JOB_TYPE", "postsubmit")
 
-	tmpDir, err := os.MkdirTemp("", "k8s.io-")
-	require.NoError(t, err)
+	tmpDir := t.TempDir()
 	testDir := filepath.Join(tmpDir, "test")
-	defer os.RemoveAll(tmpDir)
 
 	const (
 		repo   = "https://github.com/kubernetes/k8s.io"
@@ -63,6 +60,7 @@ func TestParseThinManifestsFromDirPostsubmit(t *testing.T) {
 		if onlyProwDiff {
 			expectedDigestCount = 1
 		}
+
 		assert.Equal(t, expectedDigestCount, digestCount)
 		assert.Equal(t, 623, imageCount)
 	}

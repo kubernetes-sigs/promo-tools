@@ -65,6 +65,7 @@ func GenerateManifest(_ context.Context, options GenerateManifestOptions) (*api.
 		if err != nil {
 			return err
 		}
+
 		if !strings.HasPrefix(p, basedir) {
 			return fmt.Errorf("expected path %q to have prefix %q", p, basedir)
 		}
@@ -75,15 +76,18 @@ func GenerateManifest(_ context.Context, options GenerateManifestOptions) (*api.
 
 		if !d.IsDir() {
 			relativePath := strings.TrimPrefix(p, basedir)
+
 			sha256, err := hash.SHA256ForFile(p)
 			if err != nil {
 				return fmt.Errorf("error hashing file %q: %w", p, err)
 			}
+
 			manifest.Files = append(manifest.Files, api.File{
 				Name:   relativePath,
 				SHA256: sha256,
 			})
 		}
+
 		return nil
 	}); err != nil {
 		return nil, fmt.Errorf("error walking path %q: %w", options.BaseDir, err)

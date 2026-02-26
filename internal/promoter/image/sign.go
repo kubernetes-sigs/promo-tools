@@ -66,9 +66,10 @@ const (
 // applied during its staging run. If they do it verifies them and
 // returns an error if they are not valid.
 func (di *DefaultPromoterImplementation) ValidateStagingSignatures(
-	edges map[promotion.Edge]interface{},
-) (map[promotion.Edge]interface{}, error) {
+	edges map[promotion.Edge]any,
+) (map[promotion.Edge]any, error) {
 	refsToEdges := map[string]promotion.Edge{}
+
 	for edge := range edges {
 		ref := edge.SrcReference()
 		refsToEdges[ref] = edge
@@ -84,20 +85,25 @@ func (di *DefaultPromoterImplementation) ValidateStagingSignatures(
 		return nil, fmt.Errorf("verify images: %w", err)
 	}
 
-	signedEdges := map[promotion.Edge]interface{}{}
+	signedEdges := map[promotion.Edge]any{}
+
 	res.Range(func(key, _ any) bool {
 		ref, ok := key.(string)
 		if !ok {
 			logrus.Errorf("Interface conversion failed: key is not a string: %v", key)
+
 			return false
 		}
 
 		edge, ok := refsToEdges[ref]
 		if !ok {
 			logrus.Errorf("Reference %s is not in edge map", ref)
+
 			return true
 		}
+
 		signedEdges[edge] = nil
+
 		return true
 	})
 
@@ -107,14 +113,17 @@ func (di *DefaultPromoterImplementation) ValidateStagingSignatures(
 // SignImages signs the promoted images and stores their signatures in
 // the registry.
 func (di *DefaultPromoterImplementation) SignImages(
-	opts *options.Options, edges map[promotion.Edge]interface{},
+	opts *options.Options, edges map[promotion.Edge]any,
 ) error {
 	if !opts.SignImages {
 		logrus.Info("Not signing images (--sign=false)")
+
 		return nil
 	}
+
 	if len(edges) == 0 {
 		logrus.Info("No images were promoted. Nothing to sign.")
+
 		return nil
 	}
 
@@ -126,6 +135,7 @@ func (di *DefaultPromoterImplementation) SignImages(
 	if err != nil {
 		return fmt.Errorf("generating identity token: %w", err)
 	}
+
 	signOpts.IdentityToken = token
 
 	// Creating a new Signer after setting the identity token is MANDATORY
@@ -146,7 +156,11 @@ func (di *DefaultPromoterImplementation) SignImages(
 		})
 	}
 
-	return g.Wait()
+	if err := g.Wait(); err != nil {
+		return fmt.Errorf("signing images: %w", err)
+	}
+
+	return nil
 }
 
 // signFirst signs the first (primary) image for a given identity+digest group.
@@ -187,14 +201,17 @@ func (di *DefaultPromoterImplementation) signFirst(signOpts *sign.Options, ident
 // to all additional destination registries for images that were promoted to
 // multiple registries.
 func (di *DefaultPromoterImplementation) ReplicateSignatures(
-	opts *options.Options, edges map[promotion.Edge]interface{},
+	opts *options.Options, edges map[promotion.Edge]any,
 ) error {
 	if !opts.SignImages {
 		logrus.Info("Signing disabled, skipping signature replication")
+
 		return nil
 	}
+
 	if len(edges) == 0 {
 		logrus.Info("No images were promoted. Nothing to replicate.")
+
 		return nil
 	}
 
@@ -207,12 +224,17 @@ func (di *DefaultPromoterImplementation) ReplicateSignatures(
 		if len(group) <= 1 {
 			continue
 		}
+
 		g.Go(func() error {
 			return di.replicateSignatures(&group[0], group[1:])
 		})
 	}
 
-	return g.Wait()
+	if err := g.Wait(); err != nil {
+		return fmt.Errorf("replicating signatures: %w", err)
+	}
+
+	return nil
 }
 
 // targetIdentity returns the production identity for a promotion edge.
@@ -231,6 +253,7 @@ func targetIdentity(edge *promotion.Edge) string {
 			"No production registry path %q used in image, not modifying target signature reference",
 			productionRepositoryPath,
 		)
+
 		return identity
 	}
 
@@ -244,12 +267,14 @@ func targetIdentity(edge *promotion.Edge) string {
 // and digest. Within each group, edges are sorted by destination registry name
 // to ensure deterministic ordering across calls. The first edge in each group
 // is used as the primary for signing and as the source for replication.
-func groupEdgesByIdentityDigest(edges map[promotion.Edge]interface{}) [][]promotion.Edge {
+func groupEdgesByIdentityDigest(edges map[promotion.Edge]any) [][]promotion.Edge {
 	type key struct {
 		identity string
 		digest   image.Digest
 	}
+
 	grouped := map[key][]promotion.Edge{}
+
 	for edge := range edges {
 		// Skip metadata layers
 		if strings.HasSuffix(string(edge.DstImageTag.Tag), ".sig") ||
@@ -271,6 +296,7 @@ func groupEdgesByIdentityDigest(edges map[promotion.Edge]interface{}) [][]promot
 		})
 		result = append(result, group)
 	}
+
 	return result
 }
 
@@ -282,6 +308,7 @@ func (di *DefaultPromoterImplementation) copyAttachedObjects(edge *promotion.Edg
 	srcRefString := fmt.Sprintf(
 		"%s/%s:%s", edge.SrcRegistry.Name, edge.SrcImageTag.Name, sigTag,
 	)
+
 	srcRef, err := name.ParseReference(srcRefString)
 	if err != nil {
 		return fmt.Errorf("parsing signed source reference %s: %w", srcRefString, err)
@@ -290,12 +317,14 @@ func (di *DefaultPromoterImplementation) copyAttachedObjects(edge *promotion.Edg
 	dstRefString := fmt.Sprintf(
 		"%s/%s:%s", edge.DstRegistry.Name, edge.DstImageTag.Name, sigTag,
 	)
+
 	dstRef, err := name.ParseReference(dstRefString)
 	if err != nil {
 		return fmt.Errorf("parsing reference: %w", err)
 	}
 
 	logrus.Infof("Signature pre copy: %s to %s", srcRefString, dstRefString)
+
 	craneOpts := []crane.Option{
 		crane.WithAuthFromKeychain(gcrane.Keychain),
 		crane.WithUserAgent(image.UserAgent),
@@ -308,12 +337,15 @@ func (di *DefaultPromoterImplementation) copyAttachedObjects(edge *promotion.Edg
 		var terr *transport.Error
 		if errors.As(err, &terr) && terr.StatusCode == http.StatusNotFound {
 			logrus.Debugf("Reference %s is not signed, not copying", srcRef.String())
+
 			return nil
 		}
+
 		return fmt.Errorf(
 			"copying signature %s to %s: %w", srcRef.String(), dstRef.String(), err,
 		)
 	}
+
 	return nil
 }
 
@@ -332,6 +364,7 @@ func (di *DefaultPromoterImplementation) replicateSignatures(
 	sourceRefStr := fmt.Sprintf(
 		"%s/%s:%s", src.DstRegistry.Name, src.DstImageTag.Name, sigTag,
 	)
+
 	srcRef, err := name.ParseReference(sourceRefStr)
 	if err != nil {
 		return fmt.Errorf("parsing reference %q: %w", sourceRefStr, err)
@@ -343,8 +376,10 @@ func (di *DefaultPromoterImplementation) replicateSignatures(
 		var terr *transport.Error
 		if errors.As(err, &terr) && terr.StatusCode == http.StatusNotFound {
 			logrus.WithField("src", sourceRefStr).Debug("Source signature not found, skipping group")
+
 			return nil
 		}
+
 		return fmt.Errorf("checking source signature %s: %w", sourceRefStr, err)
 	}
 
@@ -359,6 +394,7 @@ func (di *DefaultPromoterImplementation) replicateSignatures(
 		if err != nil {
 			return fmt.Errorf("parsing signature destination reference: %w", err)
 		}
+
 		dstRefs = append(dstRefs, ref)
 	}
 
@@ -372,10 +408,12 @@ func (di *DefaultPromoterImplementation) replicateSignatures(
 				remote.WithTransport(di.getSigningTransport()),
 			); err == nil {
 				logrus.WithField("dst", dstRef.String()).Debug("Signature already exists, skipping")
+
 				return nil
 			}
 
 			logrus.WithField("src", srcRef.String()).Infof("replication > %s", dstRef.String())
+
 			opts := []crane.Option{
 				crane.WithAuthFromKeychain(gcrane.Keychain),
 				crane.WithUserAgent(image.UserAgent),
@@ -385,18 +423,25 @@ func (di *DefaultPromoterImplementation) replicateSignatures(
 				var terr *transport.Error
 				if errors.As(err, &terr) && terr.StatusCode == http.StatusNotFound {
 					logrus.Debugf("Signature %s not found, skipping", srcRef.String())
+
 					return nil
 				}
+
 				return fmt.Errorf(
 					"copying signature %s to %s: %w",
 					srcRef.String(), dstRef.String(), err,
 				)
 			}
+
 			return nil
 		})
 	}
 
-	return g.Wait()
+	if err := g.Wait(); err != nil {
+		return fmt.Errorf("replicating signatures: %w", err)
+	}
+
+	return nil
 }
 
 // retryBackoff defines the exponential backoff for transient registry errors.
@@ -415,6 +460,7 @@ func isTransient(err error) bool {
 		return terr.StatusCode == http.StatusTooManyRequests ||
 			terr.StatusCode >= http.StatusInternalServerError
 	}
+
 	return false
 }
 
@@ -422,20 +468,28 @@ func isTransient(err error) bool {
 // Non-transient errors are returned immediately.
 func withRetry(fn func() error) error {
 	var lastErr error
+
 	err := wait.ExponentialBackoff(retryBackoff, func() (bool, error) {
 		lastErr = fn()
 		if lastErr == nil {
 			return true, nil // success, stop retrying
 		}
+
 		if !isTransient(lastErr) {
 			return false, lastErr // permanent error, stop retrying
 		}
+
 		return false, nil // transient error, keep retrying
 	})
 	if wait.Interrupted(err) {
 		return lastErr // retries exhausted, return the last transient error
 	}
-	return err
+
+	if err != nil {
+		return fmt.Errorf("exponential backoff: %w", err)
+	}
+
+	return nil
 }
 
 // headWithRetry performs a remote.Head with retries on transient errors.
@@ -445,7 +499,11 @@ func (di *DefaultPromoterImplementation) headWithRetry(ref name.Reference) error
 			remote.WithAuthFromKeychain(gcrane.Keychain),
 			remote.WithTransport(di.getSigningTransport()),
 		)
-		return err
+		if err != nil {
+			return fmt.Errorf("remote head %s: %w", ref.String(), err)
+		}
+
+		return nil
 	})
 }
 
@@ -461,10 +519,11 @@ func (di *DefaultPromoterImplementation) copyWithRetry(src, dst string, opts []c
 // attached in staging (e.g., by the build system) and are identified by
 // the cosign SBOM tag convention (sha256-<hash>.sbom).
 func (di *DefaultPromoterImplementation) WriteSBOMs(
-	opts *options.Options, edges map[promotion.Edge]interface{},
+	opts *options.Options, edges map[promotion.Edge]any,
 ) error {
 	if len(edges) == 0 {
 		logrus.Info("No images were promoted. No SBOMs to copy.")
+
 		return nil
 	}
 
@@ -484,11 +543,16 @@ func (di *DefaultPromoterImplementation) WriteSBOMs(
 			if err := di.copySBOM(&edge); err != nil {
 				return fmt.Errorf("copying SBOM for %s: %w", edge.DstReference(), err)
 			}
+
 			return nil
 		})
 	}
 
-	return g.Wait()
+	if err := g.Wait(); err != nil {
+		return fmt.Errorf("writing SBOMs: %w", err)
+	}
+
+	return nil
 }
 
 // copySBOM copies an SBOM from the staging registry to the production registry
@@ -509,15 +573,19 @@ func (di *DefaultPromoterImplementation) copySBOM(edge *promotion.Edge) error {
 	}
 
 	logrus.Infof("SBOM copy: %s to %s", srcRefString, dstRefString)
+
 	if err := crane.Copy(srcRefString, dstRefString, craneOpts...); err != nil {
 		// If the SBOM does not exist in staging, skip silently
 		var terr *transport.Error
 		if errors.As(err, &terr) && terr.StatusCode == http.StatusNotFound {
 			logrus.Debugf("No SBOM found for %s, skipping", srcRefString)
+
 			return nil
 		}
+
 		return fmt.Errorf("copying SBOM %s to %s: %w", srcRefString, dstRefString, err)
 	}
+
 	return nil
 }
 
@@ -535,23 +603,30 @@ func (di *DefaultPromoterImplementation) GetIdentityToken(
 	// If the test signer file is found switch to test credentials
 	if os.Getenv("CIP_E2E_KEY_FILE") != "" {
 		logrus.Info("Test keyfile set using e2e test credentials")
+
 		serviceAccount = TestSigningAccount
 	}
 
-	return di.identityTokenProvider.GetIdentityToken(
+	token, err := di.identityTokenProvider.GetIdentityToken(
 		context.Background(), serviceAccount, oidcTokenAudience,
 	)
+	if err != nil {
+		return "", fmt.Errorf("getting identity token: %w", err)
+	}
+
+	return token, nil
 }
 
 // WriteProvenanceAttestations generates SLSA provenance attestations for
 // promoted images and pushes them as .att tags to the destination registry.
 func (di *DefaultPromoterImplementation) WriteProvenanceAttestations(
 	_ *options.Options,
-	edges map[promotion.Edge]interface{},
+	edges map[promotion.Edge]any,
 	generator provenance.Generator,
 ) error {
 	if len(edges) == 0 {
 		logrus.Info("No images were promoted. No provenance to generate.")
+
 		return nil
 	}
 
@@ -615,11 +690,13 @@ func (di *DefaultPromoterImplementation) pushAttestation(
 	// Check if attestation already exists (idempotent)
 	if _, err := remote.Head(ref, remote.WithAuthFromKeychain(gcrane.Keychain)); err == nil {
 		logrus.Debugf("Attestation %s already exists, skipping", dstRefString)
+
 		return nil
 	}
 
 	// Create an OCI image with the attestation as a single layer
 	layer := static.NewLayer(attestation, types.MediaType(intotoMediaType))
+
 	img, err := mutate.AppendLayers(empty.Image, layer)
 	if err != nil {
 		return fmt.Errorf("creating attestation image: %w", err)
@@ -630,6 +707,7 @@ func (di *DefaultPromoterImplementation) pushAttestation(
 	img = mutate.ConfigMediaType(img, types.MediaType("application/vnd.oci.image.config.v1+json"))
 
 	logrus.Infof("Provenance attestation: pushing %s", dstRefString)
+
 	if err := remote.Write(ref, img,
 		remote.WithAuthFromKeychain(gcrane.Keychain),
 		remote.WithUserAgent(image.UserAgent),
@@ -655,5 +733,6 @@ func (di *DefaultPromoterImplementation) PrewarmTUFCache() error {
 	); err != nil {
 		return fmt.Errorf("initializing TUF client: %w", err)
 	}
+
 	return nil
 }

@@ -77,6 +77,7 @@ func (o *promoteOptions) Validate() error {
 	if len(o.tags) == 0 {
 		return errors.New("cannot start promotion --tag is required")
 	}
+
 	if o.userFork == "" {
 		return errors.New("cannot start promotion --fork is required")
 	}
@@ -91,6 +92,7 @@ func (o *promoteOptions) Validate() error {
 	if !isSet || token == "" {
 		return fmt.Errorf("cannot promote images if GitHub token env var %s is not set", github.TokenEnvKey)
 	}
+
 	return nil
 }
 
@@ -192,6 +194,7 @@ func runPromote(opts *promoteOptions) error {
 	if err != nil {
 		return fmt.Errorf("parsing user's fork: %w", err)
 	}
+
 	if userForkRepo == "" {
 		userForkRepo = k8sioRepo
 	}
@@ -211,6 +214,7 @@ func runPromote(opts *promoteOptions) error {
 		// Set a minimal depth to prevent downloading the whole repository.
 		Depth: 1,
 	}
+
 	repo, err := github.PrepareFork(branchname, git.DefaultGithubOrg, k8sioRepo, userForkOrg, userForkRepo, opts.useSSH, opts.updateRepo, gitCloneOpts)
 	if err != nil {
 		return fmt.Errorf("while preparing k/k8s.io fork: %w", err)
@@ -239,6 +243,7 @@ func runPromote(opts *promoteOptions) error {
 	if mustRun(opts, "Grow the manifests to add the new tags?") {
 		if helpers.Exists(filepath.Join(repo.Dir(), imagesListPath)) {
 			logrus.Debug("Reading the current image promoter manifest (image list)")
+
 			oldlist, err = os.ReadFile(filepath.Join(repo.Dir(), imagesListPath))
 			if err != nil {
 				return fmt.Errorf("while reading the current promoter image list: %w", err)
@@ -257,6 +262,7 @@ func runPromote(opts *promoteOptions) error {
 		}
 
 		logrus.Infof("Growing manifests for images matching filter %s and matching tag %s", opts.images, opts.tags)
+
 		if err := manifest.Grow(ctx, &opt); err != nil {
 			return fmt.Errorf("growing manifest with image filter %s and tag %s: %w", opts.images, opts.tags, err)
 		}
@@ -295,12 +301,14 @@ func runPromote(opts *promoteOptions) error {
 		// If the manifest was not modified, exit now
 		if bytes.Equal(newlist, oldlist) {
 			logrus.Info("No changes detected in the promoter images list, exiting without changes")
+
 			return nil
 		}
 	}
 
 	// add the modified manifest to staging
 	logrus.Debugf("Adding %s to staging area", imagesListPath)
+
 	if err := repo.Add(imagesListPath); err != nil {
 		return fmt.Errorf("adding image manifest to staging area: %w", err)
 	}
@@ -312,6 +320,7 @@ func runPromote(opts *promoteOptions) error {
 
 	// Commit files
 	logrus.Debug("Creating commit")
+
 	if err := repo.UserCommit(commitMessage); err != nil {
 		return fmt.Errorf("creating commit in %s/%s: %w", git.DefaultGithubOrg, k8sioRepo, err)
 	}
@@ -319,13 +328,14 @@ func runPromote(opts *promoteOptions) error {
 	// Push to fork
 	if mustRun(opts, fmt.Sprintf("Push changes to user's fork at %s/%s?", userForkOrg, userForkRepo)) {
 		logrus.Infof("Pushing manifest changes to %s/%s", userForkOrg, userForkRepo)
+
 		if err := repo.PushToRemote(github.UserForkName, branchname); err != nil {
 			return fmt.Errorf("pushing %s to %s/%s: %w", github.UserForkName, userForkOrg, userForkRepo, err)
 		}
 	} else {
 		// Exit if no push was made
-
 		logrus.Infof("Exiting without creating a PR since changes were not pushed to %s/%s", userForkOrg, userForkRepo)
+
 		return nil
 	}
 
@@ -339,6 +349,7 @@ func runPromote(opts *promoteOptions) error {
 		if err != nil {
 			return fmt.Errorf("creating the pull request in k/k8s.io: %w", err)
 		}
+
 		logrus.Infof(
 			"Successfully created PR: %s%s/%s/pull/%d",
 			github.GitHubURL, git.DefaultGithubOrg, k8sioRepo, pr.GetNumber(),
@@ -354,17 +365,23 @@ func mustRun(opts *promoteOptions, question string) bool {
 	if !opts.interactiveMode {
 		return true
 	}
+
 	_, success, err := helpers.Ask(question+" (Y/n)", "y:Y:yes|n:N:no|y", 10)
 	if err != nil {
 		logrus.Error(err)
-		if userInputErr, ok := err.(helpers.UserInputError); ok && userInputErr.IsCtrlC() {
+
+		var userInputErr helpers.UserInputError
+		if errors.As(err, &userInputErr) {
 			os.Exit(1)
 		}
+
 		return false
 	}
+
 	if success {
 		return true
 	}
+
 	return false
 }
 
@@ -387,14 +404,17 @@ func generatePRBody(opts *promoteOptions) string {
 	for _, tag := range opts.tags {
 		tagString.WriteString(" --tag " + tag)
 	}
+
 	args += tagString.String()
 
 	var imageString strings.Builder
+
 	for _, filterImage := range opts.images {
 		if filterImage != "" {
 			imageString.WriteString(" --image " + filterImage)
 		}
 	}
+
 	args += imageString.String()
 
 	prBody := fmt.Sprintf("Image promotion for %s %s\n", opts.project, strings.Join(opts.tags, " / "))

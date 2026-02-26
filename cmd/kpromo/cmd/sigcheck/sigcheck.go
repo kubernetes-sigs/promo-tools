@@ -56,6 +56,7 @@ kpromo to the first three images it finds run:
 			}
 
 			p := imagepromoter.New(opts)
+
 			return p.CheckSignatures(opts)
 		},
 	}

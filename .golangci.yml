@@ -4,28 +4,40 @@ run:
 linters:
   default: none
   enable:
+    - arangolint
     - asasalint
     - asciicheck
     - bidichk
     - bodyclose
     - canonicalheader
+    - containedctx
     - contextcheck
     - copyloopvar
+    - cyclop
     - decorder
     - dogsled
     - dupl
     - dupword
     - durationcheck
+    - embeddedstructfieldcheck
     - errcheck
     - errchkjson
     - errname
+    - errorlint
+    - exhaustive
+    - exptostd
     - fatcontext
+    - forcetypeassert
+    - funcorder
+    - funlen
     - ginkgolinter
     - gocheckcompilerdirectives
     - gochecksumtype
+    - gocognit
     - goconst
     - gocritic
     - gocyclo
+    - godoclint
     - godot
     - godox
     - goheader
@@ -36,15 +48,29 @@ linters:
     - gosmopolitan
     - govet
     - grouper
+    - iface
     - importas
     - ineffassign
+    - interfacebloat
     - intrange
+    - iotamixing
+    - ireturn
     - loggercheck
+    - maintidx
     - makezero
     - mirror
     - misspell
+    - modernize
+    - musttag
     - nakedret
+    - nestif
+    - nilerr
+    - nilnesserr
+    - nilnil
+    - nlreturn
+    - noctx
     - nolintlint
+    - nonamedreturns
     - nosprintfhostport
     - perfsprint
     - prealloc
@@ -52,6 +78,7 @@ linters:
     - promlinter
     - protogetter
     - reassign
+    - recvcheck
     - revive
     - rowserrcheck
     - sloglint
@@ -59,92 +86,50 @@ linters:
     - sqlclosecheck
     - staticcheck
     - tagalign
+    - tagliatelle
     - testableexamples
     - testifylint
+    - thelper
     - tparallel
     - unconvert
     - unparam
+    - unqueryvet
     - unused
     - usestdlibvars
+    - usetesting
     - wastedassign
     - whitespace
+    - wrapcheck
+    - wsl_v5
     - zerologlint
+    # - depguard
+    # - err113
+    # - exhaustruct
+    # - forbidigo
+    # - gochecknoglobals
+    # - gochecknoinits
+    # - inamedparam
+    # - lll
+    # - mnd
+    # - noinlineerr
+    # - paralleltest
+    # - testpackage
+    # - varnamelen
   settings:
+    cyclop:
+      max-complexity: 30
     errcheck:
       check-type-assertions: true
       check-blank: true
+    exhaustive:
+      default-signifies-exhaustive: true
+    funlen:
+      lines: 200
+      statements: 80
+    gocognit:
+      min-complexity: 55
     gocritic:
-      enabled-checks:
-        - appendCombine
-        - badLock
-        - badRegexp
-        - badSorting
-        - boolExprSimplify
-        - builtinShadow
-        - builtinShadowDecl
-        - commentedOutCode
-        - commentedOutImport
-        - deferInLoop
-        - deferUnlambda
-        - docStub
-        - dupImport
-        - dynamicFmtString
-        - emptyDecl
-        - emptyFallthrough
-        - emptyStringTest
-        - equalFold
-        - evalOrder
-        - exposedSyncMutex
-        - externalErrorReassign
-        - filepathJoin
-        - hexLiteral
-        - httpNoBody
-        - hugeParam
-        - importShadow
-        - indexAlloc
-        - initClause
-        - methodExprCall
-        - nestingReduce
-        - nilValReturn
-        - octalLiteral
-        - paramTypeCombine
-        - preferDecodeRune
-        - preferFilepathJoin
-        - preferFprint
-        - preferStringWriter
-        - preferWriteByte
-        - ptrToRefParam
-        - rangeExprCopy
-        - rangeValCopy
-        - redundantSprint
-        - regexpPattern
-        - regexpSimplify
-        - returnAfterHttpError
-        - ruleguard
-        - sliceClear
-        - sloppyReassign
-        - sortSlice
-        - sprintfQuotedString
-        - sqlQuery
-        - stringConcatSimplify
-        - stringXbytes
-        - stringsCompare
-        - syncMapLoadAndDelete
-        - timeExprSimplify
-        - tooManyResultsChecker
-        - truncateCmp
-        - typeAssertChain
-        - typeDefFirst
-        - typeUnparen
-        - uncheckedInlineErr
-        - unlabelStmt
-        - unnamedResult
-        - unnecessaryBlock
-        - unnecessaryDefer
-        - weakCond
-        - yodaStyleExpr
-        - badSyncOnceFunc
-        - todoCommentWithoutDetail
+      enabled-all: true
     gocyclo:
       min-complexity: 40
     godox:
@@ -152,6 +137,10 @@ linters:
         - BUG
         - FIXME
         - HACK
+    interfacebloat:
+      max: 25
+    nestif:
+      min-complexity: 7
     nolintlint:
       require-explanation: false
       require-specific: true
@@ -171,7 +160,6 @@ linters:
       - linters:
           - dupl
           - gocritic
-          - golint
         path: fake_.*\.go
     paths:
       - third_party$

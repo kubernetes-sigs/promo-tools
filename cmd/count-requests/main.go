@@ -18,6 +18,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -54,9 +55,11 @@ type response struct {
 
 // getSubProjects all sub-projects found in kubernetes/k8s.io.
 func getSubProjects() []string {
-	var cmd *exec.Cmd
-	var out []byte
-	var err error
+	var (
+		cmd *exec.Cmd
+		out []byte
+		err error
+	)
 
 	fmt.Println("Retrieving all kubernetes/k8s.io sub-projects...")
 
@@ -68,25 +71,27 @@ func getSubProjects() []string {
 		}
 	}
 	// Create a temporary directory.
-	cmd = exec.Command("mktemp", "-d")
+	cmd = exec.CommandContext(context.Background(), "mktemp", "-d")
 	out, err = cmd.Output()
 	handle(cmd, err)
+
 	tmpDir := strings.TrimSpace(string(out))
 	// Clone the kubernetes/k8s.io repo.
-	cmd = exec.Command("git", "clone", "https://github.com/kubernetes/k8s.io.git", tmpDir)
+	cmd = exec.CommandContext(context.Background(), "git", "clone", "https://github.com/kubernetes/k8s.io.git", tmpDir)
 	_, err = cmd.Output()
 	handle(cmd, err)
 	// List the number of sub-projects in the repo.
 	subProjects := tmpDir + "/k8s.gcr.io/manifests"
-	cmd = exec.Command("ls", subProjects)
+	cmd = exec.CommandContext(context.Background(), "ls", subProjects)
 	out, err = cmd.Output()
 	handle(cmd, err)
 	// Clear the temporary directory.
-	cmd = exec.Command("rm", "-r", tmpDir)
+	cmd = exec.CommandContext(context.Background(), "rm", "-r", tmpDir)
 	_, err = cmd.Output()
 	handle(cmd, err)
 	// Parse the sub-projects into a list of strings.
 	results := []string{}
+
 	scanner := bufio.NewScanner(strings.NewReader(string(out)))
 	for scanner.Scan() {
 		subProject := scanner.Text()
@@ -94,6 +99,7 @@ func getSubProjects() []string {
 			results = append(results, subProject)
 		}
 	}
+
 	return results
 }
 
@@ -108,23 +114,35 @@ func getPayload(resp *http.Response) response {
 	if err != nil {
 		panic(err)
 	}
+
 	var data response
+
 	err = json.Unmarshal(body, &data)
 	if err != nil {
 		panic(err)
 	}
+
 	resp.Body.Close()
+
 	return data
 }
 
 func makeRequest(query string) response {
-	var resp *http.Response
-	var payload response
-	var err error
+	var (
+		resp    *http.Response
+		payload response
+		err     error
+	)
 
 	// Keep requesting until valid response or too many retries.
+
 	for retries := 5; retries >= 1; retries-- {
-		resp, err = http.Get(query) //nolint: gosec
+		req, reqErr := http.NewRequestWithContext(context.Background(), http.MethodGet, query, http.NoBody)
+		if reqErr != nil {
+			panic(reqErr)
+		}
+
+		resp, err = http.DefaultClient.Do(req) //nolint:gosec // URL constructed from trusted config
 		if err == nil {
 			payload = getPayload(resp)
 		} else if retries == 0 {
@@ -160,6 +178,7 @@ func (r *request) countQueries() int {
 			queries++
 		}
 	}
+
 	return queries
 }
 
@@ -172,11 +191,13 @@ finds the sub-project that requires the most requests to validate.`)
 
 func main() {
 	var subProject string
+
 	if len(os.Args) > 2 {
 		fmt.Println("Invalid number of arguments!")
 		printUsage()
 		os.Exit(1)
 	}
+
 	if len(os.Args) == 2 {
 		subProject = os.Args[1]
 		r := request{
@@ -184,10 +205,12 @@ func main() {
 			repo:     subProject,
 		}
 		fmt.Printf("The Auditor would make %d queries to GCR.\n", r.countQueries())
+
 		return
 	}
 	// Find the sub-project requiring the largest number of queries to verify.
 	maxQueries := 0
+
 	for _, sp := range getSubProjects() {
 		r := request{
 			registry: "gcr.io",
@@ -195,10 +218,12 @@ func main() {
 		}
 		numQueries := r.countQueries()
 		fmt.Printf("Sub-project %q requires %d queries.\n", sp, numQueries)
+
 		if maxQueries < numQueries {
 			maxQueries = numQueries
 			subProject = sp
 		}
 	}
+
 	fmt.Printf("[MAX] %q takes %d queries to verify.\n", subProject, maxQueries)
 }

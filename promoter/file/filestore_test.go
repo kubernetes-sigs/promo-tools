@@ -30,6 +30,7 @@ func Test_useStorageClientAuth(t *testing.T) {
 		useServiceAccount bool
 		confirm           bool
 	}
+
 	tests := []struct {
 		name    string
 		args    args

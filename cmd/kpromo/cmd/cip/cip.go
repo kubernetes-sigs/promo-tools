@@ -50,6 +50,7 @@ Promote images from a staging registry to production
 		if err := runPromoteCmd(runOpts); err != nil {
 			return fmt.Errorf("run `cip run`: %w", err)
 		}
+
 		return nil
 	},
 }
@@ -58,9 +59,7 @@ var runOpts = &options.Options{
 	Threads: options.DefaultOptions.Threads,
 }
 
-// TODO: Function 'init' is too long (171 > 60) (funlen)
-//
-//nolint:funlen
+//nolint:funlen // cobra command initialization requires many flags
 func init() {
 	CipCmd.PersistentFlags().BoolVar(
 		&runOpts.Confirm,
@@ -194,6 +193,7 @@ network from a registry, it reads from the local manifests only`,
 		0,
 		"the maximum image size (in MiB) allowed for promotion",
 	)
+
 	if err := CipCmd.PersistentFlags().MarkHidden("max-image-size"); err != nil {
 		logrus.Infof("Failed to mark max-image-size flag as hidden: %v", err)
 	}
@@ -308,12 +308,20 @@ func runPromoteCmd(opts *options.Options) error {
 
 	// Snapshots
 	if opts.Snapshot != "" || opts.ManifestBasedSnapshotOf != "" {
-		return cip.Snapshot(opts)
+		if err := cip.Snapshot(opts); err != nil {
+			return fmt.Errorf("snapshot: %w", err)
+		}
+
+		return nil
 	}
 
 	// Security scan
 	if opts.SeverityThreshold >= 0 {
-		return cip.SecurityScan(opts)
+		if err := cip.SecurityScan(opts); err != nil {
+			return fmt.Errorf("security scan: %w", err)
+		}
+
+		return nil
 	}
 
 	// Image promotion

@@ -108,9 +108,9 @@ type promoterImplementation interface {
 
 	// Methods for promotion mode:
 	ParseManifests(*options.Options) ([]schema.Manifest, error)
-	GetPromotionEdges(*options.Options, []schema.Manifest) (map[promotion.Edge]interface{}, error)
-	EdgesFromManifests([]schema.Manifest) (map[promotion.Edge]interface{}, error)
-	PromoteImages(*options.Options, map[promotion.Edge]interface{}) error
+	GetPromotionEdges(*options.Options, []schema.Manifest) (map[promotion.Edge]any, error)
+	EdgesFromManifests([]schema.Manifest) (map[promotion.Edge]any, error)
+	PromoteImages(*options.Options, map[promotion.Edge]any) error
 
 	// Methods for snapshot mode:
 	GetSnapshotSourceRegistry(*options.Options) (*registry.Context, error)
@@ -120,15 +120,15 @@ type promoterImplementation interface {
 	Snapshot(*options.Options, registry.RegInvImage) error
 
 	// Methods for image vulnerability scans:
-	ScanEdges(*options.Options, map[promotion.Edge]interface{}) error
+	ScanEdges(*options.Options, map[promotion.Edge]any) error
 
 	// Methods for image signing and replication
 	PrewarmTUFCache() error
-	ValidateStagingSignatures(map[promotion.Edge]interface{}) (map[promotion.Edge]interface{}, error)
-	SignImages(*options.Options, map[promotion.Edge]interface{}) error
-	ReplicateSignatures(*options.Options, map[promotion.Edge]interface{}) error
-	WriteSBOMs(*options.Options, map[promotion.Edge]interface{}) error
-	WriteProvenanceAttestations(*options.Options, map[promotion.Edge]interface{}, provenance.Generator) error
+	ValidateStagingSignatures(map[promotion.Edge]any) (map[promotion.Edge]any, error)
+	SignImages(*options.Options, map[promotion.Edge]any) error
+	ReplicateSignatures(*options.Options, map[promotion.Edge]any) error
+	WriteSBOMs(*options.Options, map[promotion.Edge]any) error
+	WriteProvenanceAttestations(*options.Options, map[promotion.Edge]any, provenance.Generator) error
 
 	// Methods for checking signatures
 	GetLatestImages(*options.Options) ([]string, error)
@@ -147,7 +147,7 @@ func (p *Promoter) PromoteImages(ctx context.Context, opts *options.Options) err
 	// Shared state between pipeline phases, captured by closures.
 	var (
 		mfests         []schema.Manifest
-		promotionEdges map[promotion.Edge]interface{}
+		promotionEdges map[promotion.Edge]any
 	)
 
 	pipe := pipeline.New()
@@ -157,18 +157,22 @@ func (p *Promoter) PromoteImages(ctx context.Context, opts *options.Options) err
 		if err := p.impl.ValidateOptions(opts); err != nil {
 			return fmt.Errorf("validating options: %w", err)
 		}
+
 		if err := p.impl.ActivateServiceAccounts(opts); err != nil {
 			return fmt.Errorf("activating service accounts: %w", err)
 		}
+
 		if err := p.impl.PrewarmTUFCache(); err != nil {
 			return fmt.Errorf("prewarming TUF cache: %w", err)
 		}
+
 		return nil
 	}))
 
 	// Plan phase: parse manifests and compute edges.
 	pipe.AddPhase(pipeline.NewPhase("plan", func(_ context.Context) error {
 		var err error
+
 		mfests, err = p.impl.ParseManifests(opts)
 		if err != nil {
 			return fmt.Errorf("parsing manifests: %w", err)
@@ -183,8 +187,10 @@ func (p *Promoter) PromoteImages(ctx context.Context, opts *options.Options) err
 
 		if opts.ParseOnly {
 			logrus.Info("Manifests parsed, exiting as ParseOnly is set")
+
 			return pipeline.ErrStopPipeline
 		}
+
 		return nil
 	}))
 
@@ -192,6 +198,7 @@ func (p *Promoter) PromoteImages(ctx context.Context, opts *options.Options) err
 	pipe.AddPhase(pipeline.NewPhase("provenance", func(ctx context.Context) error {
 		if !opts.RequireProvenance {
 			logrus.Debug("Provenance verification disabled (--require-provenance=false)")
+
 			return nil
 		}
 
@@ -205,15 +212,18 @@ func (p *Promoter) PromoteImages(ctx context.Context, opts *options.Options) err
 			if ref == "" {
 				continue
 			}
+
 			result, err := verifier.Verify(ctx, ref)
 			if err != nil {
 				return fmt.Errorf("verifying provenance for %s: %w", ref, err)
 			}
+
 			if !result.Verified {
 				return fmt.Errorf("provenance verification failed for %s: %v",
 					ref, result.Errors)
 			}
 		}
+
 		return nil
 	}))
 
@@ -225,8 +235,10 @@ func (p *Promoter) PromoteImages(ctx context.Context, opts *options.Options) err
 
 		if !opts.Confirm {
 			logrus.Info("Dry run complete, exiting before promotion")
+
 			return pipeline.ErrStopPipeline
 		}
+
 		return nil
 	}))
 
@@ -242,6 +254,7 @@ func (p *Promoter) PromoteImages(ctx context.Context, opts *options.Options) err
 				logrus.WithError(err).Warn("Failed to rebalance rate limit budget")
 			}
 		}
+
 		return nil
 	}))
 
@@ -250,6 +263,7 @@ func (p *Promoter) PromoteImages(ctx context.Context, opts *options.Options) err
 		if err := p.impl.SignImages(opts, promotionEdges); err != nil {
 			return fmt.Errorf("signing images: %w", err)
 		}
+
 		return nil
 	}))
 
@@ -258,6 +272,7 @@ func (p *Promoter) PromoteImages(ctx context.Context, opts *options.Options) err
 		if err := p.impl.ReplicateSignatures(opts, promotionEdges); err != nil {
 			return fmt.Errorf("replicating signatures: %w", err)
 		}
+
 		return nil
 	}))
 
@@ -272,14 +287,19 @@ func (p *Promoter) PromoteImages(ctx context.Context, opts *options.Options) err
 				return fmt.Errorf("writing provenance attestations: %w", err)
 			}
 		}
+
 		return nil
 	}))
 
-	return pipe.Run(ctx)
+	if err := pipe.Run(ctx); err != nil {
+		return fmt.Errorf("running promotion pipeline: %w", err)
+	}
+
+	return nil
 }
 
 // Snapshot runs the steps to output a representation in json or yaml of a registry.
-func (p *Promoter) Snapshot(opts *options.Options) (err error) {
+func (p *Promoter) Snapshot(opts *options.Options) error {
 	if err := p.impl.ValidateOptions(opts); err != nil {
 		return fmt.Errorf("validating options: %w", err)
 	}
@@ -308,6 +328,7 @@ func (p *Promoter) Snapshot(opts *options.Options) (err error) {
 	if err := p.impl.Snapshot(opts, rii); err != nil {
 		return fmt.Errorf("generating snapshot: %w", err)
 	}
+
 	return nil
 }
 
@@ -339,29 +360,34 @@ func (p *Promoter) SecurityScan(opts *options.Options) error {
 	// TODO: Let's rethink this option
 	if opts.ParseOnly {
 		logrus.Info("Manifests parsed, exiting as ParseOnly is set")
+
 		return nil
 	}
 
 	if !opts.Confirm {
 		logrus.Info("Dry run complete, exiting before vulnerability scan")
+
 		return nil
 	}
 
 	if err := p.impl.ScanEdges(opts, promotionEdges); err != nil {
 		return fmt.Errorf("running vulnerability scan: %w", err)
 	}
+
 	return nil
 }
 
 // CheckSignatures checks the consistency of a set of images.
 func (p *Promoter) CheckSignatures(opts *options.Options) error {
 	logrus.Info("Fetching latest promoted images")
+
 	images, err := p.impl.GetLatestImages(opts)
 	if err != nil {
 		return fmt.Errorf("getting latest promoted images: %w", err)
 	}
 
 	logrus.Info("Checking signatures")
+
 	results, err := p.impl.GetSignatureStatus(opts, images)
 	if err != nil {
 		return fmt.Errorf("checking signature status in images: %w", err)
@@ -369,15 +395,18 @@ func (p *Promoter) CheckSignatures(opts *options.Options) error {
 
 	if results.TotalPartial() == 0 && results.TotalUnsigned() == 0 {
 		logrus.Info("Signature consistency OK!")
+
 		return nil
 	}
 
 	logrus.Infof("Fixing %d unsigned images", results.TotalUnsigned())
+
 	if err := p.impl.FixMissingSignatures(opts, results); err != nil {
 		return fmt.Errorf("fixing missing signatures: %w", err)
 	}
 
 	logrus.Infof("Fixing %d images with partial signatures", results.TotalPartial())
+
 	if err := p.impl.FixPartialSignatures(opts, results); err != nil {
 		return fmt.Errorf("fixing partial signatures: %w", err)
 	}
@@ -391,7 +420,7 @@ func (p *Promoter) CheckSignatures(opts *options.Options) error {
 // ALL edges from manifests (not just unsynced ones) so it can run
 // independently of the promotion job.
 func (p *Promoter) ReplicateSignatures(ctx context.Context, opts *options.Options) error {
-	var promotionEdges map[promotion.Edge]interface{}
+	var promotionEdges map[promotion.Edge]any
 
 	// Give the signing transport the full rate limit budget since
 	// standalone replication has no promotion or signing workload.
@@ -408,12 +437,15 @@ func (p *Promoter) ReplicateSignatures(ctx context.Context, opts *options.Option
 		if err := p.impl.ValidateOptions(opts); err != nil {
 			return fmt.Errorf("validating options: %w", err)
 		}
+
 		if err := p.impl.ActivateServiceAccounts(opts); err != nil {
 			return fmt.Errorf("activating service accounts: %w", err)
 		}
+
 		if err := p.impl.PrewarmTUFCache(); err != nil {
 			return fmt.Errorf("prewarming TUF cache: %w", err)
 		}
+
 		return nil
 	}))
 
@@ -433,8 +465,10 @@ func (p *Promoter) ReplicateSignatures(ctx context.Context, opts *options.Option
 
 		if !opts.Confirm {
 			logrus.Info("Dry run complete (use --confirm to replicate)")
+
 			return pipeline.ErrStopPipeline
 		}
+
 		return nil
 	}))
 
@@ -443,8 +477,13 @@ func (p *Promoter) ReplicateSignatures(ctx context.Context, opts *options.Option
 		if err := p.impl.ReplicateSignatures(opts, promotionEdges); err != nil {
 			return fmt.Errorf("replicating signatures: %w", err)
 		}
+
 		return nil
 	}))
 
-	return pipe.Run(ctx)
+	if err := pipe.Run(ctx); err != nil {
+		return fmt.Errorf("running replication pipeline: %w", err)
+	}
+
+	return nil
 }
