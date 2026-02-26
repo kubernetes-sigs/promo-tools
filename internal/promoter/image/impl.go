@@ -45,11 +45,11 @@ type DefaultPromoterImplementation struct {
 	signer *sign.Signer
 
 	// promotionTransport is the HTTP transport used for image promotion
-	// (crane.Copy). If nil, falls back to the global ratelimit.Limiter.
+	// (crane.Copy).
 	promotionTransport *ratelimit.RoundTripper
 
 	// signingTransport is the HTTP transport used for signature copy and
-	// replication. If nil, falls back to the global ratelimit.Limiter.
+	// replication.
 	signingTransport *ratelimit.RoundTripper
 
 	// registryProvider abstracts registry operations (read inventory, copy images).
@@ -82,14 +82,9 @@ func (di *DefaultPromoterImplementation) SetSigningTransport(rt *ratelimit.Round
 	di.signingTransport = rt
 }
 
-// getSigningTransport returns the transport for signing, falling back to the
-// global singleton for backwards compatibility.
+// getSigningTransport returns the transport for signing operations.
 func (di *DefaultPromoterImplementation) getSigningTransport() *ratelimit.RoundTripper {
-	if di.signingTransport != nil {
-		return di.signingTransport
-	}
-	//nolint:staticcheck // Legacy fallback during transition to BudgetAllocator.
-	return ratelimit.Limiter
+	return di.signingTransport
 }
 
 // SetRegistryProvider sets the registry provider for image operations.

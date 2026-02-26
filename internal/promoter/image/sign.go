@@ -35,9 +35,9 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/remote/transport"
 	"github.com/google/go-containerregistry/pkg/v1/static"
 	"github.com/google/go-containerregistry/pkg/v1/types"
-	"github.com/nozzle/throttler"
 	"github.com/sigstore/sigstore/pkg/tuf"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/release-sdk/sign"
 	"sigs.k8s.io/release-utils/version"
@@ -137,18 +137,16 @@ func (di *DefaultPromoterImplementation) SignImages(
 	// We only sign the first normalized image per digest of each edge.
 	grouped := groupEdgesByIdentityDigest(edges)
 
-	t := throttler.New(opts.MaxSignatureOps, len(grouped))
-	// Sign the required edges
+	g := new(errgroup.Group)
+	g.SetLimit(opts.MaxSignatureOps)
+
 	for _, group := range grouped {
-		go func(edges []promotion.Edge) {
-			t.Done(di.signFirst(signOpts, targetIdentity(&edges[0]), &edges[0]))
-		}(group)
-		if t.Throttle() > 0 {
-			break
-		}
+		g.Go(func() error {
+			return di.signFirst(signOpts, targetIdentity(&group[0]), &group[0])
+		})
 	}
 
-	return t.Err()
+	return g.Wait()
 }
 
 // signFirst signs the first (primary) image for a given identity+digest group.
@@ -202,20 +200,19 @@ func (di *DefaultPromoterImplementation) ReplicateSignatures(
 
 	grouped := groupEdgesByIdentityDigest(edges)
 
-	t := throttler.New(opts.MaxSignatureCopies, len(grouped))
+	g := new(errgroup.Group)
+	g.SetLimit(opts.MaxSignatureCopies)
+
 	for _, group := range grouped {
 		if len(group) <= 1 {
 			continue
 		}
-		go func(edges []promotion.Edge) {
-			t.Done(di.replicateSignatures(&edges[0], edges[1:]))
-		}(group)
-		if t.Throttle() > 0 {
-			break
-		}
+		g.Go(func() error {
+			return di.replicateSignatures(&group[0], group[1:])
+		})
 	}
 
-	return t.Err()
+	return g.Wait()
 }
 
 // targetIdentity returns the production identity for a promotion edge.
