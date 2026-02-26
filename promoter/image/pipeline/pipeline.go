@@ -105,10 +105,10 @@ func (p *Pipeline) Run(ctx context.Context) error {
 			return fmt.Errorf("phase %q failed: %w", phase.Name(), err)
 		}
 
-		logrus.Infof("Phase %q completed in %s", phase.Name(), time.Since(phaseStart))
+		logrus.Infof("Phase %q completed in %s", phase.Name(), time.Since(phaseStart).Round(time.Millisecond))
 	}
 
-	logrus.Infof("Pipeline completed in %s", time.Since(start))
+	logrus.Infof("Pipeline completed in %s", time.Since(start).Round(time.Millisecond))
 
 	return nil
 }
