@@ -32,6 +32,7 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/google"
 	"github.com/sigstore/sigstore/pkg/cryptoutils"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 	yaml "gopkg.in/yaml.v2"
 	"sigs.k8s.io/release-sdk/sign"
 	"sigs.k8s.io/release-utils/http"
@@ -43,7 +44,11 @@ import (
 	"sigs.k8s.io/promo-tools/v4/types/image"
 )
 
-var mirrorsList []string
+var (
+	mirrorsOnce     sync.Once
+	mirrorsList     []string
+	errMirrorsFetch error
+)
 
 const (
 	productionImagePath      = "k8s-artifacts-prod"
@@ -75,46 +80,48 @@ func (di *DefaultPromoterImplementation) GetLatestImages(opts *options.Options) 
 }
 
 func (di *DefaultPromoterImplementation) getMirrors() ([]string, error) {
-	if mirrorsList != nil {
-		return mirrorsList, nil
-	}
-	urls := []string{}
-	iurls := map[string]string{}
-	manifest, err := http.NewAgent().Get(
-		"https://github.com/kubernetes/k8s.io/raw/main/registry.k8s.io/manifests/k8s-staging-kubernetes/promoter-manifest.yaml",
-	)
-	if err != nil {
-		return nil, fmt.Errorf("downloading promoter manifest: %w", err)
-	}
-
-	type entriesList struct {
-		Registries []struct {
-			Name string `yaml:"name,omitempty"`
-			Src  bool   `yaml:"src,omitempty"`
-		} `yaml:"registries"`
-	}
-
-	entries := entriesList{}
-	if err := yaml.Unmarshal(manifest, &entries); err != nil {
-		return nil, fmt.Errorf("unmarshalling promoter manifest: %w", err)
-	}
-
-	for _, e := range entries.Registries {
-		if e.Src {
-			continue
-		}
-		u, err := url.Parse("https://" + e.Name)
+	mirrorsOnce.Do(func() {
+		iurls := map[string]string{}
+		manifest, err := http.NewAgent().Get(
+			"https://github.com/kubernetes/k8s.io/raw/main/registry.k8s.io/manifests/k8s-staging-kubernetes/promoter-manifest.yaml",
+		)
 		if err != nil {
-			return nil, fmt.Errorf("parsing url %s: %w", u, err)
+			errMirrorsFetch = fmt.Errorf("downloading promoter manifest: %w", err)
+			return
 		}
-		iurls[u.Hostname()] = u.Hostname()
-	}
 
-	for u := range iurls {
-		urls = append(urls, u)
-	}
-	mirrorsList = urls
-	return urls, nil
+		type entriesList struct {
+			Registries []struct {
+				Name string `yaml:"name,omitempty"`
+				Src  bool   `yaml:"src,omitempty"`
+			} `yaml:"registries"`
+		}
+
+		entries := entriesList{}
+		if err := yaml.Unmarshal(manifest, &entries); err != nil {
+			errMirrorsFetch = fmt.Errorf("unmarshalling promoter manifest: %w", err)
+			return
+		}
+
+		for _, e := range entries.Registries {
+			if e.Src {
+				continue
+			}
+			u, err := url.Parse("https://" + e.Name)
+			if err != nil {
+				errMirrorsFetch = fmt.Errorf("parsing url %s: %w", u, err)
+				return
+			}
+			iurls[u.Hostname()] = u.Hostname()
+		}
+
+		urls := make([]string, 0, len(iurls))
+		for u := range iurls {
+			urls = append(urls, u)
+		}
+		mirrorsList = urls
+	})
+	return mirrorsList, errMirrorsFetch
 }
 
 func (di *DefaultPromoterImplementation) GetSignatureStatus(
@@ -174,24 +181,42 @@ type miniManifest struct {
 	} `json:"layers"`
 }
 
-// CheckSignatureLayers checks a list of signature layers to ensure.
+// CheckSignatureLayers checks a list of signature layers in parallel.
 func (di *DefaultPromoterImplementation) CheckSignatureLayers(opts *options.Options, oList []string) (existing, missing []string, err error) {
-	// TODO: Parallelize this check
-	existing = []string{}
-	missing = []string{}
-	for _, s := range oList {
-		e, err := objectExists(opts, s)
-		if err != nil {
-			return existing, missing, fmt.Errorf("checking reference: %w", err)
-		}
-
-		if !e {
-			missing = append(missing, s)
-			continue
-		}
-
-		existing = append(existing, s)
+	type result struct {
+		ref    string
+		exists bool
 	}
+
+	results := make([]result, len(oList))
+
+	g := new(errgroup.Group)
+	g.SetLimit(10)
+
+	for i, s := range oList {
+		results[i].ref = s
+		g.Go(func() error {
+			e, err := objectExists(opts, s)
+			if err != nil {
+				return fmt.Errorf("checking reference: %w", err)
+			}
+			results[i].exists = e
+			return nil
+		})
+	}
+
+	if err := g.Wait(); err != nil {
+		return nil, nil, err
+	}
+
+	for _, r := range results {
+		if r.exists {
+			existing = append(existing, r.ref)
+		} else {
+			missing = append(missing, r.ref)
+		}
+	}
+
 	return existing, missing, nil
 }
 
@@ -256,7 +281,7 @@ func objectExists(opts *options.Options, refString string) (bool, error) {
 // FixMissingSignatures signs an image that has no signatures at all.
 func (di *DefaultPromoterImplementation) FixMissingSignatures(opts *options.Options, results checkresults.Signature) error {
 	for mainImg, res := range results {
-		if len(res.Signed) > 0 {
+		if len(res.Signed) > 0 || len(res.Missing) == 0 {
 			continue
 		}
 

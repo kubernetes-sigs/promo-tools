@@ -180,19 +180,18 @@ func ReadManifests(options PromoteFilesOptions) ([]*api.Manifest, error) {
 
 	var projects []string
 
-	// TODO: Consider using filepath.WalkDir() instead
-	if err := filepath.Walk(
+	if err := filepath.WalkDir(
 		filestoresDir,
-		func(_ string, info os.FileInfo, err error) error {
+		func(_ string, d os.DirEntry, err error) error {
 			if err != nil {
 				return err
 			}
 
-			if !info.IsDir() || info.Name() == "filestores" {
+			if !d.IsDir() || d.Name() == "filestores" {
 				return nil
 			}
 
-			projects = append(projects, info.Name())
+			projects = append(projects, d.Name())
 			return nil
 		},
 	); err != nil {
@@ -283,12 +282,12 @@ func readFilestores(p string) ([]api.Filestore, error) {
 func readFiles(filesPath string) ([]api.File, error) {
 	// We first list and sort the paths, for a consistent ordering
 	var paths []string
-	err := filepath.Walk(filesPath, func(p string, info os.FileInfo, err error) error {
+	err := filepath.WalkDir(filesPath, func(p string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 
-		if info.IsDir() {
+		if d.IsDir() {
 			return nil
 		}
 

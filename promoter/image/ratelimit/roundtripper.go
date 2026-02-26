@@ -61,19 +61,6 @@ type RoundTripper struct {
 
 var _ http.RoundTripper = &RoundTripper{}
 
-// Limiter is the global default rate limiter, kept for backwards compatibility.
-//
-// Deprecated: Use NewRoundTripper or a BudgetAllocator instead of the global
-// singleton. The global singleton causes promotion and signing to compete for
-// the same rate budget, leading to 429 errors under load.
-var Limiter *RoundTripper
-
-func init() {
-	if Limiter == nil {
-		Limiter = NewRoundTripper(MaxEvents)
-	}
-}
-
 // NewRoundTripper creates a rate-limited HTTP transport with the given
 // requests-per-second limit.
 func NewRoundTripper(limit rate.Limit) *RoundTripper {

@@ -102,7 +102,7 @@ func (s *gcsSyncFilestore) UploadFile(ctx context.Context, dest, localFile strin
 
 	if _, err := io.Copy(w, in); err != nil {
 		if err2 := w.Close(); err2 != nil {
-			logrus.Warnf("error closing upload stream: %v", err)
+			logrus.Warnf("error closing upload stream: %v", err2)
 			// TODO: Try to delete the possibly partially written file?
 		}
 		return fmt.Errorf("error uploading to %q: %v", gcsURL, err)

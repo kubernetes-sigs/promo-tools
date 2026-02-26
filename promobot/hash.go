@@ -61,7 +61,7 @@ func GenerateManifest(_ context.Context, options GenerateManifestOptions) (*api.
 		basedir += "/"
 	}
 
-	if err := filepath.Walk(basedir, func(p string, info os.FileInfo, err error) error {
+	if err := filepath.WalkDir(basedir, func(p string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -73,7 +73,7 @@ func GenerateManifest(_ context.Context, options GenerateManifestOptions) (*api.
 			return nil
 		}
 
-		if !info.IsDir() {
+		if !d.IsDir() {
 			relativePath := strings.TrimPrefix(p, basedir)
 			sha256, err := hash.SHA256ForFile(p)
 			if err != nil {

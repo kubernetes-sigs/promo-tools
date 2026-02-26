@@ -169,16 +169,6 @@ func TestBackoffCooldown(t *testing.T) {
 	}
 }
 
-func TestGlobalLimiterBackwardsCompat(t *testing.T) {
-	// Verify the global Limiter is initialized.
-	if Limiter == nil {
-		t.Fatal("global Limiter should be initialized via init()")
-	}
-	if Limiter.rateLimiter.Limit() != MaxEvents {
-		t.Errorf("expected global limiter rate %v, got %v", MaxEvents, Limiter.rateLimiter.Limit())
-	}
-}
-
 func TestWaitForBackoffRespectsContext(t *testing.T) {
 	rt := NewNamedRoundTripper("test", rate.Inf, 1)
 
