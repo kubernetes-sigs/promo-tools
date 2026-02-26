@@ -147,7 +147,7 @@ type Options struct {
 
 var DefaultOptions = &Options{
 	OutputFormat:            "yaml",
-	Threads:                 10,
+	Threads:                 20,
 	SeverityThreshold:       -1,
 	SignImages:              true,
 	SignerAccount:           "krel-trust@k8s-releng-prod.iam.gserviceaccount.com",

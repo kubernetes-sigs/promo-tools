@@ -38,6 +38,7 @@ import (
 	"github.com/nozzle/throttler"
 	"github.com/sigstore/sigstore/pkg/tuf"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/release-sdk/sign"
 	"sigs.k8s.io/release-utils/version"
@@ -365,37 +366,41 @@ func (di *DefaultPromoterImplementation) replicateSignatures(
 		dstRefs = append(dstRefs, ref)
 	}
 
-	// Copy the signatures to the missing registries
+	// Copy the signatures to the missing registries in parallel.
+	g := new(errgroup.Group)
 	for _, dstRef := range dstRefs {
-		// Skip if the signature tag already exists at the destination.
-		if _, err := remote.Head(dstRef,
-			remote.WithAuthFromKeychain(gcrane.Keychain),
-			remote.WithTransport(di.getSigningTransport()),
-		); err == nil {
-			logrus.WithField("dst", dstRef.String()).Debug("Signature already exists, skipping")
-			continue
-		}
-
-		logrus.WithField("src", srcRef.String()).Infof("replication > %s", dstRef.String())
-		opts := []crane.Option{
-			crane.WithAuthFromKeychain(gcrane.Keychain),
-			crane.WithUserAgent(image.UserAgent),
-			crane.WithTransport(di.getSigningTransport()),
-		}
-		if err := di.copyWithRetry(srcRef.String(), dstRef.String(), opts); err != nil {
-			var terr *transport.Error
-			if errors.As(err, &terr) && terr.StatusCode == http.StatusNotFound {
-				logrus.Debugf("Signature %s not found, skipping", srcRef.String())
-				continue
+		g.Go(func() error {
+			// Skip if the signature tag already exists at the destination.
+			if _, err := remote.Head(dstRef,
+				remote.WithAuthFromKeychain(gcrane.Keychain),
+				remote.WithTransport(di.getSigningTransport()),
+			); err == nil {
+				logrus.WithField("dst", dstRef.String()).Debug("Signature already exists, skipping")
+				return nil
 			}
-			return fmt.Errorf(
-				"copying signature %s to %s: %w",
-				srcRef.String(), dstRef.String(), err,
-			)
-		}
+
+			logrus.WithField("src", srcRef.String()).Infof("replication > %s", dstRef.String())
+			opts := []crane.Option{
+				crane.WithAuthFromKeychain(gcrane.Keychain),
+				crane.WithUserAgent(image.UserAgent),
+				crane.WithTransport(di.getSigningTransport()),
+			}
+			if err := di.copyWithRetry(srcRef.String(), dstRef.String(), opts); err != nil {
+				var terr *transport.Error
+				if errors.As(err, &terr) && terr.StatusCode == http.StatusNotFound {
+					logrus.Debugf("Signature %s not found, skipping", srcRef.String())
+					return nil
+				}
+				return fmt.Errorf(
+					"copying signature %s to %s: %w",
+					srcRef.String(), dstRef.String(), err,
+				)
+			}
+			return nil
+		})
 	}
 
-	return nil
+	return g.Wait()
 }
 
 // retryBackoff defines the exponential backoff for transient registry errors.
@@ -460,12 +465,15 @@ func (di *DefaultPromoterImplementation) copyWithRetry(src, dst string, opts []c
 // attached in staging (e.g., by the build system) and are identified by
 // the cosign SBOM tag convention (sha256-<hash>.sbom).
 func (di *DefaultPromoterImplementation) WriteSBOMs(
-	_ *options.Options, edges map[promotion.Edge]interface{},
+	opts *options.Options, edges map[promotion.Edge]interface{},
 ) error {
 	if len(edges) == 0 {
 		logrus.Info("No images were promoted. No SBOMs to copy.")
 		return nil
 	}
+
+	g := new(errgroup.Group)
+	g.SetLimit(opts.MaxSignatureCopies)
 
 	for edge := range edges {
 		// Skip signature and attestation layers
@@ -476,12 +484,15 @@ func (di *DefaultPromoterImplementation) WriteSBOMs(
 			continue
 		}
 
-		if err := di.copySBOM(&edge); err != nil {
-			return fmt.Errorf("copying SBOM for %s: %w", edge.DstReference(), err)
-		}
+		g.Go(func() error {
+			if err := di.copySBOM(&edge); err != nil {
+				return fmt.Errorf("copying SBOM for %s: %w", edge.DstReference(), err)
+			}
+			return nil
+		})
 	}
 
-	return nil
+	return g.Wait()
 }
 
 // copySBOM copies an SBOM from the staging registry to the production registry
