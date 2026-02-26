@@ -51,12 +51,12 @@ type Promoter struct {
 }
 
 func New(opts *options.Options) *Promoter {
-	// Create a budget allocator that splits the rate limit between
-	// promotion (70%) and signing (30%). After promotion completes,
-	// signing gets the full budget via GiveAll.
+	// Create a budget allocator that gives the full rate limit to the
+	// active phase. Promotion runs first with 100% budget, then after
+	// it completes, signing gets the full budget via GiveAll.
 	budget := ratelimit.NewBudgetAllocator(ratelimit.MaxEvents)
-	promoRT := budget.Allocate("promotion", 0.7)
-	signRT := budget.Allocate("signing", 0.3)
+	promoRT := budget.Allocate("promotion", 1.0)
+	signRT := budget.Allocate("signing", 0.0)
 
 	di := impl.NewDefaultPromoterImplementation(opts)
 	di.SetPromotionTransport(promoRT)
