@@ -60,6 +60,5 @@ func (di *DefaultPromoterImplementation) ScanEdges(
 		}
 	}
 
-	di.PrintSection("END (VULNSCAN)", opts.Confirm)
 	return nil
 }

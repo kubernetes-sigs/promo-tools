@@ -83,7 +83,9 @@ func (p *CraneProvider) ReadRegistries(
 		splitRegs = registries
 	}
 
-	for _, r := range registries {
+	for i, r := range registries {
+		logrus.Infof("Reading registry %d/%d: %s", i+1, len(registries), r.Name)
+
 		repo, err := name.NewRepository(string(r.Name))
 		if err != nil {
 			return nil, fmt.Errorf("parsing repo name %s: %w", r.Name, err)

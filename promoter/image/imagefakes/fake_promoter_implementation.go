@@ -199,12 +199,6 @@ type FakePromoterImplementation struct {
 	printSecDisclaimerMutex       sync.RWMutex
 	printSecDisclaimerArgsForCall []struct {
 	}
-	PrintSectionStub        func(string, bool)
-	printSectionMutex       sync.RWMutex
-	printSectionArgsForCall []struct {
-		arg1 string
-		arg2 bool
-	}
 	PrintVersionStub        func()
 	printVersionMutex       sync.RWMutex
 	printVersionArgsForCall []struct {
@@ -1187,39 +1181,6 @@ func (fake *FakePromoterImplementation) PrintSecDisclaimerCalls(stub func()) {
 	fake.printSecDisclaimerMutex.Lock()
 	defer fake.printSecDisclaimerMutex.Unlock()
 	fake.PrintSecDisclaimerStub = stub
-}
-
-func (fake *FakePromoterImplementation) PrintSection(arg1 string, arg2 bool) {
-	fake.printSectionMutex.Lock()
-	fake.printSectionArgsForCall = append(fake.printSectionArgsForCall, struct {
-		arg1 string
-		arg2 bool
-	}{arg1, arg2})
-	stub := fake.PrintSectionStub
-	fake.recordInvocation("PrintSection", []interface{}{arg1, arg2})
-	fake.printSectionMutex.Unlock()
-	if stub != nil {
-		fake.PrintSectionStub(arg1, arg2)
-	}
-}
-
-func (fake *FakePromoterImplementation) PrintSectionCallCount() int {
-	fake.printSectionMutex.RLock()
-	defer fake.printSectionMutex.RUnlock()
-	return len(fake.printSectionArgsForCall)
-}
-
-func (fake *FakePromoterImplementation) PrintSectionCalls(stub func(string, bool)) {
-	fake.printSectionMutex.Lock()
-	defer fake.printSectionMutex.Unlock()
-	fake.PrintSectionStub = stub
-}
-
-func (fake *FakePromoterImplementation) PrintSectionArgsForCall(i int) (string, bool) {
-	fake.printSectionMutex.RLock()
-	defer fake.printSectionMutex.RUnlock()
-	argsForCall := fake.printSectionArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2
 }
 
 func (fake *FakePromoterImplementation) PrintVersion() {

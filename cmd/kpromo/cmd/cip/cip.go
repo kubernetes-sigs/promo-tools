@@ -19,8 +19,6 @@ package cip
 import (
 	"context"
 	"fmt"
-	"sync"
-	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -293,24 +291,6 @@ vulnerability check failing [severity levels between 0 and 5; 0 - UNSPECIFIED,
 	)
 }
 
-// logTimingHook is a logrus hook that records elapsed time between log entries.
-type logTimingHook struct {
-	lastTime time.Time
-	mu       sync.RWMutex
-}
-
-func (h *logTimingHook) Fire(e *logrus.Entry) error {
-	h.mu.Lock()
-	e.Data["diff"] = e.Time.Sub(h.lastTime).Round(time.Millisecond)
-	h.lastTime = e.Time
-	h.mu.Unlock()
-	return nil
-}
-
-func (h *logTimingHook) Levels() []logrus.Level {
-	return logrus.AllLevels
-}
-
 func runPromoteCmd(opts *options.Options) error {
 	cip := promoter.New(opts)
 
@@ -319,7 +299,6 @@ func runPromoteCmd(opts *options.Options) error {
 		FullTimestamp:    true,
 		TimestampFormat:  "15:04:05.000",
 	})
-	logrus.AddHook(&logTimingHook{lastTime: time.Now()})
 
 	logrus.Infof("Options to check the Signatures: SignCheckIdentity: %s | SignCheckIdentityRegexp: %s | SignCheckIssuer: %s | SignCheckIssuerRegexp: %s",
 		opts.SignCheckIdentity, opts.SignCheckIdentityRegexp, opts.SignCheckIssuer, opts.SignCheckIssuerRegexp,
