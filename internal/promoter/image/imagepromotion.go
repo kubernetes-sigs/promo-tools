@@ -20,6 +20,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync/atomic"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -132,7 +134,10 @@ func (di *DefaultPromoterImplementation) PromoteImages(
 		)
 	}
 
-	logrus.Info("---------- BEGIN PROMOTION ----------")
+	total := len(edges)
+	logrus.Infof("Promoting %d images using %d threads", total, opts.Threads)
+
+	var completed atomic.Int64
 
 	ctx := context.Background()
 	g, ctx := errgroup.WithContext(ctx)
@@ -156,9 +161,11 @@ func (di *DefaultPromoterImplementation) PromoteImages(
 			}
 
 			logrus.Infof("Copying %s to %s", srcVertex, dstVertex)
+			start := time.Now()
 			if err := di.registryProvider.CopyImage(ctx, srcVertex, dstVertex); err != nil {
 				return fmt.Errorf("copying %s to %s: %w", srcVertex, dstVertex, err)
 			}
+			logrus.Infof("Copied %s (%d/%d) in %s", dstVertex, completed.Add(1), total, time.Since(start).Round(time.Millisecond))
 			return nil
 		})
 	}
@@ -167,6 +174,5 @@ func (di *DefaultPromoterImplementation) PromoteImages(
 		return fmt.Errorf("running image promotion: %w", err)
 	}
 
-	di.PrintSection("END (PROMOTION)", true)
 	return nil
 }

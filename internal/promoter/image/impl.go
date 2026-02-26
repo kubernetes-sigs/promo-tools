@@ -159,16 +159,6 @@ func (di *DefaultPromoterImplementation) PrintVersion() {
 	logrus.Info(version.Get())
 }
 
-// printSection handles the start/finish labels in the
-// former legacy cli/run code.
-func (di *DefaultPromoterImplementation) PrintSection(message string, confirm bool) {
-	dryRunLabel := ""
-	if !confirm {
-		dryRunLabel = "(DRY RUN) "
-	}
-	logrus.Infof("********** %s %s**********", message, dryRunLabel)
-}
-
 // printSecDisclaimer prints a disclaimer about false positives
 // that may be found in container image layers.
 func (di *DefaultPromoterImplementation) PrintSecDisclaimer() {

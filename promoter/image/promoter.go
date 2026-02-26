@@ -139,7 +139,6 @@ type promoterImplementation interface {
 	// Utility functions
 	PrintVersion()
 	PrintSecDisclaimer()
-	PrintSection(string, bool)
 }
 
 // PromoteImages is the main method for image promotion.
@@ -176,7 +175,6 @@ func (p *Promoter) PromoteImages(ctx context.Context, opts *options.Options) err
 		}
 
 		p.impl.PrintVersion()
-		p.impl.PrintSection("START (PROMOTION)", opts.Confirm)
 
 		promotionEdges, err = p.impl.GetPromotionEdges(opts, mfests)
 		if err != nil {
@@ -291,7 +289,6 @@ func (p *Promoter) Snapshot(opts *options.Options) (err error) {
 	}
 
 	p.impl.PrintVersion()
-	p.impl.PrintSection("START (SNAPSHOT)", opts.Confirm)
 
 	mfests, err := p.impl.GetSnapshotManifests(opts)
 	if err != nil {
@@ -332,7 +329,6 @@ func (p *Promoter) SecurityScan(opts *options.Options) error {
 	}
 
 	p.impl.PrintVersion()
-	p.impl.PrintSection("START (VULN CHECK)", opts.Confirm)
 	p.impl.PrintSecDisclaimer()
 
 	promotionEdges, err := p.impl.GetPromotionEdges(opts, mfests)

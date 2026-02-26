@@ -50,7 +50,6 @@ func (di *DefaultPromoterImplementation) Snapshot(opts *options.Options, rii reg
 	}
 
 	// TODO: Maybe store the snapshot somewhere?
-	di.PrintSection("END (SNAPSHOT)", opts.Confirm)
 	fmt.Println(snapshot)
 	return nil
 }
