@@ -38,6 +38,7 @@ import (
 	"github.com/nozzle/throttler"
 	"github.com/sigstore/sigstore/pkg/tuf"
 	"github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/release-sdk/sign"
 	"sigs.k8s.io/release-utils/version"
 
@@ -341,10 +342,7 @@ func (di *DefaultPromoterImplementation) replicateSignatures(
 
 	// Check if the source signature exists before iterating mirrors.
 	// This avoids 20+ unnecessary HEAD requests per unsigned image.
-	if _, err := remote.Head(srcRef,
-		remote.WithAuthFromKeychain(gcrane.Keychain),
-		remote.WithTransport(di.getSigningTransport()),
-	); err != nil {
+	if err := di.headWithRetry(srcRef); err != nil {
 		var terr *transport.Error
 		if errors.As(err, &terr) && terr.StatusCode == http.StatusNotFound {
 			logrus.WithField("src", sourceRefStr).Debug("Source signature not found, skipping group")
@@ -384,7 +382,7 @@ func (di *DefaultPromoterImplementation) replicateSignatures(
 			crane.WithUserAgent(image.UserAgent),
 			crane.WithTransport(di.getSigningTransport()),
 		}
-		if err := crane.Copy(srcRef.String(), dstRef.String(), opts...); err != nil {
+		if err := di.copyWithRetry(srcRef.String(), dstRef.String(), opts); err != nil {
 			var terr *transport.Error
 			if errors.As(err, &terr) && terr.StatusCode == http.StatusNotFound {
 				logrus.Debugf("Signature %s not found, skipping", srcRef.String())
@@ -398,6 +396,63 @@ func (di *DefaultPromoterImplementation) replicateSignatures(
 	}
 
 	return nil
+}
+
+// retryBackoff defines the exponential backoff for transient registry errors.
+var retryBackoff = wait.Backoff{
+	Duration: 30 * time.Second,
+	Factor:   2,
+	Jitter:   0.1,
+	Steps:    3,
+}
+
+// isTransient returns true for HTTP status codes that indicate a temporary
+// failure worth retrying (429 Too Many Requests and 5xx server errors).
+func isTransient(err error) bool {
+	var terr *transport.Error
+	if errors.As(err, &terr) {
+		return terr.StatusCode == http.StatusTooManyRequests ||
+			terr.StatusCode >= http.StatusInternalServerError
+	}
+	return false
+}
+
+// withRetry calls fn with exponential backoff on transient registry errors.
+// Non-transient errors are returned immediately.
+func withRetry(fn func() error) error {
+	var lastErr error
+	err := wait.ExponentialBackoff(retryBackoff, func() (bool, error) {
+		lastErr = fn()
+		if lastErr == nil {
+			return true, nil // success, stop retrying
+		}
+		if !isTransient(lastErr) {
+			return false, lastErr // permanent error, stop retrying
+		}
+		return false, nil // transient error, keep retrying
+	})
+	if wait.Interrupted(err) {
+		return lastErr // retries exhausted, return the last transient error
+	}
+	return err
+}
+
+// headWithRetry performs a remote.Head with retries on transient errors.
+func (di *DefaultPromoterImplementation) headWithRetry(ref name.Reference) error {
+	return withRetry(func() error {
+		_, err := remote.Head(ref,
+			remote.WithAuthFromKeychain(gcrane.Keychain),
+			remote.WithTransport(di.getSigningTransport()),
+		)
+		return err
+	})
+}
+
+// copyWithRetry performs a crane.Copy with retries on transient errors.
+func (di *DefaultPromoterImplementation) copyWithRetry(src, dst string, opts []crane.Option) error {
+	return withRetry(func() error {
+		return crane.Copy(src, dst, opts...)
+	})
 }
 
 // WriteSBOMs copies pre-generated SBOMs from the staging registry to each
