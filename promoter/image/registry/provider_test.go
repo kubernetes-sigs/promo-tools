@@ -36,9 +36,11 @@ func TestRegistryConfigFromContext(t *testing.T) {
 	if config.Name != rc.Name {
 		t.Errorf("Name = %q, want %q", config.Name, rc.Name)
 	}
+
 	if config.ServiceAccount != rc.ServiceAccount {
 		t.Errorf("ServiceAccount = %q, want %q", config.ServiceAccount, rc.ServiceAccount)
 	}
+
 	if config.Src != rc.Src {
 		t.Errorf("Src = %v, want %v", config.Src, rc.Src)
 	}
@@ -55,12 +57,15 @@ func TestRegistryConfigsFromContexts(t *testing.T) {
 	if len(configs) != 2 {
 		t.Fatalf("len(configs) = %d, want 2", len(configs))
 	}
+
 	if configs[0].Name != "gcr.io/staging" {
 		t.Errorf("configs[0].Name = %q, want %q", configs[0].Name, "gcr.io/staging")
 	}
+
 	if !configs[0].Src {
 		t.Error("configs[0].Src = false, want true")
 	}
+
 	if configs[1].Name != "us-docker.pkg.dev/prod/images" {
 		t.Errorf("configs[1].Name = %q", configs[1].Name)
 	}
@@ -72,6 +77,7 @@ func TestNewInventory(t *testing.T) {
 	if inv.Images == nil {
 		t.Error("Images map is nil")
 	}
+
 	if inv.MediaTypes == nil {
 		t.Error("MediaTypes map is nil")
 	}
@@ -90,9 +96,11 @@ func TestFakeProviderAddImage(t *testing.T) {
 	if _, ok := f.Inventory.Images[reg]; !ok {
 		t.Fatal("registry not found in inventory")
 	}
+
 	if _, ok := f.Inventory.Images[reg][name]; !ok {
 		t.Fatal("image not found in inventory")
 	}
+
 	storedTags := f.Inventory.Images[reg][name][digest]
 	if len(storedTags) != 2 {
 		t.Fatalf("len(tags) = %d, want 2", len(storedTags))
@@ -107,6 +115,7 @@ func TestFakeProviderReadRegistries(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadRegistries() error = %v", err)
 	}
+
 	if len(inv.Images) != 1 {
 		t.Errorf("len(Images) = %d, want 1", len(inv.Images))
 	}
@@ -129,9 +138,11 @@ func TestFakeProviderCopyImage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CopyImage() error = %v", err)
 	}
+
 	if len(f.CopiedImages) != 1 {
 		t.Fatalf("len(CopiedImages) = %d, want 1", len(f.CopiedImages))
 	}
+
 	if f.CopiedImages[0].Src != "src:tag" || f.CopiedImages[0].Dst != "dst:tag" {
 		t.Errorf("CopiedImages[0] = %+v", f.CopiedImages[0])
 	}
@@ -187,14 +198,18 @@ func TestSplitByKnownRegistries(t *testing.T) {
 				if err == nil {
 					t.Error("expected error")
 				}
+
 				return
 			}
+
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
+
 			if reg != tt.wantReg {
 				t.Errorf("reg = %q, want %q", reg, tt.wantReg)
 			}
+
 			if img != tt.wantImg {
 				t.Errorf("img = %q, want %q", img, tt.wantImg)
 			}
@@ -223,6 +238,7 @@ func TestSupportedMediaType(t *testing.T) {
 			if tt.expectErr && err == nil {
 				t.Error("expected error")
 			}
+
 			if !tt.expectErr && err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}

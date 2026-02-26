@@ -19,6 +19,7 @@ package file
 import (
 	"context"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"hash/crc32"
 	"io"
@@ -57,7 +58,13 @@ func (s *gcsSyncFilestore) OpenReader(
 	name string,
 ) (io.ReadCloser, error) {
 	absolutePath := s.prefix + name
-	return s.client.Bucket(s.bucket).Object(absolutePath).NewReader(ctx)
+
+	reader, err := s.client.Bucket(s.bucket).Object(absolutePath).NewReader(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("opening GCS reader for %s: %w", absolutePath, err)
+	}
+
+	return reader, nil
 }
 
 // UploadFile uploads a local file to the specified destination.
@@ -68,8 +75,9 @@ func (s *gcsSyncFilestore) UploadFile(ctx context.Context, dest, localFile strin
 
 	in, err := os.Open(localFile)
 	if err != nil {
-		return fmt.Errorf("error opening %q: %v", localFile, err)
+		return fmt.Errorf("error opening %q: %w", localFile, err)
 	}
+
 	defer func() {
 		if err := in.Close(); err != nil {
 			logrus.Warnf("error closing %q: %v", localFile, err)
@@ -81,12 +89,13 @@ func (s *gcsSyncFilestore) UploadFile(ctx context.Context, dest, localFile strin
 	{
 		hasher := crc32.New(crc32.MakeTable(crc32.Castagnoli))
 		if _, err := io.Copy(hasher, in); err != nil {
-			return fmt.Errorf("error computing crc32 checksum: %v", err)
+			return fmt.Errorf("error computing crc32 checksum: %w", err)
 		}
+
 		fileCRC32C = hasher.Sum32()
 
 		if _, err := in.Seek(0, 0); err != nil {
-			return fmt.Errorf("error rewinding in file: %v", err)
+			return fmt.Errorf("error rewinding in file: %w", err)
 		}
 	}
 
@@ -105,11 +114,12 @@ func (s *gcsSyncFilestore) UploadFile(ctx context.Context, dest, localFile strin
 			logrus.Warnf("error closing upload stream: %v", err2)
 			// TODO: Try to delete the possibly partially written file?
 		}
-		return fmt.Errorf("error uploading to %q: %v", gcsURL, err)
+
+		return fmt.Errorf("error uploading to %q: %w", gcsURL, err)
 	}
 
 	if err := w.Close(); err != nil {
-		return fmt.Errorf("error uploading to %q: %v", gcsURL, err)
+		return fmt.Errorf("error uploading to %q: %w", gcsURL, err)
 	}
 
 	return nil
@@ -123,17 +133,20 @@ func (s *gcsSyncFilestore) ListFiles(
 
 	q := &storage.Query{Prefix: s.prefix}
 	logrus.Infof("listing files in bucket %s with prefix %q", s.bucket, s.prefix)
+
 	it := s.client.Bucket(s.bucket).Objects(ctx, q)
 	for {
 		obj, err := it.Next()
-		if err == iterator.Done {
+		if errors.Is(err, iterator.Done) {
 			break
 		}
+
 		if err != nil {
 			return nil, fmt.Errorf(
-				"error listing objects in %q: %v",
+				"error listing objects in %q: %w",
 				s.filestore.Base, err)
 		}
+
 		name := obj.Name
 		if !strings.HasPrefix(name, s.prefix) {
 			return nil, fmt.Errorf(
@@ -143,6 +156,7 @@ func (s *gcsSyncFilestore) ListFiles(
 
 		file := &SyncFileInfo{}
 		file.AbsolutePath = s.provider.Scheme() + api.Backslash + s.bucket + "/" + obj.Name
+
 		file.RelativePath = strings.TrimPrefix(name, s.prefix)
 		if obj.MD5 == nil {
 			return nil, fmt.Errorf("MD5 not set on file %q", file.AbsolutePath)

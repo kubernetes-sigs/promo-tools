@@ -81,6 +81,7 @@ func (b *BudgetAllocator) Get(name string) (*RoundTripper, error) {
 	if !ok {
 		return nil, fmt.Errorf("no rate limiter allocated with name %q", name)
 	}
+
 	return alloc.limiter, nil
 }
 
@@ -95,6 +96,7 @@ func (b *BudgetAllocator) Rebalance(from, to string, fraction float64) error {
 	if !ok {
 		return fmt.Errorf("source allocation %q not found", from)
 	}
+
 	toAlloc, ok := b.allocations[to]
 	if !ok {
 		return fmt.Errorf("destination allocation %q not found", to)
@@ -104,6 +106,7 @@ func (b *BudgetAllocator) Rebalance(from, to string, fraction float64) error {
 	if fromAlloc.fraction < 0 {
 		fromAlloc.fraction = 0
 	}
+
 	toAlloc.fraction += fraction
 
 	fromAlloc.limiter.SetLimit(rate.Limit(float64(b.total) * fromAlloc.fraction))
@@ -159,6 +162,7 @@ func (b *BudgetAllocator) Stats() map[string]struct {
 		Requests int64
 		Waited   string
 	})
+
 	for name, alloc := range b.allocations {
 		reqs, waited := alloc.limiter.Stats()
 		stats[name] = struct {
@@ -166,5 +170,6 @@ func (b *BudgetAllocator) Stats() map[string]struct {
 			Waited   string
 		}{reqs, waited.String()}
 	}
+
 	return stats
 }

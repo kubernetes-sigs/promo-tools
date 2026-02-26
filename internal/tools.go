@@ -1,5 +1,3 @@
-// +build tools
-
 /*
 Copyright 2021 The Kubernetes Authors.
 
@@ -15,6 +13,8 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+
+//go:build tools
 
 // This is used to import things required by build scripts, to force `go mod` to see them as dependencies
 

@@ -17,6 +17,7 @@ limitations under the License.
 package ratelimit
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"sync/atomic"
@@ -31,6 +32,7 @@ func TestNewRoundTripper(t *testing.T) {
 	if rt == nil {
 		t.Fatal("NewRoundTripper returned nil")
 	}
+
 	if rt.name != "default" {
 		t.Errorf("expected name 'default', got %q", rt.name)
 	}
@@ -46,6 +48,7 @@ func TestNewNamedRoundTripper(t *testing.T) {
 func TestRoundTripRateLimitsAllMethods(t *testing.T) {
 	// Verify that all HTTP methods are rate-limited, not just GET/HEAD.
 	var requestCount atomic.Int64
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requestCount.Add(1)
 		w.WriteHeader(http.StatusOK)
@@ -58,14 +61,16 @@ func TestRoundTripRateLimitsAllMethods(t *testing.T) {
 
 	methods := []string{http.MethodGet, http.MethodHead, http.MethodPut, http.MethodPost, http.MethodPatch}
 	for _, method := range methods {
-		req, err := http.NewRequest(method, server.URL, http.NoBody)
+		req, err := http.NewRequestWithContext(context.Background(), method, server.URL, http.NoBody)
 		if err != nil {
 			t.Fatalf("creating %s request: %v", method, err)
 		}
-		resp, err := client.Do(req)
+
+		resp, err := client.Do(req) //nolint:gosec // httptest URL
 		if err != nil {
 			t.Fatalf("%s request failed: %v", method, err)
 		}
+
 		resp.Body.Close()
 	}
 
@@ -76,12 +81,15 @@ func TestRoundTripRateLimitsAllMethods(t *testing.T) {
 
 func TestAdaptiveBackoffOn429(t *testing.T) {
 	callCount := 0
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		callCount++
 		if callCount == 1 {
 			w.WriteHeader(http.StatusTooManyRequests)
+
 			return
 		}
+
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer server.Close()
@@ -91,15 +99,18 @@ func TestAdaptiveBackoffOn429(t *testing.T) {
 	client := &http.Client{Transport: rt}
 
 	// First request triggers 429 and backoff.
-	req, err := http.NewRequest(http.MethodGet, server.URL, http.NoBody)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, server.URL, http.NoBody)
 	if err != nil {
 		t.Fatalf("creating request: %v", err)
 	}
-	resp, reqErr := client.Do(req)
+
+	resp, reqErr := client.Do(req) //nolint:gosec // httptest URL
 	if reqErr != nil {
 		t.Fatalf("first request failed: %v", reqErr)
 	}
+
 	resp.Body.Close()
+
 	if resp.StatusCode != http.StatusTooManyRequests {
 		t.Errorf("expected 429, got %d", resp.StatusCode)
 	}
@@ -108,6 +119,7 @@ func TestAdaptiveBackoffOn429(t *testing.T) {
 	rt.mu.Lock()
 	hasBackoff := !rt.backoffUntil.IsZero()
 	rt.mu.Unlock()
+
 	if !hasBackoff {
 		t.Error("expected backoff to be triggered after 429")
 	}
@@ -123,14 +135,16 @@ func TestStatsTracking(t *testing.T) {
 	client := &http.Client{Transport: rt}
 
 	for range 5 {
-		req, err := http.NewRequest(http.MethodGet, server.URL, http.NoBody)
+		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, server.URL, http.NoBody)
 		if err != nil {
 			t.Fatalf("creating request: %v", err)
 		}
-		resp, err := client.Do(req)
+
+		resp, err := client.Do(req) //nolint:gosec // httptest URL
 		if err != nil {
 			t.Fatalf("request failed: %v", err)
 		}
+
 		resp.Body.Close()
 	}
 
@@ -184,12 +198,13 @@ func TestWaitForBackoffRespectsContext(t *testing.T) {
 	defer server.Close()
 
 	// Use a context with a short timeout.
-	req, err := http.NewRequest(http.MethodGet, server.URL, http.NoBody)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, server.URL, http.NoBody)
 	if err != nil {
 		t.Fatalf("creating request: %v", err)
 	}
 
 	done := make(chan struct{})
+
 	go func() {
 		rt.waitForBackoff(req.Context())
 		close(done)

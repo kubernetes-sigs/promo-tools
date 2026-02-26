@@ -17,6 +17,7 @@ limitations under the License.
 package gh2gcs
 
 import (
+	"fmt"
 	"path/filepath"
 	"strings"
 
@@ -58,7 +59,11 @@ func DownloadReleases(releaseCfg *ReleaseConfig, ghClient *github.GitHub, output
 		tagsString,
 	)
 
-	return ghClient.DownloadReleaseAssets(releaseCfg.Org, releaseCfg.Repo, tags, outputDir)
+	if err := ghClient.DownloadReleaseAssets(releaseCfg.Org, releaseCfg.Repo, tags, outputDir); err != nil {
+		return fmt.Errorf("downloading release assets: %w", err)
+	}
+
+	return nil
 }
 
 // Upload copies a set of release assets from local directory to GCS
@@ -73,7 +78,7 @@ func Upload(cfg *ReleaseConfig, _ *github.GitHub, outputDir string) error {
 
 		gcs := object.NewGCS()
 		if err := gcs.CopyToRemote(srcDir, gcsPath); err != nil {
-			return err
+			return fmt.Errorf("copying to remote %s: %w", gcsPath, err)
 		}
 	}
 

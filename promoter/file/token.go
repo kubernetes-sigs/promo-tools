@@ -17,6 +17,7 @@ limitations under the License.
 package file
 
 import (
+	"fmt"
 	"strings"
 	"sync"
 
@@ -47,11 +48,13 @@ func (s *gcloudTokenSource) Token() (*oauth2.Token, error) {
 	}
 
 	cmd := command.New("gcloud", args...)
+
 	std, err := cmd.RunSilentSuccessOutput()
 	if err != nil {
 		logrus.Warnf("failed to get service-account-token for %q: %v",
 			s.ServiceAccount, err)
-		return nil, err
+
+		return nil, fmt.Errorf("getting access token for %q: %w", s.ServiceAccount, err)
 	}
 
 	return &oauth2.Token{

@@ -18,6 +18,7 @@ package vuln
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -62,12 +63,14 @@ func (s *GrafeasScanner) Scan(ctx context.Context, ref string) (*ScanResult, err
 	}
 
 	result := &ScanResult{Reference: ref}
+
 	it := client.GetGrafeasClient().ListOccurrences(ctx, req)
 	for {
 		occ, err := it.Next()
-		if err == iterator.Done {
+		if errors.Is(err, iterator.Done) {
 			break
 		}
+
 		if err != nil {
 			return nil, fmt.Errorf("listing occurrences: %w", err)
 		}
@@ -92,10 +95,12 @@ func (s *GrafeasScanner) Scan(ctx context.Context, ref string) (*ScanResult, err
 		// Extract package info from the first affected package, if available.
 		if pkgs := vuln.GetPackageIssue(); len(pkgs) > 0 {
 			pkg := pkgs[0]
+
 			v.Package = pkg.GetAffectedPackage()
 			if affected := pkg.GetAffectedVersion(); affected != nil {
 				v.InstalledVersion = affected.GetFullName()
 			}
+
 			if fixed := pkg.GetFixedVersion(); fixed != nil {
 				v.FixedVersion = fixed.GetFullName()
 			}
@@ -118,10 +123,10 @@ func (s *GrafeasScanner) Scan(ctx context.Context, ref string) (*ScanResult, err
 func parseProjectID(ref string) (string, error) {
 	// Strip digest or tag
 	refBase := ref
-	if idx := strings.Index(ref, "@"); idx != -1 {
-		refBase = ref[:idx]
-	} else if idx := strings.Index(ref, ":"); idx != -1 {
-		refBase = ref[:idx]
+	if before, _, ok := strings.Cut(ref, "@"); ok {
+		refBase = before
+	} else if before, _, ok := strings.Cut(ref, ":"); ok {
+		refBase = before
 	}
 
 	parts := strings.Split(refBase, "/")

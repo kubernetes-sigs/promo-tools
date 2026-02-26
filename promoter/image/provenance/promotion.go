@@ -72,6 +72,7 @@ func (g *PromotionGenerator) Generate(_ context.Context, record *PromotionRecord
 	if err != nil {
 		return nil, fmt.Errorf("marshaling provenance statement: %w", err)
 	}
+
 	return data, nil
 }
 
@@ -82,7 +83,7 @@ func trimDigestPrefix(digest string) string {
 
 // intotoStatement is a minimal in-toto v1 statement.
 type intotoStatement struct {
-	Type          string        `json:"_type"`
+	Type          string        `json:"_type"` //nolint:tagliatelle // in-toto spec field
 	PredicateType string        `json:"predicateType"`
 	Subject       []subject     `json:"subject"`
 	Predicate     slsaPredicate `json:"predicate"`

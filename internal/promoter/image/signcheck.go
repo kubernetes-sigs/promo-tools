@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -68,6 +69,7 @@ func (di *DefaultPromoterImplementation) GetLatestImages(opts *options.Options) 
 				return nil, fmt.Errorf("invalid image reference %s: %w", refString, err)
 			}
 		}
+
 		return opts.SignCheckReferences, nil
 	}
 
@@ -75,18 +77,22 @@ func (di *DefaultPromoterImplementation) GetLatestImages(opts *options.Options) 
 	if err != nil {
 		return nil, fmt.Errorf("fetching latest images: %w", err)
 	}
+
 	logrus.Infof("Images to check: +%v", images)
+
 	return images, nil
 }
 
 func (di *DefaultPromoterImplementation) getMirrors() ([]string, error) {
 	mirrorsOnce.Do(func() {
 		iurls := map[string]string{}
+
 		manifest, err := http.NewAgent().Get(
 			"https://github.com/kubernetes/k8s.io/raw/main/registry.k8s.io/manifests/k8s-staging-kubernetes/promoter-manifest.yaml",
 		)
 		if err != nil {
 			errMirrorsFetch = fmt.Errorf("downloading promoter manifest: %w", err)
+
 			return
 		}
 
@@ -100,6 +106,7 @@ func (di *DefaultPromoterImplementation) getMirrors() ([]string, error) {
 		entries := entriesList{}
 		if err := yaml.Unmarshal(manifest, &entries); err != nil {
 			errMirrorsFetch = fmt.Errorf("unmarshalling promoter manifest: %w", err)
+
 			return
 		}
 
@@ -107,11 +114,14 @@ func (di *DefaultPromoterImplementation) getMirrors() ([]string, error) {
 			if e.Src {
 				continue
 			}
+
 			u, err := url.Parse("https://" + e.Name)
 			if err != nil {
 				errMirrorsFetch = fmt.Errorf("parsing url %s: %w", u, err)
+
 				return
 			}
+
 			iurls[u.Hostname()] = u.Hostname()
 		}
 
@@ -119,8 +129,10 @@ func (di *DefaultPromoterImplementation) getMirrors() ([]string, error) {
 		for u := range iurls {
 			urls = append(urls, u)
 		}
+
 		mirrorsList = urls
 	})
+
 	return mirrorsList, errMirrorsFetch
 }
 
@@ -128,14 +140,17 @@ func (di *DefaultPromoterImplementation) GetSignatureStatus(
 	opts *options.Options, images []string,
 ) (checkresults.Signature, error) {
 	results := checkresults.Signature{}
+
 	mirrors, err := di.getMirrors()
 	if err != nil {
 		return results, fmt.Errorf("reading mirrors: %w", err)
 	}
+
 	logrus.Infof(
 		"Checking %d images for signatures, each in %d mirrors",
 		len(images), len(mirrors),
 	)
+
 	for _, refString := range images {
 		ref, err := name.ParseReference(refString)
 		if err != nil {
@@ -148,6 +163,7 @@ func (di *DefaultPromoterImplementation) GetSignatureStatus(
 		}
 
 		targetImages := []string{}
+
 		for _, mirror := range mirrors {
 			rpath := productionRepositoryPath
 			if strings.HasSuffix(mirror, ".gcr.io") {
@@ -161,28 +177,31 @@ func (di *DefaultPromoterImplementation) GetSignatureStatus(
 		}
 
 		logrus.Infof("Checking %s for signatures in %d mirrors", refString, len(targetImages))
+
 		existing, missing, err := di.CheckSignatureLayers(opts, targetImages)
 		if err != nil {
 			return results, fmt.Errorf("checking objects: %w", err)
 		}
+
 		results[refString] = checkresults.CheckList{
 			Signed:  existing,
 			Missing: missing,
 		}
 	}
+
 	return results, nil
 }
 
 // miniManifest is a minimal representation of the sigstore signature manifest.
 type miniManifest struct {
 	Layers []struct {
-		MediaType   string
+		MediaType   string            `json:"mediaType"`
 		Annotations map[string]string `json:"annotations"`
 	} `json:"layers"`
 }
 
 // CheckSignatureLayers checks a list of signature layers in parallel.
-func (di *DefaultPromoterImplementation) CheckSignatureLayers(opts *options.Options, oList []string) (existing, missing []string, err error) {
+func (di *DefaultPromoterImplementation) CheckSignatureLayers(opts *options.Options, oList []string) ([]string, []string, error) {
 	type result struct {
 		ref    string
 		exists bool
@@ -195,19 +214,24 @@ func (di *DefaultPromoterImplementation) CheckSignatureLayers(opts *options.Opti
 
 	for i, s := range oList {
 		results[i].ref = s
+
 		g.Go(func() error {
 			e, err := objectExists(opts, s)
 			if err != nil {
 				return fmt.Errorf("checking reference: %w", err)
 			}
+
 			results[i].exists = e
+
 			return nil
 		})
 	}
 
 	if err := g.Wait(); err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("checking signature layers: %w", err)
 	}
+
+	var existing, missing []string
 
 	for _, r := range results {
 		if r.exists {
@@ -226,8 +250,10 @@ func objectExists(opts *options.Options, refString string) (bool, error) {
 	if err != nil {
 		if strings.Contains(err.Error(), "MANIFEST_UNKNOWN") {
 			logrus.WithField("image", refString).Info("No signature found")
+
 			return false, nil
 		}
+
 		return false, fmt.Errorf("pulling signature manifest: %w", err)
 	}
 
@@ -240,7 +266,9 @@ func objectExists(opts *options.Options, refString string) (bool, error) {
 	if len(manifest.Layers) == 0 {
 		return false, nil
 	}
+
 	signedLayers := 0
+
 	for _, layer := range manifest.Layers {
 		if layer.MediaType != "application/vnd.dev.cosign.simplesigning.v1+json" {
 			continue
@@ -256,14 +284,12 @@ func objectExists(opts *options.Options, refString string) (bool, error) {
 
 		certs, err := cryptoutils.LoadCertificatesFromPEM(&b)
 		if err != nil {
-			return false, err
+			return false, fmt.Errorf("loading certificates from PEM: %w", err)
 		}
 
 		names := cryptoutils.GetSubjectAlternateNames(certs[0])
-		for _, n := range names {
-			if n == opts.SignCheckIdentity {
-				return true, nil
-			}
+		if slices.Contains(names, opts.SignCheckIdentity) {
+			return true, nil
 		}
 
 		signedLayers++
@@ -294,12 +320,14 @@ func (di *DefaultPromoterImplementation) FixMissingSignatures(opts *options.Opti
 		}
 
 		logrus.Infof("Replicating image to %d mirrors", len(res.Missing[1:]))
+
 		for _, targetRef := range res.Missing[1:] {
 			if err := di.replicateReference(opts, res.Missing[0], targetRef); err != nil {
 				return fmt.Errorf("replicating signature: %w", err)
 			}
 		}
 	}
+
 	return nil
 }
 
@@ -321,6 +349,7 @@ func (di *DefaultPromoterImplementation) FixPartialSignatures(opts *options.Opti
 			}
 		}
 	}
+
 	return nil
 }
 
@@ -333,6 +362,7 @@ func (di *DefaultPromoterImplementation) replicateReference(opts *options.Option
 
 	if !opts.SignCheckFix {
 		logrus.Infof(" (NOOP) replicating %s to %s ", srcRef, dstRef)
+
 		return nil
 	}
 
@@ -343,6 +373,7 @@ func (di *DefaultPromoterImplementation) replicateReference(opts *options.Option
 			"copying signature %s to %s: %w", srcRef, dstRef, err,
 		)
 	}
+
 	return nil
 }
 
@@ -350,8 +381,10 @@ func (di *DefaultPromoterImplementation) replicateReference(opts *options.Option
 func (di *DefaultPromoterImplementation) signReference(opts *options.Options, refString string) error {
 	if !opts.SignCheckFix {
 		logrus.Infof(" (NOOP) signing %s", refString)
+
 		return nil
 	}
+
 	logrus.Infof(" signing %s", refString)
 
 	// Options for the new signer
@@ -362,6 +395,7 @@ func (di *DefaultPromoterImplementation) signReference(opts *options.Options, re
 	if err != nil {
 		return fmt.Errorf("generating identity token: %w", err)
 	}
+
 	signOpts.IdentityToken = token
 
 	di.signer = sign.New(signOpts)
@@ -389,14 +423,17 @@ func (di *DefaultPromoterImplementation) readLatestImages(opts *options.Options)
 	))
 
 	dateCutOff := time.Now().AddDate(0, 0, opts.SignCheckFromDays*-1)
+
 	dateCutOffTo := time.Now()
 	if opts.SignCheckToDays > 0 {
 		dateCutOffTo = time.Now().AddDate(0, 0, opts.SignCheckToDays*-1)
 	}
+
 	logrus.Infof("Checking images from %s to %s",
-		dateCutOff.Local().Format(time.RFC822),   //nolint: gosmopolitan
-		dateCutOffTo.Local().Format(time.RFC822), //nolint: gosmopolitan
+		dateCutOff.Local().Format(time.RFC822),   //nolint:gosmopolitan // local timezone is intentional for human-readable log output
+		dateCutOffTo.Local().Format(time.RFC822), //nolint:gosmopolitan // local timezone is intentional for human-readable log output
 	)
+
 	images := []string{}
 
 	repo, err := name.NewRepository(scanRegistry+"/"+productionRepositoryPath, name.WeakValidation)
@@ -405,6 +442,7 @@ func (di *DefaultPromoterImplementation) readLatestImages(opts *options.Options)
 	}
 
 	var mt sync.Mutex
+
 	walkFn := func(repo name.Repository, tags *google.Tags, _ error) error {
 		if tags == nil {
 			return nil
@@ -417,6 +455,7 @@ func (di *DefaultPromoterImplementation) readLatestImages(opts *options.Options)
 			strings.HasSuffix(repo.String(), "-s390x") {
 			return nil
 		}
+
 		logrus.Infof("Indexing %d images from %s", len(tags.Manifests), repo)
 		// First var (_) is the digest
 		for _, manifest := range tags.Manifests {
@@ -439,12 +478,14 @@ func (di *DefaultPromoterImplementation) readLatestImages(opts *options.Options)
 			}
 
 			mt.Lock()
+
 			images = append(images, strings.ReplaceAll(
 				fmt.Sprintf("%s:%s", repo, manifest.Tags[0]),
 				scanRegistry+"/"+productionRepositoryPath, consts.ProdRegistry),
 			)
 			mt.Unlock()
 		}
+
 		return nil
 	}
 

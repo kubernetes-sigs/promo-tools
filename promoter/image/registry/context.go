@@ -26,7 +26,7 @@ import (
 // manifest file.
 type Context struct {
 	Name           image.Registry `yaml:"name,omitempty"`
-	ServiceAccount string         `yaml:"service-account,omitempty"`
+	ServiceAccount string         `yaml:"service-account,omitempty"` //nolint:tagliatelle // API field
 	Token          string         `yaml:"-"`
 	Src            bool           `yaml:"src,omitempty"`
 }

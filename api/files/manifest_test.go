@@ -139,14 +139,18 @@ func TestValidateFiles(t *testing.T) {
 }
 
 func checkErrorMatchesExpected(t *testing.T, err error, expected string) {
+	t.Helper()
+
 	if err != nil && expected == "" {
 		t.Errorf("unexpected error: %v", err)
 	}
+
 	if err != nil && expected != "" {
 		if !strings.Contains(err.Error(), expected) {
 			t.Errorf("error %v did not contain expected %v", err, expected)
 		}
 	}
+
 	if err == nil && expected != "" {
 		t.Errorf("expected error %q", expected)
 	}

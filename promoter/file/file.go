@@ -56,8 +56,9 @@ func (o *copyFileOp) Run(ctx context.Context) error {
 	// Download to our temp file
 	f, err := os.CreateTemp("", "promoter")
 	if err != nil {
-		return fmt.Errorf("error creating temp file: %v", err)
+		return fmt.Errorf("error creating temp file: %w", err)
 	}
+
 	tempFilename := f.Name()
 
 	defer func() {
@@ -78,26 +79,28 @@ func (o *copyFileOp) Run(ctx context.Context) error {
 
 	in, err := o.Source.filestore.OpenReader(ctx, o.Source.RelativePath)
 	if err != nil {
-		return fmt.Errorf("error reading %q: %v", o.Source.AbsolutePath, err)
+		return fmt.Errorf("error reading %q: %w", o.Source.AbsolutePath, err)
 	}
 	defer in.Close()
 
 	if _, err := io.Copy(f, in); err != nil {
 		return fmt.Errorf(
-			"error downloading %s: %v",
+			"error downloading %s: %w",
 			o.Source.AbsolutePath, err)
 	}
 	// We close the file to be sure it is fully written
 	if err := f.Close(); err != nil {
-		return fmt.Errorf("error writing temp file %q: %v", tempFilename, err)
+		return fmt.Errorf("error writing temp file %q: %w", tempFilename, err)
 	}
+
 	f = nil
 
 	// Verify the source hash
 	sha256, err := hash.SHA256ForFile(tempFilename)
 	if err != nil {
-		return err
+		return fmt.Errorf("computing SHA256 for %s: %w", tempFilename, err)
 	}
+
 	if sha256 != o.ManifestFile.SHA256 {
 		return fmt.Errorf(
 			"sha256 did not match for file %q: actual=%q expected=%q",
@@ -105,7 +108,11 @@ func (o *copyFileOp) Run(ctx context.Context) error {
 	}
 
 	// Upload to the destination
-	return o.Dest.filestore.UploadFile(ctx, o.Dest.RelativePath, tempFilename)
+	if err := o.Dest.filestore.UploadFile(ctx, o.Dest.RelativePath, tempFilename); err != nil {
+		return fmt.Errorf("uploading file to %s: %w", o.Dest.AbsolutePath, err)
+	}
+
+	return nil
 }
 
 // String is the pretty-printer for an operation, as used by dry-run.

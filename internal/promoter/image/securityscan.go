@@ -31,10 +31,11 @@ import (
 // promoter using the configured vuln.Scanner.
 func (di *DefaultPromoterImplementation) ScanEdges(
 	opts *options.Options,
-	promotionEdges map[promotion.Edge]interface{},
+	promotionEdges map[promotion.Edge]any,
 ) error {
 	if opts.SeverityThreshold <= 0 {
 		logrus.Info("Vulnerability scanning disabled (threshold <= 0)")
+
 		return nil
 	}
 

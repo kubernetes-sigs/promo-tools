@@ -104,9 +104,10 @@ update: ## Update go modules (source of truth!).
 update-mocks: ## Update all generated mocks
 	go generate ./...
 	for f in $(shell find . -name fake_*.go); do \
-		cp hack/boilerplate/boilerplate.generatego.txt tmp ;\
-		cat $$f >> tmp ;\
-		mv tmp $$f ;\
+		t=$$(mktemp) ;\
+		cp hack/boilerplate/boilerplate.generatego.txt $$t ;\
+		cat $$f >> $$t ;\
+		mv $$t $$f ;\
 	done
 
 ##@ Verify

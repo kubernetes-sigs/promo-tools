@@ -40,6 +40,7 @@ func TestBudgetAllocatorAllocate(t *testing.T) {
 	if math.Abs(float64(promoLimit)-70.0) > 0.1 {
 		t.Errorf("expected promotion limit ~70, got %v", promoLimit)
 	}
+
 	if math.Abs(float64(signLimit)-30.0) > 0.1 {
 		t.Errorf("expected signing limit ~30, got %v", signLimit)
 	}
@@ -53,6 +54,7 @@ func TestBudgetAllocatorGet(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Get failed: %v", err)
 	}
+
 	if rt.Name() != "test" {
 		t.Errorf("expected name 'test', got %q", rt.Name())
 	}
@@ -79,6 +81,7 @@ func TestBudgetAllocatorRebalance(t *testing.T) {
 	if math.Abs(float64(promoLimit)-50.0) > 0.1 {
 		t.Errorf("after rebalance, expected promotion limit ~50, got %v", promoLimit)
 	}
+
 	if math.Abs(float64(signLimit)-50.0) > 0.1 {
 		t.Errorf("after rebalance, expected signing limit ~50, got %v", signLimit)
 	}
@@ -91,6 +94,7 @@ func TestBudgetAllocatorRebalanceErrors(t *testing.T) {
 	if err := ba.Rebalance("nonexistent", "a", 0.1); err == nil {
 		t.Error("expected error for nonexistent source")
 	}
+
 	if err := ba.Rebalance("a", "nonexistent", 0.1); err == nil {
 		t.Error("expected error for nonexistent destination")
 	}
@@ -111,6 +115,7 @@ func TestBudgetAllocatorGiveAll(t *testing.T) {
 	if promoLimit != rate.Limit(0) {
 		t.Errorf("expected promotion limit 0 after GiveAll, got %v", promoLimit)
 	}
+
 	if math.Abs(float64(signLimit)-100.0) > 0.1 {
 		t.Errorf("expected signing limit ~100 after GiveAll, got %v", signLimit)
 	}
@@ -137,6 +142,7 @@ func TestBudgetAllocatorRebalanceClampToZero(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Get failed: %v", err)
 	}
+
 	if a.rateLimiter.Limit() != 0 {
 		t.Errorf("expected clamped limit 0, got %v", a.rateLimiter.Limit())
 	}
@@ -151,9 +157,11 @@ func TestBudgetAllocatorStats(t *testing.T) {
 	if len(stats) != 2 {
 		t.Errorf("expected 2 stats entries, got %d", len(stats))
 	}
+
 	if _, ok := stats["a"]; !ok {
 		t.Error("expected stats for 'a'")
 	}
+
 	if _, ok := stats["b"]; !ok {
 		t.Error("expected stats for 'b'")
 	}

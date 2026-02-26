@@ -63,6 +63,7 @@ func (a *RegInvImage) ToYAML(o YamlMarshalingOpts) string {
 	for _, image := range images {
 		fmt.Fprintf(&b, "- name: %s\n", image.Name)
 		fmt.Fprintf(&b, "  dmap:\n")
+
 		for _, digestEntry := range image.Digests {
 			if o.BareDigest {
 				fmt.Fprintf(&b, "    %s:", digestEntry.Hash)
@@ -76,11 +77,13 @@ func (a *RegInvImage) ToYAML(o YamlMarshalingOpts) string {
 			default:
 				if o.SplitTagsOverMultipleLines {
 					fmt.Fprintf(&b, "\n")
+
 					for _, tag := range digestEntry.Tags {
 						fmt.Fprintf(&b, "    - %s\n", tag)
 					}
 				} else {
 					fmt.Fprintf(&b, " [")
+
 					for i, tag := range digestEntry.Tags {
 						if i == len(digestEntry.Tags)-1 {
 							fmt.Fprintf(&b, "%q", tag)
@@ -88,6 +91,7 @@ func (a *RegInvImage) ToYAML(o YamlMarshalingOpts) string {
 							fmt.Fprintf(&b, "%q, ", tag)
 						}
 					}
+
 					fmt.Fprintf(&b, "]\n")
 				}
 			}
@@ -109,6 +113,7 @@ func (a *RegInvImage) ToCSV() string {
 	images := a.ToSorted()
 
 	var b strings.Builder
+
 	for _, image := range images {
 		for _, digestEntry := range image.Digests {
 			if len(digestEntry.Tags) > 0 {
@@ -147,6 +152,7 @@ func (a *RegInvImage) ToSorted() []ImageWithDigestSlice {
 				Tags: tags,
 			})
 		}
+
 		sort.Slice(digests, func(i, j int) bool {
 			return digests[i].Hash < digests[j].Hash
 		})

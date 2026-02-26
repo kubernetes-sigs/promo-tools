@@ -105,14 +105,15 @@ const (
 
 // Validate checks for semantic errors in the yaml fields (the structure of the
 // yaml is checked during unmarshaling).
-func (m Manifest) Validate() error {
+func (m *Manifest) Validate() error {
 	if err := validateRequiredComponents(m); err != nil {
 		return err
 	}
+
 	return validateImages(m.Images)
 }
 
-func validateRequiredComponents(m Manifest) error {
+func validateRequiredComponents(m *Manifest) error {
 	// TODO: Should we return []error here instead?
 	errs := make([]string, 0)
 
@@ -162,27 +163,6 @@ func validateRequiredComponents(m Manifest) error {
 	return errors.New(strings.Join(errs, "\n"))
 }
 
-func (m Manifest) srcRegistryCount() int {
-	var count int
-	for _, registry := range m.Registries {
-		if registry.Src {
-			count++
-		}
-	}
-
-	return count
-}
-
-func (m Manifest) srcRegistryName() image.Registry {
-	for _, registry := range m.Registries {
-		if registry.Src {
-			return registry.Name
-		}
-	}
-
-	return image.Registry("")
-}
-
 func validateImages(images []registry.Image) error {
 	for _, image := range images {
 		for digest, tagSlice := range image.Dmap {
@@ -197,6 +177,7 @@ func validateImages(images []registry.Image) error {
 			}
 		}
 	}
+
 	return nil
 }
 
@@ -225,8 +206,9 @@ func (m *Manifest) Finalize() error {
 	// Perform semantic checks (beyond just YAML validation).
 	srcRegistry, err := registry.GetSrcRegistry(m.Registries)
 	if err != nil {
-		return err
+		return fmt.Errorf("getting source registry: %w", err)
 	}
+
 	m.SrcRegistry = srcRegistry
 
 	return nil
@@ -238,7 +220,30 @@ func (m *Manifest) ToRegInvImage() registry.RegInvImage {
 	for _, img := range m.Images {
 		rii[img.Name] = img.Dmap
 	}
+
 	return rii
+}
+
+func (m *Manifest) srcRegistryCount() int {
+	var count int
+
+	for _, registry := range m.Registries {
+		if registry.Src {
+			count++
+		}
+	}
+
+	return count
+}
+
+func (m *Manifest) srcRegistryName() image.Registry {
+	for _, registry := range m.Registries {
+		if registry.Src {
+			return registry.Name
+		}
+	}
+
+	return image.Registry("")
 }
 
 // Parsers
@@ -248,9 +253,14 @@ func (m *Manifest) ToRegInvImage() registry.RegInvImage {
 // registry (there can only be 1 source registry).
 func ParseThinManifestsFromDir(
 	dir string, onlyProwDiff bool,
-) (mfests []Manifest, err error) {
+) ([]Manifest, error) {
+	var mfests []Manifest
+
 	digestsToCheck := []string{}
+
 	if onlyProwDiff {
+		var err error
+
 		digestsToCheck, err = diffProwFiles(dir)
 		if err != nil {
 			return nil, fmt.Errorf("get prow diff files: %w", err)
@@ -290,6 +300,7 @@ func ParseThinManifestsFromDir(
 		// inside a subfolder within "manifests/<dir>" --- any other paths are
 		// forbidden.
 		shortened := strings.TrimPrefix(path, dir)
+
 		shortenedList := strings.Split(shortened, "/")
 		if len(shortenedList) != ThinManifestDepth {
 			return fmt.Errorf("unexpected manifest path %q",
@@ -299,6 +310,7 @@ func ParseThinManifestsFromDir(
 		mfest, errParse := ParseThinManifestFromFile(path, digestsToCheck)
 		if errParse != nil {
 			logrus.Errorf("could not parse manifest file '%s'\n", path)
+
 			return errParse
 		}
 
@@ -311,7 +323,7 @@ func ParseThinManifestsFromDir(
 	// Only look at manifests starting with the "manifests" subfolder (no need
 	// to walk any other toplevel subfolder).
 	if err := filepath.Walk(filepath.Join(dir, "manifests"), parseAsManifest); err != nil {
-		return mfests, err
+		return mfests, fmt.Errorf("walking manifests directory: %w", err)
 	}
 
 	if len(mfests) == 0 {
@@ -323,8 +335,9 @@ func ParseThinManifestsFromDir(
 
 var digestRe = regexp.MustCompile(`"(sha256:[0-9a-f]{64})"`)
 
-func diffProwFiles(dir string) (digests []string, err error) {
+func diffProwFiles(dir string) ([]string, error) {
 	logrus.Info("Using prow diff")
+
 	const (
 		git               = "git"
 		pullBaseSHAEnv    = "PULL_BASE_SHA"
@@ -340,12 +353,14 @@ func diffProwFiles(dir string) (digests []string, err error) {
 	}
 
 	var base string
+
 	switch jobType {
 	case jobTypePresubmit, jobTypeBatch:
 		pullBaseSHA := os.Getenv(pullBaseSHAEnv)
 		if pullBaseSHA == "" {
 			return nil, fmt.Errorf("%s not set", pullBaseSHAEnv)
 		}
+
 		base = pullBaseSHA
 	case jobTypePostsubmit:
 		base = "HEAD^"
@@ -359,6 +374,7 @@ func diffProwFiles(dir string) (digests []string, err error) {
 	if err != nil {
 		return nil, fmt.Errorf("running git rev-parse: %w", err)
 	}
+
 	workdir := workdirRes.OutputTrimNL()
 
 	diff, err := command.NewWithWorkDir(
@@ -369,26 +385,32 @@ func diffProwFiles(dir string) (digests []string, err error) {
 	}
 
 	// Normalize the digests
-	for _, line := range strings.Split(diff.OutputTrimNL(), "\n") {
+	var digests []string
+
+	for line := range strings.SplitSeq(diff.OutputTrimNL(), "\n") {
 		matches := digestRe.FindAllStringSubmatch(line, -1)
 		if len(matches) != 1 || len(matches[0]) != 2 {
 			continue
 		}
+
 		digests = append(digests, matches[0][1])
 	}
 
 	logrus.Infof("Found %d digests to process in diff", len(digests))
+
 	return digests, nil
 }
 
 // ParseManifestFromFile parses a Manifest from a filepath.
 func ParseManifestFromFile(filePath string) (Manifest, error) {
-	var mfest Manifest
-	var empty Manifest
+	var (
+		mfest Manifest
+		empty Manifest
+	)
 
 	b, err := os.ReadFile(filePath)
 	if err != nil {
-		return empty, err
+		return empty, fmt.Errorf("reading manifest file %s: %w", filePath, err)
 	}
 
 	mfest, err = ParseManifestYAML(b)
@@ -409,13 +431,15 @@ func ParseManifestFromFile(filePath string) (Manifest, error) {
 // ParseThinManifestFromFile parses a ThinManifest from a filepath and generates
 // a Manifest.
 func ParseThinManifestFromFile(filePath string, digestsToCheck []string) (Manifest, error) {
-	var thinManifest ThinManifest
-	var mfest Manifest
-	var empty Manifest
+	var (
+		thinManifest ThinManifest
+		mfest        Manifest
+		empty        Manifest
+	)
 
 	b, err := os.ReadFile(filePath)
 	if err != nil {
-		return empty, err
+		return empty, fmt.Errorf("reading thin manifest file %s: %w", filePath, err)
 	}
 
 	thinManifest, err = ParseThinManifestYAML(b)
@@ -473,17 +497,21 @@ func ParseThinManifestFromFile(filePath string, digestsToCheck []string) (Manife
 func ParseManifestYAML(b []byte) (Manifest, error) {
 	var m Manifest
 	if err := yaml.UnmarshalStrict(b, &m); err != nil {
+		return m, fmt.Errorf("unmarshalling manifest YAML: %w", err)
+	}
+
+	if err := m.Validate(); err != nil {
 		return m, err
 	}
 
-	return m, m.Validate()
+	return m, nil
 }
 
 // ParseThinManifestYAML parses a ThinManifest from a byteslice.
 func ParseThinManifestYAML(b []byte) (ThinManifest, error) {
 	var m ThinManifest
 	if err := yaml.UnmarshalStrict(b, &m); err != nil {
-		return m, err
+		return m, fmt.Errorf("unmarshalling thin manifest YAML: %w", err)
 	}
 
 	return m, nil
@@ -493,7 +521,7 @@ func ParseThinManifestYAML(b []byte) (ThinManifest, error) {
 func ParseImagesYAML(b []byte) (registry.Images, error) {
 	var images registry.Images
 	if err := yaml.UnmarshalStrict(b, &images); err != nil {
-		return images, err
+		return images, fmt.Errorf("unmarshalling images YAML: %w", err)
 	}
 
 	return images, nil
@@ -521,14 +549,15 @@ func ValidateThinManifestDirectoryStructure(
 	// exists in the "images" folder.
 	files, err := os.ReadDir(manifestDir)
 	if err != nil {
-		return err
+		return fmt.Errorf("reading manifest directory %s: %w", manifestDir, err)
 	}
 
 	logrus.Infof("*looking at %q", dir)
+
 	for _, file := range files {
 		p, err := os.Stat(filepath.Join(manifestDir, file.Name()))
 		if err != nil {
-			return err
+			return fmt.Errorf("stat %s: %w", file.Name(), err)
 		}
 
 		// Skip non-directory sub-paths.
@@ -543,10 +572,13 @@ func ValidateThinManifestDirectoryStructure(
 				"promoter-manifest.yaml"))
 		if err != nil {
 			logrus.Warningln(err)
+
 			continue
 		}
+
 		if !manifestInfo.Mode().IsRegular() {
 			logrus.Warnf("ignoring irregular file %q", manifestInfo)
+
 			continue
 		}
 
@@ -557,13 +589,15 @@ func ValidateThinManifestDirectoryStructure(
 			"images",
 			file.Name(),
 			"images.yaml")
+
 		imagesInfo, err := os.Stat(imagesPath)
 		if err != nil {
 			if os.IsNotExist(err) {
 				return fmt.Errorf("corresponding file %q does not exist",
 					imagesPath)
 			}
-			return err
+
+			return fmt.Errorf("stat images file %s: %w", imagesPath, err)
 		}
 
 		if !imagesInfo.Mode().IsRegular() {
@@ -577,12 +611,14 @@ func ValidateThinManifestDirectoryStructure(
 
 // ParseImagesFromFile parses an Images type from a file.
 func ParseImagesFromFile(filePath string) (registry.Images, error) {
-	var images registry.Images
-	var empty registry.Images
+	var (
+		images registry.Images
+		empty  registry.Images
+	)
 
 	b, err := os.ReadFile(filePath)
 	if err != nil {
-		return empty, err
+		return empty, fmt.Errorf("reading images file %s: %w", filePath, err)
 	}
 
 	images, err = ParseImagesYAML(b)
@@ -597,10 +633,12 @@ func ParseImagesFromFile(filePath string) (registry.Images, error) {
 func validateIsDirectory(dir string) error {
 	p, err := os.Stat(dir)
 	if err != nil {
-		return err
+		return fmt.Errorf("stat directory %s: %w", dir, err)
 	}
+
 	if !p.IsDir() {
 		return fmt.Errorf("%q is not a directory", dir)
 	}
+
 	return nil
 }

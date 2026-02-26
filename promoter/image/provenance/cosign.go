@@ -85,13 +85,17 @@ func (v *CosignVerifier) Verify(ctx context.Context, ref string) (*Result, error
 			result.Verified = false
 			result.Errors = append(result.Errors,
 				"no attestation found for "+ref)
+
 			return result, nil
 		}
+
 		return nil, fmt.Errorf("checking attestation for %s: %w", ref, err)
 	}
 
 	result.Verified = true
+
 	logrus.Debugf("Attestation found for %s", ref)
+
 	return result, nil
 }
 

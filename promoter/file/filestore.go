@@ -64,6 +64,7 @@ var supportedProviders = []Provider{
 	S3Storage,
 }
 
+//nolint:ireturn
 func openFilestore(
 	ctx context.Context,
 	filestore *api.Filestore,
@@ -72,7 +73,12 @@ func openFilestore(
 	for _, provider := range supportedProviders {
 		scheme := provider.Scheme()
 		if strings.HasPrefix(filestore.Base, scheme+api.Backslash) {
-			return provider.OpenFilestore(ctx, filestore, useServiceAccount, confirm)
+			fs, err := provider.OpenFilestore(ctx, filestore, useServiceAccount, confirm)
+			if err != nil {
+				return nil, fmt.Errorf("opening filestore %s: %w", filestore.Base, err)
+			}
+
+			return fs, nil
 		}
 	}
 
@@ -80,7 +86,9 @@ func openFilestore(
 	for _, provider := range supportedProviders {
 		expected = append(expected, provider.Scheme())
 	}
+
 	sort.Strings(expected)
+
 	return nil, fmt.Errorf(
 		"unrecognized scheme %q (supported schemes: %s)",
 		filestore.Base,
@@ -89,6 +97,8 @@ func openFilestore(
 }
 
 // openGCSFilestore opens a filestore backed by Google Cloud Storage (GCS).
+//
+//nolint:ireturn
 func (p *gcsProvider) OpenFilestore(
 	ctx context.Context,
 	filestore *api.Filestore,
@@ -97,7 +107,7 @@ func (p *gcsProvider) OpenFilestore(
 	u, err := url.Parse(filestore.Base)
 	if err != nil {
 		return nil, fmt.Errorf(
-			"error parsing filestore base %q: %v",
+			"error parsing filestore base %q: %w",
 			filestore.Base,
 			err,
 		)
@@ -113,6 +123,7 @@ func (p *gcsProvider) OpenFilestore(
 	}
 
 	var opts []option.ClientOption
+
 	if withAuth {
 		logrus.Infof(
 			"requesting an authenticated storage client for %s",
@@ -132,7 +143,7 @@ func (p *gcsProvider) OpenFilestore(
 
 	client, err := storage.NewClient(ctx, opts...)
 	if err != nil {
-		return nil, fmt.Errorf("error building GCS client: %v", err)
+		return nil, fmt.Errorf("error building GCS client: %w", err)
 	}
 
 	prefix := strings.TrimPrefix(u.Path, "/")
@@ -149,6 +160,7 @@ func (p *gcsProvider) OpenFilestore(
 		bucket:    bucket,
 		prefix:    prefix,
 	}
+
 	return s, nil
 }
 
@@ -181,6 +193,52 @@ func useStorageClientAuth(
 	return withAuth, nil
 }
 
+// BuildOperations builds the required operations to sync from the
+// Source Filestore to the Dest Filestore.
+func (p *FilestorePromoter) BuildOperations(
+	ctx context.Context,
+) ([]SyncFileOp, error) {
+	sourceFilestore, err := openFilestore(
+		ctx,
+		p.Source,
+		p.UseServiceAccount,
+		p.Confirm,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	if sourceFilestore == nil {
+		return nil, errors.New("source filestore cannot be nil")
+	}
+
+	destFilestore, err := openFilestore(
+		ctx,
+		p.Dest,
+		p.UseServiceAccount,
+		p.Confirm,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	if destFilestore == nil {
+		return nil, errors.New("destination filestore cannot be nil")
+	}
+
+	sourceFiles, err := sourceFilestore.ListFiles(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("listing source files: %w", err)
+	}
+
+	destFiles, err := destFilestore.ListFiles(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("listing destination files: %w", err)
+	}
+
+	return p.computeNeededOperations(sourceFiles, destFiles, destFilestore)
+}
+
 // computeNeededOperations determines the list of files that need to be copied.
 func (p *FilestorePromoter) computeNeededOperations(
 	source, dest map[string]*SyncFileInfo,
@@ -191,6 +249,7 @@ func (p *FilestorePromoter) computeNeededOperations(
 	for i := range p.Files {
 		f := &p.Files[i]
 		relativePath := f.Name
+
 		sourceFile := source[relativePath]
 		if sourceFile == nil {
 			absolutePath := joinFilepath(p.Source, relativePath)
@@ -216,16 +275,19 @@ func (p *FilestorePromoter) computeNeededOperations(
 				Dest:         destFile,
 				ManifestFile: f,
 			})
+
 			continue
 		}
 
 		changed := false
+
 		if destFile.MD5 != sourceFile.MD5 {
 			logrus.Warnf("MD5 mismatch on source %q vs dest %q: %q vs %q",
 				sourceFile.AbsolutePath,
 				destFile.AbsolutePath,
 				sourceFile.MD5,
 				destFile.MD5)
+
 			changed = true
 		}
 
@@ -235,13 +297,16 @@ func (p *FilestorePromoter) computeNeededOperations(
 				destFile.AbsolutePath,
 				sourceFile.Size,
 				destFile.Size)
+
 			changed = true
 		}
 
 		if !changed {
 			logrus.Infof("metadata match for %q", destFile.AbsolutePath)
+
 			continue
 		}
+
 		ops = append(ops, &copyFileOp{
 			Source:       sourceFile,
 			Dest:         destFile,
@@ -256,49 +321,6 @@ func joinFilepath(filestore *api.Filestore, relativePath string) string {
 	s := strings.TrimSuffix(filestore.Base, "/")
 	s += "/"
 	s += strings.TrimPrefix(relativePath, "/")
+
 	return s
-}
-
-// BuildOperations builds the required operations to sync from the
-// Source Filestore to the Dest Filestore.
-func (p *FilestorePromoter) BuildOperations(
-	ctx context.Context,
-) ([]SyncFileOp, error) {
-	sourceFilestore, err := openFilestore(
-		ctx,
-		p.Source,
-		p.UseServiceAccount,
-		p.Confirm,
-	)
-	if err != nil {
-		return nil, err
-	}
-	if sourceFilestore == nil {
-		return nil, errors.New("source filestore cannot be nil")
-	}
-
-	destFilestore, err := openFilestore(
-		ctx,
-		p.Dest,
-		p.UseServiceAccount,
-		p.Confirm,
-	)
-	if err != nil {
-		return nil, err
-	}
-	if destFilestore == nil {
-		return nil, errors.New("destination filestore cannot be nil")
-	}
-
-	sourceFiles, err := sourceFilestore.ListFiles(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	destFiles, err := destFilestore.ListFiles(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	return p.computeNeededOperations(sourceFiles, destFiles, destFilestore)
 }

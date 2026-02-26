@@ -35,10 +35,11 @@ import (
 	"sigs.k8s.io/promo-tools/v4/types/image"
 )
 
-// Run a snapshot.
+// Snapshot runs a snapshot.
 func (di *DefaultPromoterImplementation) Snapshot(opts *options.Options, rii registry.RegInvImage) error {
 	// Run the snapshot
 	var snapshot string
+
 	switch strings.ToLower(opts.OutputFormat) {
 	case "csv":
 		snapshot = rii.ToCSV()
@@ -51,6 +52,7 @@ func (di *DefaultPromoterImplementation) Snapshot(opts *options.Options, rii reg
 
 	// TODO: Maybe store the snapshot somewhere?
 	fmt.Println(snapshot)
+
 	return nil
 }
 
@@ -80,7 +82,7 @@ func (di *DefaultPromoterImplementation) GetSnapshotSourceRegistry(
 	return srcRegistry, nil
 }
 
-// GetSnapshotManifest creates the manifest list from the
+// GetSnapshotManifests creates the manifest list from the
 // specified snapshot source.
 func (di *DefaultPromoterImplementation) GetSnapshotManifests(
 	opts *options.Options,
@@ -113,6 +115,7 @@ func (di *DefaultPromoterImplementation) AppendManifestToSnapshot(
 	// same list of manifests unchanged
 	if opts.Manifest == "" {
 		logrus.Info("No manifest defined, not appending to snapshot")
+
 		return mfests, nil
 	}
 
@@ -182,6 +185,7 @@ func (di *DefaultPromoterImplementation) GetRegistryImageInventory(
 
 	if opts.MinimalSnapshot {
 		logrus.Info("removing tagless child digests of manifest lists")
+
 		rii = removeChildDigests(inv, rii, mfests[0].Registries[0].Name, di.craneOptions()...)
 	}
 
@@ -211,15 +215,18 @@ func removeChildDigests(
 
 			// Fetch the manifest list to get child digests
 			ref := fmt.Sprintf("%s/%s@%s", registryName, imageName, digest)
+
 			rawManifest, err := crane.Manifest(ref, opts...)
 			if err != nil {
 				logrus.Warnf("failed to read manifest list %s: %v", ref, err)
+
 				continue
 			}
 
 			var idx v1.IndexManifest
 			if err := json.Unmarshal(rawManifest, &idx); err != nil {
 				logrus.Warnf("failed to parse manifest list %s: %v", ref, err)
+
 				continue
 			}
 
@@ -231,6 +238,7 @@ func removeChildDigests(
 
 	// Filter out tagless children
 	filtered := make(registry.RegInvImage)
+
 	for imageName, digestTags := range rii {
 		for digest, tagSlice := range digestTags {
 			// If this digest is a child of a manifest list and has no tags,
@@ -242,6 +250,7 @@ func removeChildDigests(
 			if filtered[imageName] == nil {
 				filtered[imageName] = make(registry.DigestTags)
 			}
+
 			filtered[imageName][digest] = tagSlice
 		}
 	}

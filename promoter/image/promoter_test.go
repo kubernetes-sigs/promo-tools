@@ -35,6 +35,7 @@ import (
 func TestPromoteImages(t *testing.T) {
 	sut := imagepromoter.Promoter{}
 	testErr := errors.New("synthetic error")
+
 	for _, tc := range []struct {
 		shouldErr bool
 		msg       string
@@ -122,6 +123,7 @@ func TestPromoteImages(t *testing.T) {
 		mock := imagefakes.FakePromoterImplementation{}
 		tc.prepare(&mock)
 		sut.SetImplementation(&mock)
+
 		if tc.shouldErr {
 			require.Error(t, sut.PromoteImages(context.Background(), &options.Options{Confirm: true}), tc.msg)
 		} else {
@@ -208,7 +210,7 @@ func TestPromoteImagesProvenanceFails(t *testing.T) {
 	sut := imagepromoter.Promoter{}
 	mock := imagefakes.FakePromoterImplementation{}
 	// Return a non-empty edge set so provenance has something to check
-	mock.GetPromotionEdgesReturns(map[promotion.Edge]interface{}{
+	mock.GetPromotionEdgesReturns(map[promotion.Edge]any{
 		testEdge(): nil,
 	}, nil)
 	sut.SetImplementation(&mock)
@@ -231,7 +233,7 @@ func TestPromoteImagesProvenanceFails(t *testing.T) {
 func TestPromoteImagesProvenanceVerifierError(t *testing.T) {
 	sut := imagepromoter.Promoter{}
 	mock := imagefakes.FakePromoterImplementation{}
-	mock.GetPromotionEdgesReturns(map[promotion.Edge]interface{}{
+	mock.GetPromotionEdgesReturns(map[promotion.Edge]any{
 		testEdge(): nil,
 	}, nil)
 	sut.SetImplementation(&mock)
@@ -246,6 +248,7 @@ func TestPromoteImagesProvenanceVerifierError(t *testing.T) {
 
 func TestReplicateSignatures(t *testing.T) {
 	testErr := errors.New("synthetic error")
+
 	for _, tc := range []struct {
 		shouldErr bool
 		msg       string
@@ -304,6 +307,7 @@ func TestReplicateSignatures(t *testing.T) {
 			mock := imagefakes.FakePromoterImplementation{}
 			tc.prepare(&mock)
 			sut.SetImplementation(&mock)
+
 			err := sut.ReplicateSignatures(context.Background(), &options.Options{Confirm: true})
 			if tc.shouldErr {
 				require.Error(t, err, tc.msg)

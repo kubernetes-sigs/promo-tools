@@ -44,6 +44,7 @@ func ValidateFilestores(filestores []Filestore) error {
 	}
 
 	var source *Filestore
+
 	destinationCount := 0
 
 	for i := range filestores {
@@ -69,11 +70,13 @@ func ValidateFilestores(filestores []Filestore) error {
 			if source != nil {
 				return errors.New("found multiple source filestores")
 			}
+
 			source = filestore
 		} else {
 			destinationCount++
 		}
 	}
+
 	if source == nil {
 		return errors.New("source filestore not found")
 	}

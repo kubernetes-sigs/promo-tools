@@ -35,14 +35,17 @@ func TestPipelineExecutesInOrder(t *testing.T) {
 	p := New()
 	p.AddPhase(NewPhase("first", func(_ context.Context) error {
 		order = append(order, "first")
+
 		return nil
 	}))
 	p.AddPhase(NewPhase("second", func(_ context.Context) error {
 		order = append(order, "second")
+
 		return nil
 	}))
 	p.AddPhase(NewPhase("third", func(_ context.Context) error {
 		order = append(order, "third")
+
 		return nil
 	}))
 
@@ -53,6 +56,7 @@ func TestPipelineExecutesInOrder(t *testing.T) {
 	if len(order) != 3 {
 		t.Fatalf("expected 3 phases, got %d", len(order))
 	}
+
 	for i, want := range []string{"first", "second", "third"} {
 		if order[i] != want {
 			t.Errorf("order[%d] = %q, want %q", i, order[i], want)
@@ -66,14 +70,17 @@ func TestPipelineStopsOnError(t *testing.T) {
 	p := New()
 	p.AddPhase(NewPhase("ok", func(_ context.Context) error {
 		executed = append(executed, "ok")
+
 		return nil
 	}))
 	p.AddPhase(NewPhase("fail", func(_ context.Context) error {
 		executed = append(executed, "fail")
+
 		return errors.New("boom")
 	}))
 	p.AddPhase(NewPhase("skipped", func(_ context.Context) error {
 		executed = append(executed, "skipped")
+
 		return nil
 	}))
 
@@ -81,9 +88,11 @@ func TestPipelineStopsOnError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error")
 	}
+
 	if len(executed) != 2 {
 		t.Fatalf("expected 2 phases executed, got %d: %v", len(executed), executed)
 	}
+
 	if executed[0] != "ok" || executed[1] != "fail" {
 		t.Errorf("unexpected execution order: %v", executed)
 	}
@@ -96,6 +105,7 @@ func TestPipelineCancelledContext(t *testing.T) {
 	p := New()
 	p.AddPhase(NewPhase("should-not-run", func(_ context.Context) error {
 		t.Error("phase should not have run")
+
 		return nil
 	}))
 
@@ -124,6 +134,7 @@ func TestPhaseFuncName(t *testing.T) {
 
 func TestPipelinePassesContext(t *testing.T) {
 	type ctxKey string
+
 	key := ctxKey("test")
 
 	p := New()
@@ -132,6 +143,7 @@ func TestPipelinePassesContext(t *testing.T) {
 		if val != "hello" {
 			t.Errorf("context value = %v, want %q", val, "hello")
 		}
+
 		return nil
 	}))
 
@@ -147,14 +159,17 @@ func TestPipelineErrStopPipeline(t *testing.T) {
 	p := New()
 	p.AddPhase(NewPhase("runs", func(_ context.Context) error {
 		executed = append(executed, "runs")
+
 		return nil
 	}))
 	p.AddPhase(NewPhase("stops", func(_ context.Context) error {
 		executed = append(executed, "stops")
+
 		return ErrStopPipeline
 	}))
 	p.AddPhase(NewPhase("skipped", func(_ context.Context) error {
 		executed = append(executed, "skipped")
+
 		return nil
 	}))
 
@@ -162,9 +177,11 @@ func TestPipelineErrStopPipeline(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ErrStopPipeline should result in nil error, got: %v", err)
 	}
+
 	if len(executed) != 2 {
 		t.Fatalf("expected 2 phases, got %d: %v", len(executed), executed)
 	}
+
 	if executed[0] != "runs" || executed[1] != "stops" {
 		t.Errorf("unexpected order: %v", executed)
 	}
@@ -177,12 +194,14 @@ func TestPipelineSharedState(t *testing.T) {
 	p := New()
 	p.AddPhase(NewPhase("produce", func(_ context.Context) error {
 		result = 42
+
 		return nil
 	}))
 	p.AddPhase(NewPhase("consume", func(_ context.Context) error {
 		if result != 42 {
 			t.Errorf("shared state = %d, want 42", result)
 		}
+
 		return nil
 	}))
 

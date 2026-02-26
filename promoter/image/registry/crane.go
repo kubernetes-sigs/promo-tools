@@ -61,6 +61,7 @@ func NewCraneProvider(opts ...CraneOption) *CraneProvider {
 	for _, o := range opts {
 		o(p)
 	}
+
 	return p
 }
 
@@ -76,6 +77,7 @@ func (p *CraneProvider) ReadRegistries(
 	logrus.Infof("Reading %d registries (recursive: %v)", len(registries), recurse)
 
 	inv := NewInventory()
+
 	var mu sync.Mutex
 
 	// Use base registries for splitting repo paths into registry+image
@@ -86,6 +88,7 @@ func (p *CraneProvider) ReadRegistries(
 	}
 
 	total := len(registries)
+
 	var completed atomic.Int64
 
 	g, gctx := errgroup.WithContext(ctx)
@@ -102,6 +105,7 @@ func (p *CraneProvider) ReadRegistries(
 				ggcrV1Google.WithAuthFromKeychain(gcrane.Keychain),
 				ggcrV1Google.WithContext(gctx),
 			}
+
 			recordTags := makeTagRecorder(inv, &mu, splitRegs)
 
 			if recurse {
@@ -113,19 +117,22 @@ func (p *CraneProvider) ReadRegistries(
 				if err != nil {
 					return fmt.Errorf("listing repo %s: %w", r.Name, err)
 				}
+
 				if err := recordTags(repo, tags, nil); err != nil {
 					return fmt.Errorf("recording tags for %s: %w", r.Name, err)
 				}
 			}
 
 			logrus.Infof("Read registry %d/%d: %s", completed.Add(1), total, r.Name)
+
 			return nil
 		})
 	}
 
 	if err := g.Wait(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("reading registries: %w", err)
 	}
+
 	return inv, nil
 }
 
@@ -138,7 +145,12 @@ func (p *CraneProvider) CopyImage(_ context.Context, src, dst string) error {
 	if p.transport != nil {
 		opts = append(opts, crane.WithTransport(p.transport))
 	}
-	return crane.Copy(src, dst, opts...)
+
+	if err := crane.Copy(src, dst, opts...); err != nil {
+		return fmt.Errorf("copying image %s to %s: %w", src, dst, err)
+	}
+
+	return nil
 }
 
 // makeTagRecorder creates a callback function for google.Walk that records
@@ -161,12 +173,14 @@ func makeTagRecorder(
 		logrus.Debugf("Registry: %s Image: %s Got: %s", regName, imageName, repo.Name())
 
 		digestTags := make(DigestTags)
+
 		if tags != nil && tags.Manifests != nil {
 			for digest, manifest := range tags.Manifests {
 				tagSlice := TagSlice{}
 				for _, tag := range manifest.Tags {
 					tagSlice = append(tagSlice, image.Tag(tag))
 				}
+
 				digestTags[image.Digest(digest)] = tagSlice
 
 				mediaType, err := supportedMediaType(manifest.MediaType)
@@ -186,6 +200,7 @@ func makeTagRecorder(
 		if _, ok := inv.Images[regName]; !ok {
 			inv.Images[regName] = make(RegInvImage)
 		}
+
 		if len(digestTags) > 0 {
 			inv.Images[regName][imageName] = digestTags
 		}
@@ -202,14 +217,17 @@ func splitByKnownRegistries(
 ) (image.Registry, image.Name, error) {
 	for _, r := range registries {
 		rn := string(r.Name)
+
 		fn := string(fullName)
 		if len(fn) > len(rn) && fn[:len(rn)] == rn && fn[len(rn)] == '/' {
 			return r.Name, image.Name(fn[len(rn)+1:]), nil
 		}
+
 		if fn == rn {
 			return r.Name, "", nil
 		}
 	}
+
 	return "", "", fmt.Errorf("could not determine registry for %s", fullName)
 }
 
@@ -232,6 +250,7 @@ func supportedMediaType(mediaType string) (cr.MediaType, error) {
 		if mediaType == "" {
 			return cr.DockerManifestSchema2, nil
 		}
+
 		return cr.MediaType(mediaType),
 			fmt.Errorf("unsupported media type %q", mediaType)
 	}

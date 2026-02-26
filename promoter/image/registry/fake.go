@@ -64,9 +64,11 @@ func (f *FakeProvider) AddImage(
 	if _, ok := f.Inventory.Images[reg]; !ok {
 		f.Inventory.Images[reg] = make(RegInvImage)
 	}
+
 	if _, ok := f.Inventory.Images[reg][name]; !ok {
 		f.Inventory.Images[reg][name] = make(DigestTags)
 	}
+
 	f.Inventory.Images[reg][name][digest] = tags
 }
 
@@ -77,6 +79,7 @@ func (f *FakeProvider) ReadRegistries(
 	if f.ReadRegistriesErr != nil {
 		return nil, f.ReadRegistriesErr
 	}
+
 	return f.Inventory, nil
 }
 
@@ -89,5 +92,6 @@ func (f *FakeProvider) CopyImage(_ context.Context, src, dst string) error {
 	if f.CopyImageErr != nil {
 		return fmt.Errorf("fake copy error: %w", f.CopyImageErr)
 	}
+
 	return nil
 }

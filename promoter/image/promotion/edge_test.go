@@ -134,7 +134,7 @@ func TestToEdgesTagless(t *testing.T) {
 }
 
 func TestCheckOverlappingEdgesClean(t *testing.T) {
-	edges := map[Edge]interface{}{
+	edges := map[Edge]any{
 		{
 			SrcRegistry: testSrcRC,
 			SrcImageTag: ImageTag{Name: "foo", Tag: "v1"},
@@ -150,7 +150,7 @@ func TestCheckOverlappingEdgesClean(t *testing.T) {
 
 func TestCheckOverlappingEdgesConflict(t *testing.T) {
 	// Two different digests targeting the same destination tag.
-	edges := map[Edge]interface{}{
+	edges := map[Edge]any{
 		{
 			SrcRegistry: testSrcRC,
 			SrcImageTag: ImageTag{Name: "foo", Tag: "v1"},
@@ -172,7 +172,7 @@ func TestCheckOverlappingEdgesConflict(t *testing.T) {
 }
 
 func TestGetPromotionCandidates(t *testing.T) {
-	edges := map[Edge]interface{}{
+	edges := map[Edge]any{
 		{
 			SrcRegistry: testSrcRC,
 			SrcImageTag: ImageTag{Name: "foo", Tag: "v1"},
@@ -217,7 +217,7 @@ func TestGetPromotionCandidatesTagMove(t *testing.T) {
 		DstRegistry: testDstRC1,
 		DstImageTag: ImageTag{Name: "foo", Tag: "v1"},
 	}
-	edges := map[Edge]interface{}{edge: nil}
+	edges := map[Edge]any{edge: nil}
 
 	// Tag "v1" in dst points to a different digest — tag move.
 	inv := map[image.Registry]registry.RegInvImage{
@@ -282,7 +282,7 @@ func TestVertexPropsNotPromoted(t *testing.T) {
 }
 
 func TestEdgesToRegInvImage(t *testing.T) {
-	edges := map[Edge]interface{}{
+	edges := map[Edge]any{
 		{
 			DstRegistry: testDstRC1,
 			DstImageTag: ImageTag{Name: "foo", Tag: "v1"},
@@ -333,7 +333,7 @@ func TestFilterByTagNoMatch(t *testing.T) {
 }
 
 func TestGetRegistriesToRead(t *testing.T) {
-	edges := map[Edge]interface{}{
+	edges := map[Edge]any{
 		{
 			SrcRegistry: testSrcRC,
 			SrcImageTag: ImageTag{Name: "foo"},
@@ -349,12 +349,13 @@ func TestGetRegistriesToRead(t *testing.T) {
 	for _, rc := range rcs {
 		names[rc.Name] = true
 	}
+
 	require.True(t, names["gcr.io/staging/foo"])
 	require.True(t, names["us.gcr.io/prod/foo"])
 }
 
 func TestGetBaseRegistries(t *testing.T) {
-	edges := map[Edge]interface{}{
+	edges := map[Edge]any{
 		{
 			SrcRegistry: testSrcRC,
 			SrcImageTag: ImageTag{Name: "foo"},
@@ -394,7 +395,7 @@ func TestGetPromotionCandidatesWithBaseRegistries(t *testing.T) {
 		Name: "us-docker.pkg.dev/k8s-artifacts-prod/images/foo",
 	}
 
-	edges := map[Edge]interface{}{
+	edges := map[Edge]any{
 		{
 			SrcRegistry: srcReg,
 			SrcImageTag: ImageTag{Name: "myimage", Tag: "v1.0"},

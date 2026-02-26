@@ -35,6 +35,7 @@ func (s *StaticIdentityTokenProvider) GetIdentityToken(_ context.Context, _, _ s
 	if s.Err != nil {
 		return "", fmt.Errorf("static identity token error: %w", s.Err)
 	}
+
 	return s.Token, nil
 }
 
@@ -50,5 +51,6 @@ func (n *NoopServiceActivator) ActivateServiceAccounts(_ context.Context, _ stri
 	if n.Err != nil {
 		return fmt.Errorf("noop activator error: %w", n.Err)
 	}
+
 	return nil
 }

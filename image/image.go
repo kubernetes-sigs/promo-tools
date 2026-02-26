@@ -38,16 +38,17 @@ type ManifestList []struct {
 }
 
 // NewManifestListFromFile parses an image promoter manifest file.
-func NewManifestListFromFile(manifestPath string) (imagesList *ManifestList, err error) {
+func NewManifestListFromFile(manifestPath string) (*ManifestList, error) {
 	if !helpers.Exists(manifestPath) {
 		return nil, errors.New("could not find image promoter manifest")
 	}
-	yamlCode, err := os.ReadFile(filepath.Clean(manifestPath))
+
+	yamlCode, err := os.ReadFile(filepath.Clean(manifestPath)) //nolint:gosec // path already sanitized via filepath.Clean
 	if err != nil {
 		return nil, fmt.Errorf("reading yaml code from file: %w", err)
 	}
 
-	imagesList = &ManifestList{}
+	imagesList := &ManifestList{}
 	if err := imagesList.Parse(yamlCode); err != nil {
 		return nil, fmt.Errorf("parsing manifest yaml: %w", err)
 	}
@@ -57,7 +58,11 @@ func NewManifestListFromFile(manifestPath string) (imagesList *ManifestList, err
 
 // Parse reads yaml code into an ImagePromoterManifest object.
 func (imagesList *ManifestList) Parse(yamlCode []byte) error {
-	return yaml.Unmarshal(yamlCode, imagesList)
+	if err := yaml.Unmarshal(yamlCode, imagesList); err != nil {
+		return fmt.Errorf("unmarshalling image manifest list: %w", err)
+	}
+
+	return nil
 }
 
 // Write writes the promoter image list into an YAML file.
@@ -67,7 +72,7 @@ func (imagesList *ManifestList) Write(filePath string) error {
 		return fmt.Errorf("while marshalling image list: %w", err)
 	}
 	// Write the yaml into the specified file
-	if err := os.WriteFile(filepath.Clean(filePath), yamlCode, os.FileMode(0o644)); err != nil {
+	if err := os.WriteFile(filepath.Clean(filePath), yamlCode, os.FileMode(0o644)); err != nil { //nolint:gosec // path already sanitized via filepath.Clean
 		return fmt.Errorf("writing yaml code into file: %w", err)
 	}
 
@@ -100,12 +105,15 @@ func (imagesList *ManifestList) ToYAML() ([]byte, error) {
 			tags := imgData.DMap[digestSHA]
 			sort.Strings(tags)
 			fmt.Fprintf(&yamlCode, "    %q: [", digestSHA)
+
 			for i, tag := range tags {
 				if i > 0 {
 					yamlCode.WriteString(",")
 				}
+
 				fmt.Fprintf(&yamlCode, "%q", tag)
 			}
+
 			yamlCode.WriteString("]\n")
 		}
 	}
@@ -118,6 +126,7 @@ func sortImageDigestMapByTag(imageDMap map[string][]string) []string {
 	// we need to sort the map by value (tags)
 	tags := make([]string, 0, len(imageDMap))
 	valuesToKeys := make(map[string][]string)
+
 	for k, v := range imageDMap {
 		// find the smallest tag for each image digest
 		sort.Strings(v)
@@ -126,6 +135,7 @@ func sortImageDigestMapByTag(imageDMap map[string][]string) []string {
 		if _, ok := valuesToKeys[first]; !ok {
 			tags = append(tags, first)
 		}
+
 		valuesToKeys[first] = append(valuesToKeys[first], k)
 	}
 	// Then, sort the tags lexicographically

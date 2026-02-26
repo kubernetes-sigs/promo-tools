@@ -29,6 +29,7 @@ func TestStaticIdentityTokenProvider(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetIdentityToken() error = %v", err)
 	}
+
 	if tok != "oidc-token" {
 		t.Errorf("GetIdentityToken() = %q, want %q", tok, "oidc-token")
 	}

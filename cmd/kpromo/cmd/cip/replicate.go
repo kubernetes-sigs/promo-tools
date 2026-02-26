@@ -50,6 +50,7 @@ Example usage:
 		if err := p.ReplicateSignatures(context.Background(), runOpts); err != nil {
 			return fmt.Errorf("replicate signatures: %w", err)
 		}
+
 		return nil
 	},
 }

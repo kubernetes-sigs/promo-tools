@@ -19,6 +19,7 @@ package imagepromoter
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/google/go-containerregistry/pkg/crane"
@@ -82,11 +83,6 @@ func (di *DefaultPromoterImplementation) SetSigningTransport(rt *ratelimit.Round
 	di.signingTransport = rt
 }
 
-// getSigningTransport returns the transport for signing operations.
-func (di *DefaultPromoterImplementation) getSigningTransport() *ratelimit.RoundTripper {
-	return di.signingTransport
-}
-
 // SetRegistryProvider sets the registry provider for image operations.
 func (di *DefaultPromoterImplementation) SetRegistryProvider(p registry.Provider) {
 	di.registryProvider = p
@@ -139,6 +135,7 @@ func (di *DefaultPromoterImplementation) ValidateOptions(opts *options.Options) 
 			return errors.New("either a manifest or a thin manifest dir have to be set")
 		}
 	}
+
 	return nil
 }
 
@@ -147,17 +144,27 @@ func (di *DefaultPromoterImplementation) ActivateServiceAccounts(opts *options.O
 	if !opts.UseServiceAcct {
 		logrus.Warn("Not setting a service account")
 	}
-	return di.serviceActivator.ActivateServiceAccounts(context.Background(), opts.KeyFiles)
+
+	if err := di.serviceActivator.ActivateServiceAccounts(context.Background(), opts.KeyFiles); err != nil {
+		return fmt.Errorf("activating service accounts: %w", err)
+	}
+
+	return nil
 }
 
 func (di *DefaultPromoterImplementation) PrintVersion() {
 	logrus.Info(version.Get())
 }
 
-// printSecDisclaimer prints a disclaimer about false positives
+// PrintSecDisclaimer prints a disclaimer about false positives
 // that may be found in container image layers.
 func (di *DefaultPromoterImplementation) PrintSecDisclaimer() {
 	logrus.Info(vulnerabilityDiscalimer)
+}
+
+// getSigningTransport returns the transport for signing operations.
+func (di *DefaultPromoterImplementation) getSigningTransport() *ratelimit.RoundTripper {
+	return di.signingTransport
 }
 
 // craneOptions returns common crane options for registry operations,
@@ -170,5 +177,6 @@ func (di *DefaultPromoterImplementation) craneOptions() []crane.Option {
 	if di.promotionTransport != nil {
 		opts = append(opts, crane.WithTransport(di.promotionTransport))
 	}
+
 	return opts
 }

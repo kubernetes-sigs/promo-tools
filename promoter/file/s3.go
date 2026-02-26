@@ -18,7 +18,7 @@ package file
 
 import (
 	"context"
-	"crypto/md5" //nolint: gosec
+	"crypto/md5" //nolint:gosec // MD5 required by S3 API
 	"crypto/sha256"
 	"crypto/sha512"
 	"encoding/base64"
@@ -56,13 +56,14 @@ type s3SyncFilestore struct {
 	prefix    string
 }
 
-// openS3Filestore opens a filestore backed by Amazon S3 (S3)
-
+// openS3Filestore opens a filestore backed by Amazon S3 (S3).
+//
+//nolint:ireturn
 func (p *s3Provider) OpenFilestore(ctx context.Context, filestore *api.Filestore, useServiceAccount, confirm bool) (syncFilestore, error) {
 	u, err := url.Parse(filestore.Base)
 	if err != nil {
 		return nil, fmt.Errorf(
-			"error parsing filestore base %q: %v",
+			"error parsing filestore base %q: %w",
 			filestore.Base,
 			err,
 		)
@@ -101,6 +102,7 @@ func (p *s3Provider) OpenFilestore(ctx context.Context, filestore *api.Filestore
 		bucket:    bucket,
 		prefix:    prefix,
 	}
+
 	return s, nil
 }
 
@@ -121,6 +123,7 @@ func (p *s3Provider) findRegionForBucket(ctx context.Context, bucket string) (st
 	}
 
 	client := s3.NewFromConfig(cfg)
+
 	bucketRegion, err := s3manager.GetBucketRegion(ctx, client, bucket)
 	if err != nil {
 		return "", fmt.Errorf("error finding s3 region for bucket %q: %w", bucket, err)
@@ -139,10 +142,12 @@ func (s *s3SyncFilestore) OpenReader(
 		Bucket: &s.bucket,
 		Key:    &key,
 	}
+
 	obj, err := s.client.GetObject(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("error reading object %q: %w", key, err)
 	}
+
 	return obj.Body, nil
 }
 
@@ -161,6 +166,7 @@ func (s *s3SyncFilestore) UploadFile(ctx context.Context, dest, localFile string
 	if err != nil {
 		return fmt.Errorf("error opening %q: %w", localFile, err)
 	}
+
 	defer func() {
 		if err := f.Close(); err != nil {
 			logrus.Warnf("error closing %q: %v", localFile, err)
@@ -192,6 +198,7 @@ func (s *s3SyncFilestore) UploadFile(ctx context.Context, dest, localFile string
 	if _, err := f.Seek(0, 0); err != nil {
 		return fmt.Errorf("error rewinding file: %w", err)
 	}
+
 	req.Body = f
 
 	logrus.Infof("uploading to %s", s3URL)
@@ -245,6 +252,7 @@ func (s *s3SyncFilestore) ListFiles(
 		file.RelativePath = strings.TrimPrefix(name, s.prefix)
 
 		md5 := aws.ToString(obj.ETag)
+
 		md5 = strings.Trim(md5, "\"")
 		if md5 == "" {
 			return fmt.Errorf("MD5 not set on file %q", file.AbsolutePath)
@@ -260,6 +268,7 @@ func (s *s3SyncFilestore) ListFiles(
 		file.filestore = s
 
 		files[file.RelativePath] = file
+
 		return nil
 	}
 
@@ -289,7 +298,7 @@ type Hashes struct {
 func computeHashes(in io.ReadSeeker) (*Hashes, error) {
 	hasherSHA256 := sha256.New()
 	hasherSHA512 := sha512.New()
-	hasherMD5 := md5.New() //nolint: gosec
+	hasherMD5 := md5.New() //nolint:gosec // MD5 required by S3 API
 
 	hasher := io.MultiWriter(hasherMD5, hasherSHA256, hasherSHA512)
 
@@ -301,6 +310,7 @@ func computeHashes(in io.ReadSeeker) (*Hashes, error) {
 	if _, err := in.Seek(0, 0); err != nil {
 		return nil, fmt.Errorf("error rewinding file: %w", err)
 	}
+
 	return &Hashes{
 		SHA256: hasherSHA256.Sum(nil),
 		SHA512: hasherSHA512.Sum(nil),

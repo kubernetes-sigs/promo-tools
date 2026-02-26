@@ -25,10 +25,12 @@ import (
 
 func TestNoopVerifier(t *testing.T) {
 	v := &NoopVerifier{}
+
 	result, err := v.Verify(context.Background(), "gcr.io/test/image@sha256:abc")
 	if err != nil {
 		t.Fatalf("Verify() error = %v", err)
 	}
+
 	if !result.Verified {
 		t.Error("NoopVerifier should always return Verified=true")
 	}
