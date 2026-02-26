@@ -38,12 +38,13 @@ type FakeProvider struct {
 	copyImageReturnsOnCall map[int]struct {
 		result1 error
 	}
-	ReadRegistriesStub        func(context.Context, []registry.RegistryConfig, bool) (*registry.Inventory, error)
+	ReadRegistriesStub        func(context.Context, []registry.RegistryConfig, bool, []registry.RegistryConfig) (*registry.Inventory, error)
 	readRegistriesMutex       sync.RWMutex
 	readRegistriesArgsForCall []struct {
 		arg1 context.Context
 		arg2 []registry.RegistryConfig
 		arg3 bool
+		arg4 []registry.RegistryConfig
 	}
 	readRegistriesReturns struct {
 		result1 *registry.Inventory
@@ -120,11 +121,16 @@ func (fake *FakeProvider) CopyImageReturnsOnCall(i int, result1 error) {
 	}{result1}
 }
 
-func (fake *FakeProvider) ReadRegistries(arg1 context.Context, arg2 []registry.RegistryConfig, arg3 bool) (*registry.Inventory, error) {
+func (fake *FakeProvider) ReadRegistries(arg1 context.Context, arg2 []registry.RegistryConfig, arg3 bool, arg4 []registry.RegistryConfig) (*registry.Inventory, error) {
 	var arg2Copy []registry.RegistryConfig
 	if arg2 != nil {
 		arg2Copy = make([]registry.RegistryConfig, len(arg2))
 		copy(arg2Copy, arg2)
+	}
+	var arg4Copy []registry.RegistryConfig
+	if arg4 != nil {
+		arg4Copy = make([]registry.RegistryConfig, len(arg4))
+		copy(arg4Copy, arg4)
 	}
 	fake.readRegistriesMutex.Lock()
 	ret, specificReturn := fake.readRegistriesReturnsOnCall[len(fake.readRegistriesArgsForCall)]
@@ -132,13 +138,14 @@ func (fake *FakeProvider) ReadRegistries(arg1 context.Context, arg2 []registry.R
 		arg1 context.Context
 		arg2 []registry.RegistryConfig
 		arg3 bool
-	}{arg1, arg2Copy, arg3})
+		arg4 []registry.RegistryConfig
+	}{arg1, arg2Copy, arg3, arg4Copy})
 	stub := fake.ReadRegistriesStub
 	fakeReturns := fake.readRegistriesReturns
-	fake.recordInvocation("ReadRegistries", []interface{}{arg1, arg2Copy, arg3})
+	fake.recordInvocation("ReadRegistries", []interface{}{arg1, arg2Copy, arg3, arg4Copy})
 	fake.readRegistriesMutex.Unlock()
 	if stub != nil {
-		return stub(arg1, arg2, arg3)
+		return stub(arg1, arg2, arg3, arg4)
 	}
 	if specificReturn {
 		return ret.result1, ret.result2
@@ -152,17 +159,17 @@ func (fake *FakeProvider) ReadRegistriesCallCount() int {
 	return len(fake.readRegistriesArgsForCall)
 }
 
-func (fake *FakeProvider) ReadRegistriesCalls(stub func(context.Context, []registry.RegistryConfig, bool) (*registry.Inventory, error)) {
+func (fake *FakeProvider) ReadRegistriesCalls(stub func(context.Context, []registry.RegistryConfig, bool, []registry.RegistryConfig) (*registry.Inventory, error)) {
 	fake.readRegistriesMutex.Lock()
 	defer fake.readRegistriesMutex.Unlock()
 	fake.ReadRegistriesStub = stub
 }
 
-func (fake *FakeProvider) ReadRegistriesArgsForCall(i int) (context.Context, []registry.RegistryConfig, bool) {
+func (fake *FakeProvider) ReadRegistriesArgsForCall(i int) (context.Context, []registry.RegistryConfig, bool, []registry.RegistryConfig) {
 	fake.readRegistriesMutex.RLock()
 	defer fake.readRegistriesMutex.RUnlock()
 	argsForCall := fake.readRegistriesArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4
 }
 
 func (fake *FakeProvider) ReadRegistriesReturns(result1 *registry.Inventory, result2 error) {
