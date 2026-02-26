@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
+	"sync/atomic"
 
 	"github.com/google/go-containerregistry/pkg/crane"
 	"github.com/google/go-containerregistry/pkg/gcrane"
@@ -28,9 +29,15 @@ import (
 	ggcrV1Google "github.com/google/go-containerregistry/pkg/v1/google"
 	cr "github.com/google/go-containerregistry/pkg/v1/types"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 
 	"sigs.k8s.io/promo-tools/v4/types/image"
 )
+
+// readRegistryConcurrency controls the maximum number of concurrent
+// registry read operations. Each read is an HTTP request bounded by
+// the rate limiter at the transport level.
+const readRegistryConcurrency = 20
 
 // CraneProvider implements Provider using go-containerregistry/crane and the
 // Google-specific extensions for optimized registry walking.
@@ -71,11 +78,6 @@ func (p *CraneProvider) ReadRegistries(
 	inv := NewInventory()
 	var mu sync.Mutex
 
-	walkOpts := []ggcrV1Google.Option{
-		ggcrV1Google.WithAuthFromKeychain(gcrane.Keychain),
-		ggcrV1Google.WithContext(ctx),
-	}
-
 	// Use base registries for splitting repo paths into registry+image
 	// name. When not provided, fall back to the registries parameter.
 	splitRegs := baseRegistries
@@ -83,29 +85,46 @@ func (p *CraneProvider) ReadRegistries(
 		splitRegs = registries
 	}
 
-	for i, r := range registries {
-		logrus.Infof("Reading registry %d/%d: %s", i+1, len(registries), r.Name)
+	total := len(registries)
+	var completed atomic.Int64
 
-		repo, err := name.NewRepository(string(r.Name))
-		if err != nil {
-			return nil, fmt.Errorf("parsing repo name %s: %w", r.Name, err)
-		}
+	g, gctx := errgroup.WithContext(ctx)
+	g.SetLimit(readRegistryConcurrency)
 
-		recordTags := makeTagRecorder(inv, &mu, splitRegs)
-
-		if recurse {
-			if err := ggcrV1Google.Walk(repo, recordTags, walkOpts...); err != nil {
-				return nil, fmt.Errorf("walking repo %s: %w", r.Name, err)
-			}
-		} else {
-			tags, err := ggcrV1Google.List(repo, walkOpts...)
+	for _, r := range registries {
+		g.Go(func() error {
+			repo, err := name.NewRepository(string(r.Name))
 			if err != nil {
-				return nil, fmt.Errorf("listing repo %s: %w", r.Name, err)
+				return fmt.Errorf("parsing repo name %s: %w", r.Name, err)
 			}
-			if err := recordTags(repo, tags, nil); err != nil {
-				return nil, fmt.Errorf("recording tags for %s: %w", r.Name, err)
+
+			walkOpts := []ggcrV1Google.Option{
+				ggcrV1Google.WithAuthFromKeychain(gcrane.Keychain),
+				ggcrV1Google.WithContext(gctx),
 			}
-		}
+			recordTags := makeTagRecorder(inv, &mu, splitRegs)
+
+			if recurse {
+				if err := ggcrV1Google.Walk(repo, recordTags, walkOpts...); err != nil {
+					return fmt.Errorf("walking repo %s: %w", r.Name, err)
+				}
+			} else {
+				tags, err := ggcrV1Google.List(repo, walkOpts...)
+				if err != nil {
+					return fmt.Errorf("listing repo %s: %w", r.Name, err)
+				}
+				if err := recordTags(repo, tags, nil); err != nil {
+					return fmt.Errorf("recording tags for %s: %w", r.Name, err)
+				}
+			}
+
+			logrus.Infof("Read registry %d/%d: %s", completed.Add(1), total, r.Name)
+			return nil
+		})
+	}
+
+	if err := g.Wait(); err != nil {
+		return nil, err
 	}
 	return inv, nil
 }
