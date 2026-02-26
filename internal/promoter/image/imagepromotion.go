@@ -28,6 +28,7 @@ import (
 
 	options "sigs.k8s.io/promo-tools/v4/promoter/image/options"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/promotion"
+	"sigs.k8s.io/promo-tools/v4/promoter/image/ratelimit"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/registry"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/schema"
 )
@@ -173,7 +174,7 @@ func (di *DefaultPromoterImplementation) PromoteImages(
 
 			start := time.Now()
 
-			if err := withRetry(func() error {
+			if err := ratelimit.WithRetry(func() error {
 				return di.registryProvider.CopyImage(ctx, srcVertex, dstVertex)
 			}); err != nil {
 				return fmt.Errorf("copying %s to %s: %w", srcVertex, dstVertex, err)

@@ -38,7 +38,6 @@ import (
 	"github.com/sigstore/sigstore/pkg/tuf"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/release-sdk/sign"
 	"sigs.k8s.io/release-utils/version"
 
@@ -47,6 +46,7 @@ import (
 	options "sigs.k8s.io/promo-tools/v4/promoter/image/options"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/promotion"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/provenance"
+	"sigs.k8s.io/promo-tools/v4/promoter/image/ratelimit"
 	"sigs.k8s.io/promo-tools/v4/types/image"
 )
 
@@ -331,7 +331,9 @@ func (di *DefaultPromoterImplementation) copyAttachedObjects(edge *promotion.Edg
 		crane.WithTransport(di.getTransport()),
 	}
 
-	if err := crane.Copy(srcRef.String(), dstRef.String(), craneOpts...); err != nil {
+	if err := ratelimit.WithRetry(func() error {
+		return crane.Copy(srcRef.String(), dstRef.String(), craneOpts...)
+	}); err != nil {
 		// If the signature layer does not exist it means that the src image
 		// is not signed, so we catch the error and return nil
 		var terr *transport.Error
@@ -444,74 +446,34 @@ func (di *DefaultPromoterImplementation) replicateSignatures(
 	return nil
 }
 
-// retryBackoff defines the exponential backoff for transient registry errors.
-var retryBackoff = wait.Backoff{
-	Duration: 30 * time.Second,
-	Factor:   2,
-	Jitter:   0.1,
-	Steps:    3,
-}
-
-// isTransient returns true for HTTP status codes that indicate a temporary
-// failure worth retrying (429 Too Many Requests and 5xx server errors).
-func isTransient(err error) bool {
-	var terr *transport.Error
-	if errors.As(err, &terr) {
-		return terr.StatusCode == http.StatusTooManyRequests ||
-			terr.StatusCode >= http.StatusInternalServerError
-	}
-
-	return false
-}
-
-// withRetry calls fn with exponential backoff on transient registry errors.
-// Non-transient errors are returned immediately.
-func withRetry(fn func() error) error {
-	var lastErr error
-
-	err := wait.ExponentialBackoff(retryBackoff, func() (bool, error) {
-		lastErr = fn()
-		if lastErr == nil {
-			return true, nil // success, stop retrying
-		}
-
-		if !isTransient(lastErr) {
-			return false, lastErr // permanent error, stop retrying
-		}
-
-		return false, nil // transient error, keep retrying
-	})
-	if wait.Interrupted(err) {
-		return lastErr // retries exhausted, return the last transient error
-	}
-
-	if err != nil {
-		return fmt.Errorf("exponential backoff: %w", err)
-	}
-
-	return nil
-}
-
 // headWithRetry performs a remote.Head with retries on transient errors.
 func (di *DefaultPromoterImplementation) headWithRetry(ref name.Reference) error {
-	return withRetry(func() error {
+	if err := ratelimit.WithRetry(func() error {
 		_, err := remote.Head(ref,
 			remote.WithAuthFromKeychain(gcrane.Keychain),
 			remote.WithTransport(di.getTransport()),
 		)
 		if err != nil {
-			return fmt.Errorf("remote head %s: %w", ref.String(), err)
+			return fmt.Errorf("head: %w", err)
 		}
 
 		return nil
-	})
+	}); err != nil {
+		return fmt.Errorf("remote head %s: %w", ref.String(), err)
+	}
+
+	return nil
 }
 
 // copyWithRetry performs a crane.Copy with retries on transient errors.
 func (di *DefaultPromoterImplementation) copyWithRetry(src, dst string, opts []crane.Option) error {
-	return withRetry(func() error {
+	if err := ratelimit.WithRetry(func() error {
 		return crane.Copy(src, dst, opts...)
-	})
+	}); err != nil {
+		return fmt.Errorf("copying %s to %s: %w", src, dst, err)
+	}
+
+	return nil
 }
 
 // WriteSBOMs copies pre-generated SBOMs from the staging registry to each
@@ -574,7 +536,9 @@ func (di *DefaultPromoterImplementation) copySBOM(edge *promotion.Edge) error {
 
 	logrus.Infof("SBOM copy: %s to %s", srcRefString, dstRefString)
 
-	if err := crane.Copy(srcRefString, dstRefString, craneOpts...); err != nil {
+	if err := ratelimit.WithRetry(func() error {
+		return crane.Copy(srcRefString, dstRefString, craneOpts...)
+	}); err != nil {
 		// If the SBOM does not exist in staging, skip silently
 		var terr *transport.Error
 		if errors.As(err, &terr) && terr.StatusCode == http.StatusNotFound {
@@ -708,11 +672,13 @@ func (di *DefaultPromoterImplementation) pushAttestation(
 
 	logrus.Infof("Provenance attestation: pushing %s", dstRefString)
 
-	if err := remote.Write(ref, img,
-		remote.WithAuthFromKeychain(gcrane.Keychain),
-		remote.WithUserAgent(image.UserAgent),
-		remote.WithTransport(di.getTransport()),
-	); err != nil {
+	if err := ratelimit.WithRetry(func() error {
+		return remote.Write(ref, img,
+			remote.WithAuthFromKeychain(gcrane.Keychain),
+			remote.WithUserAgent(image.UserAgent),
+			remote.WithTransport(di.getTransport()),
+		)
+	}); err != nil {
 		return fmt.Errorf("pushing attestation %s: %w", dstRefString, err)
 	}
 
