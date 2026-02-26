@@ -45,13 +45,8 @@ necessarily mean that a new version of the image layer is available.`
 type DefaultPromoterImplementation struct {
 	signer *sign.Signer
 
-	// promotionTransport is the HTTP transport used for image promotion
-	// (crane.Copy).
-	promotionTransport *ratelimit.RoundTripper
-
-	// signingTransport is the HTTP transport used for signature copy and
-	// replication.
-	signingTransport *ratelimit.RoundTripper
+	// transport is the rate-limited HTTP transport shared by all phases.
+	transport *ratelimit.RoundTripper
 
 	// registryProvider abstracts registry operations (read inventory, copy images).
 	registryProvider registry.Provider
@@ -73,14 +68,9 @@ func NewDefaultPromoterImplementation(opts *options.Options) *DefaultPromoterImp
 	}
 }
 
-// SetPromotionTransport sets the HTTP transport used for image promotion.
-func (di *DefaultPromoterImplementation) SetPromotionTransport(rt *ratelimit.RoundTripper) {
-	di.promotionTransport = rt
-}
-
-// SetSigningTransport sets the HTTP transport used for signing operations.
-func (di *DefaultPromoterImplementation) SetSigningTransport(rt *ratelimit.RoundTripper) {
-	di.signingTransport = rt
+// SetTransport sets the rate-limited HTTP transport for all phases.
+func (di *DefaultPromoterImplementation) SetTransport(rt *ratelimit.RoundTripper) {
+	di.transport = rt
 }
 
 // SetRegistryProvider sets the registry provider for image operations.
@@ -162,9 +152,9 @@ func (di *DefaultPromoterImplementation) PrintSecDisclaimer() {
 	logrus.Info(vulnerabilityDiscalimer)
 }
 
-// getSigningTransport returns the transport for signing operations.
-func (di *DefaultPromoterImplementation) getSigningTransport() *ratelimit.RoundTripper {
-	return di.signingTransport
+// getTransport returns the rate-limited transport.
+func (di *DefaultPromoterImplementation) getTransport() *ratelimit.RoundTripper {
+	return di.transport
 }
 
 // craneOptions returns common crane options for registry operations,
@@ -174,8 +164,8 @@ func (di *DefaultPromoterImplementation) craneOptions() []crane.Option {
 		crane.WithAuthFromKeychain(gcrane.Keychain),
 		crane.WithUserAgent(image.UserAgent),
 	}
-	if di.promotionTransport != nil {
-		opts = append(opts, crane.WithTransport(di.promotionTransport))
+	if di.transport != nil {
+		opts = append(opts, crane.WithTransport(di.transport))
 	}
 
 	return opts

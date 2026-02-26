@@ -328,7 +328,7 @@ func (di *DefaultPromoterImplementation) copyAttachedObjects(edge *promotion.Edg
 	craneOpts := []crane.Option{
 		crane.WithAuthFromKeychain(gcrane.Keychain),
 		crane.WithUserAgent(image.UserAgent),
-		crane.WithTransport(di.getSigningTransport()),
+		crane.WithTransport(di.getTransport()),
 	}
 
 	if err := crane.Copy(srcRef.String(), dstRef.String(), craneOpts...); err != nil {
@@ -405,7 +405,7 @@ func (di *DefaultPromoterImplementation) replicateSignatures(
 			// Skip if the signature tag already exists at the destination.
 			if _, err := remote.Head(dstRef,
 				remote.WithAuthFromKeychain(gcrane.Keychain),
-				remote.WithTransport(di.getSigningTransport()),
+				remote.WithTransport(di.getTransport()),
 			); err == nil {
 				logrus.WithField("dst", dstRef.String()).Debug("Signature already exists, skipping")
 
@@ -417,7 +417,7 @@ func (di *DefaultPromoterImplementation) replicateSignatures(
 			opts := []crane.Option{
 				crane.WithAuthFromKeychain(gcrane.Keychain),
 				crane.WithUserAgent(image.UserAgent),
-				crane.WithTransport(di.getSigningTransport()),
+				crane.WithTransport(di.getTransport()),
 			}
 			if err := di.copyWithRetry(srcRef.String(), dstRef.String(), opts); err != nil {
 				var terr *transport.Error
@@ -497,7 +497,7 @@ func (di *DefaultPromoterImplementation) headWithRetry(ref name.Reference) error
 	return withRetry(func() error {
 		_, err := remote.Head(ref,
 			remote.WithAuthFromKeychain(gcrane.Keychain),
-			remote.WithTransport(di.getSigningTransport()),
+			remote.WithTransport(di.getTransport()),
 		)
 		if err != nil {
 			return fmt.Errorf("remote head %s: %w", ref.String(), err)
@@ -569,7 +569,7 @@ func (di *DefaultPromoterImplementation) copySBOM(edge *promotion.Edge) error {
 	craneOpts := []crane.Option{
 		crane.WithAuthFromKeychain(gcrane.Keychain),
 		crane.WithUserAgent(image.UserAgent),
-		crane.WithTransport(di.getSigningTransport()),
+		crane.WithTransport(di.getTransport()),
 	}
 
 	logrus.Infof("SBOM copy: %s to %s", srcRefString, dstRefString)
@@ -711,7 +711,7 @@ func (di *DefaultPromoterImplementation) pushAttestation(
 	if err := remote.Write(ref, img,
 		remote.WithAuthFromKeychain(gcrane.Keychain),
 		remote.WithUserAgent(image.UserAgent),
-		remote.WithTransport(di.getSigningTransport()),
+		remote.WithTransport(di.getTransport()),
 	); err != nil {
 		return fmt.Errorf("pushing attestation %s: %w", dstRefString, err)
 	}

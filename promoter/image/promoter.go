@@ -45,24 +45,19 @@ var AllowedOutputFormats = []string{
 type Promoter struct {
 	Options             *options.Options
 	impl                promoterImplementation
-	budget              *ratelimit.BudgetAllocator
 	provenanceVerifier  provenance.Verifier
 	provenanceGenerator provenance.Generator
 }
 
 func New(opts *options.Options) *Promoter {
-	// Create a budget allocator that gives the full rate limit to the
-	// active phase. Promotion runs first with 100% budget, then after
-	// it completes, signing gets the full budget via GiveAll.
-	budget := ratelimit.NewBudgetAllocator(ratelimit.MaxEvents)
-	promoRT := budget.Allocate("promotion", 1.0)
-	signRT := budget.Allocate("signing", 0.0)
+	// All pipeline phases run sequentially, so a single rate limiter
+	// with the full budget is sufficient.
+	rt := ratelimit.NewRoundTripper(ratelimit.MaxEvents)
 
 	di := impl.NewDefaultPromoterImplementation(opts)
-	di.SetPromotionTransport(promoRT)
-	di.SetSigningTransport(signRT)
+	di.SetTransport(rt)
 	di.SetRegistryProvider(registry.NewCraneProvider(
-		registry.WithTransport(promoRT),
+		registry.WithTransport(rt),
 	))
 	di.SetServiceActivator(&auth.GCPServiceActivator{})
 	di.SetIdentityTokenProvider(&auth.GCPIdentityTokenProvider{
@@ -73,7 +68,6 @@ func New(opts *options.Options) *Promoter {
 	p := &Promoter{
 		Options: opts,
 		impl:    di,
-		budget:  budget,
 	}
 
 	if opts.GeneratePromotionProvenance {
@@ -248,13 +242,6 @@ func (p *Promoter) PromoteImages(ctx context.Context, opts *options.Options) err
 			return fmt.Errorf("running promotion: %w", err)
 		}
 
-		// Rebalance rate limit budget: give signing the full capacity.
-		if p.budget != nil {
-			if err := p.budget.GiveAll("signing"); err != nil {
-				logrus.WithError(err).Warn("Failed to rebalance rate limit budget")
-			}
-		}
-
 		return nil
 	}))
 
@@ -421,14 +408,6 @@ func (p *Promoter) CheckSignatures(opts *options.Options) error {
 // independently of the promotion job.
 func (p *Promoter) ReplicateSignatures(ctx context.Context, opts *options.Options) error {
 	var promotionEdges map[promotion.Edge]any
-
-	// Give the signing transport the full rate limit budget since
-	// standalone replication has no promotion or signing workload.
-	if p.budget != nil {
-		if err := p.budget.GiveAll("signing"); err != nil {
-			logrus.WithError(err).Warn("Failed to rebalance rate limit budget")
-		}
-	}
 
 	pipe := pipeline.New()
 
