@@ -42,7 +42,6 @@ import (
 	"sigs.k8s.io/release-utils/version"
 
 	"sigs.k8s.io/promo-tools/v4/image/consts"
-	internalversion "sigs.k8s.io/promo-tools/v4/internal/version"
 	options "sigs.k8s.io/promo-tools/v4/promoter/image/options"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/promotion"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/provenance"
@@ -595,7 +594,7 @@ func (di *DefaultPromoterImplementation) WriteProvenanceAttestations(
 	}
 
 	builderID := "https://k8s.io/promo-tools"
-	if v := internalversion.Get().GitVersion; v != "" {
+	if v := version.GetVersionInfo().GitVersion; v != "" {
 		builderID += "@" + v
 	}
 
