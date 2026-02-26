@@ -352,3 +352,108 @@ func TestGetRegistriesToRead(t *testing.T) {
 	require.True(t, names["gcr.io/staging/foo"])
 	require.True(t, names["us.gcr.io/prod/foo"])
 }
+
+func TestGetBaseRegistries(t *testing.T) {
+	edges := map[Edge]interface{}{
+		{
+			SrcRegistry: testSrcRC,
+			SrcImageTag: ImageTag{Name: "foo"},
+			DstRegistry: testDstRC1,
+			DstImageTag: ImageTag{Name: "foo"},
+		}: nil,
+		{
+			SrcRegistry: testSrcRC,
+			SrcImageTag: ImageTag{Name: "bar"},
+			DstRegistry: testDstRC2,
+			DstImageTag: ImageTag{Name: "bar"},
+		}: nil,
+	}
+
+	rcs := GetBaseRegistries(edges)
+	require.Len(t, rcs, 3)
+
+	names := make(map[image.Registry]bool)
+	for _, rc := range rcs {
+		names[rc.Name] = true
+	}
+	// Base registries should NOT have image names appended.
+	require.True(t, names["gcr.io/staging"])
+	require.True(t, names["us.gcr.io/prod"])
+	require.True(t, names["eu.gcr.io/prod"])
+}
+
+func TestGetPromotionCandidatesWithBaseRegistries(t *testing.T) {
+	// This test verifies the fix for the inventory key mismatch bug.
+	// When ReadRegistries uses base registries for splitByKnownRegistries,
+	// the inventory is keyed correctly and digests are found.
+	srcReg := registry.Context{
+		Name: "gcr.io/k8s-staging-foo",
+		Src:  true,
+	}
+	dstReg := registry.Context{
+		Name: "us-docker.pkg.dev/k8s-artifacts-prod/images/foo",
+	}
+
+	edges := map[Edge]interface{}{
+		{
+			SrcRegistry: srcReg,
+			SrcImageTag: ImageTag{Name: "myimage", Tag: "v1.0"},
+			DstRegistry: dstReg,
+			DstImageTag: ImageTag{Name: "myimage", Tag: "v1.0"},
+			Digest:      testDigest1,
+		}: nil,
+	}
+
+	// Inventory keyed by BASE registry name with image name as sub-key
+	// (this is the correct keying produced when base registries are used).
+	// Both src and dst have the digest+tag → already promoted.
+	inv := map[image.Registry]registry.RegInvImage{
+		"gcr.io/k8s-staging-foo": {
+			"myimage": registry.DigestTags{
+				testDigest1: {"v1.0"},
+			},
+		},
+		"us-docker.pkg.dev/k8s-artifacts-prod/images/foo": {
+			"myimage": registry.DigestTags{
+				testDigest1: {"v1.0"},
+			},
+		},
+	}
+
+	candidates, clean := GetPromotionCandidates(edges, inv)
+	require.True(t, clean)
+	// Already promoted, so no candidates.
+	require.Empty(t, candidates)
+
+	// Now test with a digest that needs promotion (exists in src, not in dst).
+	inv = map[image.Registry]registry.RegInvImage{
+		"gcr.io/k8s-staging-foo": {
+			"myimage": registry.DigestTags{
+				testDigest1: {"v1.0"},
+			},
+		},
+		"us-docker.pkg.dev/k8s-artifacts-prod/images/foo": {
+			"myimage": registry.DigestTags{},
+		},
+	}
+
+	candidates, clean = GetPromotionCandidates(edges, inv)
+	require.True(t, clean)
+	require.Len(t, candidates, 1)
+
+	// Verify that with WRONG keying (full-path keys as produced by the
+	// old buggy code), digests would NOT be found and candidates would
+	// be empty (all _LOST_).
+	invBadKeys := map[image.Registry]registry.RegInvImage{
+		"gcr.io/k8s-staging-foo/myimage": {
+			"": registry.DigestTags{
+				testDigest1: {"v1.0"},
+			},
+		},
+	}
+
+	candidates, clean = GetPromotionCandidates(edges, invBadKeys)
+	require.True(t, clean)
+	// With wrong keys, nothing is found → no candidates (all _LOST_).
+	require.Empty(t, candidates)
+}

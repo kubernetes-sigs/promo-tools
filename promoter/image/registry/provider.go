@@ -32,7 +32,10 @@ import (
 type Provider interface {
 	// ReadRegistries reads the image inventory from one or more registries.
 	// If recurse is true, child repositories are walked recursively.
-	ReadRegistries(ctx context.Context, registries []RegistryConfig, recurse bool) (*Inventory, error)
+	// baseRegistries, when non-nil, provides the base registry paths
+	// (without image name suffixes) used to key the returned inventory.
+	// When nil, the registries parameter is used for keying instead.
+	ReadRegistries(ctx context.Context, registries []RegistryConfig, recurse bool, baseRegistries []RegistryConfig) (*Inventory, error)
 
 	// CopyImage copies a container image from the source reference to the
 	// destination reference. References can be by digest (FQIN) or tag (PQIN).

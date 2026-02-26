@@ -271,6 +271,26 @@ func EdgesToRegInvImage(
 	return rii
 }
 
+// GetBaseRegistries collects the unique base registries (without image name
+// suffixes) from the edges. These are used by ReadRegistries to correctly
+// key the inventory so that vertexPropsFor can look up digests by the
+// original registry name from the edge.
+func GetBaseRegistries(edges map[Edge]interface{}) []registry.Context {
+	rcs := make(map[registry.Context]interface{})
+
+	for edge := range edges {
+		rcs[edge.SrcRegistry] = nil
+		rcs[edge.DstRegistry] = nil
+	}
+
+	rcsFinal := make([]registry.Context, 0, len(rcs))
+	for rc := range rcs {
+		rcsFinal = append(rcsFinal, rc)
+	}
+
+	return rcsFinal
+}
+
 // GetRegistriesToRead collects all unique Docker repositories we want to read
 // from. This way, we don't have to read the entire Docker registry, but only
 // those paths that we are thinking of modifying.

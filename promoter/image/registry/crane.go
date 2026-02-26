@@ -59,8 +59,12 @@ func NewCraneProvider(opts ...CraneOption) *CraneProvider {
 
 // ReadRegistries reads the image inventory from one or more registries using
 // google.Walk (recursive) or google.List (non-recursive).
+// baseRegistries, when non-nil, provides the base registry paths used to
+// key the returned inventory. This is needed when registries contain
+// full image paths (e.g. "gcr.io/staging/image") but the inventory must
+// be keyed by the base registry (e.g. "gcr.io/staging").
 func (p *CraneProvider) ReadRegistries(
-	ctx context.Context, registries []RegistryConfig, recurse bool,
+	ctx context.Context, registries []RegistryConfig, recurse bool, baseRegistries []RegistryConfig,
 ) (*Inventory, error) {
 	logrus.Infof("Reading %d registries (recursive: %v)", len(registries), recurse)
 
@@ -72,13 +76,20 @@ func (p *CraneProvider) ReadRegistries(
 		ggcrV1Google.WithContext(ctx),
 	}
 
+	// Use base registries for splitting repo paths into registry+image
+	// name. When not provided, fall back to the registries parameter.
+	splitRegs := baseRegistries
+	if len(splitRegs) == 0 {
+		splitRegs = registries
+	}
+
 	for _, r := range registries {
 		repo, err := name.NewRepository(string(r.Name))
 		if err != nil {
 			return nil, fmt.Errorf("parsing repo name %s: %w", r.Name, err)
 		}
 
-		recordTags := makeTagRecorder(inv, &mu, registries)
+		recordTags := makeTagRecorder(inv, &mu, splitRegs)
 
 		if recurse {
 			if err := ggcrV1Google.Walk(repo, recordTags, walkOpts...); err != nil {

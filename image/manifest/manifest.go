@@ -220,6 +220,7 @@ func ReadStagingRepo(
 		ctx,
 		[]registry.RegistryConfig{{Name: o.StagingRepo}},
 		true, // recursive
+		nil,
 	)
 	if err != nil {
 		return registry.RegInvImage{}, err

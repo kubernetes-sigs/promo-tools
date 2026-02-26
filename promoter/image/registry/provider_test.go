@@ -103,7 +103,7 @@ func TestFakeProviderReadRegistries(t *testing.T) {
 	f := NewFakeProvider()
 	f.AddImage("gcr.io/test", "img", "sha256:abc", "v1")
 
-	inv, err := f.ReadRegistries(context.Background(), nil, false)
+	inv, err := f.ReadRegistries(context.Background(), nil, false, nil)
 	if err != nil {
 		t.Fatalf("ReadRegistries() error = %v", err)
 	}
@@ -116,7 +116,7 @@ func TestFakeProviderReadRegistriesError(t *testing.T) {
 	f := NewFakeProvider()
 	f.ReadRegistriesErr = errors.New("boom")
 
-	_, err := f.ReadRegistries(context.Background(), nil, false)
+	_, err := f.ReadRegistries(context.Background(), nil, false, nil)
 	if err == nil {
 		t.Fatal("expected error")
 	}

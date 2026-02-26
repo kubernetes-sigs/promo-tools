@@ -153,6 +153,7 @@ func (di *DefaultPromoterImplementation) GetRegistryImageInventory(
 				context.Background(),
 				[]registry.RegistryConfig{registryConfig},
 				true,
+				nil,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("reading registry for minimal snapshot: %w", err)
@@ -169,6 +170,7 @@ func (di *DefaultPromoterImplementation) GetRegistryImageInventory(
 		context.Background(),
 		[]registry.RegistryConfig{registryConfig},
 		true,
+		nil,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("reading registries: %w", err)

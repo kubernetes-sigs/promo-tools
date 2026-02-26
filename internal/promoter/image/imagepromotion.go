@@ -66,9 +66,14 @@ func (di *DefaultPromoterImplementation) GetPromotionEdges(
 		return nil, fmt.Errorf("converting manifests to edges: %w", err)
 	}
 
-	// Collect registries we need to read
+	// Collect registries we need to read (full paths including image names)
 	regs := promotion.GetRegistriesToRead(edges)
 	configs := registry.RegistryConfigsFromContexts(regs)
+
+	// Collect base registries (without image name suffixes) for correct
+	// inventory keying in splitByKnownRegistries.
+	baseRegs := promotion.GetBaseRegistries(edges)
+	baseConfigs := registry.RegistryConfigsFromContexts(baseRegs)
 
 	for _, cfg := range configs {
 		logrus.Debugf("reading registry %s (src=%v)", cfg.Name, cfg.Src)
@@ -76,7 +81,7 @@ func (di *DefaultPromoterImplementation) GetPromotionEdges(
 
 	// Read registry inventories (non-recursive, specific repos only)
 	ctx := context.Background()
-	inv, err := di.registryProvider.ReadRegistries(ctx, configs, false)
+	inv, err := di.registryProvider.ReadRegistries(ctx, configs, false, baseConfigs)
 	if err != nil {
 		return nil, fmt.Errorf("reading registries: %w", err)
 	}

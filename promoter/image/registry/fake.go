@@ -72,7 +72,7 @@ func (f *FakeProvider) AddImage(
 
 // ReadRegistries returns the pre-populated inventory.
 func (f *FakeProvider) ReadRegistries(
-	_ context.Context, _ []RegistryConfig, _ bool,
+	_ context.Context, _ []RegistryConfig, _ bool, _ []RegistryConfig,
 ) (*Inventory, error) {
 	if f.ReadRegistriesErr != nil {
 		return nil, f.ReadRegistriesErr
