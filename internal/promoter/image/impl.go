@@ -26,8 +26,8 @@ import (
 	"github.com/google/go-containerregistry/pkg/gcrane"
 	"github.com/sirupsen/logrus"
 	"sigs.k8s.io/release-sdk/sign"
+	"sigs.k8s.io/release-utils/version"
 
-	"sigs.k8s.io/promo-tools/v4/internal/version"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/auth"
 	options "sigs.k8s.io/promo-tools/v4/promoter/image/options"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/ratelimit"
@@ -153,7 +153,11 @@ func (di *DefaultPromoterImplementation) ActivateServiceAccounts(opts *options.O
 }
 
 func (di *DefaultPromoterImplementation) PrintVersion() {
-	logrus.Info(version.Get())
+	v := version.GetVersionInfo()
+	logrus.Infof(
+		"kpromo %s (commit: %s, built: %s, go: %s)",
+		v.GitVersion, v.GitCommit, v.BuildDate, v.GoVersion,
+	)
 }
 
 // PrintSecDisclaimer prints a disclaimer about false positives
