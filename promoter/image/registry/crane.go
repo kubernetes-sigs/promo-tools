@@ -31,6 +31,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 
+	"sigs.k8s.io/promo-tools/v4/promoter/image/ratelimit"
 	"sigs.k8s.io/promo-tools/v4/types/image"
 )
 
@@ -109,12 +110,24 @@ func (p *CraneProvider) ReadRegistries(
 			recordTags := makeTagRecorder(inv, &mu, splitRegs)
 
 			if recurse {
-				if err := ggcrV1Google.Walk(repo, recordTags, walkOpts...); err != nil {
+				if err := ratelimit.WithRetry(func() error {
+					return ggcrV1Google.Walk(repo, recordTags, walkOpts...)
+				}); err != nil {
 					return fmt.Errorf("walking repo %s: %w", r.Name, err)
 				}
 			} else {
-				tags, err := ggcrV1Google.List(repo, walkOpts...)
-				if err != nil {
+				var tags *ggcrV1Google.Tags
+
+				if err := ratelimit.WithRetry(func() error {
+					var listErr error
+
+					tags, listErr = ggcrV1Google.List(repo, walkOpts...)
+					if listErr != nil {
+						return fmt.Errorf("listing: %w", listErr)
+					}
+
+					return nil
+				}); err != nil {
 					return fmt.Errorf("listing repo %s: %w", r.Name, err)
 				}
 

@@ -29,6 +29,7 @@ import (
 
 	options "sigs.k8s.io/promo-tools/v4/promoter/image/options"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/promotion"
+	"sigs.k8s.io/promo-tools/v4/promoter/image/ratelimit"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/registry"
 	"sigs.k8s.io/promo-tools/v4/types/image"
 )
@@ -168,7 +169,7 @@ func TestIsTransient(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			require.Equal(t, tc.want, isTransient(tc.err))
+			require.Equal(t, tc.want, ratelimit.IsTransient(tc.err))
 		})
 	}
 }
