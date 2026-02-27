@@ -44,7 +44,7 @@ SemVer is described in detail [here](https://semver.org/).
 Example:
 
 ```console
-v3.4.0
+v4.3.0
 ```
 
 Image tags are derived from the git tag, with the addition of a revision.
@@ -52,7 +52,7 @@ Image tags are derived from the git tag, with the addition of a revision.
 Example:
 
 ```console
-v3.4.0-1
+v4.3.0-1
 ```
 
 This is a similar pattern to what you might expect from an OS package.
@@ -104,21 +104,21 @@ To create the image promotion PR follow these instructions:
 
 make kpromo
 
-# The kpromo binary shoold no be in ./bin/kpromo
+# The kpromo binary should now be in ./bin/kpromo
 
 ```
 
 #### 2. Ensure the New Image Is Staged:
 ```
-# Use something like crane to search for v3.4.4
+# Use something like crane to search for v4.3.0
 
-gcrane ls gcr.io/k8s-staging-artifact-promoter/kpromo | grep v3.4.4
-v3.4.4-1
+gcrane ls gcr.io/k8s-staging-artifact-promoter/kpromo | grep v4.3.0
+v4.3.0-1
 
 # ... or skopeo
 
-skopeo list-tags docker://gcr.io/k8s-staging-artifact-promoter/kpromo | grep v3.4.4
-        "v3.4.4-1"
+skopeo list-tags docker://gcr.io/k8s-staging-artifact-promoter/kpromo | grep v4.3.0
+        "v4.3.0-1"
 ```
 #### 3. Create the Image Promotion PR
 
@@ -129,11 +129,11 @@ with a [personal access token](https://docs.github.com/en/authentication/keeping
 with enough permissions to create a pull request on your behalf.
 
 Now, run the following from the `promo-tools` repo, replacing 
-`yourUsername` with your GitHub userbaname and `v3.4.4-1` with the
+`yourUsername` with your GitHub username and the version with the
 actual tag you want to promote:
 
 ```
-./bin/kpromo pr --fork puerco --interactive --project artifact-promoter --tag v3.4.4-1
+./bin/kpromo pr --fork yourUsername --interactive --project artifact-promoter --tag v4.3.0-1
 ```
 
 `kpromo` will ask you some questions before proceeding and it will
