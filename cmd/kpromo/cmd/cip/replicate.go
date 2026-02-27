@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
 	promoter "sigs.k8s.io/promo-tools/v4/promoter/image"
@@ -46,6 +47,12 @@ Example usage:
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(_ *cobra.Command, _ []string) error {
+		logrus.SetFormatter(&logrus.TextFormatter{
+			DisableTimestamp: false,
+			FullTimestamp:    true,
+			TimestampFormat:  "15:04:05.000",
+		})
+
 		p := promoter.New(runOpts)
 		if err := p.ReplicateSignatures(context.Background(), runOpts); err != nil {
 			return fmt.Errorf("replicate signatures: %w", err)

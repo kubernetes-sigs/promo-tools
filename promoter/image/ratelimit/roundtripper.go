@@ -114,9 +114,7 @@ func (rt *RoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 // to rebalance budgets between phases.
 func (rt *RoundTripper) SetLimit(newLimit rate.Limit) {
 	rt.rateLimiter.SetLimit(newLimit)
-	logrus.WithField("limiter", rt.name).Infof(
-		"Rate limit adjusted to %.1f req/sec", float64(newLimit),
-	)
+	logrus.Infof("Rate limit adjusted to %.1f req/sec", float64(newLimit))
 }
 
 // SetBurst changes the burst limit dynamically.
@@ -147,9 +145,6 @@ func (rt *RoundTripper) waitForBackoff(ctx context.Context) {
 	}
 
 	wait := time.Until(until)
-	logrus.WithField("limiter", rt.name).Warnf(
-		"Backoff active, waiting %s before next request", wait.Round(time.Millisecond),
-	)
 
 	select {
 	case <-time.After(wait):
@@ -172,7 +167,5 @@ func (rt *RoundTripper) triggerBackoff() {
 
 	rt.lastBackoff = now
 	rt.backoffUntil = now.Add(backoffDuration)
-	logrus.WithField("limiter", rt.name).Warnf(
-		"Received 429 Too Many Requests, backing off for %s", backoffDuration,
-	)
+	logrus.Warnf("Received 429 Too Many Requests, backing off for %s", backoffDuration)
 }

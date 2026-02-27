@@ -435,6 +435,8 @@ func (p *Promoter) ReplicateSignatures(ctx context.Context, opts *options.Option
 			return fmt.Errorf("parsing manifests: %w", err)
 		}
 
+		p.impl.PrintVersion()
+
 		promotionEdges, err = p.impl.EdgesFromManifests(mfests)
 		if err != nil {
 			return fmt.Errorf("computing edges from manifests: %w", err)
