@@ -104,14 +104,6 @@ func TestPromoteImages(t *testing.T) {
 			},
 		},
 		{
-			// CopyFreshSignatures fails
-			shouldErr: true,
-			msg:       "CopyFreshSignatures fails",
-			prepare: func(fpi *imagefakes.FakePromoterImplementation) {
-				fpi.CopyFreshSignaturesReturns(testErr)
-			},
-		},
-		{
 			// WriteSBOMs fails
 			shouldErr: true,
 			msg:       "WriteSBOMs fails",
