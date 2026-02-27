@@ -24,6 +24,7 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/go-containerregistry/pkg/crane"
@@ -216,6 +217,25 @@ func (di *DefaultPromoterImplementation) ReplicateSignatures(
 
 	grouped := groupEdgesByIdentityDigest(edges)
 
+	// Count groups that need replication (more than one destination).
+	var total int
+
+	for _, group := range grouped {
+		if len(group) > 1 {
+			total++
+		}
+	}
+
+	if total == 0 {
+		logrus.Info("No multi-registry groups to replicate")
+
+		return nil
+	}
+
+	logrus.Infof("Replicating signatures for %d groups", total)
+
+	var completed atomic.Int64
+
 	g := new(errgroup.Group)
 	g.SetLimit(opts.MaxSignatureCopies)
 
@@ -225,7 +245,16 @@ func (di *DefaultPromoterImplementation) ReplicateSignatures(
 		}
 
 		g.Go(func() error {
-			return di.replicateSignatures(&group[0], group[1:])
+			ref := group[0].DstReference()
+			if err := di.replicateSignatures(&group[0], group[1:]); err != nil {
+				return err
+			}
+
+			logrus.Infof("Replicated group %s (%d/%d)",
+				ref, completed.Add(1), total,
+			)
+
+			return nil
 		})
 	}
 
@@ -400,7 +429,10 @@ func (di *DefaultPromoterImplementation) replicateSignatures(
 	}
 
 	// Copy the signatures to the missing registries in parallel.
+	// Limit concurrency to avoid overwhelming the shared rate limiter.
 	g := new(errgroup.Group)
+	g.SetLimit(10)
+
 	for _, dstRef := range dstRefs {
 		g.Go(func() error {
 			// Skip if the signature tag already exists at the destination.
