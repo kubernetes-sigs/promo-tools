@@ -44,6 +44,7 @@ const readRegistryConcurrency = 20
 // Google-specific extensions for optimized registry walking.
 type CraneProvider struct {
 	transport http.RoundTripper
+	craneOpts []crane.Option
 }
 
 // CraneOption configures a CraneProvider.
@@ -53,6 +54,14 @@ type CraneOption func(*CraneProvider)
 func WithTransport(rt http.RoundTripper) CraneOption {
 	return func(p *CraneProvider) {
 		p.transport = rt
+	}
+}
+
+// WithCraneOptions sets additional crane options for registry operations.
+// This can be used to pass options like crane.Insecure for non-TLS registries.
+func WithCraneOptions(opts ...crane.Option) CraneOption {
+	return func(p *CraneProvider) {
+		p.craneOpts = opts
 	}
 }
 
@@ -158,6 +167,8 @@ func (p *CraneProvider) CopyImage(_ context.Context, src, dst string) error {
 	if p.transport != nil {
 		opts = append(opts, crane.WithTransport(p.transport))
 	}
+
+	opts = append(opts, p.craneOpts...)
 
 	if err := crane.Copy(src, dst, opts...); err != nil {
 		return fmt.Errorf("copying image %s to %s: %w", src, dst, err)
