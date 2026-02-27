@@ -24,6 +24,7 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -197,9 +198,65 @@ func (di *DefaultPromoterImplementation) signFirst(signOpts *sign.Options, ident
 	return nil
 }
 
-// ReplicateSignatures copies signatures from the primary destination registry
-// to all additional destination registries for images that were promoted to
-// multiple registries.
+// CopyFreshSignatures copies freshly created signatures from the primary
+// destination registry to all mirror registries. It copies every signature
+// unconditionally, which is optimal during inline promotion where signatures
+// were just created and mirrors are known to be empty.
+func (di *DefaultPromoterImplementation) CopyFreshSignatures(
+	opts *options.Options, edges map[promotion.Edge]any,
+) error {
+	if !opts.SignImages {
+		logrus.Info("Signing disabled, skipping signature copy")
+
+		return nil
+	}
+
+	if len(edges) == 0 {
+		logrus.Info("No images were promoted. Nothing to copy.")
+
+		return nil
+	}
+
+	multiGroups := collectMultiRegistryGroups(edges)
+	if len(multiGroups) == 0 {
+		logrus.Info("No multi-registry groups to copy")
+
+		return nil
+	}
+
+	var copies []copyItem
+
+	seen := map[string]struct{}{}
+
+	for _, group := range multiGroups {
+		src := group[0]
+		sigTag := digestToSignatureTag(src.Digest)
+		srcRef := fmt.Sprintf("%s/%s:%s",
+			src.DstRegistry.Name, src.DstImageTag.Name, sigTag)
+
+		for _, dst := range group[1:] {
+			dstRef := fmt.Sprintf("%s/%s:%s",
+				dst.DstRegistry.Name, dst.DstImageTag.Name, sigTag)
+
+			if _, ok := seen[dstRef]; ok {
+				continue
+			}
+
+			seen[dstRef] = struct{}{}
+			copies = append(copies, copyItem{srcRef, dstRef})
+		}
+	}
+
+	logrus.Infof("Copying fresh signatures for %d groups (%d copies)",
+		len(multiGroups), len(copies))
+
+	return di.executeCopies(opts, copies)
+}
+
+// ReplicateSignatures batch-lists tags for all image repositories across all
+// registries in a single concurrent pass, then copies only the signatures
+// that are missing from the mirrors. This is used by the standalone
+// replication pipeline where most signatures already exist.
 func (di *DefaultPromoterImplementation) ReplicateSignatures(
 	opts *options.Options, edges map[promotion.Edge]any,
 ) error {
@@ -210,59 +267,223 @@ func (di *DefaultPromoterImplementation) ReplicateSignatures(
 	}
 
 	if len(edges) == 0 {
-		logrus.Info("No images were promoted. Nothing to replicate.")
+		logrus.Info("No edges. Nothing to replicate.")
 
 		return nil
 	}
 
-	grouped := groupEdgesByIdentityDigest(edges)
-
-	// Count groups that need replication (more than one destination).
-	var total int
-
-	for _, group := range grouped {
-		if len(group) > 1 {
-			total++
-		}
-	}
-
-	if total == 0 {
+	multiGroups := collectMultiRegistryGroups(edges)
+	if len(multiGroups) == 0 {
 		logrus.Info("No multi-registry groups to replicate")
 
 		return nil
 	}
 
-	logrus.Infof("Replicating signatures for %d groups", total)
+	copies, err := di.computeCopiesFromInventory(multiGroups)
+	if err != nil {
+		return fmt.Errorf("computing copies from inventory: %w", err)
+	}
+
+	if len(copies) == 0 {
+		logrus.Info("All signatures already replicated")
+
+		return nil
+	}
+
+	return di.executeCopies(opts, copies)
+}
+
+// collectMultiRegistryGroups groups edges by identity+digest, keeps only
+// groups with more than one registry, and sorts them deterministically.
+func collectMultiRegistryGroups(edges map[promotion.Edge]any) [][]promotion.Edge {
+	grouped := groupEdgesByIdentityDigest(edges)
+
+	multiGroups := make([][]promotion.Edge, 0, len(grouped))
+
+	for _, group := range grouped {
+		if len(group) > 1 {
+			multiGroups = append(multiGroups, group)
+		}
+	}
+
+	sort.Slice(multiGroups, func(i, j int) bool {
+		return multiGroups[i][0].DstReference() < multiGroups[j][0].DstReference()
+	})
+
+	return multiGroups
+}
+
+// executeCopies runs the given signature copies concurrently with bounded
+// parallelism and progress logging.
+func (di *DefaultPromoterImplementation) executeCopies(
+	opts *options.Options, copies []copyItem,
+) error {
+	logrus.Infof("Copying %d signatures", len(copies))
 
 	var completed atomic.Int64
+
+	total := int64(len(copies))
 
 	g := new(errgroup.Group)
 	g.SetLimit(opts.MaxSignatureCopies)
 
-	for _, group := range grouped {
-		if len(group) <= 1 {
-			continue
-		}
-
+	for _, c := range copies {
 		g.Go(func() error {
-			ref := group[0].DstReference()
-			if err := di.replicateSignatures(&group[0], group[1:]); err != nil {
-				return err
+			craneOpts := []crane.Option{
+				crane.WithAuthFromKeychain(gcrane.Keychain),
+				crane.WithUserAgent(image.UserAgent),
+				crane.WithTransport(di.getTransport()),
 			}
 
-			logrus.Infof("Replicated group %s (%d/%d)",
-				ref, completed.Add(1), total,
-			)
+			if err := di.copyWithRetry(c.src, c.dst, craneOpts); err != nil {
+				var terr *transport.Error
+				if errors.As(err, &terr) && terr.StatusCode == http.StatusNotFound {
+					logrus.Debugf("Signature %s not found, skipping (%d/%d)",
+						c.src, completed.Add(1), total)
+
+					return nil
+				}
+
+				return fmt.Errorf("copying signature %s to %s: %w",
+					c.src, c.dst, err)
+			}
+
+			logrus.Infof("Copied signature %s (%d/%d)",
+				c.dst, completed.Add(1), total)
 
 			return nil
 		})
 	}
 
 	if err := g.Wait(); err != nil {
-		return fmt.Errorf("replicating signatures: %w", err)
+		return fmt.Errorf("copying signatures: %w", err)
 	}
 
 	return nil
+}
+
+type copyItem struct{ src, dst string }
+
+// computeCopiesFromInventory batch-lists tags for all repositories across
+// source and mirrors in a single concurrent pass, then returns only the
+// copies where the source has a signature tag that the mirror is missing.
+func (di *DefaultPromoterImplementation) computeCopiesFromInventory(
+	multiGroups [][]promotion.Edge,
+) ([]copyItem, error) {
+	type repoKey struct{ registry, image string }
+
+	type tagSet = map[string]struct{}
+
+	allRepos := map[repoKey]struct{}{}
+
+	for _, group := range multiGroups {
+		for _, edge := range group {
+			key := repoKey{string(edge.DstRegistry.Name), string(edge.DstImageTag.Name)}
+			allRepos[key] = struct{}{}
+		}
+	}
+
+	totalRepos := len(allRepos)
+
+	logrus.Infof("Listing tags for %d repositories across %d groups",
+		totalRepos, len(multiGroups))
+
+	// Temporarily increase the rate limit during read-only listing.
+	// The AR quota is ~83 req/sec; we use 80 for headroom. The normal
+	// limit (50) is restored after the batch completes.
+	rt := di.getTransport()
+	rt.SetLimit(ratelimit.ListingLimit)
+	rt.SetBurst(ratelimit.ListingBurst)
+
+	defer func() {
+		rt.SetLimit(ratelimit.MaxEvents)
+		rt.SetBurst(ratelimit.DefaultBurst)
+	}()
+
+	allTags := make(map[repoKey]tagSet, totalRepos)
+
+	var (
+		mu     sync.Mutex
+		listed atomic.Int64
+	)
+
+	g := new(errgroup.Group)
+	g.SetLimit(ratelimit.ListingConcurrency)
+
+	for key := range allRepos {
+		g.Go(func() error {
+			tags, err := di.listTagsWithRetry(
+				fmt.Sprintf("%s/%s", key.registry, key.image),
+			)
+			if err != nil {
+				return err
+			}
+
+			set := make(tagSet, len(tags))
+			for _, t := range tags {
+				set[t] = struct{}{}
+			}
+
+			mu.Lock()
+			allTags[key] = set
+			mu.Unlock()
+
+			if n := listed.Add(1); n%1000 == 0 {
+				logrus.Infof("Listed %d/%d repositories", n, totalRepos)
+			}
+
+			return nil
+		})
+	}
+
+	if err := g.Wait(); err != nil {
+		return nil, fmt.Errorf("listing repositories: %w", err)
+	}
+
+	logrus.Infof("Listed %d repositories", totalRepos)
+
+	var (
+		copies      []copyItem
+		seen        = map[string]struct{}{}
+		signedCount int
+	)
+
+	for _, group := range multiGroups {
+		src := group[0]
+		srcKey := repoKey{string(src.DstRegistry.Name), string(src.DstImageTag.Name)}
+		sigTag := digestToSignatureTag(src.Digest)
+
+		if _, ok := allTags[srcKey][sigTag]; !ok {
+			continue
+		}
+
+		signedCount++
+
+		srcRef := fmt.Sprintf("%s/%s:%s",
+			src.DstRegistry.Name, src.DstImageTag.Name, sigTag)
+
+		for _, dst := range group[1:] {
+			dstRef := fmt.Sprintf("%s/%s:%s",
+				dst.DstRegistry.Name, dst.DstImageTag.Name, sigTag)
+
+			if _, ok := seen[dstRef]; ok {
+				continue
+			}
+
+			seen[dstRef] = struct{}{}
+
+			dstKey := repoKey{string(dst.DstRegistry.Name), string(dst.DstImageTag.Name)}
+
+			if _, ok := allTags[dstKey][sigTag]; !ok {
+				copies = append(copies, copyItem{srcRef, dstRef})
+			}
+		}
+	}
+
+	logrus.Infof("Signature status: %d/%d groups signed, %d copies needed",
+		signedCount, len(multiGroups), len(copies))
+
+	return copies, nil
 }
 
 // targetIdentity returns the production identity for a promotion edge.
@@ -385,117 +606,6 @@ func digestToSignatureTag(dg image.Digest) string {
 	return strings.ReplaceAll(string(dg), "sha256:", "sha256-") + signatureTagSuffix
 }
 
-// replicateSignatures takes a source edge (an image) and a list of destinations
-// and copies the signature to all of them.
-func (di *DefaultPromoterImplementation) replicateSignatures(
-	src *promotion.Edge, dsts []promotion.Edge,
-) error {
-	sigTag := digestToSignatureTag(src.Digest)
-	sourceRefStr := fmt.Sprintf(
-		"%s/%s:%s", src.DstRegistry.Name, src.DstImageTag.Name, sigTag,
-	)
-
-	srcRef, err := name.ParseReference(sourceRefStr)
-	if err != nil {
-		return fmt.Errorf("parsing reference %q: %w", sourceRefStr, err)
-	}
-
-	// Check if the source signature exists before iterating mirrors.
-	// This avoids 20+ unnecessary HEAD requests per unsigned image.
-	if err := di.headWithRetry(srcRef); err != nil {
-		var terr *transport.Error
-		if errors.As(err, &terr) && terr.StatusCode == http.StatusNotFound {
-			logrus.WithField("src", sourceRefStr).Debug("Source signature not found, skipping group")
-
-			return nil
-		}
-
-		return fmt.Errorf("checking source signature %s: %w", sourceRefStr, err)
-	}
-
-	logrus.WithField("src", sourceRefStr).Infof("Replicating signature to %d images", len(dsts))
-
-	dstRefs := []name.Reference{}
-
-	for i := range dsts {
-		ref, err := name.ParseReference(fmt.Sprintf(
-			"%s/%s:%s", dsts[i].DstRegistry.Name, dsts[i].DstImageTag.Name, sigTag,
-		))
-		if err != nil {
-			return fmt.Errorf("parsing signature destination reference: %w", err)
-		}
-
-		dstRefs = append(dstRefs, ref)
-	}
-
-	// Copy the signatures to the missing registries in parallel.
-	// Limit concurrency to avoid overwhelming the shared rate limiter.
-	g := new(errgroup.Group)
-	g.SetLimit(10)
-
-	for _, dstRef := range dstRefs {
-		g.Go(func() error {
-			// Skip if the signature tag already exists at the destination.
-			if _, err := remote.Head(dstRef,
-				remote.WithAuthFromKeychain(gcrane.Keychain),
-				remote.WithTransport(di.getTransport()),
-			); err == nil {
-				logrus.WithField("dst", dstRef.String()).Debug("Signature already exists, skipping")
-
-				return nil
-			}
-
-			logrus.WithField("src", srcRef.String()).Infof("replication > %s", dstRef.String())
-
-			opts := []crane.Option{
-				crane.WithAuthFromKeychain(gcrane.Keychain),
-				crane.WithUserAgent(image.UserAgent),
-				crane.WithTransport(di.getTransport()),
-			}
-			if err := di.copyWithRetry(srcRef.String(), dstRef.String(), opts); err != nil {
-				var terr *transport.Error
-				if errors.As(err, &terr) && terr.StatusCode == http.StatusNotFound {
-					logrus.Debugf("Signature %s not found, skipping", srcRef.String())
-
-					return nil
-				}
-
-				return fmt.Errorf(
-					"copying signature %s to %s: %w",
-					srcRef.String(), dstRef.String(), err,
-				)
-			}
-
-			return nil
-		})
-	}
-
-	if err := g.Wait(); err != nil {
-		return fmt.Errorf("replicating signatures: %w", err)
-	}
-
-	return nil
-}
-
-// headWithRetry performs a remote.Head with retries on transient errors.
-func (di *DefaultPromoterImplementation) headWithRetry(ref name.Reference) error {
-	if err := ratelimit.WithRetry(func() error {
-		_, err := remote.Head(ref,
-			remote.WithAuthFromKeychain(gcrane.Keychain),
-			remote.WithTransport(di.getTransport()),
-		)
-		if err != nil {
-			return fmt.Errorf("head: %w", err)
-		}
-
-		return nil
-	}); err != nil {
-		return fmt.Errorf("remote head %s: %w", ref.String(), err)
-	}
-
-	return nil
-}
-
 // copyWithRetry performs a crane.Copy with retries on transient errors.
 func (di *DefaultPromoterImplementation) copyWithRetry(src, dst string, opts []crane.Option) error {
 	if err := ratelimit.WithRetry(func() error {
@@ -505,6 +615,35 @@ func (di *DefaultPromoterImplementation) copyWithRetry(src, dst string, opts []c
 	}
 
 	return nil
+}
+
+// listTagsWithRetry lists all tags for a repository with retries on transient
+// errors. Returns nil (not an error) if the repository does not exist.
+func (di *DefaultPromoterImplementation) listTagsWithRetry(repo string) ([]string, error) {
+	var tags []string
+
+	if err := ratelimit.WithRetry(func() error {
+		var err error
+
+		tags, err = crane.ListTags(repo,
+			crane.WithAuthFromKeychain(gcrane.Keychain),
+			crane.WithTransport(di.getTransport()),
+		)
+		if err != nil {
+			return fmt.Errorf("listing tags for %s: %w", repo, err)
+		}
+
+		return nil
+	}); err != nil {
+		var terr *transport.Error
+		if errors.As(err, &terr) && terr.StatusCode == http.StatusNotFound {
+			return nil, nil
+		}
+
+		return nil, fmt.Errorf("with retry: %w", err)
+	}
+
+	return tags, nil
 }
 
 // WriteSBOMs copies pre-generated SBOMs from the staging registry to each
