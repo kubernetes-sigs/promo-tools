@@ -79,12 +79,12 @@ func pushTestImage(t *testing.T, di *DefaultPromoterImplementation, ref string) 
 }
 
 // testEdgeForHost constructs a promotion edge suitable for local registry tests.
-func testEdgeForHost(host, dstPath string, digest image.Digest) promotion.Edge {
+func testEdgeForHost(host string, digest image.Digest) promotion.Edge {
 	return promotion.Edge{
 		SrcRegistry: reg.Context{Name: image.Registry(host + "/staging"), Src: true},
 		SrcImageTag: promotion.ImageTag{Name: "myimage", Tag: "v1.0"},
 		Digest:      digest,
-		DstRegistry: reg.Context{Name: image.Registry(host + "/" + dstPath)},
+		DstRegistry: reg.Context{Name: image.Registry(host + "/production")},
 		DstImageTag: promotion.ImageTag{Name: "myimage", Tag: "v1.0"},
 	}
 }
@@ -106,7 +106,7 @@ func TestCopyAttachedObjectsSignatureExists(t *testing.T) {
 	sigRef := fmt.Sprintf("%s/staging/myimage:%s", host, sigTag)
 	pushTestImage(t, di, sigRef)
 
-	edge := testEdgeForHost(host, "production", image.Digest(digest))
+	edge := testEdgeForHost(host, image.Digest(digest))
 
 	err := di.copyAttachedObjects(&edge)
 	require.NoError(t, err)
@@ -129,7 +129,7 @@ func TestCopyAttachedObjectsSignatureMissing(t *testing.T) {
 	imgRef := host + "/staging/myimage:v1.0"
 	digest := pushTestImage(t, di, imgRef)
 
-	edge := testEdgeForHost(host, "production", image.Digest(digest))
+	edge := testEdgeForHost(host, image.Digest(digest))
 
 	// Should gracefully succeed when no signature exists (404 is not an error).
 	err := di.copyAttachedObjects(&edge)
@@ -151,7 +151,7 @@ func TestCopySBOMExists(t *testing.T) {
 	sbomRef := fmt.Sprintf("%s/staging/myimage:%s", host, sbomTag)
 	pushTestImage(t, di, sbomRef)
 
-	edge := testEdgeForHost(host, "production", image.Digest(digest))
+	edge := testEdgeForHost(host, image.Digest(digest))
 
 	err := di.copySBOM(&edge)
 	require.NoError(t, err)
@@ -173,79 +173,10 @@ func TestCopySBOMMissing(t *testing.T) {
 	imgRef := host + "/staging/myimage:v1.0"
 	digest := pushTestImage(t, di, imgRef)
 
-	edge := testEdgeForHost(host, "production", image.Digest(digest))
+	edge := testEdgeForHost(host, image.Digest(digest))
 
 	// Should gracefully succeed when no SBOM exists.
 	err := di.copySBOM(&edge)
-	require.NoError(t, err)
-}
-
-// --- replicateSignatures tests ---
-
-func TestReplicateSignaturesExists(t *testing.T) {
-	t.Parallel()
-
-	host, di := newTLSTestRegistry(t)
-
-	imgRef := host + "/primary/myimage:v1.0"
-	digest := pushTestImage(t, di, imgRef)
-
-	// Push a signature to the primary destination.
-	sigTag := digestToSignatureTag(image.Digest(digest))
-	sigRef := fmt.Sprintf("%s/primary/myimage:%s", host, sigTag)
-	pushTestImage(t, di, sigRef)
-
-	// Source edge (primary destination where signature already exists).
-	srcEdge := testEdgeForHost(host, "primary", image.Digest(digest))
-
-	// Destination edges (mirrors).
-	dstEdge := testEdgeForHost(host, "mirror", image.Digest(digest))
-
-	err := di.replicateSignatures(&srcEdge, []promotion.Edge{dstEdge})
-	require.NoError(t, err)
-
-	// Verify the signature was replicated to the mirror.
-	mirrorSigRef := fmt.Sprintf("%s/mirror/myimage:%s", host, sigTag)
-	ref, err := name.ParseReference(mirrorSigRef)
-	require.NoError(t, err)
-
-	_, err = remote.Head(ref, remote.WithTransport(di.getTransport()))
-	require.NoError(t, err, "signature should exist in mirror")
-}
-
-func TestReplicateSignaturesMissing(t *testing.T) {
-	t.Parallel()
-
-	host, di := newTLSTestRegistry(t)
-
-	// No signature exists at all — replication should gracefully skip.
-	digest := "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-
-	srcEdge := testEdgeForHost(host, "primary", image.Digest(digest))
-	dstEdge := testEdgeForHost(host, "mirror", image.Digest(digest))
-
-	err := di.replicateSignatures(&srcEdge, []promotion.Edge{dstEdge})
-	require.NoError(t, err)
-}
-
-func TestReplicateSignaturesAlreadyExists(t *testing.T) {
-	t.Parallel()
-
-	host, di := newTLSTestRegistry(t)
-
-	imgRef := host + "/primary/myimage:v1.0"
-	digest := pushTestImage(t, di, imgRef)
-
-	// Push signature to both primary and mirror.
-	sigTag := digestToSignatureTag(image.Digest(digest))
-	pushTestImage(t, di, fmt.Sprintf("%s/primary/myimage:%s", host, sigTag))
-	pushTestImage(t, di, fmt.Sprintf("%s/mirror/myimage:%s", host, sigTag))
-
-	srcEdge := testEdgeForHost(host, "primary", image.Digest(digest))
-	dstEdge := testEdgeForHost(host, "mirror", image.Digest(digest))
-
-	// Should succeed without error (signature already present).
-	err := di.replicateSignatures(&srcEdge, []promotion.Edge{dstEdge})
 	require.NoError(t, err)
 }
 
@@ -268,7 +199,7 @@ func TestPushAttestation(t *testing.T) {
 	imgRef := host + "/production/myimage:v1.0"
 	digest := pushTestImage(t, di, imgRef)
 
-	edge := testEdgeForHost(host, "production", image.Digest(digest))
+	edge := testEdgeForHost(host, image.Digest(digest))
 	record := &provenance.PromotionRecord{
 		SrcRef:    edge.SrcReference(),
 		DstRef:    edge.DstReference(),
@@ -299,7 +230,7 @@ func TestPushAttestationIdempotent(t *testing.T) {
 	imgRef := host + "/production/myimage:v1.0"
 	digest := pushTestImage(t, di, imgRef)
 
-	edge := testEdgeForHost(host, "production", image.Digest(digest))
+	edge := testEdgeForHost(host, image.Digest(digest))
 	record := &provenance.PromotionRecord{
 		SrcRef:    edge.SrcReference(),
 		DstRef:    edge.DstReference(),
@@ -325,9 +256,6 @@ func TestDigestToAttestationTag(t *testing.T) {
 	require.Equal(t, "sha256-abc123.att", tag)
 	require.True(t, strings.HasSuffix(tag, attestationTagSuffix))
 }
-
-// --- copyWithRetry / headWithRetry are exercised by the above tests
-// through replicateSignatures and copyAttachedObjects. ---
 
 // --- Integration test for the full promotion flow with CraneProvider ---
 
@@ -399,4 +327,308 @@ func TestPromoteImagesCraneProvider(t *testing.T) {
 	tags, err := remote.List(repo, remote.WithTransport(di.getTransport()))
 	require.NoError(t, err)
 	require.ElementsMatch(t, []string{"v1.0", "v2.0"}, tags)
+}
+
+// --- CopyFreshSignatures integration tests ---
+
+// TestCopyFreshSignaturesCopiesUnconditionally verifies that CopyFreshSignatures
+// copies signatures from the primary to all mirrors without checking whether
+// they already exist. This exercises the inline promotion path.
+func TestCopyFreshSignaturesCopiesUnconditionally(t *testing.T) {
+	t.Parallel()
+
+	host, di := newTLSTestRegistry(t)
+
+	primary := prodPath("aa-primary")
+	mirror1 := prodPath("bb-mirror1")
+	mirror2 := prodPath("bb-mirror2")
+
+	// Push an image and its signature to the primary.
+	digest := pushTestImage(t, di, host+"/"+primary+"/app:v1.0")
+	sigTag := digestToSignatureTag(image.Digest(digest))
+	pushTestImage(t, di, fmt.Sprintf("%s/%s/app:%s", host, primary, sigTag))
+
+	// Push images to mirrors (no signatures).
+	pushTestImage(t, di, host+"/"+mirror1+"/app:v1.0")
+	pushTestImage(t, di, host+"/"+mirror2+"/app:v1.0")
+
+	edges := map[promotion.Edge]any{
+		makeProdEdge(host, "aa-primary", "app", "v1.0", image.Digest(digest)): nil,
+		makeProdEdge(host, "bb-mirror1", "app", "v1.0", image.Digest(digest)): nil,
+		makeProdEdge(host, "bb-mirror2", "app", "v1.0", image.Digest(digest)): nil,
+	}
+
+	opts := &options.Options{
+		SignImages:         true,
+		MaxSignatureCopies: 10,
+	}
+
+	err := di.CopyFreshSignatures(opts, edges)
+	require.NoError(t, err)
+
+	// Verify signatures landed on both mirrors.
+	for _, m := range []string{mirror1, mirror2} {
+		refStr := fmt.Sprintf("%s/%s/app:%s", host, m, sigTag)
+		ref, err := name.ParseReference(refStr)
+		require.NoError(t, err)
+
+		_, err = remote.Head(ref, remote.WithTransport(di.getTransport()))
+		require.NoError(t, err, "signature should exist on %s", m)
+	}
+}
+
+// --- ReplicateSignatures (batch-listing path) integration tests ---
+
+// prodPath returns a registry path that includes the production repository
+// path so that targetIdentity normalizes all mirrors to the same identity
+// (registry.k8s.io/<image>). This mirrors real-world registries like
+// "us-west2-docker.pkg.dev/k8s-artifacts-prod/images".
+func prodPath(prefix string) string {
+	return prefix + "/k8s-artifacts-prod/images"
+}
+
+// makeProdEdge constructs a promotion edge using production-like registry
+// paths so that edges across different registries share the same identity.
+func makeProdEdge(host, dstPrefix, imgName string, tag image.Tag, digest image.Digest) promotion.Edge {
+	return promotion.Edge{
+		SrcRegistry: reg.Context{Name: image.Registry(host + "/" + prodPath("staging")), Src: true},
+		SrcImageTag: promotion.ImageTag{Name: image.Name(imgName), Tag: tag},
+		Digest:      digest,
+		DstRegistry: reg.Context{Name: image.Registry(host + "/" + prodPath(dstPrefix))},
+		DstImageTag: promotion.ImageTag{Name: image.Name(imgName), Tag: tag},
+	}
+}
+
+// TestReplicateSignaturesBatchCopiesMissing verifies that the batch-listing
+// ReplicateSignatures method copies signatures that exist on the primary
+// registry but are missing from the mirrors.
+//
+// Registry prefixes are chosen so that "aa-primary" sorts alphabetically
+// before "bb-mirror*", matching the groupEdgesByIdentityDigest convention
+// where group[0] is the source (alphabetically first).
+func TestReplicateSignaturesBatchCopiesMissing(t *testing.T) {
+	t.Parallel()
+
+	host, di := newTLSTestRegistry(t)
+
+	primary := prodPath("aa-primary")
+	mirror1 := prodPath("bb-mirror1")
+	mirror2 := prodPath("bb-mirror2")
+
+	// Push two images to the primary registry.
+	d1 := pushTestImage(t, di, host+"/"+primary+"/app:v1.0")
+	d2 := pushTestImage(t, di, host+"/"+primary+"/app:v2.0")
+
+	// Push signatures only to the primary.
+	sigTag1 := digestToSignatureTag(image.Digest(d1))
+	sigTag2 := digestToSignatureTag(image.Digest(d2))
+
+	pushTestImage(t, di, fmt.Sprintf("%s/%s/app:%s", host, primary, sigTag1))
+	pushTestImage(t, di, fmt.Sprintf("%s/%s/app:%s", host, primary, sigTag2))
+
+	// Also push the images to the mirrors (but NOT the signatures).
+	pushTestImage(t, di, host+"/"+mirror1+"/app:v1.0")
+	pushTestImage(t, di, host+"/"+mirror1+"/app:v2.0")
+	pushTestImage(t, di, host+"/"+mirror2+"/app:v1.0")
+	pushTestImage(t, di, host+"/"+mirror2+"/app:v2.0")
+
+	// Build edges: each image exists in primary + 2 mirrors.
+	edges := map[promotion.Edge]any{
+		makeProdEdge(host, "aa-primary", "app", "v1.0", image.Digest(d1)): nil,
+		makeProdEdge(host, "bb-mirror1", "app", "v1.0", image.Digest(d1)): nil,
+		makeProdEdge(host, "bb-mirror2", "app", "v1.0", image.Digest(d1)): nil,
+		makeProdEdge(host, "aa-primary", "app", "v2.0", image.Digest(d2)): nil,
+		makeProdEdge(host, "bb-mirror1", "app", "v2.0", image.Digest(d2)): nil,
+		makeProdEdge(host, "bb-mirror2", "app", "v2.0", image.Digest(d2)): nil,
+	}
+
+	opts := &options.Options{
+		SignImages:         true,
+		MaxSignatureCopies: 10,
+	}
+
+	err := di.ReplicateSignatures(opts, edges)
+	require.NoError(t, err)
+
+	// Verify signatures landed on both mirrors for both images.
+	for _, st := range []string{sigTag1, sigTag2} {
+		for _, m := range []string{mirror1, mirror2} {
+			refStr := fmt.Sprintf("%s/%s/app:%s", host, m, st)
+			ref, err := name.ParseReference(refStr)
+			require.NoError(t, err)
+
+			_, err = remote.Head(ref, remote.WithTransport(di.getTransport()))
+			require.NoError(t, err, "signature %s should exist on %s", st, m)
+		}
+	}
+}
+
+// TestReplicateSignaturesBatchSkipsExisting verifies that the batch-listing
+// path correctly skips signatures that already exist on the mirrors.
+func TestReplicateSignaturesBatchSkipsExisting(t *testing.T) {
+	t.Parallel()
+
+	host, di := newTLSTestRegistry(t)
+
+	primary := prodPath("aa-primary")
+	mirror := prodPath("bb-mirror")
+
+	digest := pushTestImage(t, di, host+"/"+primary+"/app:v1.0")
+	sigTag := digestToSignatureTag(image.Digest(digest))
+
+	// Push the signature to primary AND mirror (already replicated).
+	pushTestImage(t, di, fmt.Sprintf("%s/%s/app:%s", host, primary, sigTag))
+	pushTestImage(t, di, fmt.Sprintf("%s/%s/app:%s", host, mirror, sigTag))
+
+	// Also push the images to the mirror.
+	pushTestImage(t, di, host+"/"+mirror+"/app:v1.0")
+
+	edges := map[promotion.Edge]any{
+		makeProdEdge(host, "aa-primary", "app", "v1.0", image.Digest(digest)): nil,
+		makeProdEdge(host, "bb-mirror", "app", "v1.0", image.Digest(digest)):  nil,
+	}
+
+	opts := &options.Options{
+		SignImages:         true,
+		MaxSignatureCopies: 10,
+	}
+
+	// Should succeed and report "All signatures already replicated".
+	err := di.ReplicateSignatures(opts, edges)
+	require.NoError(t, err)
+}
+
+// TestReplicateSignaturesBatchNoSignature verifies that edges without a
+// signature on the primary are gracefully skipped.
+func TestReplicateSignaturesBatchNoSignature(t *testing.T) {
+	t.Parallel()
+
+	host, di := newTLSTestRegistry(t)
+
+	primary := prodPath("aa-primary")
+	mirror := prodPath("bb-mirror")
+
+	// Push images but NO signatures.
+	digest := pushTestImage(t, di, host+"/"+primary+"/app:v1.0")
+	pushTestImage(t, di, host+"/"+mirror+"/app:v1.0")
+
+	edges := map[promotion.Edge]any{
+		makeProdEdge(host, "aa-primary", "app", "v1.0", image.Digest(digest)): nil,
+		makeProdEdge(host, "bb-mirror", "app", "v1.0", image.Digest(digest)):  nil,
+	}
+
+	opts := &options.Options{
+		SignImages:         true,
+		MaxSignatureCopies: 10,
+	}
+
+	// Should succeed — no signatures to copy.
+	err := di.ReplicateSignatures(opts, edges)
+	require.NoError(t, err)
+
+	// Verify no signature appeared on the mirror.
+	sigTag := digestToSignatureTag(image.Digest(digest))
+	refStr := fmt.Sprintf("%s/%s/app:%s", host, mirror, sigTag)
+	ref, err := name.ParseReference(refStr)
+	require.NoError(t, err)
+
+	_, err = remote.Head(ref, remote.WithTransport(di.getTransport()))
+	require.Error(t, err, "signature should NOT exist on mirror")
+}
+
+// TestReplicateSignaturesBatchMultipleImages verifies batch listing across
+// different image repositories within the same registries.
+func TestReplicateSignaturesBatchMultipleImages(t *testing.T) {
+	t.Parallel()
+
+	host, di := newTLSTestRegistry(t)
+
+	primary := prodPath("aa-primary")
+	mirror := prodPath("bb-mirror")
+
+	// Two different images with different digests.
+	d1 := pushTestImage(t, di, host+"/"+primary+"/app:v1.0")
+	d2 := pushTestImage(t, di, host+"/"+primary+"/web:latest")
+
+	// Push signatures to primary only.
+	sigTag1 := digestToSignatureTag(image.Digest(d1))
+	sigTag2 := digestToSignatureTag(image.Digest(d2))
+
+	pushTestImage(t, di, fmt.Sprintf("%s/%s/app:%s", host, primary, sigTag1))
+	pushTestImage(t, di, fmt.Sprintf("%s/%s/web:%s", host, primary, sigTag2))
+
+	// Push images to mirror (no signatures).
+	pushTestImage(t, di, host+"/"+mirror+"/app:v1.0")
+	pushTestImage(t, di, host+"/"+mirror+"/web:latest")
+
+	edges := map[promotion.Edge]any{
+		makeProdEdge(host, "aa-primary", "app", "v1.0", image.Digest(d1)):   nil,
+		makeProdEdge(host, "bb-mirror", "app", "v1.0", image.Digest(d1)):    nil,
+		makeProdEdge(host, "aa-primary", "web", "latest", image.Digest(d2)): nil,
+		makeProdEdge(host, "bb-mirror", "web", "latest", image.Digest(d2)):  nil,
+	}
+
+	opts := &options.Options{
+		SignImages:         true,
+		MaxSignatureCopies: 10,
+	}
+
+	err := di.ReplicateSignatures(opts, edges)
+	require.NoError(t, err)
+
+	// Verify both signatures landed on the mirror.
+	for _, tc := range []struct {
+		img    string
+		sigTag string
+	}{
+		{"app", sigTag1},
+		{"web", sigTag2},
+	} {
+		refStr := fmt.Sprintf("%s/%s/%s:%s", host, mirror, tc.img, tc.sigTag)
+		ref, err := name.ParseReference(refStr)
+		require.NoError(t, err)
+
+		_, err = remote.Head(ref, remote.WithTransport(di.getTransport()))
+		require.NoError(t, err, "signature for %s should exist on mirror", tc.img)
+	}
+}
+
+// TestReplicateSignaturesBatchIdempotent verifies that running
+// ReplicateSignatures twice produces the same result (idempotent).
+func TestReplicateSignaturesBatchIdempotent(t *testing.T) {
+	t.Parallel()
+
+	host, di := newTLSTestRegistry(t)
+
+	primary := prodPath("aa-primary")
+	mirror := prodPath("bb-mirror")
+
+	digest := pushTestImage(t, di, host+"/"+primary+"/app:v1.0")
+	sigTag := digestToSignatureTag(image.Digest(digest))
+	pushTestImage(t, di, fmt.Sprintf("%s/%s/app:%s", host, primary, sigTag))
+	pushTestImage(t, di, host+"/"+mirror+"/app:v1.0")
+
+	edges := map[promotion.Edge]any{
+		makeProdEdge(host, "aa-primary", "app", "v1.0", image.Digest(digest)): nil,
+		makeProdEdge(host, "bb-mirror", "app", "v1.0", image.Digest(digest)):  nil,
+	}
+
+	opts := &options.Options{
+		SignImages:         true,
+		MaxSignatureCopies: 10,
+	}
+
+	// Run twice — both should succeed.
+	for i := range 2 {
+		err := di.ReplicateSignatures(opts, edges)
+		require.NoError(t, err, "run %d", i+1)
+	}
+
+	// Verify signature exists on mirror.
+	refStr := fmt.Sprintf("%s/%s/app:%s", host, mirror, sigTag)
+	ref, err := name.ParseReference(refStr)
+	require.NoError(t, err)
+
+	_, err = remote.Head(ref, remote.WithTransport(di.getTransport()))
+	require.NoError(t, err, "signature should exist on mirror")
 }

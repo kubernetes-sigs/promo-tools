@@ -38,6 +38,18 @@ const (
 	// target to leave headroom for retries and other API consumers.
 	MaxEvents rate.Limit = 50
 
+	// ListingLimit is a higher rate limit used during read-only phases
+	// (e.g. batch tag listing) where no write operations compete for
+	// quota. Still below the AR hard limit of ~83 req/sec.
+	ListingLimit rate.Limit = 80
+
+	// ListingBurst allows higher burst during listing phases.
+	ListingBurst = 10
+
+	// ListingConcurrency is the maximum number of concurrent goroutines
+	// during read-only listing phases.
+	ListingConcurrency = 80
+
 	// backoffDuration is how long to pause after receiving a 429 response.
 	backoffDuration = 10 * time.Second
 

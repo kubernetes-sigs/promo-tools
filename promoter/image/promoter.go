@@ -120,6 +120,7 @@ type promoterImplementation interface {
 	PrewarmTUFCache() error
 	ValidateStagingSignatures(map[promotion.Edge]any) (map[promotion.Edge]any, error)
 	SignImages(*options.Options, map[promotion.Edge]any) error
+	CopyFreshSignatures(*options.Options, map[promotion.Edge]any) error
 	ReplicateSignatures(*options.Options, map[promotion.Edge]any) error
 	WriteSBOMs(*options.Options, map[promotion.Edge]any) error
 	WriteProvenanceAttestations(*options.Options, map[promotion.Edge]any, provenance.Generator) error
@@ -254,10 +255,10 @@ func (p *Promoter) PromoteImages(ctx context.Context, opts *options.Options) err
 		return nil
 	}))
 
-	// Replicate phase: copy signatures to mirror registries.
+	// Replicate phase: copy freshly created signatures to mirror registries.
 	pipe.AddPhase(pipeline.NewPhase("replicate", func(_ context.Context) error {
-		if err := p.impl.ReplicateSignatures(opts, promotionEdges); err != nil {
-			return fmt.Errorf("replicating signatures: %w", err)
+		if err := p.impl.CopyFreshSignatures(opts, promotionEdges); err != nil {
+			return fmt.Errorf("copying fresh signatures: %w", err)
 		}
 
 		return nil
@@ -453,7 +454,7 @@ func (p *Promoter) ReplicateSignatures(ctx context.Context, opts *options.Option
 		return nil
 	}))
 
-	// Replicate phase: copy signatures to mirror registries.
+	// Replicate phase: batch-list tags and copy only missing signatures.
 	pipe.AddPhase(pipeline.NewPhase("replicate", func(_ context.Context) error {
 		if err := p.impl.ReplicateSignatures(opts, promotionEdges); err != nil {
 			return fmt.Errorf("replicating signatures: %w", err)
