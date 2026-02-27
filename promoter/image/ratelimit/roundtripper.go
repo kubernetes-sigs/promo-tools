@@ -78,6 +78,16 @@ func NewNamedRoundTripper(name string, limit rate.Limit, burst int) *RoundTrippe
 	}
 }
 
+// NewRoundTripperWithBase creates a rate-limited HTTP transport that wraps
+// the given base transport instead of http.DefaultTransport.
+func NewRoundTripperWithBase(limit rate.Limit, base http.RoundTripper) *RoundTripper {
+	return &RoundTripper{
+		name:         "default",
+		rateLimiter:  rate.NewLimiter(limit, DefaultBurst),
+		roundTripper: base,
+	}
+}
+
 // RoundTrip executes the HTTP request with rate limiting. All HTTP methods are
 // rate-limited because Artifact Registry quotas apply to both reads and writes.
 // If a 429 response is received, an adaptive backoff pauses future requests.

@@ -161,6 +161,9 @@ linters:
           - dupl
           - gocritic
         path: fake_.*\.go
+      - linters:
+          - ireturn
+        path: promoter/file/
     paths:
       - third_party$
       - builtin$

@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"sort"
 	"testing"
 
 	"github.com/google/go-containerregistry/pkg/v1/remote/transport"
@@ -226,4 +227,59 @@ func TestTargetIdentity(t *testing.T) {
 			assert(res)
 		})
 	}
+}
+
+func TestGroupEdgesByIdentityDigest(t *testing.T) {
+	t.Parallel()
+
+	digest1 := image.Digest("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+	digest2 := image.Digest("sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
+
+	// Use production-style registry names so targetIdentity normalizes them
+	// to the same identity (registry.k8s.io/app), allowing edges with
+	// different registries to be grouped together.
+	mkEdge := func(dstReg string, imgName string, digest image.Digest, tag image.Tag) promotion.Edge {
+		return promotion.Edge{
+			SrcRegistry: registry.Context{Name: "staging", Src: true},
+			SrcImageTag: promotion.ImageTag{Name: image.Name(imgName), Tag: tag},
+			Digest:      digest,
+			DstRegistry: registry.Context{Name: image.Registry(dstReg)},
+			DstImageTag: promotion.ImageTag{Name: image.Name(imgName), Tag: tag},
+		}
+	}
+
+	edges := map[promotion.Edge]any{
+		// Same normalized identity + digest, different registries → same group.
+		mkEdge("us-central1-docker.pkg.dev/k8s-artifacts-prod/images", "app", digest1, "v1.0"): nil,
+		mkEdge("us-east1-docker.pkg.dev/k8s-artifacts-prod/images", "app", digest1, "v1.0"):    nil,
+		mkEdge("us-west1-docker.pkg.dev/k8s-artifacts-prod/images", "app", digest1, "v1.0"):    nil,
+		// Different digest → different group.
+		mkEdge("us-central1-docker.pkg.dev/k8s-artifacts-prod/images", "app", digest2, "v2.0"): nil,
+		// Metadata layers should be skipped.
+		mkEdge("us-central1-docker.pkg.dev/k8s-artifacts-prod/images", "app", digest1, "sha256-aaa.sig"): nil,
+		mkEdge("us-central1-docker.pkg.dev/k8s-artifacts-prod/images", "app", digest1, "sha256-aaa.att"): nil,
+		// Tagless edge should be skipped.
+		mkEdge("us-central1-docker.pkg.dev/k8s-artifacts-prod/images", "app", digest1, ""): nil,
+	}
+
+	groups := groupEdgesByIdentityDigest(edges)
+
+	// Should have 2 groups (digest1 and digest2), metadata/tagless skipped.
+	require.Len(t, groups, 2)
+
+	// Sort groups by digest for deterministic assertion.
+	sort.Slice(groups, func(i, j int) bool {
+		return groups[i][0].Digest < groups[j][0].Digest
+	})
+
+	// Group 1: digest1 with 3 edges (us-central1, us-east1, us-west1).
+	require.Len(t, groups[0], 3)
+	// Edges should be sorted by destination registry name.
+	require.Equal(t, image.Registry("us-central1-docker.pkg.dev/k8s-artifacts-prod/images"), groups[0][0].DstRegistry.Name)
+	require.Equal(t, image.Registry("us-east1-docker.pkg.dev/k8s-artifacts-prod/images"), groups[0][1].DstRegistry.Name)
+	require.Equal(t, image.Registry("us-west1-docker.pkg.dev/k8s-artifacts-prod/images"), groups[0][2].DstRegistry.Name)
+
+	// Group 2: digest2 with 1 edge.
+	require.Len(t, groups[1], 1)
+	require.Equal(t, digest2, groups[1][0].Digest)
 }

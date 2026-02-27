@@ -64,7 +64,6 @@ var supportedProviders = []Provider{
 	S3Storage,
 }
 
-//nolint:ireturn
 func openFilestore(
 	ctx context.Context,
 	filestore *api.Filestore,
@@ -97,8 +96,6 @@ func openFilestore(
 }
 
 // openGCSFilestore opens a filestore backed by Google Cloud Storage (GCS).
-//
-//nolint:ireturn
 func (p *gcsProvider) OpenFilestore(
 	ctx context.Context,
 	filestore *api.Filestore,
