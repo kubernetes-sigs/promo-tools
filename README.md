@@ -95,7 +95,8 @@ Available Commands:
   manifest    Generate/modify a manifest for artifact promotion
   pr          Starts an image promotion for a given image tag
   run         Run artifact promotion
-  version     output version information
+  sigcheck    Check image signatures
+  version     Prints the version
 ```
 
 ### Image promotion

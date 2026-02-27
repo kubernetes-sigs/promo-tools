@@ -21,7 +21,7 @@ First, take the following steps to prepare your environment for promoting images
   go install sigs.k8s.io/promo-tools/v4/cmd/kpromo@latest
   ```
 
-  > Note: If kpromo has not yet published a [minor release](https://github.com/kubernetes-sigs/promo-tools/releases) and you desire to run the actual latest version. Specify it explicitly with the full version, for example:  `go install sigs.k8s.io/promo-tools/v4/cmd/kpromo@v3.3.0-beta.3`.
+  > Note: If kpromo has not yet published a [minor release](https://github.com/kubernetes-sigs/promo-tools/releases) and you desire to run the actual latest version. Specify it explicitly with the full version, for example:  `go install sigs.k8s.io/promo-tools/v4/cmd/kpromo@v4.0.0`.
 
 - Promoting images will require a GitHub Personal Access Token in order to
   create a PR on your behalf.

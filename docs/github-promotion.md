@@ -19,7 +19,7 @@ Google Cloud has [documentation on installing and configuring the Google Cloud S
 `kpromo gh` is a subcommand of `kpromo` and can be installed via `go install`:
 
 ```console
-go install sigs.k8s.io/promo-tools/cmd/kpromo
+go install sigs.k8s.io/promo-tools/v4/cmd/kpromo@latest
 ```
 
 This will install `kpromo` to `$(go env GOPATH)/bin/kpromo`.
