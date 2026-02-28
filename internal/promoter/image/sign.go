@@ -198,61 +198,6 @@ func (di *DefaultPromoterImplementation) signFirst(signOpts *sign.Options, ident
 	return nil
 }
 
-// CopyFreshSignatures copies freshly created signatures from the primary
-// destination registry to all mirror registries. It copies every signature
-// unconditionally, which is optimal during inline promotion where signatures
-// were just created and mirrors are known to be empty.
-func (di *DefaultPromoterImplementation) CopyFreshSignatures(
-	opts *options.Options, edges map[promotion.Edge]any,
-) error {
-	if !opts.SignImages {
-		logrus.Info("Signing disabled, skipping signature copy")
-
-		return nil
-	}
-
-	if len(edges) == 0 {
-		logrus.Info("No images were promoted. Nothing to copy.")
-
-		return nil
-	}
-
-	multiGroups := collectMultiRegistryGroups(edges)
-	if len(multiGroups) == 0 {
-		logrus.Info("No multi-registry groups to copy")
-
-		return nil
-	}
-
-	var copies []copyItem
-
-	seen := map[string]struct{}{}
-
-	for _, group := range multiGroups {
-		src := group[0]
-		sigTag := digestToSignatureTag(src.Digest)
-		srcRef := fmt.Sprintf("%s/%s:%s",
-			src.DstRegistry.Name, src.DstImageTag.Name, sigTag)
-
-		for _, dst := range group[1:] {
-			dstRef := fmt.Sprintf("%s/%s:%s",
-				dst.DstRegistry.Name, dst.DstImageTag.Name, sigTag)
-
-			if _, ok := seen[dstRef]; ok {
-				continue
-			}
-
-			seen[dstRef] = struct{}{}
-			copies = append(copies, copyItem{srcRef, dstRef})
-		}
-	}
-
-	logrus.Infof("Copying fresh signatures for %d groups (%d copies)",
-		len(multiGroups), len(copies))
-
-	return di.executeCopies(opts, copies)
-}
-
 // ReplicateSignatures batch-lists tags for all image repositories across all
 // registries in a single concurrent pass, then copies only the signatures
 // that are missing from the mirrors. This is used by the standalone

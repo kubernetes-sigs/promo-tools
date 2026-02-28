@@ -173,8 +173,7 @@ The promotion flow is organized into sequential pipeline phases:
 | 4 | **validate** | Validate staging image signatures |
 | 5 | **promote** | Copy images from staging to production |
 | 6 | **sign** | Sign promoted images with cosign (primary registry only) |
-| 7 | **replicate** | Copy signatures to mirror registries (see [Standalone signature replication](#standalone-signature-replication)) |
-| 8 | **attest** | Copy pre-generated SBOMs from staging to production, generate promotion provenance |
+| 7 | **attest** | Copy pre-generated SBOMs from staging to production, generate promotion provenance |
 
 Without `--confirm`, the pipeline stops after the validate phase (dry-run
 precheck). With `--parse-only`, it stops after parsing manifests.
@@ -201,7 +200,9 @@ pushed back up. This is important for two reasons:
 
 After promotion, images are signed using [cosign](https://github.com/sigstore/cosign)
 with a keyless (OIDC) identity. Signatures are replicated to all mirror
-registries. The signing identity is configured with `--signer-account`.
+registries by a dedicated periodic Prow job (see
+[Standalone signature replication](#standalone-signature-replication)).
+The signing identity is configured with `--signer-account`.
 
 Pre-generated SBOMs are copied from staging to production using the cosign SBOM
 tag convention (`sha256-<hash>.sbom`). Missing SBOMs are skipped gracefully.
@@ -218,9 +219,9 @@ Related flags:
 ## Standalone signature replication
 
 When images are promoted to multiple mirror registries, signatures must be
-replicated from the primary registry to all mirrors. This normally happens
-inline during promotion (in the sign phase), but can also be run standalone
-via the `replicate-signatures` subcommand:
+replicated from the primary registry to all mirrors. This is handled by a
+dedicated periodic Prow job ([`ci-k8sio-image-signature-replication`](https://prow.k8s.io/?job=ci-k8sio-image-signature-replication)) using
+the `replicate-signatures` subcommand:
 
 ```console
 kpromo cip replicate-signatures \
@@ -233,9 +234,12 @@ computes edges, but does not copy any signatures.
 
 The standalone mode reads **all** edges from the manifests (not just unsynced
 ones), so it works even when images were promoted long ago. Each signature copy
-is idempotent -- existing signatures are detected via a HEAD request and
-skipped. This makes it safe to run frequently (e.g. via a periodic Prow job)
-alongside the main promotion pipeline.
+is idempotent -- existing signatures are detected via batch tag listing and
+skipped. This makes it safe to run frequently via the periodic Prow job.
+
+Job health dashboards:
+- [sig-release-releng-informing](https://testgrid.k8s.io/sig-release-releng-informing#ci-k8sio-image-signature-replication)
+- [sig-k8s-infra-k8sio](https://testgrid.k8s.io/sig-k8s-infra-k8sio#ci-k8sio-image-signature-replication)
 
 ## Provenance verification
 

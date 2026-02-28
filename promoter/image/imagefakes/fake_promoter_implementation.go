@@ -54,18 +54,6 @@ type FakePromoterImplementation struct {
 		result1 []schema.Manifest
 		result2 error
 	}
-	CopyFreshSignaturesStub        func(*imagepromotera.Options, map[promotion.Edge]any) error
-	copyFreshSignaturesMutex       sync.RWMutex
-	copyFreshSignaturesArgsForCall []struct {
-		arg1 *imagepromotera.Options
-		arg2 map[promotion.Edge]any
-	}
-	copyFreshSignaturesReturns struct {
-		result1 error
-	}
-	copyFreshSignaturesReturnsOnCall map[int]struct {
-		result1 error
-	}
 	EdgesFromManifestsStub        func([]schema.Manifest) (map[promotion.Edge]any, error)
 	edgesFromManifestsMutex       sync.RWMutex
 	edgesFromManifestsArgsForCall []struct {
@@ -457,68 +445,6 @@ func (fake *FakePromoterImplementation) AppendManifestToSnapshotReturnsOnCall(i 
 		result1 []schema.Manifest
 		result2 error
 	}{result1, result2}
-}
-
-func (fake *FakePromoterImplementation) CopyFreshSignatures(arg1 *imagepromotera.Options, arg2 map[promotion.Edge]any) error {
-	fake.copyFreshSignaturesMutex.Lock()
-	ret, specificReturn := fake.copyFreshSignaturesReturnsOnCall[len(fake.copyFreshSignaturesArgsForCall)]
-	fake.copyFreshSignaturesArgsForCall = append(fake.copyFreshSignaturesArgsForCall, struct {
-		arg1 *imagepromotera.Options
-		arg2 map[promotion.Edge]any
-	}{arg1, arg2})
-	stub := fake.CopyFreshSignaturesStub
-	fakeReturns := fake.copyFreshSignaturesReturns
-	fake.recordInvocation("CopyFreshSignatures", []interface{}{arg1, arg2})
-	fake.copyFreshSignaturesMutex.Unlock()
-	if stub != nil {
-		return stub(arg1, arg2)
-	}
-	if specificReturn {
-		return ret.result1
-	}
-	return fakeReturns.result1
-}
-
-func (fake *FakePromoterImplementation) CopyFreshSignaturesCallCount() int {
-	fake.copyFreshSignaturesMutex.RLock()
-	defer fake.copyFreshSignaturesMutex.RUnlock()
-	return len(fake.copyFreshSignaturesArgsForCall)
-}
-
-func (fake *FakePromoterImplementation) CopyFreshSignaturesCalls(stub func(*imagepromotera.Options, map[promotion.Edge]any) error) {
-	fake.copyFreshSignaturesMutex.Lock()
-	defer fake.copyFreshSignaturesMutex.Unlock()
-	fake.CopyFreshSignaturesStub = stub
-}
-
-func (fake *FakePromoterImplementation) CopyFreshSignaturesArgsForCall(i int) (*imagepromotera.Options, map[promotion.Edge]any) {
-	fake.copyFreshSignaturesMutex.RLock()
-	defer fake.copyFreshSignaturesMutex.RUnlock()
-	argsForCall := fake.copyFreshSignaturesArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2
-}
-
-func (fake *FakePromoterImplementation) CopyFreshSignaturesReturns(result1 error) {
-	fake.copyFreshSignaturesMutex.Lock()
-	defer fake.copyFreshSignaturesMutex.Unlock()
-	fake.CopyFreshSignaturesStub = nil
-	fake.copyFreshSignaturesReturns = struct {
-		result1 error
-	}{result1}
-}
-
-func (fake *FakePromoterImplementation) CopyFreshSignaturesReturnsOnCall(i int, result1 error) {
-	fake.copyFreshSignaturesMutex.Lock()
-	defer fake.copyFreshSignaturesMutex.Unlock()
-	fake.CopyFreshSignaturesStub = nil
-	if fake.copyFreshSignaturesReturnsOnCall == nil {
-		fake.copyFreshSignaturesReturnsOnCall = make(map[int]struct {
-			result1 error
-		})
-	}
-	fake.copyFreshSignaturesReturnsOnCall[i] = struct {
-		result1 error
-	}{result1}
 }
 
 func (fake *FakePromoterImplementation) EdgesFromManifests(arg1 []schema.Manifest) (map[promotion.Edge]any, error) {

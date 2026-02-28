@@ -329,54 +329,6 @@ func TestPromoteImagesCraneProvider(t *testing.T) {
 	require.ElementsMatch(t, []string{"v1.0", "v2.0"}, tags)
 }
 
-// --- CopyFreshSignatures integration tests ---
-
-// TestCopyFreshSignaturesCopiesUnconditionally verifies that CopyFreshSignatures
-// copies signatures from the primary to all mirrors without checking whether
-// they already exist. This exercises the inline promotion path.
-func TestCopyFreshSignaturesCopiesUnconditionally(t *testing.T) {
-	t.Parallel()
-
-	host, di := newTLSTestRegistry(t)
-
-	primary := prodPath("aa-primary")
-	mirror1 := prodPath("bb-mirror1")
-	mirror2 := prodPath("bb-mirror2")
-
-	// Push an image and its signature to the primary.
-	digest := pushTestImage(t, di, host+"/"+primary+"/app:v1.0")
-	sigTag := digestToSignatureTag(image.Digest(digest))
-	pushTestImage(t, di, fmt.Sprintf("%s/%s/app:%s", host, primary, sigTag))
-
-	// Push images to mirrors (no signatures).
-	pushTestImage(t, di, host+"/"+mirror1+"/app:v1.0")
-	pushTestImage(t, di, host+"/"+mirror2+"/app:v1.0")
-
-	edges := map[promotion.Edge]any{
-		makeProdEdge(host, "aa-primary", "app", "v1.0", image.Digest(digest)): nil,
-		makeProdEdge(host, "bb-mirror1", "app", "v1.0", image.Digest(digest)): nil,
-		makeProdEdge(host, "bb-mirror2", "app", "v1.0", image.Digest(digest)): nil,
-	}
-
-	opts := &options.Options{
-		SignImages:         true,
-		MaxSignatureCopies: 10,
-	}
-
-	err := di.CopyFreshSignatures(opts, edges)
-	require.NoError(t, err)
-
-	// Verify signatures landed on both mirrors.
-	for _, m := range []string{mirror1, mirror2} {
-		refStr := fmt.Sprintf("%s/%s/app:%s", host, m, sigTag)
-		ref, err := name.ParseReference(refStr)
-		require.NoError(t, err)
-
-		_, err = remote.Head(ref, remote.WithTransport(di.getTransport()))
-		require.NoError(t, err, "signature should exist on %s", m)
-	}
-}
-
 // --- ReplicateSignatures (batch-listing path) integration tests ---
 
 // prodPath returns a registry path that includes the production repository

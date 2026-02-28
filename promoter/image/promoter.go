@@ -120,7 +120,6 @@ type promoterImplementation interface {
 	PrewarmTUFCache() error
 	ValidateStagingSignatures(map[promotion.Edge]any) (map[promotion.Edge]any, error)
 	SignImages(*options.Options, map[promotion.Edge]any) error
-	CopyFreshSignatures(*options.Options, map[promotion.Edge]any) error
 	ReplicateSignatures(*options.Options, map[promotion.Edge]any) error
 	WriteSBOMs(*options.Options, map[promotion.Edge]any) error
 	WriteProvenanceAttestations(*options.Options, map[promotion.Edge]any, provenance.Generator) error
@@ -250,15 +249,6 @@ func (p *Promoter) PromoteImages(ctx context.Context, opts *options.Options) err
 	pipe.AddPhase(pipeline.NewPhase("sign", func(_ context.Context) error {
 		if err := p.impl.SignImages(opts, promotionEdges); err != nil {
 			return fmt.Errorf("signing images: %w", err)
-		}
-
-		return nil
-	}))
-
-	// Replicate phase: copy freshly created signatures to mirror registries.
-	pipe.AddPhase(pipeline.NewPhase("replicate", func(_ context.Context) error {
-		if err := p.impl.CopyFreshSignatures(opts, promotionEdges); err != nil {
-			return fmt.Errorf("copying fresh signatures: %w", err)
 		}
 
 		return nil
@@ -404,9 +394,8 @@ func (p *Promoter) CheckSignatures(opts *options.Options) error {
 
 // ReplicateSignatures is a standalone mode that copies image signatures
 // from the primary destination registry to all mirror registries.
-// Unlike the inline replicate phase in PromoteImages, this method reads
-// ALL edges from manifests (not just unsynced ones) so it can run
-// independently of the promotion job.
+// It reads ALL edges from manifests (not just unsynced ones) so it can
+// run independently of the promotion job.
 func (p *Promoter) ReplicateSignatures(ctx context.Context, opts *options.Options) error {
 	var promotionEdges map[promotion.Edge]any
 
