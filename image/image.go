@@ -85,7 +85,7 @@ func (imagesList *ManifestList) ToYAML() ([]byte, error) {
 	// Images are sorted by:
 	//	  1. Name 2. Tag
 	// If there are multiple tags for a single image digest, the smallest tag is used in the sort.''
-	// Image tags are sorted lexicographically as they are not guaranteed to be Semver compliant. See https://github.com/opencontainers/distribution-spec/issues/154 fpr more details.
+	// Image tags are sorted lexicographically as they are not guaranteed to be Semver compliant. See https://github.com/opencontainers/distribution-spec/issues/154 for more details.
 
 	// First, sort by name (sort #1)
 	sort.Slice(*imagesList, func(i, j int) bool {

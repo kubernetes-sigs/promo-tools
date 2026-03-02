@@ -61,7 +61,7 @@ mapfile -t packages < <(go list ./... | grep -v 'sigs.k8s.io/promo-tools/cmd\|te
 
 export GO111MODULE=on
 
-# If the user rquests failing fast (so that they can iterate on the failing test
+# If the user requests failing fast (so that they can iterate on the failing test
 # quickly without having to swim across the verbose log outputs from parallel
 # tests), then iterate through each module serially.
 if [[ -n "${TEST_FAILFAST:-}" ]]; then
