@@ -18,12 +18,12 @@ package promobot
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"golang.org/x/xerrors"
 	"sigs.k8s.io/release-utils/hash"
 
 	api "sigs.k8s.io/promo-tools/v4/api/files"
@@ -53,7 +53,7 @@ func GenerateManifest(_ context.Context, options GenerateManifestOptions) (*api.
 	manifest := &api.Manifest{}
 
 	if options.BaseDir == "" {
-		return nil, xerrors.New("must specify BaseDir")
+		return nil, errors.New("must specify BaseDir")
 	}
 
 	basedir := options.BaseDir

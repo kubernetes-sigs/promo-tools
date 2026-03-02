@@ -18,6 +18,7 @@ package manifest
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -25,7 +26,6 @@ import (
 	"slices"
 
 	"github.com/sirupsen/logrus"
-	"golang.org/x/xerrors"
 
 	"sigs.k8s.io/promo-tools/v4/promoter/image/registry"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/schema"
@@ -109,11 +109,11 @@ func toDigests(digestStrings []string) []image.Digest {
 // Validate validates the options.
 func (o *GrowOptions) Validate() error {
 	if o.BaseDir == "" {
-		return xerrors.New("must specify --base_dir")
+		return errors.New("must specify --base_dir")
 	}
 
 	if o.StagingRepo == "" {
-		return xerrors.New("must specify --staging_repo")
+		return errors.New("must specify --staging_repo")
 	}
 
 	if containsTag(o.FilterTags, latestTag) {
@@ -262,7 +262,7 @@ func ApplyFilters(o *GrowOptions, rii registry.RegInvImage) (registry.RegInvImag
 	rii = ExcludeTags(rii, excludeTags)
 
 	if len(rii) == 0 {
-		return registry.RegInvImage{}, xerrors.New(
+		return registry.RegInvImage{}, errors.New(
 			"no images survived filtering; double-check your --filter_* flag(s) for typos",
 		)
 	}
