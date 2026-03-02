@@ -36,7 +36,7 @@ import (
 	"sigs.k8s.io/promo-tools/v4/types/image"
 )
 
-const vulnerabilityDiscalimer = `DISCLAIMER: Vulnerabilities are found as issues with package
+const vulnerabilityDisclaimer = `DISCLAIMER: Vulnerabilities are found as issues with package
 binaries within image layers, not necessarily with the image layers themselves.
 So a 'fixable' vulnerability may not necessarily be immediately actionable. For
 example, even though a fixed version of the binary is available, it doesn't
@@ -153,7 +153,7 @@ func (di *DefaultPromoterImplementation) PrintVersion() {
 // PrintSecDisclaimer prints a disclaimer about false positives
 // that may be found in container image layers.
 func (di *DefaultPromoterImplementation) PrintSecDisclaimer() {
-	logrus.Info(vulnerabilityDiscalimer)
+	logrus.Info(vulnerabilityDisclaimer)
 }
 
 // getTransport returns the rate-limited transport.

@@ -34,7 +34,7 @@ func TestNewManifestListFromFile(t *testing.T) {
 	require.NoError(t, err, "creating temp file")
 
 	_, err = tempFile.WriteString(listYAML)
-	require.NoError(t, err, "wrinting temporary promoter image list")
+	require.NoError(t, err, "writing temporary promoter image list")
 
 	imageList, err := NewManifestListFromFile(tempFile.Name())
 	require.NoError(t, err)

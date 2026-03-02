@@ -76,7 +76,7 @@ type Options struct {
 	// before promoting or generating a snapshot when set to true
 	ParseOnly bool
 
-	// When tru, sign the container images using the sigstore cosign libraries
+	// When true, sign the container images using the sigstore cosign libraries
 	SignImages bool
 
 	// SignerAccount is a service account that will provide the identity
