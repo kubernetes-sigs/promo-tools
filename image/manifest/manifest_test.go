@@ -24,7 +24,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"golang.org/x/xerrors"
 
 	"sigs.k8s.io/promo-tools/v4/image/manifest"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/registry"
@@ -233,7 +232,7 @@ func TestApplyFilters(t *testing.T) {
 				},
 			},
 			registry.RegInvImage{},
-			xerrors.New("no images survived filtering; double-check your --filter_* flag(s) for typos"),
+			errors.New("no images survived filtering; double-check your --filter_* flag(s) for typos"),
 		},
 		{
 			"filter on digest",
