@@ -53,18 +53,3 @@ type Result struct {
 	// Errors lists any issues found during verification.
 	Errors []string
 }
-
-// Policy defines the provenance requirements for image promotion.
-type Policy struct {
-	// RequireProvenance controls whether provenance verification is mandatory.
-	// When false, images without provenance are allowed through.
-	RequireProvenance bool
-
-	// AllowedBuilders is the list of acceptable builder identities.
-	// If empty, any builder is accepted.
-	AllowedBuilders []string
-
-	// AllowedSourceRepos is the list of acceptable source repositories.
-	// If empty, any source repo is accepted.
-	AllowedSourceRepos []string
-}

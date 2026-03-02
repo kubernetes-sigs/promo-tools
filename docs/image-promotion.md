@@ -169,7 +169,7 @@ The promotion flow is organized into sequential pipeline phases:
 |-------|------|-------------|
 | 1 | **setup** | Validate options, activate service accounts, prewarm TUF cache |
 | 2 | **plan** | Parse manifests, read registry inventories, compute promotion edges |
-| 3 | **provenance** | Optional SLSA provenance verification (see [Provenance verification](#provenance-verification)) |
+| 3 | **provenance** | SLSA provenance verification (see [Provenance verification](#provenance-verification)) |
 | 4 | **validate** | Validate staging image signatures |
 | 5 | **promote** | Copy images from staging to production |
 | 6 | **sign** | Sign promoted images with cosign (primary registry only) |
@@ -243,31 +243,19 @@ Job health dashboards:
 
 ## Provenance verification
 
-Optional SLSA provenance verification can be enabled to ensure images were built
-by authorized build systems before promotion. When enabled, the promoter checks
-that a SLSA attestation tag exists on each staging image and verifies the builder
-identity and source repository against configured policies.
-
-Related flags:
-
-- `--require-provenance` — require valid SLSA attestations (default: `false`)
-- `--allowed-builders` — comma-separated list of acceptable builder identities
-- `--allowed-source-repos` — comma-separated list of acceptable source repo URLs
+The promoter verifies SLSA provenance attestations on staging images before
+promotion using verify-if-present semantics: if an attestation tag exists on a
+staging image, it is cryptographically verified using cosign against the
+configured signing identity and OIDC issuer. If no attestation is found, a
+warning is logged and the image is still promoted. This allows progressive
+adoption without blocking images that do not yet have attestations.
 
 ## Provenance generation
 
-The promoter can generate SLSA v1.0 provenance attestations for promoted images.
-When enabled, the promoter pushes an `.att` tag for each promoted image containing
-an in-toto statement with the promotion metadata (source/destination registries,
-digest, builder identity, timestamp).
-
-```console
-kpromo cip --thin-manifest-dir=<dir> --generate-promotion-provenance --confirm
-```
-
-Related flags:
-
-- `--generate-promotion-provenance` — generate SLSA provenance attestations (default: `false`)
+The promoter generates SLSA v1.0 provenance attestations for promoted images.
+It pushes an `.att` tag for each promoted image containing an in-toto statement
+with the promotion metadata (source/destination registries, digest, builder
+identity, timestamp).
 
 ## Vulnerability scanning
 

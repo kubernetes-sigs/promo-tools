@@ -59,7 +59,6 @@ var runOpts = &options.Options{
 	Threads: options.DefaultOptions.Threads,
 }
 
-//nolint:funlen // cobra command initialization requires many flags
 func init() {
 	CipCmd.PersistentFlags().BoolVar(
 		&runOpts.Confirm,
@@ -262,34 +261,6 @@ network from a registry, it reads from the local manifests only`,
 check. Found vulnerabilities at or above this threshold will result in the
 vulnerability check failing [severity levels between 0 and 5; 0 - UNSPECIFIED,
 1 - MINIMAL, 2 - LOW, 3 - MEDIUM, 4 - HIGH, 5 - CRITICAL]`,
-	)
-
-	CipCmd.PersistentFlags().BoolVar(
-		&runOpts.RequireProvenance,
-		"require-provenance",
-		options.DefaultOptions.RequireProvenance,
-		"require valid SLSA provenance attestations before promotion",
-	)
-
-	CipCmd.PersistentFlags().StringSliceVar(
-		&runOpts.AllowedBuilders,
-		"allowed-builders",
-		options.DefaultOptions.AllowedBuilders,
-		"comma-separated list of acceptable builder identities for provenance verification",
-	)
-
-	CipCmd.PersistentFlags().StringSliceVar(
-		&runOpts.AllowedSourceRepos,
-		"allowed-source-repos",
-		options.DefaultOptions.AllowedSourceRepos,
-		"comma-separated list of acceptable source repository URLs for provenance verification",
-	)
-
-	CipCmd.PersistentFlags().BoolVar(
-		&runOpts.GeneratePromotionProvenance,
-		"generate-promotion-provenance",
-		options.DefaultOptions.GeneratePromotionProvenance,
-		"generate SLSA provenance attestations for promoted images",
 	)
 }
 
