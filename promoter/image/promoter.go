@@ -121,7 +121,6 @@ type promoterImplementation interface {
 	ValidateStagingSignatures(map[promotion.Edge]any) (map[promotion.Edge]any, error)
 	SignImages(*options.Options, map[promotion.Edge]any) error
 	ReplicateSignatures(*options.Options, map[promotion.Edge]any) error
-	WriteSBOMs(*options.Options, map[promotion.Edge]any) error
 	WriteProvenanceAttestations(*options.Options, map[promotion.Edge]any, provenance.Generator) error
 
 	// Methods for checking signatures
@@ -244,15 +243,14 @@ func (p *Promoter) PromoteImages(ctx context.Context, opts *options.Options) err
 		return nil
 	}))
 
-	// Attest phase: write SBOMs and provenance attestations.
+	// Attest phase: generate and push provenance attestations.
 	pipe.AddPhase(pipeline.NewPhase("attest", func(_ context.Context) error {
-		if err := p.impl.WriteSBOMs(opts, promotionEdges); err != nil {
-			return fmt.Errorf("writing SBOMs: %w", err)
-		}
-
 		if err := p.impl.WriteProvenanceAttestations(opts, promotionEdges, p.provenanceGenerator); err != nil {
 			return fmt.Errorf("writing provenance attestations: %w", err)
 		}
+
+		logrus.Info("Signature replication to mirror registries is handled by the periodic Prow job: " +
+			"https://prow.k8s.io/job-history/gs/kubernetes-ci-logs/logs/ci-k8sio-image-signature-replication")
 
 		return nil
 	}))

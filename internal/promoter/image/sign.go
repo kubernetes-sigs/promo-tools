@@ -30,12 +30,12 @@ import (
 
 	"github.com/google/go-containerregistry/pkg/crane"
 	"github.com/google/go-containerregistry/pkg/name"
-	"github.com/google/go-containerregistry/pkg/v1/empty"
-	"github.com/google/go-containerregistry/pkg/v1/mutate"
-	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/google/go-containerregistry/pkg/v1/remote/transport"
-	"github.com/google/go-containerregistry/pkg/v1/static"
 	"github.com/google/go-containerregistry/pkg/v1/types"
+	ocimutate "github.com/sigstore/cosign/v2/pkg/oci/mutate"
+	ociremote "github.com/sigstore/cosign/v2/pkg/oci/remote"
+	"github.com/sigstore/cosign/v2/pkg/oci/static"
+	ctypes "github.com/sigstore/cosign/v2/pkg/types"
 	"github.com/sigstore/sigstore/pkg/tuf"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -51,13 +51,8 @@ import (
 )
 
 const (
-	oidcTokenAudience    = "sigstore"
-	signatureTagSuffix   = ".sig"
-	sbomTagSuffix        = ".sbom"
-	attestationTagSuffix = ".att"
-
-	// intotoMediaType is the media type for in-toto attestation layers.
-	intotoMediaType = "application/vnd.dsse.envelope.v1+json"
+	oidcTokenAudience  = "sigstore"
+	signatureTagSuffix = ".sig"
 
 	TestSigningAccount = "k8s-infra-promoter-test-signer@k8s-cip-test-prod.iam.gserviceaccount.com"
 )
@@ -143,6 +138,7 @@ func (di *DefaultPromoterImplementation) SignImages(
 	// internal Signer structs. Without that, the identity token wouldn't be
 	// used at all and images would be signed with a wrong identity.
 	di.signer = sign.New(signOpts)
+	di.signOpts = signOpts
 
 	// We only sign the first normalized image per digest of each edge.
 	grouped := groupEdgesByIdentityDigest(edges)
@@ -308,6 +304,13 @@ type copyItem struct{ src, dst string }
 
 type repoKey struct{ registry, image string }
 
+// signedGroup pairs a group of edges (from groupEdgesByIdentityDigest) with
+// the signature tag that was found on the primary (source) registry.
+type signedGroup struct {
+	group  []promotion.Edge
+	sigTag string
+}
+
 // computeCopiesFromInventory uses a two-phase tag listing strategy to
 // minimise API requests against Artifact Registry:
 //
@@ -347,11 +350,6 @@ func (di *DefaultPromoterImplementation) computeCopiesFromInventory(
 	}
 
 	// Filter: keep only groups whose source has a signature.
-
-	type signedGroup struct {
-		group  []promotion.Edge
-		sigTag string
-	}
 
 	var signed []signedGroup
 
@@ -403,8 +401,21 @@ func (di *DefaultPromoterImplementation) computeCopiesFromInventory(
 		maps.Copy(allTags, mirrorTags)
 	}
 
-	// Compute copies.
+	// Compute copies: replicate all .sig tags from source to mirrors.
+	copies := computeSigCopies(signed, allTags)
 
+	logrus.Infof("%d copies needed", len(copies))
+
+	return copies, nil
+}
+
+// computeSigCopies determines which .sig tags from the source repositories
+// need to be replicated to mirror repositories. It returns the list of
+// (src, dst) copy items for signatures not yet present on the mirrors.
+func computeSigCopies(
+	signed []signedGroup,
+	allTags map[repoKey]map[string]struct{},
+) []copyItem {
 	var (
 		copies []copyItem
 		seen   = map[string]struct{}{}
@@ -412,30 +423,36 @@ func (di *DefaultPromoterImplementation) computeCopiesFromInventory(
 
 	for _, sg := range signed {
 		src := sg.group[0]
-		srcRef := fmt.Sprintf("%s/%s:%s",
-			src.DstRegistry.Name, src.DstImageTag.Name, sg.sigTag)
+		srcKey := repoKey{string(src.DstRegistry.Name), string(src.DstImageTag.Name)}
 
-		for _, dst := range sg.group[1:] {
-			dstRef := fmt.Sprintf("%s/%s:%s",
-				dst.DstRegistry.Name, dst.DstImageTag.Name, sg.sigTag)
-
-			if _, ok := seen[dstRef]; ok {
+		for tag := range allTags[srcKey] {
+			if !strings.HasSuffix(tag, signatureTagSuffix) {
 				continue
 			}
 
-			seen[dstRef] = struct{}{}
+			srcRef := fmt.Sprintf("%s/%s:%s",
+				src.DstRegistry.Name, src.DstImageTag.Name, tag)
 
-			dstKey := repoKey{string(dst.DstRegistry.Name), string(dst.DstImageTag.Name)}
+			for _, dst := range sg.group[1:] {
+				dstRef := fmt.Sprintf("%s/%s:%s",
+					dst.DstRegistry.Name, dst.DstImageTag.Name, tag)
 
-			if _, ok := allTags[dstKey][sg.sigTag]; !ok {
-				copies = append(copies, copyItem{srcRef, dstRef})
+				if _, ok := seen[dstRef]; ok {
+					continue
+				}
+
+				seen[dstRef] = struct{}{}
+
+				dstKey := repoKey{string(dst.DstRegistry.Name), string(dst.DstImageTag.Name)}
+
+				if _, ok := allTags[dstKey][tag]; !ok {
+					copies = append(copies, copyItem{srcRef, dstRef})
+				}
 			}
 		}
 	}
 
-	logrus.Infof("%d copies needed", len(copies))
-
-	return copies, nil
+	return copies
 }
 
 // batchListTags concurrently lists tags for the given repositories and
@@ -555,8 +572,7 @@ func groupEdgesByIdentityDigest(edges map[promotion.Edge]any) [][]promotion.Edge
 }
 
 // copyAttachedObjects copies any attached signatures from the staging registry to
-// the production registry. The function is called copyAttachedObjects as it will
-// move attestations and SBOMs too once we stabilize the signing code.
+// the production registry.
 func (di *DefaultPromoterImplementation) copyAttachedObjects(edge *promotion.Edge) error {
 	sigTag := digestToSignatureTag(edge.Digest)
 	srcRefString := fmt.Sprintf(
@@ -646,83 +662,6 @@ func (di *DefaultPromoterImplementation) listTagsWithRetry(repo string) ([]strin
 	return tags, nil
 }
 
-// WriteSBOMs copies pre-generated SBOMs from the staging registry to each
-// production registry for the promoted images. SBOMs are expected to be
-// attached in staging (e.g., by the build system) and are identified by
-// the cosign SBOM tag convention (sha256-<hash>.sbom).
-func (di *DefaultPromoterImplementation) WriteSBOMs(
-	opts *options.Options, edges map[promotion.Edge]any,
-) error {
-	if len(edges) == 0 {
-		logrus.Info("No images were promoted. No SBOMs to copy.")
-
-		return nil
-	}
-
-	g := new(errgroup.Group)
-	g.SetLimit(opts.MaxSignatureCopies)
-
-	for edge := range edges {
-		// Skip signature and attestation layers
-		if strings.HasSuffix(string(edge.DstImageTag.Tag), ".sig") ||
-			strings.HasSuffix(string(edge.DstImageTag.Tag), ".att") ||
-			strings.HasSuffix(string(edge.DstImageTag.Tag), ".sbom") ||
-			edge.DstImageTag.Tag == "" {
-			continue
-		}
-
-		g.Go(func() error {
-			if err := di.copySBOM(&edge); err != nil {
-				return fmt.Errorf("copying SBOM for %s: %w", edge.DstReference(), err)
-			}
-
-			return nil
-		})
-	}
-
-	if err := g.Wait(); err != nil {
-		return fmt.Errorf("writing SBOMs: %w", err)
-	}
-
-	return nil
-}
-
-// copySBOM copies an SBOM from the staging registry to the production registry
-// for a single promotion edge. If no SBOM exists in staging, this is not an error.
-func (di *DefaultPromoterImplementation) copySBOM(edge *promotion.Edge) error {
-	sbomTag := digestToSBOMTag(edge.Digest)
-	srcRefString := fmt.Sprintf(
-		"%s/%s:%s", edge.SrcRegistry.Name, edge.SrcImageTag.Name, sbomTag,
-	)
-	dstRefString := fmt.Sprintf(
-		"%s/%s:%s", edge.DstRegistry.Name, edge.DstImageTag.Name, sbomTag,
-	)
-
-	logrus.Infof("SBOM copy: %s to %s", srcRefString, dstRefString)
-
-	if err := ratelimit.WithRetry(func() error {
-		return craneCopyWithTimeout(srcRefString, dstRefString, ratelimit.CopyTimeout, di.craneOptions())
-	}); err != nil {
-		// If the SBOM does not exist in staging, skip silently
-		var terr *transport.Error
-		if errors.As(err, &terr) && terr.StatusCode == http.StatusNotFound {
-			logrus.Debugf("No SBOM found for %s, skipping", srcRefString)
-
-			return nil
-		}
-
-		return fmt.Errorf("copying SBOM %s to %s: %w", srcRefString, dstRefString, err)
-	}
-
-	return nil
-}
-
-// digestToSBOMTag takes a digest and infers the tag name where
-// its SBOM can be found.
-func digestToSBOMTag(dg image.Digest) string {
-	return strings.ReplaceAll(string(dg), "sha256:", "sha256-") + sbomTagSuffix
-}
-
 // GetIdentityToken returns an identity token for the selected service account
 // in order for this function to work, an account has to be already logged.
 func (di *DefaultPromoterImplementation) GetIdentityToken(
@@ -741,7 +680,7 @@ func (di *DefaultPromoterImplementation) GetIdentityToken(
 // WriteProvenanceAttestations generates SLSA provenance attestations for
 // promoted images and pushes them as .att tags to the destination registry.
 func (di *DefaultPromoterImplementation) WriteProvenanceAttestations(
-	_ *options.Options,
+	opts *options.Options,
 	edges map[promotion.Edge]any,
 	generator provenance.Generator,
 ) error {
@@ -759,12 +698,14 @@ func (di *DefaultPromoterImplementation) WriteProvenanceAttestations(
 	ctx := context.Background()
 	now := time.Now()
 
+	g := new(errgroup.Group)
+	g.SetLimit(opts.MaxSignatureCopies)
+
 	for edge := range edges {
 		// Skip metadata layers
 		tag := string(edge.DstImageTag.Tag)
 		if strings.HasSuffix(tag, ".sig") ||
 			strings.HasSuffix(tag, ".att") ||
-			strings.HasSuffix(tag, ".sbom") ||
 			tag == "" {
 			continue
 		}
@@ -777,81 +718,113 @@ func (di *DefaultPromoterImplementation) WriteProvenanceAttestations(
 			BuilderID: builderID,
 		}
 
-		if err := di.pushAttestation(ctx, &edge, generator, &record); err != nil {
-			return fmt.Errorf("writing provenance for %s: %w", edge.DstReference(), err)
-		}
+		g.Go(func() error {
+			if err := di.pushAttestation(ctx, &edge, generator, &record); err != nil {
+				return fmt.Errorf("writing provenance for %s: %w", edge.DstReference(), err)
+			}
+
+			return nil
+		})
+	}
+
+	if err := g.Wait(); err != nil {
+		return fmt.Errorf("writing provenance attestations: %w", err)
 	}
 
 	return nil
 }
 
-// pushAttestation generates and pushes a provenance attestation as an
-// OCI image with an .att tag.
+// pushAttestation generates and pushes a provenance attestation as a
+// layer in the .att image for the destination digest. The layer includes
+// a predicateType annotation for idempotency checking and compatibility
+// with cosign's attestation conventions.
 func (di *DefaultPromoterImplementation) pushAttestation(
 	ctx context.Context,
 	edge *promotion.Edge,
 	generator provenance.Generator,
 	record *provenance.PromotionRecord,
 ) error {
-	attestation, err := generator.Generate(ctx, record)
+	payload, err := generator.Generate(ctx, record)
 	if err != nil {
 		return fmt.Errorf("generating attestation: %w", err)
 	}
 
-	attTag := digestToAttestationTag(edge.Digest)
-	dstRefString := fmt.Sprintf(
-		"%s/%s:%s", edge.DstRegistry.Name, edge.DstImageTag.Name, attTag,
+	// Build the digest reference for the destination image.
+	dstDigestRef := fmt.Sprintf(
+		"%s/%s@%s", edge.DstRegistry.Name, edge.DstImageTag.Name, edge.Digest,
 	)
 
-	ref, err := name.ParseReference(dstRefString)
+	digest, err := name.NewDigest(dstDigestRef)
 	if err != nil {
-		return fmt.Errorf("parsing attestation reference %s: %w", dstRefString, err)
+		return fmt.Errorf("parsing digest reference %s: %w", dstDigestRef, err)
 	}
 
-	// Check if attestation already exists (idempotent)
-	headCtx, headCancel := context.WithTimeout(ctx, ratelimit.ListTagsTimeout)
-	defer headCancel()
+	remoteOpt := ociremote.WithRemoteOptions(di.remoteOptions()...)
 
-	if _, err := remote.Head(ref,
-		append(di.remoteOptions(), remote.WithContext(headCtx))...,
-	); err == nil {
-		logrus.Debugf("Attestation %s already exists, skipping", dstRefString)
+	// Check if our predicate type already exists (idempotent).
+	if hasPredicateType(digest, provenance.PredicateType, remoteOpt) {
+		logrus.Debugf("Attestation for %s already exists, skipping", dstDigestRef)
 
 		return nil
 	}
 
-	// Create an OCI image with the attestation as a single layer
-	layer := static.NewLayer(attestation, types.MediaType(intotoMediaType))
-
-	img, err := mutate.AppendLayers(empty.Image, layer)
+	// Create the attestation layer with predicate type annotation.
+	att, err := static.NewAttestation(payload,
+		static.WithLayerMediaType(types.MediaType(ctypes.IntotoPayloadType)),
+		static.WithAnnotations(map[string]string{
+			"predicateType": provenance.PredicateType,
+		}),
+	)
 	if err != nil {
-		return fmt.Errorf("creating attestation image: %w", err)
+		return fmt.Errorf("creating attestation: %w", err)
 	}
 
-	// Set the config media type to mark this as an attestation
-	img = mutate.MediaType(img, types.OCIManifestSchema1)
-	img = mutate.ConfigMediaType(img, types.MediaType("application/vnd.oci.image.config.v1+json"))
+	// Get the existing signed entity for this digest and append.
+	se := ociremote.SignedUnknown(digest, remoteOpt)
 
-	logrus.Infof("Provenance attestation: pushing %s", dstRefString)
+	newSE, err := ocimutate.AttachAttestationToEntity(se, att)
+	if err != nil {
+		return fmt.Errorf("attaching attestation: %w", err)
+	}
+
+	logrus.Infof("Provenance attestation: pushing for %s", dstDigestRef)
 
 	if err := ratelimit.WithRetry(func() error {
-		writeCtx, writeCancel := context.WithTimeout(ctx, ratelimit.CopyTimeout)
-		defer writeCancel()
-
-		return remote.Write(ref, img,
-			append(di.remoteOptions(), remote.WithContext(writeCtx))...,
-		)
+		return ociremote.WriteAttestations(digest.Context(), newSE, remoteOpt)
 	}); err != nil {
-		return fmt.Errorf("pushing attestation %s: %w", dstRefString, err)
+		return fmt.Errorf("pushing attestation for %s: %w", dstDigestRef, err)
 	}
 
 	return nil
 }
 
-// digestToAttestationTag takes a digest and infers the tag name where
-// its attestation can be found.
-func digestToAttestationTag(dg image.Digest) string {
-	return strings.ReplaceAll(string(dg), "sha256:", "sha256-") + attestationTagSuffix
+// hasPredicateType checks if the .att image for the given digest already
+// contains a layer with the specified predicateType annotation.
+func hasPredicateType(digest name.Digest, predicateType string, opts ...ociremote.Option) bool {
+	se := ociremote.SignedUnknown(digest, opts...)
+
+	atts, err := se.Attestations()
+	if err != nil {
+		return false
+	}
+
+	sigs, err := atts.Get()
+	if err != nil {
+		return false
+	}
+
+	for _, sig := range sigs {
+		ann, err := sig.Annotations()
+		if err != nil {
+			continue
+		}
+
+		if ann["predicateType"] == predicateType {
+			return true
+		}
+	}
+
+	return false
 }
 
 // craneCopyWithTimeout wraps crane.Copy with a per-request context timeout.

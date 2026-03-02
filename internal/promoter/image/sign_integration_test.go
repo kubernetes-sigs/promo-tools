@@ -20,13 +20,13 @@ import (
 	"context"
 	"fmt"
 	"net/http/httptest"
-	"strings"
 	"testing"
 
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/registry"
 	"github.com/google/go-containerregistry/pkg/v1/random"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
+	ociremote "github.com/sigstore/cosign/v2/pkg/oci/remote"
 	"github.com/stretchr/testify/require"
 
 	options "sigs.k8s.io/promo-tools/v4/promoter/image/options"
@@ -136,50 +136,6 @@ func TestCopyAttachedObjectsSignatureMissing(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// --- copySBOM tests ---
-
-func TestCopySBOMExists(t *testing.T) {
-	t.Parallel()
-
-	host, di := newTLSTestRegistry(t)
-
-	imgRef := host + "/staging/myimage:v1.0"
-	digest := pushTestImage(t, di, imgRef)
-
-	// Push a fake SBOM to staging.
-	sbomTag := digestToSBOMTag(image.Digest(digest))
-	sbomRef := fmt.Sprintf("%s/staging/myimage:%s", host, sbomTag)
-	pushTestImage(t, di, sbomRef)
-
-	edge := testEdgeForHost(host, image.Digest(digest))
-
-	err := di.copySBOM(&edge)
-	require.NoError(t, err)
-
-	// Verify the SBOM landed in production.
-	dstSBOMRef := fmt.Sprintf("%s/production/myimage:%s", host, sbomTag)
-	ref, err := name.ParseReference(dstSBOMRef)
-	require.NoError(t, err)
-
-	_, err = remote.Head(ref, remote.WithTransport(di.getTransport()))
-	require.NoError(t, err, "SBOM should exist in production")
-}
-
-func TestCopySBOMMissing(t *testing.T) {
-	t.Parallel()
-
-	host, di := newTLSTestRegistry(t)
-
-	imgRef := host + "/staging/myimage:v1.0"
-	digest := pushTestImage(t, di, imgRef)
-
-	edge := testEdgeForHost(host, image.Digest(digest))
-
-	// Should gracefully succeed when no SBOM exists.
-	err := di.copySBOM(&edge)
-	require.NoError(t, err)
-}
-
 // --- pushAttestation tests ---
 
 // fakeGenerator is a provenance.Generator that returns a fixed attestation.
@@ -212,14 +168,13 @@ func TestPushAttestation(t *testing.T) {
 	err := di.pushAttestation(context.Background(), &edge, gen, record)
 	require.NoError(t, err)
 
-	// Verify the attestation landed.
-	attTag := digestToAttestationTag(image.Digest(digest))
-	attRef := fmt.Sprintf("%s/production/myimage:%s", host, attTag)
-	ref, err := name.ParseReference(attRef)
+	// Verify the attestation landed with the correct predicate type.
+	digestRef, err := name.NewDigest(fmt.Sprintf("%s/production/myimage@%s", host, digest))
 	require.NoError(t, err)
 
-	_, err = remote.Head(ref, remote.WithTransport(di.getTransport()))
-	require.NoError(t, err, "attestation should exist in production")
+	remoteOpt := ociremote.WithRemoteOptions(remote.WithTransport(di.getTransport()))
+	require.True(t, hasPredicateType(digestRef, provenance.PredicateType, remoteOpt),
+		"attestation with predicate type should exist")
 }
 
 func TestPushAttestationIdempotent(t *testing.T) {
@@ -240,21 +195,27 @@ func TestPushAttestationIdempotent(t *testing.T) {
 
 	gen := &fakeGenerator{data: []byte(`{"test": "attestation"}`)}
 
-	// Push twice — second push should skip because attestation already exists.
-	for i := range 2 {
-		err := di.pushAttestation(context.Background(), &edge, gen, record)
-		require.NoError(t, err, "push attempt %d", i+1)
-	}
-}
+	// First push should succeed.
+	err := di.pushAttestation(context.Background(), &edge, gen, record)
+	require.NoError(t, err)
 
-// --- Tag convention tests ---
+	// Second push should skip because predicate type already exists.
+	err = di.pushAttestation(context.Background(), &edge, gen, record)
+	require.NoError(t, err)
 
-func TestDigestToAttestationTag(t *testing.T) {
-	t.Parallel()
+	// Verify exactly one attestation layer exists (not duplicated).
+	digestRef, err := name.NewDigest(fmt.Sprintf("%s/production/myimage@%s", host, digest))
+	require.NoError(t, err)
 
-	tag := digestToAttestationTag("sha256:abc123")
-	require.Equal(t, "sha256-abc123.att", tag)
-	require.True(t, strings.HasSuffix(tag, attestationTagSuffix))
+	remoteOpt := ociremote.WithRemoteOptions(remote.WithTransport(di.getTransport()))
+	se := ociremote.SignedUnknown(digestRef, remoteOpt)
+
+	atts, err := se.Attestations()
+	require.NoError(t, err)
+
+	sigs, err := atts.Get()
+	require.NoError(t, err)
+	require.Len(t, sigs, 1, "should have exactly one attestation layer")
 }
 
 // --- Integration test for the full promotion flow with CraneProvider ---
@@ -709,4 +670,49 @@ func TestComputeCopiesFromInventoryTwoPhase(t *testing.T) {
 	require.Contains(t, dsts, fmt.Sprintf("%s/%s/img1:%s", host, mirror1, sigTag1))
 	require.Contains(t, dsts, fmt.Sprintf("%s/%s/img1:%s", host, mirror2, sigTag1))
 	require.Contains(t, dsts, fmt.Sprintf("%s/%s/img2:%s", host, mirror2, sigTag2))
+}
+
+// TestWriteProvenanceAttestationsIdempotent verifies that running
+// WriteProvenanceAttestations twice completes without error, and the
+// second run skips already-existing attestations.
+func TestWriteProvenanceAttestationsIdempotent(t *testing.T) {
+	t.Parallel()
+
+	host, di := newTLSTestRegistry(t)
+
+	srcRegistry := image.Registry(host + "/staging")
+	dstRegistry := image.Registry(host + "/production")
+
+	digest := pushTestImage(t, di, fmt.Sprintf("%s/app:v1.0", srcRegistry))
+
+	edges := map[promotion.Edge]any{
+		{
+			SrcRegistry: reg.Context{Name: srcRegistry, Src: true},
+			SrcImageTag: promotion.ImageTag{Name: "app", Tag: "v1.0"},
+			Digest:      image.Digest(digest),
+			DstRegistry: reg.Context{Name: dstRegistry},
+			DstImageTag: promotion.ImageTag{Name: "app", Tag: "v1.0"},
+		}: nil,
+	}
+
+	opts := &options.Options{
+		MaxSignatureCopies: 10,
+		MaxSignatureOps:    10,
+	}
+
+	gen := &fakeGenerator{data: []byte(`{"test": "attestation"}`)}
+
+	// Run twice — both should succeed without error.
+	for i := range 2 {
+		err := di.WriteProvenanceAttestations(opts, edges, gen)
+		require.NoError(t, err, "run %d", i+1)
+	}
+
+	// Verify the attestation exists with the correct predicate type.
+	digestRef, err := name.NewDigest(fmt.Sprintf("%s/app@%s", dstRegistry, digest))
+	require.NoError(t, err)
+
+	remoteOpt := ociremote.WithRemoteOptions(remote.WithTransport(di.getTransport()))
+	require.True(t, hasPredicateType(digestRef, provenance.PredicateType, remoteOpt),
+		"attestation should exist in production")
 }
