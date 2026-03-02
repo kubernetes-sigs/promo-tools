@@ -61,8 +61,7 @@ func (di *DefaultPromoterImplementation) GetSnapshotSourceRegistry(
 ) (*registry.Context, error) {
 	// Build the source registry:
 	srcRegistry := &registry.Context{
-		ServiceAccount: opts.SnapshotSvcAcct,
-		Src:            true,
+		Src: true,
 	}
 
 	// The only difference when running from Snapshot or

@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
 	"sort"
 	"strings"
 	"sync"
@@ -679,13 +678,6 @@ func digestToSBOMTag(dg image.Digest) string {
 func (di *DefaultPromoterImplementation) GetIdentityToken(
 	_ *options.Options, serviceAccount string,
 ) (string, error) {
-	// If the test signer file is found switch to test credentials
-	if os.Getenv("CIP_E2E_KEY_FILE") != "" {
-		logrus.Info("Test keyfile set using e2e test credentials")
-
-		serviceAccount = TestSigningAccount
-	}
-
 	token, err := di.identityTokenProvider.GetIdentityToken(
 		context.Background(), serviceAccount, oidcTokenAudience,
 	)

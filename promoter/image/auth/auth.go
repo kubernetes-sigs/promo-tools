@@ -30,12 +30,3 @@ type IdentityTokenProvider interface {
 	// service account and audience (e.g., "sigstore").
 	GetIdentityToken(ctx context.Context, serviceAccount, audience string) (string, error)
 }
-
-// ServiceActivator activates service accounts for subsequent operations.
-//
-//counterfeiter:generate . ServiceActivator
-type ServiceActivator interface {
-	// ActivateServiceAccounts activates the service accounts specified
-	// by the given key file paths (comma-separated).
-	ActivateServiceAccounts(ctx context.Context, keyFilePaths string) error
-}

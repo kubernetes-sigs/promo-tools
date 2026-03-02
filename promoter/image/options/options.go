@@ -30,9 +30,6 @@ type Options struct {
 	// making any modifications.
 	Confirm bool
 
-	// Use a service account when true
-	UseServiceAcct bool
-
 	// Use only the latest diff for the manifests. Works only when running in prow.
 	UseProwManifestDiff bool
 
@@ -46,22 +43,12 @@ type Options struct {
 	// how the imagtes stored there look like to the promoter.
 	Snapshot string
 
-	// SnapshotSvcAcct is the service account we use when snapshotting.
-	// TODO(puerco): Check as we can simplify to just one account
-	SnapshotSvcAcct string
-
 	// ManifestBasedSnapshotOf performs a snapshot from the given manifests
 	// as opposed of Snapshot which will snapshot a registry across the network
 	ManifestBasedSnapshotOf string
 
-	// KeyFiles is a string that points to file of service account keys
-	KeyFiles string
-
 	// SeverityThreshold is the level of security vulns to search for.
 	SeverityThreshold int
-
-	// JSONLogSummary signals to the promoter if it should print a JSON summary of the operation
-	JSONLogSummary bool
 
 	// OutputFormat is the format we will use for snapshots json/yaml
 	OutputFormat string
@@ -82,15 +69,6 @@ type Options struct {
 	// SignerAccount is a service account that will provide the identity
 	// when signing promoted images
 	SignerAccount string
-
-	// SignerCredentials is a credentials json file to initialize the identity
-	// of the signer before running. If specified, the promoter will
-	// initialize its API client with the identity in the file and use it
-	// to request tokens of the signer account.
-	//
-	// If this credentials file is not set, the promoter will attempt to generate
-	// the OIDC tokens getting its identity from the default application credentials.
-	SignerInitCredentials string
 
 	// SignCheckReferences list of image references to check for signatures
 	SignCheckReferences []string
@@ -158,7 +136,4 @@ func (o *Options) Validate() error {
 type RunOptions struct {
 	// Confirm
 	Confirm bool
-
-	// Use a service account when true
-	UseServiceAcct bool
 }

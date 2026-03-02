@@ -37,10 +37,6 @@ func TestRegistryConfigFromContext(t *testing.T) {
 		t.Errorf("Name = %q, want %q", config.Name, rc.Name)
 	}
 
-	if config.ServiceAccount != rc.ServiceAccount {
-		t.Errorf("ServiceAccount = %q, want %q", config.ServiceAccount, rc.ServiceAccount)
-	}
-
 	if config.Src != rc.Src {
 		t.Errorf("Src = %v, want %v", config.Src, rc.Src)
 	}

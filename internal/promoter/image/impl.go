@@ -17,9 +17,7 @@ limitations under the License.
 package imagepromoter
 
 import (
-	"context"
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/google/go-containerregistry/pkg/crane"
@@ -54,9 +52,6 @@ type DefaultPromoterImplementation struct {
 	// identityTokenProvider abstracts OIDC token generation for signing.
 	identityTokenProvider auth.IdentityTokenProvider
 
-	// serviceActivator abstracts service account activation.
-	serviceActivator auth.ServiceActivator
-
 	// vulnScanner abstracts vulnerability scanning of container images.
 	vulnScanner vuln.Scanner
 }
@@ -81,11 +76,6 @@ func (di *DefaultPromoterImplementation) SetRegistryProvider(p registry.Provider
 // SetIdentityTokenProvider sets the OIDC token provider for signing.
 func (di *DefaultPromoterImplementation) SetIdentityTokenProvider(p auth.IdentityTokenProvider) {
 	di.identityTokenProvider = p
-}
-
-// SetServiceActivator sets the service account activator.
-func (di *DefaultPromoterImplementation) SetServiceActivator(a auth.ServiceActivator) {
-	di.serviceActivator = a
 }
 
 // SetVulnScanner sets the vulnerability scanner.
@@ -124,19 +114,6 @@ func (di *DefaultPromoterImplementation) ValidateOptions(opts *options.Options) 
 		if opts.Manifest == "" && opts.ThinManifestDir == "" {
 			return errors.New("either a manifest or a thin manifest dir have to be set")
 		}
-	}
-
-	return nil
-}
-
-// ActivateServiceAccounts gets key files and activates service accounts.
-func (di *DefaultPromoterImplementation) ActivateServiceAccounts(opts *options.Options) error {
-	if !opts.UseServiceAcct {
-		logrus.Warn("Not setting a service account")
-	}
-
-	if err := di.serviceActivator.ActivateServiceAccounts(context.Background(), opts.KeyFiles); err != nil {
-		return fmt.Errorf("activating service accounts: %w", err)
 	}
 
 	return nil

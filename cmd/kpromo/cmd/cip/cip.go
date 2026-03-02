@@ -94,25 +94,10 @@ the 'images: ...' contents`,
 	)
 
 	CipCmd.PersistentFlags().BoolVar(
-		&runOpts.JSONLogSummary,
-		"json-log-summary",
-		runOpts.JSONLogSummary,
-		"only log a JSON summary of important errors",
-	)
-
-	CipCmd.PersistentFlags().BoolVar(
 		&runOpts.ParseOnly,
 		"parse-only",
 		runOpts.ParseOnly,
 		"only check that the given manifest file is parsable as a Manifest",
-	)
-
-	CipCmd.PersistentFlags().StringVar(
-		&runOpts.KeyFiles,
-		"key-files",
-		runOpts.KeyFiles,
-		`CSV of service account key files that must be activated for the
-promotion (<json-key-file-path>,...)`,
 	)
 
 	CipCmd.PersistentFlags().StringVar(
@@ -153,16 +138,6 @@ format of the snapshot (allowed values: %q)`,
 	)
 
 	CipCmd.PersistentFlags().StringVar(
-		&runOpts.SnapshotSvcAcct,
-		"snapshot-service-account",
-		runOpts.SnapshotSvcAcct,
-		fmt.Sprintf(
-			"service account to use for '--%s'",
-			snapshotFlag,
-		),
-	)
-
-	CipCmd.PersistentFlags().StringVar(
 		&runOpts.ManifestBasedSnapshotOf,
 		manifestBasedSnapshotOfFlag,
 		runOpts.ManifestBasedSnapshotOf,
@@ -174,13 +149,6 @@ network from a registry, it reads from the local manifests only`,
 			thinManifestDirFlag,
 			snapshotFlag,
 		),
-	)
-
-	CipCmd.PersistentFlags().BoolVar(
-		&runOpts.UseServiceAcct,
-		"use-service-account",
-		runOpts.UseServiceAcct,
-		"pass '--account=...' to all gcloud calls",
 	)
 
 	// This flag does nothing, but we don't want to remove it in case it breaks someone.
