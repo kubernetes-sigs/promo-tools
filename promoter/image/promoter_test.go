@@ -60,13 +60,6 @@ func TestPromoteImages(t *testing.T) {
 			},
 		},
 		{
-			// ActivateServiceAccounts fails
-			shouldErr: true,
-			prepare: func(fpi *imagefakes.FakePromoterImplementation) {
-				fpi.ActivateServiceAccountsReturns(testErr)
-			},
-		},
-		{
 			// PrewarmTUFCache fails
 			shouldErr: true,
 			prepare: func(fpi *imagefakes.FakePromoterImplementation) {
@@ -268,13 +261,6 @@ func TestReplicateSignatures(t *testing.T) {
 			msg:       "ValidateOptions fails",
 			prepare: func(fpi *imagefakes.FakePromoterImplementation) {
 				fpi.ValidateOptionsReturns(testErr)
-			},
-		},
-		{
-			shouldErr: true,
-			msg:       "ActivateServiceAccounts fails",
-			prepare: func(fpi *imagefakes.FakePromoterImplementation) {
-				fpi.ActivateServiceAccountsReturns(testErr)
 			},
 		},
 		{

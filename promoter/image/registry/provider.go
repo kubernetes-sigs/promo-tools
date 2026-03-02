@@ -47,9 +47,6 @@ type RegistryConfig struct {
 	// Name is the registry URL (e.g., "us-docker.pkg.dev/k8s-artifacts-prod/images").
 	Name image.Registry
 
-	// ServiceAccount is the service account used for authentication.
-	ServiceAccount string
-
 	// Src marks this registry as a source (staging) registry.
 	Src bool
 }
@@ -57,9 +54,8 @@ type RegistryConfig struct {
 // RegistryConfigFromContext converts a legacy registry.Context to a RegistryConfig.
 func RegistryConfigFromContext(rc Context) RegistryConfig {
 	return RegistryConfig{
-		Name:           rc.Name,
-		ServiceAccount: rc.ServiceAccount,
-		Src:            rc.Src,
+		Name: rc.Name,
+		Src:  rc.Src,
 	}
 }
 

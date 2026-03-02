@@ -20,47 +20,17 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
 	"sort"
 	"testing"
 
 	"github.com/google/go-containerregistry/pkg/v1/remote/transport"
 	"github.com/stretchr/testify/require"
-	"sigs.k8s.io/release-utils/env"
 
-	options "sigs.k8s.io/promo-tools/v4/promoter/image/options"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/promotion"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/ratelimit"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/registry"
 	"sigs.k8s.io/promo-tools/v4/types/image"
 )
-
-// TestGetIdentityToken tests the identity token generation logic. By default
-// it will test using the testSigningAccount defined in sign.go. For local testing
-// purposes you can override the target account with another one setting
-// TEST_SERVICE_ACCOUNT and accessing it with an identity set in a credentials
-// file in CIP_E2E_KEY_FILE.
-func TestGetIdentityToken(t *testing.T) {
-	// This unit needs a valid credentials to run
-	if os.Getenv("CIP_E2E_KEY_FILE") == "" {
-		return
-	}
-
-	opts := &options.Options{
-		SignerInitCredentials: os.Getenv("CIP_E2E_KEY_FILE"),
-	}
-
-	di := DefaultPromoterImplementation{}
-	_, err := di.GetIdentityToken(opts, "fakeAccount@iam.project..")
-	require.Error(t, err)
-
-	tok, err := di.GetIdentityToken(
-		opts, env.Default("TEST_SERVICE_ACCOUNT", TestSigningAccount),
-	)
-
-	require.NoError(t, err)
-	require.NotEmpty(t, tok)
-}
 
 func TestDigestToSignatureTag(t *testing.T) {
 	t.Parallel()

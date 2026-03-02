@@ -60,10 +60,7 @@ func New(opts *options.Options) *Promoter {
 	di.SetRegistryProvider(registry.NewCraneProvider(
 		registry.WithTransport(rt),
 	))
-	di.SetServiceActivator(&auth.GCPServiceActivator{})
-	di.SetIdentityTokenProvider(&auth.GCPIdentityTokenProvider{
-		CredentialsFile: opts.SignerInitCredentials,
-	})
+	di.SetIdentityTokenProvider(&auth.GCPIdentityTokenProvider{})
 	di.SetVulnScanner(&vuln.GrafeasScanner{FixableOnly: true})
 
 	p := &Promoter{
@@ -102,7 +99,6 @@ func (p *Promoter) SetProvenanceGenerator(g provenance.Generator) {
 type promoterImplementation interface {
 	// General methods common to all modes of the promoter
 	ValidateOptions(*options.Options) error
-	ActivateServiceAccounts(*options.Options) error
 
 	// Methods for promotion mode:
 	ParseManifests(*options.Options) ([]schema.Manifest, error)
@@ -150,14 +146,10 @@ func (p *Promoter) PromoteImages(ctx context.Context, opts *options.Options) err
 
 	pipe := pipeline.New()
 
-	// Setup phase: validate, activate accounts, prewarm caches.
+	// Setup phase: validate and prewarm caches.
 	pipe.AddPhase(pipeline.NewPhase("setup", func(_ context.Context) error {
 		if err := p.impl.ValidateOptions(opts); err != nil {
 			return fmt.Errorf("validating options: %w", err)
-		}
-
-		if err := p.impl.ActivateServiceAccounts(opts); err != nil {
-			return fmt.Errorf("activating service accounts: %w", err)
 		}
 
 		if err := p.impl.PrewarmTUFCache(); err != nil {
@@ -278,10 +270,6 @@ func (p *Promoter) Snapshot(opts *options.Options) error {
 		return fmt.Errorf("validating options: %w", err)
 	}
 
-	if err := p.impl.ActivateServiceAccounts(opts); err != nil {
-		return fmt.Errorf("activating service accounts: %w", err)
-	}
-
 	p.impl.PrintVersion()
 
 	mfests, err := p.impl.GetSnapshotManifests(opts)
@@ -312,10 +300,6 @@ func (p *Promoter) Snapshot(opts *options.Options) error {
 func (p *Promoter) SecurityScan(opts *options.Options) error {
 	if err := p.impl.ValidateOptions(opts); err != nil {
 		return fmt.Errorf("validating options: %w", err)
-	}
-
-	if err := p.impl.ActivateServiceAccounts(opts); err != nil {
-		return fmt.Errorf("activating service accounts: %w", err)
 	}
 
 	mfests, err := p.impl.ParseManifests(opts)
@@ -397,14 +381,10 @@ func (p *Promoter) ReplicateSignatures(ctx context.Context, opts *options.Option
 
 	pipe := pipeline.New()
 
-	// Setup phase: validate, activate accounts, prewarm caches.
+	// Setup phase: validate and prewarm caches.
 	pipe.AddPhase(pipeline.NewPhase("setup", func(_ context.Context) error {
 		if err := p.impl.ValidateOptions(opts); err != nil {
 			return fmt.Errorf("validating options: %w", err)
-		}
-
-		if err := p.impl.ActivateServiceAccounts(opts); err != nil {
-			return fmt.Errorf("activating service accounts: %w", err)
 		}
 
 		if err := p.impl.PrewarmTUFCache(); err != nil {

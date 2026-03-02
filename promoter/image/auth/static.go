@@ -38,19 +38,3 @@ func (s *StaticIdentityTokenProvider) GetIdentityToken(_ context.Context, _, _ s
 
 	return s.Token, nil
 }
-
-// NoopServiceActivator implements ServiceActivator as a no-op.
-// Useful for testing or environments that don't need service account activation.
-type NoopServiceActivator struct {
-	// Err is returned for all ActivateServiceAccounts calls if non-nil.
-	Err error
-}
-
-// ActivateServiceAccounts is a no-op.
-func (n *NoopServiceActivator) ActivateServiceAccounts(_ context.Context, _ string) error {
-	if n.Err != nil {
-		return fmt.Errorf("noop activator error: %w", n.Err)
-	}
-
-	return nil
-}

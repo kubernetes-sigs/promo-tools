@@ -29,17 +29,6 @@ import (
 )
 
 type FakePromoterImplementation struct {
-	ActivateServiceAccountsStub        func(*imagepromotera.Options) error
-	activateServiceAccountsMutex       sync.RWMutex
-	activateServiceAccountsArgsForCall []struct {
-		arg1 *imagepromotera.Options
-	}
-	activateServiceAccountsReturns struct {
-		result1 error
-	}
-	activateServiceAccountsReturnsOnCall map[int]struct {
-		result1 error
-	}
 	AppendManifestToSnapshotStub        func(*imagepromotera.Options, []schema.Manifest) ([]schema.Manifest, error)
 	appendManifestToSnapshotMutex       sync.RWMutex
 	appendManifestToSnapshotArgsForCall []struct {
@@ -314,67 +303,6 @@ type FakePromoterImplementation struct {
 	}
 	invocations      map[string][][]interface{}
 	invocationsMutex sync.RWMutex
-}
-
-func (fake *FakePromoterImplementation) ActivateServiceAccounts(arg1 *imagepromotera.Options) error {
-	fake.activateServiceAccountsMutex.Lock()
-	ret, specificReturn := fake.activateServiceAccountsReturnsOnCall[len(fake.activateServiceAccountsArgsForCall)]
-	fake.activateServiceAccountsArgsForCall = append(fake.activateServiceAccountsArgsForCall, struct {
-		arg1 *imagepromotera.Options
-	}{arg1})
-	stub := fake.ActivateServiceAccountsStub
-	fakeReturns := fake.activateServiceAccountsReturns
-	fake.recordInvocation("ActivateServiceAccounts", []interface{}{arg1})
-	fake.activateServiceAccountsMutex.Unlock()
-	if stub != nil {
-		return stub(arg1)
-	}
-	if specificReturn {
-		return ret.result1
-	}
-	return fakeReturns.result1
-}
-
-func (fake *FakePromoterImplementation) ActivateServiceAccountsCallCount() int {
-	fake.activateServiceAccountsMutex.RLock()
-	defer fake.activateServiceAccountsMutex.RUnlock()
-	return len(fake.activateServiceAccountsArgsForCall)
-}
-
-func (fake *FakePromoterImplementation) ActivateServiceAccountsCalls(stub func(*imagepromotera.Options) error) {
-	fake.activateServiceAccountsMutex.Lock()
-	defer fake.activateServiceAccountsMutex.Unlock()
-	fake.ActivateServiceAccountsStub = stub
-}
-
-func (fake *FakePromoterImplementation) ActivateServiceAccountsArgsForCall(i int) *imagepromotera.Options {
-	fake.activateServiceAccountsMutex.RLock()
-	defer fake.activateServiceAccountsMutex.RUnlock()
-	argsForCall := fake.activateServiceAccountsArgsForCall[i]
-	return argsForCall.arg1
-}
-
-func (fake *FakePromoterImplementation) ActivateServiceAccountsReturns(result1 error) {
-	fake.activateServiceAccountsMutex.Lock()
-	defer fake.activateServiceAccountsMutex.Unlock()
-	fake.ActivateServiceAccountsStub = nil
-	fake.activateServiceAccountsReturns = struct {
-		result1 error
-	}{result1}
-}
-
-func (fake *FakePromoterImplementation) ActivateServiceAccountsReturnsOnCall(i int, result1 error) {
-	fake.activateServiceAccountsMutex.Lock()
-	defer fake.activateServiceAccountsMutex.Unlock()
-	fake.ActivateServiceAccountsStub = nil
-	if fake.activateServiceAccountsReturnsOnCall == nil {
-		fake.activateServiceAccountsReturnsOnCall = make(map[int]struct {
-			result1 error
-		})
-	}
-	fake.activateServiceAccountsReturnsOnCall[i] = struct {
-		result1 error
-	}{result1}
 }
 
 func (fake *FakePromoterImplementation) AppendManifestToSnapshot(arg1 *imagepromotera.Options, arg2 []schema.Manifest) ([]schema.Manifest, error) {

@@ -44,26 +44,5 @@ func TestStaticIdentityTokenProviderError(t *testing.T) {
 	}
 }
 
-func TestNoopServiceActivator(t *testing.T) {
-	a := &NoopServiceActivator{}
-
-	err := a.ActivateServiceAccounts(context.Background(), "/path/to/key.json")
-	if err != nil {
-		t.Fatalf("ActivateServiceAccounts() error = %v", err)
-	}
-}
-
-func TestNoopServiceActivatorError(t *testing.T) {
-	a := &NoopServiceActivator{Err: errors.New("denied")}
-
-	err := a.ActivateServiceAccounts(context.Background(), "/path/to/key.json")
-	if err == nil {
-		t.Fatal("expected error")
-	}
-}
-
 // Verify interface compliance at compile time.
-var (
-	_ IdentityTokenProvider = &StaticIdentityTokenProvider{}
-	_ ServiceActivator      = &NoopServiceActivator{}
-)
+var _ IdentityTokenProvider = &StaticIdentityTokenProvider{}
