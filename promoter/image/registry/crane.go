@@ -159,6 +159,8 @@ func (p *CraneProvider) ReadRegistries(
 }
 
 // CopyImage copies a container image from src to dst using crane.
+// No per-request timeout is applied here because promoted images can
+// have large layers whose transfer time is unpredictable.
 func (p *CraneProvider) CopyImage(_ context.Context, src, dst string) error {
 	opts := []crane.Option{
 		crane.WithAuthFromKeychain(gcrane.Keychain),

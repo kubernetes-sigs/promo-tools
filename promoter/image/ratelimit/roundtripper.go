@@ -50,6 +50,15 @@ const (
 	// during read-only listing phases.
 	ListingConcurrency = 80
 
+	// ListTagsTimeout is the per-repository timeout for tag listing.
+	// A single stalled request without a deadline can block the entire
+	// replication pipeline, so every crane.ListTags call should use a
+	// context with this timeout.
+	ListTagsTimeout = 2 * time.Minute
+
+	// CopyTimeout is the per-image timeout for crane.Copy operations.
+	CopyTimeout = 5 * time.Minute
+
 	// backoffDuration is how long to pause after receiving a 429 response.
 	backoffDuration = 10 * time.Second
 

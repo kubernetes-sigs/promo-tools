@@ -216,12 +216,16 @@ func (di *DefaultPromoterImplementation) ReplicateSignatures(
 		return nil
 	}
 
+	logrus.Infof("Grouping %d edges by identity and digest", len(edges))
+
 	multiGroups := collectMultiRegistryGroups(edges)
 	if len(multiGroups) == 0 {
 		logrus.Info("No multi-registry groups to replicate")
 
 		return nil
 	}
+
+	logrus.Infof("Found %d multi-registry groups, computing copies", len(multiGroups))
 
 	copies, err := di.computeCopiesFromInventory(multiGroups)
 	if err != nil {
@@ -576,7 +580,7 @@ func (di *DefaultPromoterImplementation) copyAttachedObjects(edge *promotion.Edg
 	logrus.Infof("Signature pre copy: %s to %s", srcRefString, dstRefString)
 
 	if err := ratelimit.WithRetry(func() error {
-		return crane.Copy(srcRef.String(), dstRef.String(), di.craneOptions()...)
+		return craneCopyWithTimeout(srcRef.String(), dstRef.String(), ratelimit.CopyTimeout, di.craneOptions())
 	}); err != nil {
 		// If the signature layer does not exist it means that the src image
 		// is not signed, so we catch the error and return nil
@@ -604,7 +608,7 @@ func digestToSignatureTag(dg image.Digest) string {
 // copyWithRetry performs a crane.Copy with retries on transient errors.
 func (di *DefaultPromoterImplementation) copyWithRetry(src, dst string, opts []crane.Option) error {
 	if err := ratelimit.WithRetry(func() error {
-		return crane.Copy(src, dst, opts...)
+		return craneCopyWithTimeout(src, dst, ratelimit.CopyTimeout, opts)
 	}); err != nil {
 		return fmt.Errorf("copying %s to %s: %w", src, dst, err)
 	}
@@ -618,9 +622,13 @@ func (di *DefaultPromoterImplementation) listTagsWithRetry(repo string) ([]strin
 	var tags []string
 
 	if err := ratelimit.WithRetry(func() error {
+		ctx, cancel := context.WithTimeout(context.Background(), ratelimit.ListTagsTimeout)
+		defer cancel()
+
 		var err error
 
-		tags, err = crane.ListTags(repo, di.craneOptions()...)
+		tags, err = crane.ListTags(repo,
+			append(di.craneOptions(), crane.WithContext(ctx))...)
 		if err != nil {
 			return fmt.Errorf("listing tags for %s: %w", repo, err)
 		}
@@ -693,7 +701,7 @@ func (di *DefaultPromoterImplementation) copySBOM(edge *promotion.Edge) error {
 	logrus.Infof("SBOM copy: %s to %s", srcRefString, dstRefString)
 
 	if err := ratelimit.WithRetry(func() error {
-		return crane.Copy(srcRefString, dstRefString, di.craneOptions()...)
+		return craneCopyWithTimeout(srcRefString, dstRefString, ratelimit.CopyTimeout, di.craneOptions())
 	}); err != nil {
 		// If the SBOM does not exist in staging, skip silently
 		var terr *transport.Error
@@ -801,7 +809,12 @@ func (di *DefaultPromoterImplementation) pushAttestation(
 	}
 
 	// Check if attestation already exists (idempotent)
-	if _, err := remote.Head(ref, di.remoteOptions()...); err == nil {
+	headCtx, headCancel := context.WithTimeout(ctx, ratelimit.ListTagsTimeout)
+	defer headCancel()
+
+	if _, err := remote.Head(ref,
+		append(di.remoteOptions(), remote.WithContext(headCtx))...,
+	); err == nil {
 		logrus.Debugf("Attestation %s already exists, skipping", dstRefString)
 
 		return nil
@@ -822,7 +835,12 @@ func (di *DefaultPromoterImplementation) pushAttestation(
 	logrus.Infof("Provenance attestation: pushing %s", dstRefString)
 
 	if err := ratelimit.WithRetry(func() error {
-		return remote.Write(ref, img, di.remoteOptions()...)
+		writeCtx, writeCancel := context.WithTimeout(ctx, ratelimit.CopyTimeout)
+		defer writeCancel()
+
+		return remote.Write(ref, img,
+			append(di.remoteOptions(), remote.WithContext(writeCtx))...,
+		)
 	}); err != nil {
 		return fmt.Errorf("pushing attestation %s: %w", dstRefString, err)
 	}
@@ -834,6 +852,20 @@ func (di *DefaultPromoterImplementation) pushAttestation(
 // its attestation can be found.
 func digestToAttestationTag(dg image.Digest) string {
 	return strings.ReplaceAll(string(dg), "sha256:", "sha256-") + attestationTagSuffix
+}
+
+// craneCopyWithTimeout wraps crane.Copy with a per-request context timeout.
+// It copies the opts slice to avoid mutating the caller's backing array.
+func craneCopyWithTimeout(src, dst string, timeout time.Duration, opts []crane.Option) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	withCtx := make([]crane.Option, len(opts), len(opts)+1)
+	copy(withCtx, opts)
+	withCtx = append(withCtx, crane.WithContext(ctx))
+
+	//nolint:wrapcheck // callers add their own context-specific wrapping
+	return crane.Copy(src, dst, withCtx...)
 }
 
 // PrewarmTUFCache initializes the TUF cache so that threads do not have to compete
