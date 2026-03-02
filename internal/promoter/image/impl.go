@@ -24,6 +24,7 @@ import (
 
 	"github.com/google/go-containerregistry/pkg/crane"
 	"github.com/google/go-containerregistry/pkg/gcrane"
+	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/sirupsen/logrus"
 	"sigs.k8s.io/release-sdk/sign"
 	"sigs.k8s.io/release-utils/version"
@@ -48,6 +49,12 @@ type DefaultPromoterImplementation struct {
 	// transport is the rate-limited HTTP transport shared by all phases.
 	transport *ratelimit.RoundTripper
 
+	// puller reuses HTTP auth/transport state across pull operations.
+	puller *remote.Puller
+
+	// pusher reuses HTTP auth/transport state across push operations.
+	pusher *remote.Pusher
+
 	// registryProvider abstracts registry operations (read inventory, copy images).
 	registryProvider registry.Provider
 
@@ -68,9 +75,11 @@ func NewDefaultPromoterImplementation(opts *options.Options) *DefaultPromoterImp
 	}
 }
 
-// SetTransport sets the rate-limited HTTP transport for all phases.
+// SetTransport sets the rate-limited HTTP transport for all phases
+// and initializes the shared puller/pusher for connection reuse.
 func (di *DefaultPromoterImplementation) SetTransport(rt *ratelimit.RoundTripper) {
 	di.transport = rt
+	di.initRemote()
 }
 
 // SetRegistryProvider sets the registry provider for image operations.
@@ -161,15 +170,75 @@ func (di *DefaultPromoterImplementation) getTransport() *ratelimit.RoundTripper 
 	return di.transport
 }
 
+// initRemote creates a shared puller and pusher that reuse HTTP
+// auth/transport state across OCI operations.
+func (di *DefaultPromoterImplementation) initRemote() {
+	remoteOpts := di.remoteOptions()
+
+	if p, err := remote.NewPuller(remoteOpts...); err == nil {
+		di.puller = p
+	} else {
+		logrus.Warnf("Failed to create shared puller: %v", err)
+	}
+
+	if p, err := remote.NewPusher(remoteOpts...); err == nil {
+		di.pusher = p
+	} else {
+		logrus.Warnf("Failed to create shared pusher: %v", err)
+	}
+}
+
+// remoteOptions returns common remote options for OCI operations,
+// including authentication, user-agent, transport, and reuse of
+// puller/pusher state when available.
+func (di *DefaultPromoterImplementation) remoteOptions() []remote.Option {
+	opts := []remote.Option{
+		remote.WithAuthFromKeychain(gcrane.Keychain),
+		remote.WithUserAgent(image.UserAgent),
+	}
+
+	if di.transport != nil {
+		opts = append(opts, remote.WithTransport(di.transport))
+	}
+
+	if di.puller != nil {
+		opts = append(opts, remote.Reuse(di.puller))
+	}
+
+	if di.pusher != nil {
+		opts = append(opts, remote.Reuse(di.pusher))
+	}
+
+	return opts
+}
+
 // craneOptions returns common crane options for registry operations,
-// including authentication and rate-limited transport.
+// including authentication, rate-limited transport, and reuse of
+// puller/pusher state when available.
 func (di *DefaultPromoterImplementation) craneOptions() []crane.Option {
 	opts := []crane.Option{
 		crane.WithAuthFromKeychain(gcrane.Keychain),
 		crane.WithUserAgent(image.UserAgent),
 	}
+
 	if di.transport != nil {
 		opts = append(opts, crane.WithTransport(di.transport))
+	}
+
+	if di.puller != nil || di.pusher != nil {
+		var remoteOpts []remote.Option
+
+		if di.puller != nil {
+			remoteOpts = append(remoteOpts, remote.Reuse(di.puller))
+		}
+
+		if di.pusher != nil {
+			remoteOpts = append(remoteOpts, remote.Reuse(di.pusher))
+		}
+
+		opts = append(opts, func(o *crane.Options) {
+			o.Remote = append(o.Remote, remoteOpts...)
+		})
 	}
 
 	return opts
