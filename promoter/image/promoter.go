@@ -20,6 +20,7 @@ package imagepromoter
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/sirupsen/logrus"
@@ -68,10 +69,13 @@ func New(opts *options.Options) *Promoter {
 	p := &Promoter{
 		Options: opts,
 		impl:    di,
-	}
-
-	if opts.GeneratePromotionProvenance {
-		p.provenanceGenerator = &provenance.PromotionGenerator{}
+		provenanceVerifier: &provenance.CosignVerifier{
+			CertIdentity:         opts.SignCheckIdentity,
+			CertIdentityRegexp:   opts.SignCheckIdentityRegexp,
+			CertOidcIssuer:       opts.SignCheckIssuer,
+			CertOidcIssuerRegexp: opts.SignCheckIssuerRegexp,
+		},
+		provenanceGenerator: &provenance.PromotionGenerator{},
 	}
 
 	return p
@@ -188,17 +192,11 @@ func (p *Promoter) PromoteImages(ctx context.Context, opts *options.Options) err
 		return nil
 	}))
 
-	// Provenance phase: verify image provenance (optional).
+	// Provenance phase: verify image provenance (verify-if-present).
 	pipe.AddPhase(pipeline.NewPhase("provenance", func(ctx context.Context) error {
-		if !opts.RequireProvenance {
-			logrus.Debug("Provenance verification disabled (--require-provenance=false)")
-
-			return nil
-		}
-
 		verifier := p.provenanceVerifier
 		if verifier == nil {
-			verifier = &provenance.NoopVerifier{}
+			return errors.New("provenance verifier not configured")
 		}
 
 		for edge := range promotionEdges {
@@ -260,10 +258,8 @@ func (p *Promoter) PromoteImages(ctx context.Context, opts *options.Options) err
 			return fmt.Errorf("writing SBOMs: %w", err)
 		}
 
-		if opts.GeneratePromotionProvenance && p.provenanceGenerator != nil {
-			if err := p.impl.WriteProvenanceAttestations(opts, promotionEdges, p.provenanceGenerator); err != nil {
-				return fmt.Errorf("writing provenance attestations: %w", err)
-			}
+		if err := p.impl.WriteProvenanceAttestations(opts, promotionEdges, p.provenanceGenerator); err != nil {
+			return fmt.Errorf("writing provenance attestations: %w", err)
 		}
 
 		return nil

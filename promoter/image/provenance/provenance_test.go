@@ -17,24 +17,10 @@ limitations under the License.
 package provenance
 
 import (
-	"context"
 	"testing"
 
 	"sigs.k8s.io/promo-tools/v4/types/image"
 )
-
-func TestNoopVerifier(t *testing.T) {
-	v := &NoopVerifier{}
-
-	result, err := v.Verify(context.Background(), "gcr.io/test/image@sha256:abc")
-	if err != nil {
-		t.Fatalf("Verify() error = %v", err)
-	}
-
-	if !result.Verified {
-		t.Error("NoopVerifier should always return Verified=true")
-	}
-}
 
 func TestDigestToAttestationTag(t *testing.T) {
 	tests := []struct {
@@ -60,7 +46,4 @@ func TestDigestToAttestationTag(t *testing.T) {
 }
 
 // Verify interface compliance at compile time.
-var (
-	_ Verifier = &NoopVerifier{}
-	_ Verifier = &CosignVerifier{}
-)
+var _ Verifier = &CosignVerifier{}

@@ -34,6 +34,11 @@ import (
 
 func TestPromoteImages(t *testing.T) {
 	sut := imagepromoter.Promoter{}
+	sut.SetProvenanceGenerator(&provenance.PromotionGenerator{})
+	sut.SetProvenanceVerifier(&fakeVerifier{
+		result: &provenance.Result{Verified: true},
+	})
+
 	testErr := errors.New("synthetic error")
 
 	for _, tc := range []struct {
@@ -111,6 +116,14 @@ func TestPromoteImages(t *testing.T) {
 				fpi.WriteSBOMsReturns(testErr)
 			},
 		},
+		{
+			// WriteProvenanceAttestations fails
+			shouldErr: true,
+			msg:       "WriteProvenanceAttestations fails",
+			prepare: func(fpi *imagefakes.FakePromoterImplementation) {
+				fpi.WriteProvenanceAttestationsReturns(testErr)
+			},
+		},
 	} {
 		mock := imagefakes.FakePromoterImplementation{}
 		tc.prepare(&mock)
@@ -143,6 +156,9 @@ func TestPromoteImagesNonConfirm(t *testing.T) {
 	sut := imagepromoter.Promoter{}
 	mock := imagefakes.FakePromoterImplementation{}
 	sut.SetImplementation(&mock)
+	sut.SetProvenanceVerifier(&fakeVerifier{
+		result: &provenance.Result{Verified: true},
+	})
 
 	// non-Confirm should stop after validate phase
 	opts := &options.Options{Confirm: false}
@@ -154,24 +170,20 @@ func TestPromoteImagesNonConfirm(t *testing.T) {
 	require.Equal(t, 0, mock.PromoteImagesCallCount())
 }
 
-func TestPromoteImagesProvenanceDisabled(t *testing.T) {
+func TestPromoteImagesProvenanceAlwaysRuns(t *testing.T) {
 	sut := imagepromoter.Promoter{}
 	mock := imagefakes.FakePromoterImplementation{}
+	mock.GetPromotionEdgesReturns(map[promotion.Edge]any{
+		testEdge(): nil,
+	}, nil)
 	sut.SetImplementation(&mock)
 
-	// Provenance disabled (default): should proceed without calling verifier
-	opts := &options.Options{Confirm: true, RequireProvenance: false}
-	require.NoError(t, sut.PromoteImages(context.Background(), opts))
-}
+	// Set a verifier that returns success
+	sut.SetProvenanceVerifier(&fakeVerifier{
+		result: &provenance.Result{Verified: true},
+	})
 
-func TestPromoteImagesProvenanceEnabled(t *testing.T) {
-	sut := imagepromoter.Promoter{}
-	mock := imagefakes.FakePromoterImplementation{}
-	sut.SetImplementation(&mock)
-
-	// When provenance is required but no verifier is set, the noop verifier
-	// is used (always passes).
-	opts := &options.Options{Confirm: true, RequireProvenance: true}
+	opts := &options.Options{Confirm: true}
 	require.NoError(t, sut.PromoteImages(context.Background(), opts))
 }
 
@@ -211,11 +223,11 @@ func TestPromoteImagesProvenanceFails(t *testing.T) {
 	sut.SetProvenanceVerifier(&fakeVerifier{
 		result: &provenance.Result{
 			Verified: false,
-			Errors:   []string{"no attestation found"},
+			Errors:   []string{"attestation verification failed"},
 		},
 	})
 
-	opts := &options.Options{Confirm: true, RequireProvenance: true}
+	opts := &options.Options{Confirm: true}
 	require.Error(t, sut.PromoteImages(context.Background(), opts))
 
 	// Promotion should not have been called
@@ -234,7 +246,7 @@ func TestPromoteImagesProvenanceVerifierError(t *testing.T) {
 		err: errors.New("connection refused"),
 	})
 
-	opts := &options.Options{Confirm: true, RequireProvenance: true}
+	opts := &options.Options{Confirm: true}
 	require.Error(t, sut.PromoteImages(context.Background(), opts))
 }
 
@@ -330,4 +342,12 @@ func TestNewPromoter(t *testing.T) {
 	p := imagepromoter.New(options.DefaultOptions)
 	require.NotNil(t, p)
 	require.NotNil(t, p.Options)
+
+	// Verify that a promoter created via New() has the verifier and
+	// generator configured by running a full pipeline with a mock impl.
+	mock := imagefakes.FakePromoterImplementation{}
+	p.SetImplementation(&mock)
+
+	require.NoError(t, p.PromoteImages(context.Background(), &options.Options{Confirm: true}))
+	require.Equal(t, 1, mock.WriteProvenanceAttestationsCallCount())
 }

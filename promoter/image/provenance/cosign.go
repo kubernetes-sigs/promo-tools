@@ -27,6 +27,7 @@ import (
 	"github.com/google/go-containerregistry/pkg/gcrane"
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1/remote/transport"
+	cosignverify "github.com/sigstore/cosign/v2/cmd/cosign/cli/verify"
 	"github.com/sirupsen/logrus"
 
 	"sigs.k8s.io/promo-tools/v4/types/image"
@@ -34,22 +35,32 @@ import (
 
 const attestationTagSuffix = ".att"
 
-// CosignVerifier checks for the existence of SLSA attestations
-// attached to container images using the cosign attestation tag convention.
+// CosignVerifier verifies SLSA attestations attached to container images
+// using the cosign attestation tag convention.
 //
-// Currently this only verifies that an attestation tag exists — it does
-// not inspect the attestation contents or enforce Policy.AllowedBuilders
-// / AllowedSourceRepos. Policy enforcement will be added in a follow-up.
-type CosignVerifier struct{}
+// It uses verify-if-present semantics: when an attestation tag exists it
+// is cryptographically verified using cosign; when no attestation is
+// found a warning is logged and the image is still allowed through.
+type CosignVerifier struct {
+	// CertIdentity is the expected certificate identity for attestation
+	// verification (e.g., "krel-trust@k8s-releng-prod.iam.gserviceaccount.com").
+	CertIdentity string
 
-// Verify checks whether the image has a SLSA attestation attached.
-// It looks for an attestation tag following the cosign convention
-// (sha256-<hash>.att).
-//
-// Note: crane.Manifest does not accept a context, so cancellation is
-// not propagated to the underlying HTTP call.
+	// CertIdentityRegexp is a regex alternative to CertIdentity.
+	CertIdentityRegexp string
+
+	// CertOidcIssuer is the expected OIDC issuer for the signing identity
+	// (e.g., "https://accounts.google.com").
+	CertOidcIssuer string
+
+	// CertOidcIssuerRegexp is a regex alternative to CertOidcIssuer.
+	CertOidcIssuerRegexp string
+}
+
+// Verify checks whether the image has a valid SLSA attestation attached.
+// It first checks for the attestation tag existence, then verifies the
+// attestation signature using cosign.
 func (v *CosignVerifier) Verify(ctx context.Context, ref string) (*Result, error) {
-	_ = ctx // crane.Manifest does not support context
 	result := &Result{}
 
 	parsedRef, err := name.ParseReference(ref)
@@ -73,18 +84,18 @@ func (v *CosignVerifier) Verify(ctx context.Context, ref string) (*Result, error
 	logrus.Debugf("Checking attestation at %s", attRef)
 
 	// Check if the attestation tag exists.
-	opts := []crane.Option{
+	craneOpts := []crane.Option{
 		crane.WithAuthFromKeychain(gcrane.Keychain),
 		crane.WithUserAgent(image.UserAgent),
 	}
 
-	_, err = crane.Manifest(attRef, opts...)
+	_, err = crane.Manifest(attRef, craneOpts...)
 	if err != nil {
 		var terr *transport.Error
 		if errors.As(err, &terr) && terr.StatusCode == http.StatusNotFound {
-			result.Verified = false
-			result.Errors = append(result.Errors,
-				"no attestation found for "+ref)
+			logrus.Warnf("No attestation found for %s, skipping verification", ref)
+
+			result.Verified = true
 
 			return result, nil
 		}
@@ -92,9 +103,30 @@ func (v *CosignVerifier) Verify(ctx context.Context, ref string) (*Result, error
 		return nil, fmt.Errorf("checking attestation for %s: %w", ref, err)
 	}
 
+	// Attestation exists — verify it cryptographically.
+	logrus.Infof("Verifying attestation for %s", ref)
+
+	cmd := cosignverify.VerifyAttestationCommand{
+		CheckClaims: true,
+		IgnoreTlog:  false,
+	}
+
+	cmd.CertIdentity = v.CertIdentity
+	cmd.CertIdentityRegexp = v.CertIdentityRegexp
+	cmd.CertOidcIssuer = v.CertOidcIssuer
+	cmd.CertOidcIssuerRegexp = v.CertOidcIssuerRegexp
+
+	if err := cmd.Exec(ctx, []string{ref}); err != nil {
+		result.Verified = false
+		result.Errors = append(result.Errors,
+			fmt.Sprintf("attestation verification failed for %s: %v", ref, err))
+
+		return result, nil
+	}
+
 	result.Verified = true
 
-	logrus.Debugf("Attestation found for %s", ref)
+	logrus.Infof("Attestation verified for %s", ref)
 
 	return result, nil
 }
