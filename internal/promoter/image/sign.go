@@ -28,7 +28,6 @@ import (
 	"time"
 
 	"github.com/google/go-containerregistry/pkg/crane"
-	"github.com/google/go-containerregistry/pkg/gcrane"
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1/empty"
 	"github.com/google/go-containerregistry/pkg/v1/mutate"
@@ -273,13 +272,7 @@ func (di *DefaultPromoterImplementation) executeCopies(
 
 	for _, c := range copies {
 		g.Go(func() error {
-			craneOpts := []crane.Option{
-				crane.WithAuthFromKeychain(gcrane.Keychain),
-				crane.WithUserAgent(image.UserAgent),
-				crane.WithTransport(di.getTransport()),
-			}
-
-			if err := di.copyWithRetry(c.src, c.dst, craneOpts); err != nil {
+			if err := di.copyWithRetry(c.src, c.dst, di.craneOptions()); err != nil {
 				var terr *transport.Error
 				if errors.As(err, &terr) && terr.StatusCode == http.StatusNotFound {
 					logrus.Debugf("Signature %s not found, skipping (%d/%d)",
@@ -518,14 +511,8 @@ func (di *DefaultPromoterImplementation) copyAttachedObjects(edge *promotion.Edg
 
 	logrus.Infof("Signature pre copy: %s to %s", srcRefString, dstRefString)
 
-	craneOpts := []crane.Option{
-		crane.WithAuthFromKeychain(gcrane.Keychain),
-		crane.WithUserAgent(image.UserAgent),
-		crane.WithTransport(di.getTransport()),
-	}
-
 	if err := ratelimit.WithRetry(func() error {
-		return crane.Copy(srcRef.String(), dstRef.String(), craneOpts...)
+		return crane.Copy(srcRef.String(), dstRef.String(), di.craneOptions()...)
 	}); err != nil {
 		// If the signature layer does not exist it means that the src image
 		// is not signed, so we catch the error and return nil
@@ -569,10 +556,7 @@ func (di *DefaultPromoterImplementation) listTagsWithRetry(repo string) ([]strin
 	if err := ratelimit.WithRetry(func() error {
 		var err error
 
-		tags, err = crane.ListTags(repo,
-			crane.WithAuthFromKeychain(gcrane.Keychain),
-			crane.WithTransport(di.getTransport()),
-		)
+		tags, err = crane.ListTags(repo, di.craneOptions()...)
 		if err != nil {
 			return fmt.Errorf("listing tags for %s: %w", repo, err)
 		}
@@ -642,16 +626,10 @@ func (di *DefaultPromoterImplementation) copySBOM(edge *promotion.Edge) error {
 		"%s/%s:%s", edge.DstRegistry.Name, edge.DstImageTag.Name, sbomTag,
 	)
 
-	craneOpts := []crane.Option{
-		crane.WithAuthFromKeychain(gcrane.Keychain),
-		crane.WithUserAgent(image.UserAgent),
-		crane.WithTransport(di.getTransport()),
-	}
-
 	logrus.Infof("SBOM copy: %s to %s", srcRefString, dstRefString)
 
 	if err := ratelimit.WithRetry(func() error {
-		return crane.Copy(srcRefString, dstRefString, craneOpts...)
+		return crane.Copy(srcRefString, dstRefString, di.craneOptions()...)
 	}); err != nil {
 		// If the SBOM does not exist in staging, skip silently
 		var terr *transport.Error
@@ -759,7 +737,7 @@ func (di *DefaultPromoterImplementation) pushAttestation(
 	}
 
 	// Check if attestation already exists (idempotent)
-	if _, err := remote.Head(ref, remote.WithAuthFromKeychain(gcrane.Keychain)); err == nil {
+	if _, err := remote.Head(ref, di.remoteOptions()...); err == nil {
 		logrus.Debugf("Attestation %s already exists, skipping", dstRefString)
 
 		return nil
@@ -780,11 +758,7 @@ func (di *DefaultPromoterImplementation) pushAttestation(
 	logrus.Infof("Provenance attestation: pushing %s", dstRefString)
 
 	if err := ratelimit.WithRetry(func() error {
-		return remote.Write(ref, img,
-			remote.WithAuthFromKeychain(gcrane.Keychain),
-			remote.WithUserAgent(image.UserAgent),
-			remote.WithTransport(di.getTransport()),
-		)
+		return remote.Write(ref, img, di.remoteOptions()...)
 	}); err != nil {
 		return fmt.Errorf("pushing attestation %s: %w", dstRefString, err)
 	}
