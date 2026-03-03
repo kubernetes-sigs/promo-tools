@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"net/http"
 	"sort"
 	"strings"
@@ -196,10 +197,10 @@ func (di *DefaultPromoterImplementation) signFirst(signOpts *sign.Options, ident
 	return nil
 }
 
-// ReplicateSignatures batch-lists tags for all image repositories across all
-// registries in a single concurrent pass, then copies only the signatures
-// that are missing from the mirrors. This is used by the standalone
-// replication pipeline where most signatures already exist.
+// ReplicateSignatures lists tags for source repositories first, then only
+// for mirror repositories of signed groups, and copies the signatures that
+// are missing from the mirrors. This is used by the standalone replication
+// pipeline where most signatures already exist.
 func (di *DefaultPromoterImplementation) ReplicateSignatures(
 	opts *options.Options, edges map[promotion.Edge]any,
 ) error {
@@ -301,33 +302,21 @@ func (di *DefaultPromoterImplementation) executeCopies(
 
 type copyItem struct{ src, dst string }
 
-// computeCopiesFromInventory batch-lists tags for all repositories across
-// source and mirrors in a single concurrent pass, then returns only the
-// copies where the source has a signature tag that the mirror is missing.
+type repoKey struct{ registry, image string }
+
+// computeCopiesFromInventory uses a two-phase tag listing strategy to
+// minimise API requests against Artifact Registry:
+//
+//  1. List tags for source repositories only (group[0] per group).
+//  2. Filter to groups whose source has a signature tag.
+//  3. List tags for mirror repositories of signed groups only.
+//
+// This avoids listing mirror repos for unsigned images (~57 % of groups in
+// practice), cutting the total number of API calls roughly in half.
 func (di *DefaultPromoterImplementation) computeCopiesFromInventory(
 	multiGroups [][]promotion.Edge,
 ) ([]copyItem, error) {
-	type repoKey struct{ registry, image string }
-
-	type tagSet = map[string]struct{}
-
-	allRepos := map[repoKey]struct{}{}
-
-	for _, group := range multiGroups {
-		for _, edge := range group {
-			key := repoKey{string(edge.DstRegistry.Name), string(edge.DstImageTag.Name)}
-			allRepos[key] = struct{}{}
-		}
-	}
-
-	totalRepos := len(allRepos)
-
-	logrus.Infof("Listing tags for %d repositories across %d groups",
-		totalRepos, len(multiGroups))
-
 	// Temporarily increase the rate limit during read-only listing.
-	// The AR quota is ~83 req/sec; we use 80 for headroom. The normal
-	// limit (50) is restored after the batch completes.
 	rt := di.getTransport()
 	rt.SetLimit(ratelimit.ListingLimit)
 	rt.SetBurst(ratelimit.ListingBurst)
@@ -337,7 +326,123 @@ func (di *DefaultPromoterImplementation) computeCopiesFromInventory(
 		rt.SetBurst(ratelimit.DefaultBurst)
 	}()
 
-	allTags := make(map[repoKey]tagSet, totalRepos)
+	// Phase 1: list tags for source repositories only.
+
+	srcRepos := map[repoKey]struct{}{}
+
+	for _, group := range multiGroups {
+		src := group[0]
+		srcRepos[repoKey{string(src.DstRegistry.Name), string(src.DstImageTag.Name)}] = struct{}{}
+	}
+
+	logrus.Infof("Phase 1: listing tags for %d source repositories", len(srcRepos))
+
+	srcTags, err := di.batchListTags(srcRepos)
+	if err != nil {
+		return nil, fmt.Errorf("listing source repositories: %w", err)
+	}
+
+	// Filter: keep only groups whose source has a signature.
+
+	type signedGroup struct {
+		group  []promotion.Edge
+		sigTag string
+	}
+
+	var signed []signedGroup
+
+	for _, group := range multiGroups {
+		src := group[0]
+		srcKey := repoKey{string(src.DstRegistry.Name), string(src.DstImageTag.Name)}
+		sigTag := digestToSignatureTag(src.Digest)
+
+		if _, ok := srcTags[srcKey][sigTag]; ok {
+			signed = append(signed, signedGroup{group, sigTag})
+		}
+	}
+
+	logrus.Infof("Signature status: %d/%d groups signed",
+		len(signed), len(multiGroups))
+
+	if len(signed) == 0 {
+		logrus.Info("No signed groups, skipping mirror listing")
+
+		return nil, nil
+	}
+
+	// Phase 2: list tags for mirror repositories of signed groups only.
+
+	mirrorRepos := map[repoKey]struct{}{}
+
+	for _, sg := range signed {
+		for _, dst := range sg.group[1:] {
+			key := repoKey{string(dst.DstRegistry.Name), string(dst.DstImageTag.Name)}
+			if _, ok := srcTags[key]; !ok {
+				mirrorRepos[key] = struct{}{}
+			}
+		}
+	}
+
+	// Build a single lookup map for all destinations.
+	allTags := make(map[repoKey]map[string]struct{}, len(srcTags)+len(mirrorRepos))
+
+	maps.Copy(allTags, srcTags)
+
+	if len(mirrorRepos) > 0 {
+		logrus.Infof("Phase 2: listing tags for %d mirror repositories", len(mirrorRepos))
+
+		mirrorTags, err := di.batchListTags(mirrorRepos)
+		if err != nil {
+			return nil, fmt.Errorf("listing mirror repositories: %w", err)
+		}
+
+		maps.Copy(allTags, mirrorTags)
+	}
+
+	// Compute copies.
+
+	var (
+		copies []copyItem
+		seen   = map[string]struct{}{}
+	)
+
+	for _, sg := range signed {
+		src := sg.group[0]
+		srcRef := fmt.Sprintf("%s/%s:%s",
+			src.DstRegistry.Name, src.DstImageTag.Name, sg.sigTag)
+
+		for _, dst := range sg.group[1:] {
+			dstRef := fmt.Sprintf("%s/%s:%s",
+				dst.DstRegistry.Name, dst.DstImageTag.Name, sg.sigTag)
+
+			if _, ok := seen[dstRef]; ok {
+				continue
+			}
+
+			seen[dstRef] = struct{}{}
+
+			dstKey := repoKey{string(dst.DstRegistry.Name), string(dst.DstImageTag.Name)}
+
+			if _, ok := allTags[dstKey][sg.sigTag]; !ok {
+				copies = append(copies, copyItem{srcRef, dstRef})
+			}
+		}
+	}
+
+	logrus.Infof("%d copies needed", len(copies))
+
+	return copies, nil
+}
+
+// batchListTags concurrently lists tags for the given repositories and
+// returns a map from repo key to the set of tags found.
+func (di *DefaultPromoterImplementation) batchListTags(
+	repos map[repoKey]struct{},
+) (map[repoKey]map[string]struct{}, error) {
+	type tagSet = map[string]struct{}
+
+	total := len(repos)
+	result := make(map[repoKey]tagSet, total)
 
 	var (
 		mu     sync.Mutex
@@ -347,7 +452,7 @@ func (di *DefaultPromoterImplementation) computeCopiesFromInventory(
 	g := new(errgroup.Group)
 	g.SetLimit(ratelimit.ListingConcurrency)
 
-	for key := range allRepos {
+	for key := range repos {
 		g.Go(func() error {
 			tags, err := di.listTagsWithRetry(
 				fmt.Sprintf("%s/%s", key.registry, key.image),
@@ -362,11 +467,11 @@ func (di *DefaultPromoterImplementation) computeCopiesFromInventory(
 			}
 
 			mu.Lock()
-			allTags[key] = set
+			result[key] = set
 			mu.Unlock()
 
 			if n := listed.Add(1); n%1000 == 0 {
-				logrus.Infof("Listed %d/%d repositories", n, totalRepos)
+				logrus.Infof("Listed %d/%d repositories", n, total)
 			}
 
 			return nil
@@ -374,53 +479,12 @@ func (di *DefaultPromoterImplementation) computeCopiesFromInventory(
 	}
 
 	if err := g.Wait(); err != nil {
-		return nil, fmt.Errorf("listing repositories: %w", err)
+		return nil, fmt.Errorf("listing tags: %w", err)
 	}
 
-	logrus.Infof("Listed %d repositories", totalRepos)
+	logrus.Infof("Listed %d repositories", total)
 
-	var (
-		copies      []copyItem
-		seen        = map[string]struct{}{}
-		signedCount int
-	)
-
-	for _, group := range multiGroups {
-		src := group[0]
-		srcKey := repoKey{string(src.DstRegistry.Name), string(src.DstImageTag.Name)}
-		sigTag := digestToSignatureTag(src.Digest)
-
-		if _, ok := allTags[srcKey][sigTag]; !ok {
-			continue
-		}
-
-		signedCount++
-
-		srcRef := fmt.Sprintf("%s/%s:%s",
-			src.DstRegistry.Name, src.DstImageTag.Name, sigTag)
-
-		for _, dst := range group[1:] {
-			dstRef := fmt.Sprintf("%s/%s:%s",
-				dst.DstRegistry.Name, dst.DstImageTag.Name, sigTag)
-
-			if _, ok := seen[dstRef]; ok {
-				continue
-			}
-
-			seen[dstRef] = struct{}{}
-
-			dstKey := repoKey{string(dst.DstRegistry.Name), string(dst.DstImageTag.Name)}
-
-			if _, ok := allTags[dstKey][sigTag]; !ok {
-				copies = append(copies, copyItem{srcRef, dstRef})
-			}
-		}
-	}
-
-	logrus.Infof("Signature status: %d/%d groups signed, %d copies needed",
-		signedCount, len(multiGroups), len(copies))
-
-	return copies, nil
+	return result, nil
 }
 
 // targetIdentity returns the production identity for a promotion edge.

@@ -584,3 +584,129 @@ func TestReplicateSignaturesBatchIdempotent(t *testing.T) {
 	_, err = remote.Head(ref, remote.WithTransport(di.getTransport()))
 	require.NoError(t, err, "signature should exist on mirror")
 }
+
+// TestReplicateSignaturesMixedSignedUnsigned verifies the two-phase listing:
+// only mirror repos for signed groups are listed, unsigned groups are skipped
+// entirely in phase 2.
+func TestReplicateSignaturesMixedSignedUnsigned(t *testing.T) {
+	t.Parallel()
+
+	host, di := newTLSTestRegistry(t)
+
+	primary := prodPath("aa-primary")
+	mirror := prodPath("bb-mirror")
+
+	// "app" has a signature, "web" does not.
+	dApp := pushTestImage(t, di, host+"/"+primary+"/app:v1.0")
+	dWeb := pushTestImage(t, di, host+"/"+primary+"/web:latest")
+
+	sigTagApp := digestToSignatureTag(image.Digest(dApp))
+	pushTestImage(t, di, fmt.Sprintf("%s/%s/app:%s", host, primary, sigTagApp))
+
+	// Push images to the mirror (no signatures).
+	pushTestImage(t, di, host+"/"+mirror+"/app:v1.0")
+	pushTestImage(t, di, host+"/"+mirror+"/web:latest")
+
+	edges := map[promotion.Edge]any{
+		makeProdEdge(host, "aa-primary", "app", "v1.0", image.Digest(dApp)):   nil,
+		makeProdEdge(host, "bb-mirror", "app", "v1.0", image.Digest(dApp)):    nil,
+		makeProdEdge(host, "aa-primary", "web", "latest", image.Digest(dWeb)): nil,
+		makeProdEdge(host, "bb-mirror", "web", "latest", image.Digest(dWeb)):  nil,
+	}
+
+	opts := &options.Options{
+		SignImages:         true,
+		MaxSignatureCopies: 10,
+	}
+
+	err := di.ReplicateSignatures(opts, edges)
+	require.NoError(t, err)
+
+	// "app" signature should be replicated to the mirror.
+	refStr := fmt.Sprintf("%s/%s/app:%s", host, mirror, sigTagApp)
+	ref, err := name.ParseReference(refStr)
+	require.NoError(t, err)
+
+	_, err = remote.Head(ref, remote.WithTransport(di.getTransport()))
+	require.NoError(t, err, "app signature should exist on mirror")
+
+	// "web" should have no signature on the mirror (none existed on primary).
+	sigTagWeb := digestToSignatureTag(image.Digest(dWeb))
+	refStr = fmt.Sprintf("%s/%s/web:%s", host, mirror, sigTagWeb)
+	ref, err = name.ParseReference(refStr)
+	require.NoError(t, err)
+
+	_, err = remote.Head(ref, remote.WithTransport(di.getTransport()))
+	require.Error(t, err, "web signature should NOT exist on mirror")
+}
+
+// TestComputeCopiesFromInventoryTwoPhase directly tests computeCopiesFromInventory
+// to verify it produces the correct copies with the two-phase listing strategy.
+func TestComputeCopiesFromInventoryTwoPhase(t *testing.T) {
+	t.Parallel()
+
+	host, di := newTLSTestRegistry(t)
+
+	primary := prodPath("aa-primary")
+	mirror1 := prodPath("bb-mirror1")
+	mirror2 := prodPath("cc-mirror2")
+
+	// Push three images: img1 and img2 are signed, img3 is not.
+	d1 := pushTestImage(t, di, host+"/"+primary+"/img1:v1")
+	d2 := pushTestImage(t, di, host+"/"+primary+"/img2:v1")
+	d3 := pushTestImage(t, di, host+"/"+primary+"/img3:v1")
+
+	sigTag1 := digestToSignatureTag(image.Digest(d1))
+	sigTag2 := digestToSignatureTag(image.Digest(d2))
+
+	pushTestImage(t, di, fmt.Sprintf("%s/%s/img1:%s", host, primary, sigTag1))
+	pushTestImage(t, di, fmt.Sprintf("%s/%s/img2:%s", host, primary, sigTag2))
+
+	// Push images to mirrors (no signatures).
+	for _, m := range []string{mirror1, mirror2} {
+		pushTestImage(t, di, host+"/"+m+"/img1:v1")
+		pushTestImage(t, di, host+"/"+m+"/img2:v1")
+		pushTestImage(t, di, host+"/"+m+"/img3:v1")
+	}
+
+	// img2 signature already exists on mirror1 (partially replicated).
+	pushTestImage(t, di, fmt.Sprintf("%s/%s/img2:%s", host, mirror1, sigTag2))
+
+	// Build edges for all three images across all three registries.
+	edges := map[promotion.Edge]any{}
+
+	for _, img := range []struct {
+		name   string
+		tag    image.Tag
+		digest image.Digest
+	}{
+		{"img1", "v1", image.Digest(d1)},
+		{"img2", "v1", image.Digest(d2)},
+		{"img3", "v1", image.Digest(d3)},
+	} {
+		for _, prefix := range []string{"aa-primary", "bb-mirror1", "cc-mirror2"} {
+			edges[makeProdEdge(host, prefix, img.name, img.tag, img.digest)] = nil
+		}
+	}
+
+	multiGroups := collectMultiRegistryGroups(edges)
+
+	copies, err := di.computeCopiesFromInventory(multiGroups)
+	require.NoError(t, err)
+
+	// Expected copies:
+	// - img1 signature → mirror1 and mirror2 (2 copies)
+	// - img2 signature → mirror2 only (mirror1 already has it) (1 copy)
+	// - img3 → no signature, no copies
+	require.Len(t, copies, 3)
+
+	// Verify the exact copy destinations.
+	dsts := make(map[string]struct{}, len(copies))
+	for _, c := range copies {
+		dsts[c.dst] = struct{}{}
+	}
+
+	require.Contains(t, dsts, fmt.Sprintf("%s/%s/img1:%s", host, mirror1, sigTag1))
+	require.Contains(t, dsts, fmt.Sprintf("%s/%s/img1:%s", host, mirror2, sigTag1))
+	require.Contains(t, dsts, fmt.Sprintf("%s/%s/img2:%s", host, mirror2, sigTag2))
+}
