@@ -7,31 +7,6 @@
 This repository contains a suite of tools responsible for artifact promotion
 in the Kubernetes project.
 
-## DISCLAIMER
-
-Before getting started, it's important to note that the tooling stored here
-is an aggregate of several efforts to improve artifact promotion, across
-multiple SIGs, subprojects, and contributors.
-
-We call that out to set the expectation that:
-
-- you may see duplicated code within the codebase
-- you may encounter multiple techniques/tools for accomplishing the same thing
-- you will encounter several TODOs
-- you will see gaps in documentation including:
-  - missing documentation
-  - example commands that may not work
-  - broken links
-
-This list is far from exhaustive.
-
-If you encounter issues, please search for existing issues/PRs in the
-repository and join the conversation.
-
-If you cannot find an existing issue, please file a detailed report, so that
-maintainers can work on it.
-
-- [DISCLAIMER](#disclaimer)
 - [`kpromo`](#kpromo)
   - [Installation](#installation)
     - [User](#user)
