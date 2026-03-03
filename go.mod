@@ -11,7 +11,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.22.4
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.96.2
 	github.com/go-git/go-git/v5 v5.17.0
-	github.com/google/go-containerregistry v0.21.1
+	github.com/google/go-containerregistry v0.21.2
 	github.com/maxbrunsfeld/counterfeiter/v6 v6.12.1
 	github.com/sigstore/cosign/v2 v2.6.2
 	github.com/sigstore/sigstore v1.10.4
