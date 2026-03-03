@@ -39,6 +39,7 @@ import (
 	"github.com/sigstore/sigstore/pkg/tuf"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	"sigs.k8s.io/release-sdk/sign"
 	"sigs.k8s.io/release-utils/version"
 
@@ -714,8 +715,8 @@ func (di *DefaultPromoterImplementation) WriteProvenanceAttestations(
 			SrcRef:    edge.SrcReference(),
 			DstRef:    edge.DstReference(),
 			Digest:    string(edge.Digest),
-			Timestamp: now,
-			BuilderID: builderID,
+			Timestamp: timestamppb.New(now),
+			BuilderId: builderID,
 		}
 
 		g.Go(func() error {
