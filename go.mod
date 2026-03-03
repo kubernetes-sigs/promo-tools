@@ -12,6 +12,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.96.3
 	github.com/go-git/go-git/v5 v5.17.0
 	github.com/google/go-containerregistry v0.21.2
+	github.com/in-toto/attestation v1.1.2
 	github.com/maxbrunsfeld/counterfeiter/v6 v6.12.1
 	github.com/sigstore/cosign/v2 v2.6.2
 	github.com/sigstore/sigstore v1.10.4
@@ -24,6 +25,7 @@ require (
 	golang.org/x/time v0.14.0
 	google.golang.org/api v0.269.0
 	google.golang.org/genproto v0.0.0-20260128011058-8636f8732409
+	google.golang.org/protobuf v1.36.11
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/apimachinery v0.35.2
 	k8s.io/utils v0.0.0-20251002143259-bc988d571ff4
@@ -184,7 +186,6 @@ require (
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.4 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-retryablehttp v0.7.8 // indirect
-	github.com/in-toto/attestation v1.1.2 // indirect
 	github.com/in-toto/in-toto-golang v0.9.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
@@ -296,7 +297,6 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20260203192932-546029d2fa20 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260217215200-42d3e9bedb6d // indirect
 	google.golang.org/grpc v1.79.1 // indirect
-	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.67.1 // indirect

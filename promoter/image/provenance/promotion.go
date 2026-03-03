@@ -21,6 +21,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+
+	intoto "github.com/in-toto/attestation/go/v1"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 const (
@@ -41,82 +45,39 @@ type PromotionGenerator struct{}
 // Generate creates an in-toto statement with a SLSA v1.0 provenance
 // predicate describing the promotion action.
 func (g *PromotionGenerator) Generate(_ context.Context, record *PromotionRecord) ([]byte, error) {
-	stmt := intotoStatement{
-		Type:          intotoStatementType,
-		PredicateType: PredicateType,
-		Subject: []subject{
+	recordJSON, err := json.Marshal(record)
+	if err != nil {
+		return nil, fmt.Errorf("marshaling promotion record: %w", err)
+	}
+
+	var recordMap map[string]interface{}
+	if err := json.Unmarshal(recordJSON, &recordMap); err != nil {
+		return nil, fmt.Errorf("unmarshaling promotion record: %w", err)
+	}
+
+	predicate, err := structpb.NewStruct(recordMap)
+	if err != nil {
+		return nil, fmt.Errorf("creating predicate struct: %w", err)
+	}
+
+	stmt := &intoto.Statement{
+		Type: intotoStatementType,
+		Subject: []*intoto.ResourceDescriptor{
 			{
 				Name: record.DstRef,
 				Digest: map[string]string{
-					"sha256": trimDigestPrefix(record.Digest),
+					"sha256": strings.TrimPrefix(record.Digest, "sha256:"),
 				},
 			},
 		},
-		Predicate: slsaPredicate{
-			BuildDefinition: buildDefinition{
-				BuildType: "https://k8s.io/promo-tools/promotion/v1",
-				ExternalParameters: map[string]string{
-					"source":      record.SrcRef,
-					"destination": record.DstRef,
-				},
-			},
-			RunDetails: runDetails{
-				Builder: builder{
-					ID: record.BuilderID,
-				},
-				Metadata: metadata{
-					StartedOn: record.Timestamp.UTC().Format("2006-01-02T15:04:05Z"),
-				},
-			},
-		},
+		PredicateType: PredicateType,
+		Predicate:     predicate,
 	}
 
-	data, err := json.Marshal(stmt)
+	data, err := protojson.Marshal(stmt)
 	if err != nil {
 		return nil, fmt.Errorf("marshaling provenance statement: %w", err)
 	}
 
 	return data, nil
-}
-
-// trimDigestPrefix removes the "sha256:" prefix from a digest string.
-func trimDigestPrefix(digest string) string {
-	return strings.TrimPrefix(digest, "sha256:")
-}
-
-// intotoStatement is a minimal in-toto v1 statement.
-type intotoStatement struct {
-	Type          string        `json:"_type"` //nolint:tagliatelle // in-toto spec field
-	PredicateType string        `json:"predicateType"`
-	Subject       []subject     `json:"subject"`
-	Predicate     slsaPredicate `json:"predicate"`
-}
-
-type subject struct {
-	Name   string            `json:"name"`
-	Digest map[string]string `json:"digest"`
-}
-
-// slsaPredicate is a minimal SLSA v1.0 provenance predicate.
-type slsaPredicate struct {
-	BuildDefinition buildDefinition `json:"buildDefinition"`
-	RunDetails      runDetails      `json:"runDetails"`
-}
-
-type buildDefinition struct {
-	BuildType          string            `json:"buildType"`
-	ExternalParameters map[string]string `json:"externalParameters"`
-}
-
-type runDetails struct {
-	Builder  builder  `json:"builder"`
-	Metadata metadata `json:"metadata"`
-}
-
-type builder struct {
-	ID string `json:"id"`
-}
-
-type metadata struct {
-	StartedOn string `json:"startedOn"`
 }
