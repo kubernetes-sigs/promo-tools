@@ -18,7 +18,6 @@ package provenance
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -42,31 +41,26 @@ const (
 // provenance attestations for image promotions.
 type PromotionGenerator struct{}
 
-// Generate creates an in-toto statement with a SLSA v1.0 provenance
+// Generate creates an in-toto statement with a promotion recor
 // predicate describing the promotion action.
 func (g *PromotionGenerator) Generate(_ context.Context, record *PromotionRecord) ([]byte, error) {
-	recordJSON, err := json.Marshal(record)
+	recordJSON, err := protojson.Marshal(record)
 	if err != nil {
 		return nil, fmt.Errorf("marshaling promotion record: %w", err)
 	}
 
-	var recordMap map[string]interface{}
-	if err := json.Unmarshal(recordJSON, &recordMap); err != nil {
-		return nil, fmt.Errorf("unmarshaling promotion record: %w", err)
-	}
-
-	predicate, err := structpb.NewStruct(recordMap)
-	if err != nil {
-		return nil, fmt.Errorf("creating predicate struct: %w", err)
+	predicate := &structpb.Struct{}
+	if err := protojson.Unmarshal(recordJSON, predicate); err != nil {
+		return nil, fmt.Errorf("unmarshaling predicate struct: %w", err)
 	}
 
 	stmt := &intoto.Statement{
 		Type: intotoStatementType,
 		Subject: []*intoto.ResourceDescriptor{
 			{
-				Name: record.DstRef,
+				Name: record.GetDstRef(),
 				Digest: map[string]string{
-					"sha256": strings.TrimPrefix(record.Digest, "sha256:"),
+					"sha256": strings.TrimPrefix(record.GetDigest(), "sha256:"),
 				},
 			},
 		},
