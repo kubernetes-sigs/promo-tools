@@ -27,8 +27,11 @@ const (
 	// intotoStatementType is the in-toto statement media type.
 	intotoStatementType = "https://in-toto.io/Statement/v1"
 
-	// slsaProvenanceType is the SLSA v1.0 provenance predicate type.
-	slsaProvenanceType = "https://slsa.dev/provenance/v1"
+	// PredicateType is the predicate type for promotion provenance
+	// attestations. Using a custom type (rather than the generic SLSA
+	// provenance type) makes it easy to distinguish promoter attestations
+	// from build-time attestations in the same .att image.
+	PredicateType = "https://k8s.io/promo-tools/promotion/v1"
 )
 
 // PromotionGenerator implements Generator by producing SLSA v1.0
@@ -40,7 +43,7 @@ type PromotionGenerator struct{}
 func (g *PromotionGenerator) Generate(_ context.Context, record *PromotionRecord) ([]byte, error) {
 	stmt := intotoStatement{
 		Type:          intotoStatementType,
-		PredicateType: slsaProvenanceType,
+		PredicateType: PredicateType,
 		Subject: []subject{
 			{
 				Name: record.DstRef,

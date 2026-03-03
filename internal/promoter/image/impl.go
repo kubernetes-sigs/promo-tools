@@ -44,6 +44,10 @@ necessarily mean that a new version of the image layer is available.`
 type DefaultPromoterImplementation struct {
 	signer *sign.Signer
 
+	// signOpts stores the sign options initialized during the sign phase
+	// for reuse by the attest phase when signing attestations.
+	signOpts *sign.Options
+
 	// transport is the rate-limited HTTP transport shared by all phases.
 	transport *ratelimit.RoundTripper
 

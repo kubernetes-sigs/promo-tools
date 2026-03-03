@@ -102,14 +102,6 @@ func TestPromoteImages(t *testing.T) {
 			},
 		},
 		{
-			// WriteSBOMs fails
-			shouldErr: true,
-			msg:       "WriteSBOMs fails",
-			prepare: func(fpi *imagefakes.FakePromoterImplementation) {
-				fpi.WriteSBOMsReturns(testErr)
-			},
-		},
-		{
 			// WriteProvenanceAttestations fails
 			shouldErr: true,
 			msg:       "WriteProvenanceAttestations fails",

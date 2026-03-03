@@ -58,32 +58,6 @@ func TestDigestToSignatureTag(t *testing.T) {
 	}
 }
 
-func TestDigestToSBOMTag(t *testing.T) {
-	t.Parallel()
-
-	for _, tc := range []struct {
-		name   string
-		digest image.Digest
-		want   string
-	}{
-		{
-			name:   "standard sha256 digest",
-			digest: "sha256:709e17a9c17018997724ed19afc18dbf576e9af10dfe78c13b34175027916d8f",
-			want:   "sha256-709e17a9c17018997724ed19afc18dbf576e9af10dfe78c13b34175027916d8f.sbom",
-		},
-		{
-			name:   "bare sha256 prefix",
-			digest: "sha256:abc",
-			want:   "sha256-abc.sbom",
-		},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			require.Equal(t, tc.want, digestToSBOMTag(tc.digest))
-		})
-	}
-}
-
 func TestIsTransient(t *testing.T) {
 	t.Parallel()
 
@@ -197,6 +171,57 @@ func TestTargetIdentity(t *testing.T) {
 			assert(res)
 		})
 	}
+}
+
+func TestComputeSigCopiesReplicatesAllSigTags(t *testing.T) {
+	t.Parallel()
+
+	digest := image.Digest("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+
+	mkEdge := func(dstReg string) promotion.Edge {
+		return promotion.Edge{
+			SrcRegistry: registry.Context{Name: "staging", Src: true},
+			SrcImageTag: promotion.ImageTag{Name: "app", Tag: "v1.0"},
+			Digest:      digest,
+			DstRegistry: registry.Context{Name: image.Registry(dstReg)},
+			DstImageTag: promotion.ImageTag{Name: "app", Tag: "v1.0"},
+		}
+	}
+
+	// Simulate tag listings: source has two .sig tags, mirror has only one.
+	sigTag1 := "sha256-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.sig"
+	sigTag2 := "sha256-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.sig"
+
+	srcKey := repoKey{"us-central1-docker.pkg.dev/k8s-artifacts-prod/images", "app"}
+	dstKey := repoKey{"us-east1-docker.pkg.dev/k8s-artifacts-prod/images", "app"}
+
+	allTags := map[repoKey]map[string]struct{}{
+		srcKey: {
+			sigTag1: {},
+			sigTag2: {},
+			"v1.0":  {},
+		},
+		dstKey: {
+			sigTag1: {}, // already replicated
+			"v1.0":  {},
+			// missing sigTag2
+		},
+	}
+
+	signed := []signedGroup{{
+		group: []promotion.Edge{
+			mkEdge("us-central1-docker.pkg.dev/k8s-artifacts-prod/images"),
+			mkEdge("us-east1-docker.pkg.dev/k8s-artifacts-prod/images"),
+		},
+		sigTag: sigTag1,
+	}}
+
+	copies := computeSigCopies(signed, allTags)
+
+	// Should produce exactly one copy: the .sig tag missing from the mirror.
+	require.Len(t, copies, 1)
+	require.Contains(t, copies[0].src, sigTag2)
+	require.Contains(t, copies[0].dst, sigTag2)
 }
 
 func TestGroupEdgesByIdentityDigest(t *testing.T) {

@@ -173,7 +173,7 @@ The promotion flow is organized into sequential pipeline phases:
 | 4 | **validate** | Validate staging image signatures |
 | 5 | **promote** | Copy images from staging to production |
 | 6 | **sign** | Sign promoted images with cosign (primary registry only) |
-| 7 | **attest** | Copy pre-generated SBOMs from staging to production, generate promotion provenance |
+| 7 | **attest** | Generate promotion provenance attestations |
 
 Without `--confirm`, the pipeline stops after the validate phase (dry-run
 precheck). With `--parse-only`, it stops after parsing manifests.
@@ -204,8 +204,11 @@ registries by a dedicated periodic Prow job (see
 [Standalone signature replication](#standalone-signature-replication)).
 The signing identity is configured with `--signer-account`.
 
-Pre-generated SBOMs are copied from staging to production using the cosign SBOM
-tag convention (`sha256-<hash>.sbom`). Missing SBOMs are skipped gracefully.
+Promotion provenance attestations are stored as in-toto statement layers in the
+cosign `.att` image for each promoted digest. Each layer carries a
+`predicateType` annotation (`https://k8s.io/promo-tools/promotion/v1`) to
+distinguish promoter attestations from build-time attestations and to enable
+predicate-type-aware idempotency.
 
 Related flags:
 
@@ -233,8 +236,9 @@ Without `--confirm` the command performs a dry run: it parses manifests and
 computes edges, but does not copy any signatures.
 
 The standalone mode reads **all** edges from the manifests (not just unsynced
-ones), so it works even when images were promoted long ago. Each signature copy
-is idempotent -- existing signatures are detected via batch tag listing and
+ones), so it works even when images were promoted long ago. All `.sig` tags in
+each source repository are replicated to the mirrors. Each copy is
+idempotent -- existing signatures are detected via batch tag listing and
 skipped. This makes it safe to run frequently via the periodic Prow job.
 
 Job health dashboards:

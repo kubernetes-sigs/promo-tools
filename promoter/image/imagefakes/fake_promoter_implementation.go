@@ -289,18 +289,6 @@ type FakePromoterImplementation struct {
 	writeProvenanceAttestationsReturnsOnCall map[int]struct {
 		result1 error
 	}
-	WriteSBOMsStub        func(*imagepromotera.Options, map[promotion.Edge]any) error
-	writeSBOMsMutex       sync.RWMutex
-	writeSBOMsArgsForCall []struct {
-		arg1 *imagepromotera.Options
-		arg2 map[promotion.Edge]any
-	}
-	writeSBOMsReturns struct {
-		result1 error
-	}
-	writeSBOMsReturnsOnCall map[int]struct {
-		result1 error
-	}
 	invocations      map[string][][]interface{}
 	invocationsMutex sync.RWMutex
 }
@@ -1629,68 +1617,6 @@ func (fake *FakePromoterImplementation) WriteProvenanceAttestationsReturnsOnCall
 		})
 	}
 	fake.writeProvenanceAttestationsReturnsOnCall[i] = struct {
-		result1 error
-	}{result1}
-}
-
-func (fake *FakePromoterImplementation) WriteSBOMs(arg1 *imagepromotera.Options, arg2 map[promotion.Edge]any) error {
-	fake.writeSBOMsMutex.Lock()
-	ret, specificReturn := fake.writeSBOMsReturnsOnCall[len(fake.writeSBOMsArgsForCall)]
-	fake.writeSBOMsArgsForCall = append(fake.writeSBOMsArgsForCall, struct {
-		arg1 *imagepromotera.Options
-		arg2 map[promotion.Edge]any
-	}{arg1, arg2})
-	stub := fake.WriteSBOMsStub
-	fakeReturns := fake.writeSBOMsReturns
-	fake.recordInvocation("WriteSBOMs", []interface{}{arg1, arg2})
-	fake.writeSBOMsMutex.Unlock()
-	if stub != nil {
-		return stub(arg1, arg2)
-	}
-	if specificReturn {
-		return ret.result1
-	}
-	return fakeReturns.result1
-}
-
-func (fake *FakePromoterImplementation) WriteSBOMsCallCount() int {
-	fake.writeSBOMsMutex.RLock()
-	defer fake.writeSBOMsMutex.RUnlock()
-	return len(fake.writeSBOMsArgsForCall)
-}
-
-func (fake *FakePromoterImplementation) WriteSBOMsCalls(stub func(*imagepromotera.Options, map[promotion.Edge]any) error) {
-	fake.writeSBOMsMutex.Lock()
-	defer fake.writeSBOMsMutex.Unlock()
-	fake.WriteSBOMsStub = stub
-}
-
-func (fake *FakePromoterImplementation) WriteSBOMsArgsForCall(i int) (*imagepromotera.Options, map[promotion.Edge]any) {
-	fake.writeSBOMsMutex.RLock()
-	defer fake.writeSBOMsMutex.RUnlock()
-	argsForCall := fake.writeSBOMsArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2
-}
-
-func (fake *FakePromoterImplementation) WriteSBOMsReturns(result1 error) {
-	fake.writeSBOMsMutex.Lock()
-	defer fake.writeSBOMsMutex.Unlock()
-	fake.WriteSBOMsStub = nil
-	fake.writeSBOMsReturns = struct {
-		result1 error
-	}{result1}
-}
-
-func (fake *FakePromoterImplementation) WriteSBOMsReturnsOnCall(i int, result1 error) {
-	fake.writeSBOMsMutex.Lock()
-	defer fake.writeSBOMsMutex.Unlock()
-	fake.WriteSBOMsStub = nil
-	if fake.writeSBOMsReturnsOnCall == nil {
-		fake.writeSBOMsReturnsOnCall = make(map[int]struct {
-			result1 error
-		})
-	}
-	fake.writeSBOMsReturnsOnCall[i] = struct {
 		result1 error
 	}{result1}
 }
