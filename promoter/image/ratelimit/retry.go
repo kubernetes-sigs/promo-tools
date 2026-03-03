@@ -17,6 +17,7 @@ limitations under the License.
 package ratelimit
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -35,9 +36,14 @@ var retryBackoff = wait.Backoff{
 	Steps:    3,
 }
 
-// IsTransient returns true for HTTP status codes that indicate a temporary
-// failure worth retrying (429 Too Many Requests and 5xx server errors).
+// IsTransient returns true for errors that indicate a temporary failure
+// worth retrying: context deadline exceeded (per-request timeouts),
+// HTTP 429 Too Many Requests, and 5xx server errors.
 func IsTransient(err error) bool {
+	if errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+
 	var terr *transport.Error
 	if errors.As(err, &terr) {
 		return terr.StatusCode == http.StatusTooManyRequests ||
