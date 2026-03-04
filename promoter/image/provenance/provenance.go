@@ -16,8 +16,8 @@ limitations under the License.
 
 // Package provenance provides interfaces and implementations for verifying
 // the provenance of container images before promotion. This includes
-// checking SLSA attestations, builder identity, and source repository
-// against configurable policies.
+// checking attestations, builder identity, and source repository against
+// configurable policies.
 package provenance
 
 import (

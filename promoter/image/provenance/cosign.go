@@ -35,7 +35,7 @@ import (
 
 const attestationTagSuffix = ".att"
 
-// CosignVerifier verifies SLSA attestations attached to container images
+// CosignVerifier verifies provenance attestations attached to container images
 // using the cosign attestation tag convention.
 //
 // It uses verify-if-present semantics: when an attestation tag exists it
@@ -57,7 +57,7 @@ type CosignVerifier struct {
 	CertOidcIssuerRegexp string
 }
 
-// Verify checks whether the image has a valid SLSA attestation attached.
+// Verify checks whether the image has a valid provenance attestation attached.
 // It first checks for the attestation tag existence, then verifies the
 // attestation signature using cosign.
 func (v *CosignVerifier) Verify(ctx context.Context, ref string) (*Result, error) {
