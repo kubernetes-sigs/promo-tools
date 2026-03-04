@@ -37,11 +37,11 @@ const (
 	PredicateType = "https://k8s.io/promo-tools/promotion/v1"
 )
 
-// PromotionGenerator implements Generator by producing SLSA v1.0
+// PromotionGenerator implements Generator by producing in-toto
 // provenance attestations for image promotions.
 type PromotionGenerator struct{}
 
-// Generate creates an in-toto statement with a promotion recor
+// Generate creates an in-toto statement with a promotion record
 // predicate describing the promotion action.
 func (g *PromotionGenerator) Generate(_ context.Context, record *PromotionRecord) ([]byte, error) {
 	recordJSON, err := protojson.Marshal(record)
