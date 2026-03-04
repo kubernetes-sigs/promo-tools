@@ -518,10 +518,10 @@ func (di *DefaultPromoterImplementation) batchListTags(
 // to match the production registry:
 // 'registry.k8s.io/kubernetes/conformance-arm64'.
 func targetIdentity(edge *promotion.Edge) string {
-	identity := fmt.Sprintf("%s/%s", edge.DstRegistry.Name, edge.DstImageTag.Name)
+	identity := string(edge.DstRegistry.Name) + "/" + string(edge.DstImageTag.Name)
 
 	if !strings.Contains(string(edge.DstRegistry.Name), productionRepositoryPath) {
-		logrus.Infof(
+		logrus.Debugf(
 			"No production registry path %q used in image, not modifying target signature reference",
 			productionRepositoryPath,
 		)
@@ -545,7 +545,7 @@ func groupEdgesByIdentityDigest(edges map[promotion.Edge]any) [][]promotion.Edge
 		digest   image.Digest
 	}
 
-	grouped := map[key][]promotion.Edge{}
+	grouped := make(map[key][]promotion.Edge, len(edges)/2)
 
 	for edge := range edges {
 		// Skip metadata layers
