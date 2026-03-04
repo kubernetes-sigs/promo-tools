@@ -18,7 +18,6 @@ package provenance
 
 import (
 	"context"
-	"time"
 )
 
 // Generator produces provenance attestations for promoted images.
@@ -28,24 +27,4 @@ type Generator interface {
 	// Generate creates an in-toto attestation envelope (JSON) for the
 	// given promotion record.
 	Generate(ctx context.Context, record *PromotionRecord) ([]byte, error)
-}
-
-// PromotionRecord captures the details of a single image promotion
-// for provenance generation.
-type PromotionRecord struct {
-	// SrcRef is the fully qualified source image reference.
-	SrcRef string
-
-	// DstRef is the fully qualified destination image reference.
-	DstRef string
-
-	// Digest is the image digest (e.g., "sha256:abc...").
-	Digest string
-
-	// Timestamp is when the promotion occurred.
-	Timestamp time.Time
-
-	// BuilderID identifies the promotion system
-	// (e.g., "https://k8s.io/promo-tools@v4.0.8").
-	BuilderID string
 }

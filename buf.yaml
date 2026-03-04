@@ -1,0 +1,5 @@
+version: v2
+modules:
+  - path: promoter/image/provenance
+deps:
+  - buf.build/protocolbuffers/wellknowntypes

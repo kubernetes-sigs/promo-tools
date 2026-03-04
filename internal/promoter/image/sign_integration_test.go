@@ -160,7 +160,7 @@ func TestPushAttestation(t *testing.T) {
 		SrcRef:    edge.SrcReference(),
 		DstRef:    edge.DstReference(),
 		Digest:    string(edge.Digest),
-		BuilderID: "https://k8s.io/promo-tools@test",
+		BuilderId: "https://k8s.io/promo-tools@test",
 	}
 
 	gen := &fakeGenerator{data: []byte(`{"test": "attestation"}`)}
@@ -190,7 +190,7 @@ func TestPushAttestationIdempotent(t *testing.T) {
 		SrcRef:    edge.SrcReference(),
 		DstRef:    edge.DstReference(),
 		Digest:    string(edge.Digest),
-		BuilderID: "https://k8s.io/promo-tools@test",
+		BuilderId: "https://k8s.io/promo-tools@test",
 	}
 
 	gen := &fakeGenerator{data: []byte(`{"test": "attestation"}`)}
