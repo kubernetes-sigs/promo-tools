@@ -548,6 +548,8 @@ func groupEdgesByIdentityDigest(edges map[promotion.Edge]any) [][]promotion.Edge
 	grouped := make(map[key][]promotion.Edge, len(edges)/2)
 
 	for edge := range edges {
+		delete(edges, edge) // free as we go to reduce peak memory
+
 		// Skip metadata layers
 		if strings.HasSuffix(string(edge.DstImageTag.Tag), ".sig") ||
 			strings.HasSuffix(string(edge.DstImageTag.Tag), ".att") ||
