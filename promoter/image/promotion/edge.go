@@ -158,6 +158,8 @@ func CheckOverlappingEdges(
 	checked := make(map[Edge]any)
 
 	for edge := range edges {
+		delete(edges, edge) // free as we go to reduce peak memory
+
 		if edge.DstImageTag.Tag == "" {
 			checked[edge] = nil
 
