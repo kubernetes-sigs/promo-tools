@@ -128,7 +128,7 @@ func (di *DefaultPromoterImplementation) AppendManifestToSnapshot(
 }
 
 func (di *DefaultPromoterImplementation) GetRegistryImageInventory(
-	opts *options.Options, mfests []schema.Manifest,
+	ctx context.Context, opts *options.Options, mfests []schema.Manifest,
 ) (registry.RegInvImage, error) {
 	srcRegistry, err := di.GetSnapshotSourceRegistry(opts)
 	if err != nil {
@@ -151,7 +151,7 @@ func (di *DefaultPromoterImplementation) GetRegistryImageInventory(
 
 		if opts.MinimalSnapshot {
 			inv, err := di.registryProvider.ReadRegistries(
-				context.Background(),
+				ctx,
 				[]registry.RegistryConfig{registryConfig},
 				true,
 				nil,
@@ -168,7 +168,7 @@ func (di *DefaultPromoterImplementation) GetRegistryImageInventory(
 
 	// Direct snapshot path: read the registry
 	inv, err := di.registryProvider.ReadRegistries(
-		context.Background(),
+		ctx,
 		[]registry.RegistryConfig{registryConfig},
 		true,
 		nil,

@@ -599,7 +599,7 @@ func (di *DefaultPromoterImplementation) copyAttachedObjects(edge *promotion.Edg
 	logrus.Infof("Signature pre copy: %s to %s", srcRefString, dstRefString)
 
 	if err := ratelimit.WithRetry(func() error {
-		return craneCopyWithTimeout(srcRef.String(), dstRef.String(), ratelimit.CopyTimeout, di.craneOptions())
+		return craneCopyWithTimeout(context.TODO(), srcRef.String(), dstRef.String(), ratelimit.CopyTimeout, di.craneOptions())
 	}); err != nil {
 		// If the signature layer does not exist it means that the src image
 		// is not signed, so we catch the error and return nil
@@ -627,7 +627,7 @@ func digestToSignatureTag(dg image.Digest) string {
 // copyWithRetry performs a crane.Copy with retries on transient errors.
 func (di *DefaultPromoterImplementation) copyWithRetry(src, dst string, opts []crane.Option) error {
 	if err := ratelimit.WithRetry(func() error {
-		return craneCopyWithTimeout(src, dst, ratelimit.CopyTimeout, opts)
+		return craneCopyWithTimeout(context.TODO(), src, dst, ratelimit.CopyTimeout, opts)
 	}); err != nil {
 		return fmt.Errorf("copying %s to %s: %w", src, dst, err)
 	}
@@ -683,6 +683,7 @@ func (di *DefaultPromoterImplementation) GetIdentityToken(
 // WriteProvenanceAttestations generates SLSA provenance attestations for
 // promoted images and pushes them as .att tags to the destination registry.
 func (di *DefaultPromoterImplementation) WriteProvenanceAttestations(
+	ctx context.Context,
 	opts *options.Options,
 	edges map[promotion.Edge]any,
 	generator provenance.Generator,
@@ -698,7 +699,6 @@ func (di *DefaultPromoterImplementation) WriteProvenanceAttestations(
 		builderID += "@" + v
 	}
 
-	ctx := context.Background()
 	now := time.Now()
 
 	g := new(errgroup.Group)
@@ -832,8 +832,8 @@ func hasPredicateType(digest name.Digest, predicateType string, opts ...ociremot
 
 // craneCopyWithTimeout wraps crane.Copy with a per-request context timeout.
 // It copies the opts slice to avoid mutating the caller's backing array.
-func craneCopyWithTimeout(src, dst string, timeout time.Duration, opts []crane.Option) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+func craneCopyWithTimeout(ctx context.Context, src, dst string, timeout time.Duration, opts []crane.Option) error {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	withCtx := make([]crane.Option, len(opts), len(opts)+1)
@@ -846,9 +846,9 @@ func craneCopyWithTimeout(src, dst string, timeout time.Duration, opts []crane.O
 
 // PrewarmTUFCache initializes the TUF cache so that threads do not have to compete
 // against each other creating the TUF database.
-func (di *DefaultPromoterImplementation) PrewarmTUFCache() error {
+func (di *DefaultPromoterImplementation) PrewarmTUFCache(ctx context.Context) error {
 	if err := tuf.Initialize(
-		context.Background(), tuf.DefaultRemoteRoot, nil,
+		ctx, tuf.DefaultRemoteRoot, nil,
 	); err != nil {
 		return fmt.Errorf("initializing TUF client: %w", err)
 	}

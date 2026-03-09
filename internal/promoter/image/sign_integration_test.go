@@ -267,7 +267,7 @@ func TestPromoteImagesCraneProvider(t *testing.T) {
 
 	// Run promotion.
 	opts := &options.Options{Threads: 4}
-	err := di.PromoteImages(opts, edges)
+	err := di.PromoteImages(context.Background(), opts, edges)
 	require.NoError(t, err)
 
 	// Verify all images landed.
@@ -704,7 +704,7 @@ func TestWriteProvenanceAttestationsIdempotent(t *testing.T) {
 
 	// Run twice — both should succeed without error.
 	for i := range 2 {
-		err := di.WriteProvenanceAttestations(opts, edges, gen)
+		err := di.WriteProvenanceAttestations(context.Background(), opts, edges, gen)
 		require.NoError(t, err, "run %d", i+1)
 	}
 

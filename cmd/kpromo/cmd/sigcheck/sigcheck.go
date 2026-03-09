@@ -17,6 +17,8 @@ limitations under the License.
 package sigcheck
 
 import (
+	"context"
+
 	"github.com/spf13/cobra"
 
 	imagepromoter "sigs.k8s.io/promo-tools/v4/promoter/image"
@@ -57,7 +59,7 @@ kpromo to the first three images it finds run:
 
 			p := imagepromoter.New(opts)
 
-			return p.CheckSignatures(opts)
+			return p.CheckSignatures(context.Background(), opts)
 		},
 	}
 
