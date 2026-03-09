@@ -24,6 +24,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	imagepromoter "sigs.k8s.io/promo-tools/v4/promoter/image"
+	"sigs.k8s.io/promo-tools/v4/promoter/image/checkresults"
 	imagefakes "sigs.k8s.io/promo-tools/v4/promoter/image/imagefakes"
 	options "sigs.k8s.io/promo-tools/v4/promoter/image/options"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/promotion"
@@ -328,4 +329,236 @@ func TestNewPromoter(t *testing.T) {
 
 	require.NoError(t, p.PromoteImages(context.Background(), &options.Options{Confirm: true}))
 	require.Equal(t, 1, mock.WriteProvenanceAttestationsCallCount())
+}
+
+func TestSnapshot(t *testing.T) {
+	testErr := errors.New("synthetic error")
+
+	for _, tc := range []struct {
+		shouldErr bool
+		msg       string
+		prepare   func(*imagefakes.FakePromoterImplementation)
+	}{
+		{
+			shouldErr: false,
+			msg:       "No errors",
+			prepare:   func(_ *imagefakes.FakePromoterImplementation) {},
+		},
+		{
+			shouldErr: true,
+			msg:       "ValidateOptions fails",
+			prepare: func(fpi *imagefakes.FakePromoterImplementation) {
+				fpi.ValidateOptionsReturns(testErr)
+			},
+		},
+		{
+			shouldErr: true,
+			msg:       "GetSnapshotManifests fails",
+			prepare: func(fpi *imagefakes.FakePromoterImplementation) {
+				fpi.GetSnapshotManifestsReturns(nil, testErr)
+			},
+		},
+		{
+			shouldErr: true,
+			msg:       "AppendManifestToSnapshot fails",
+			prepare: func(fpi *imagefakes.FakePromoterImplementation) {
+				fpi.AppendManifestToSnapshotReturns(nil, testErr)
+			},
+		},
+		{
+			shouldErr: true,
+			msg:       "GetRegistryImageInventory fails",
+			prepare: func(fpi *imagefakes.FakePromoterImplementation) {
+				fpi.GetRegistryImageInventoryReturns(nil, testErr)
+			},
+		},
+		{
+			shouldErr: true,
+			msg:       "Snapshot impl fails",
+			prepare: func(fpi *imagefakes.FakePromoterImplementation) {
+				fpi.SnapshotReturns(testErr)
+			},
+		},
+	} {
+		t.Run(tc.msg, func(t *testing.T) {
+			sut := imagepromoter.Promoter{}
+			mock := imagefakes.FakePromoterImplementation{}
+			tc.prepare(&mock)
+			sut.SetImplementation(&mock)
+
+			opts := &options.Options{Snapshot: "gcr.io/test"}
+			if tc.shouldErr {
+				require.Error(t, sut.Snapshot(opts), tc.msg)
+			} else {
+				require.NoError(t, sut.Snapshot(opts), tc.msg)
+			}
+		})
+	}
+}
+
+func TestSecurityScan(t *testing.T) {
+	testErr := errors.New("synthetic error")
+
+	for _, tc := range []struct {
+		shouldErr bool
+		msg       string
+		prepare   func(*imagefakes.FakePromoterImplementation)
+		opts      *options.Options
+	}{
+		{
+			shouldErr: false,
+			msg:       "No errors with confirm",
+			prepare:   func(_ *imagefakes.FakePromoterImplementation) {},
+			opts:      &options.Options{Confirm: true, SeverityThreshold: 3},
+		},
+		{
+			shouldErr: true,
+			msg:       "ValidateOptions fails",
+			prepare: func(fpi *imagefakes.FakePromoterImplementation) {
+				fpi.ValidateOptionsReturns(testErr)
+			},
+			opts: &options.Options{Confirm: true, SeverityThreshold: 3},
+		},
+		{
+			shouldErr: true,
+			msg:       "ParseManifests fails",
+			prepare: func(fpi *imagefakes.FakePromoterImplementation) {
+				fpi.ParseManifestsReturns(nil, testErr)
+			},
+			opts: &options.Options{Confirm: true, SeverityThreshold: 3},
+		},
+		{
+			shouldErr: true,
+			msg:       "GetPromotionEdges fails",
+			prepare: func(fpi *imagefakes.FakePromoterImplementation) {
+				fpi.GetPromotionEdgesReturns(nil, testErr)
+			},
+			opts: &options.Options{Confirm: true, SeverityThreshold: 3},
+		},
+		{
+			shouldErr: true,
+			msg:       "ScanEdges fails",
+			prepare: func(fpi *imagefakes.FakePromoterImplementation) {
+				fpi.ScanEdgesReturns(testErr)
+			},
+			opts: &options.Options{Confirm: true, SeverityThreshold: 3},
+		},
+	} {
+		t.Run(tc.msg, func(t *testing.T) {
+			sut := imagepromoter.Promoter{}
+			mock := imagefakes.FakePromoterImplementation{}
+			tc.prepare(&mock)
+			sut.SetImplementation(&mock)
+
+			if tc.shouldErr {
+				require.Error(t, sut.SecurityScan(tc.opts), tc.msg)
+			} else {
+				require.NoError(t, sut.SecurityScan(tc.opts), tc.msg)
+			}
+		})
+	}
+}
+
+func TestSecurityScanParseOnly(t *testing.T) {
+	sut := imagepromoter.Promoter{}
+	mock := imagefakes.FakePromoterImplementation{}
+	sut.SetImplementation(&mock)
+
+	opts := &options.Options{ParseOnly: true, SeverityThreshold: 3}
+	require.NoError(t, sut.SecurityScan(opts))
+
+	require.Equal(t, 1, mock.ParseManifestsCallCount())
+	require.Equal(t, 0, mock.ScanEdgesCallCount())
+}
+
+func TestSecurityScanDryRun(t *testing.T) {
+	sut := imagepromoter.Promoter{}
+	mock := imagefakes.FakePromoterImplementation{}
+	sut.SetImplementation(&mock)
+
+	opts := &options.Options{Confirm: false, SeverityThreshold: 3}
+	require.NoError(t, sut.SecurityScan(opts))
+
+	require.Equal(t, 1, mock.GetPromotionEdgesCallCount())
+	require.Equal(t, 0, mock.ScanEdgesCallCount())
+}
+
+func TestCheckSignatures(t *testing.T) {
+	testErr := errors.New("synthetic error")
+
+	for _, tc := range []struct {
+		shouldErr bool
+		msg       string
+		prepare   func(*imagefakes.FakePromoterImplementation)
+	}{
+		{
+			shouldErr: false,
+			msg:       "All signed",
+			prepare:   func(_ *imagefakes.FakePromoterImplementation) {},
+		},
+		{
+			shouldErr: true,
+			msg:       "GetLatestImages fails",
+			prepare: func(fpi *imagefakes.FakePromoterImplementation) {
+				fpi.GetLatestImagesReturns(nil, testErr)
+			},
+		},
+		{
+			shouldErr: true,
+			msg:       "GetSignatureStatus fails",
+			prepare: func(fpi *imagefakes.FakePromoterImplementation) {
+				fpi.GetSignatureStatusReturns(nil, testErr)
+			},
+		},
+		{
+			shouldErr: true,
+			msg:       "FixMissingSignatures fails",
+			prepare: func(fpi *imagefakes.FakePromoterImplementation) {
+				fpi.GetSignatureStatusReturns(checkresults.Signature{
+					"img@sha256:abc": {Missing: []string{"mirror1"}},
+				}, nil)
+				fpi.FixMissingSignaturesReturns(testErr)
+			},
+		},
+		{
+			shouldErr: true,
+			msg:       "FixPartialSignatures fails",
+			prepare: func(fpi *imagefakes.FakePromoterImplementation) {
+				fpi.GetSignatureStatusReturns(checkresults.Signature{
+					"img@sha256:abc": {Signed: []string{"primary"}, Missing: []string{"mirror1"}},
+				}, nil)
+				fpi.FixPartialSignaturesReturns(testErr)
+			},
+		},
+	} {
+		t.Run(tc.msg, func(t *testing.T) {
+			sut := imagepromoter.Promoter{}
+			mock := imagefakes.FakePromoterImplementation{}
+			tc.prepare(&mock)
+			sut.SetImplementation(&mock)
+
+			opts := &options.Options{}
+			if tc.shouldErr {
+				require.Error(t, sut.CheckSignatures(opts), tc.msg)
+			} else {
+				require.NoError(t, sut.CheckSignatures(opts), tc.msg)
+			}
+		})
+	}
+}
+
+func TestCheckSignaturesAllConsistent(t *testing.T) {
+	sut := imagepromoter.Promoter{}
+	mock := imagefakes.FakePromoterImplementation{}
+	// Return a result with no missing signatures
+	mock.GetSignatureStatusReturns(checkresults.Signature{
+		"img@sha256:abc": {Signed: []string{"primary", "mirror1"}},
+	}, nil)
+	sut.SetImplementation(&mock)
+
+	require.NoError(t, sut.CheckSignatures(&options.Options{}))
+
+	// Should not attempt to fix anything
+	require.Equal(t, 0, mock.FixMissingSignaturesCallCount())
+	require.Equal(t, 0, mock.FixPartialSignaturesCallCount())
 }

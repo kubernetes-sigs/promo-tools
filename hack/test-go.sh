@@ -51,6 +51,7 @@ mkdir -p "${ARTIFACTS}"
 go_test_flags=(
     -v
     -count=1
+    -race
     -timeout="${TEST_TIMEOUT}s"
     -cover -coverprofile "${ARTIFACTS}/coverage.out"
     ${TEST_FAILFAST:-}
