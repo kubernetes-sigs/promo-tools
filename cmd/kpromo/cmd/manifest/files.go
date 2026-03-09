@@ -46,7 +46,6 @@ var filesCmd = &cobra.Command{
 var filesOpts = &promobot.GenerateManifestOptions{}
 
 func init() {
-	// TODO: Move this into a default options function in pkg/promobot
 	filesOpts.PopulateDefaults()
 
 	filesCmd.PersistentFlags().StringVar(
@@ -74,7 +73,16 @@ func runFileManifest(opts *promobot.GenerateManifestOptions) error {
 
 	src, err := filepath.Abs(opts.BaseDir)
 	if err != nil {
-		return fmt.Errorf("resolving %q to absolute path: %w", src, err)
+		return fmt.Errorf("resolving %q to absolute path: %w", opts.BaseDir, err)
+	}
+
+	info, err := os.Stat(src)
+	if err != nil {
+		return fmt.Errorf("--src directory %q: %w", src, err)
+	}
+
+	if !info.IsDir() {
+		return fmt.Errorf("--src %q is not a directory", src)
 	}
 
 	opts.BaseDir = src
@@ -95,5 +103,3 @@ func runFileManifest(opts *promobot.GenerateManifestOptions) error {
 
 	return nil
 }
-
-// TODO: Validate options

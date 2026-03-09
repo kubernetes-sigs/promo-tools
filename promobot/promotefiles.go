@@ -73,6 +73,29 @@ type PromoteFilesOptions struct {
 	Out io.Writer
 }
 
+// Validate checks that the options contain a valid manifest source.
+// Either ManifestsPath (multi-project) or both FilestoresPath and
+// FilesPath (single-project) must be provided.
+func (o *PromoteFilesOptions) Validate() error {
+	if o.ManifestsPath != "" {
+		return nil
+	}
+
+	if o.FilestoresPath == "" && o.FilesPath == "" {
+		return errors.New("either --manifests or both --filestores and --files must be specified")
+	}
+
+	if o.FilestoresPath == "" {
+		return errors.New("--filestores is required when not using --manifests")
+	}
+
+	if o.FilesPath == "" {
+		return errors.New("--files is required when not using --manifests")
+	}
+
+	return nil
+}
+
 // PopulateDefaults sets the default values for PromoteFilesOptions.
 func (o *PromoteFilesOptions) PopulateDefaults() {
 	o.Confirm = false

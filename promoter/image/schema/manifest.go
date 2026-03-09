@@ -114,7 +114,6 @@ func (m *Manifest) Validate() error {
 }
 
 func validateRequiredComponents(m *Manifest) error {
-	// TODO: Should we return []error here instead?
 	errs := make([]string, 0)
 
 	if len(m.Registries) > 0 {

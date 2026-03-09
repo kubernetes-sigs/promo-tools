@@ -32,6 +32,10 @@ var filesCmd = &cobra.Command{
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(_ *cobra.Command, _ []string) error {
+		if err := filesOpts.Validate(); err != nil {
+			return fmt.Errorf("validating options: %w", err)
+		}
+
 		if err := runFilePromotion(filesOpts); err != nil {
 			return fmt.Errorf("run `kpromo run files`: %w", err)
 		}
@@ -43,7 +47,6 @@ var filesCmd = &cobra.Command{
 var filesOpts = &promobot.PromoteFilesOptions{}
 
 func init() {
-	// TODO: Move this into a default options function in pkg/promobot
 	filesOpts.PopulateDefaults()
 
 	filesCmd.PersistentFlags().StringVar(
@@ -67,7 +70,6 @@ func init() {
 		"path to manifests for multiple projects",
 	)
 
-	// TODO: Consider moving this to the root command
 	filesCmd.PersistentFlags().BoolVar(
 		&filesOpts.Confirm,
 		"confirm",
@@ -82,8 +84,6 @@ func init() {
 		"allow service account usage with gcloud and S3 calls",
 	)
 
-	// TODO(kpromo): Consider marking manifest flags as required
-
 	RunCmd.AddCommand(filesCmd)
 }
 
@@ -96,5 +96,3 @@ func runFilePromotion(opts *promobot.PromoteFilesOptions) error {
 
 	return nil
 }
-
-// TODO: Validate options

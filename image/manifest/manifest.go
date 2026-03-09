@@ -249,7 +249,6 @@ func ApplyFilters(o *GrowOptions, rii registry.RegInvImage) (registry.RegInvImag
 	}
 
 	if len(o.FilterTags) > 0 {
-		// TODO(manifest): Should func be pulled into this package?
 		rii = FilterByTags(rii, o.FilterTags)
 	}
 
