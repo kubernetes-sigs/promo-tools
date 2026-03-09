@@ -35,8 +35,7 @@ const (
 	outputFlag                  = "output"
 )
 
-// CipCmd represents the base command when called without any subcommands
-// TODO: Update command description.
+// CipCmd represents the base command when called without any subcommands.
 var CipCmd = &cobra.Command{
 	Use:   "cip",
 	Short: "Promote images from a staging registry to production",
@@ -67,7 +66,6 @@ func init() {
 		"initiate a PRODUCTION image promotion",
 	)
 
-	// TODO: Move this into a default options function in pkg/promobot
 	CipCmd.PersistentFlags().StringVar(
 		&runOpts.Manifest,
 		manifestFlag,

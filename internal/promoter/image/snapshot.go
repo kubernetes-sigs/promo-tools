@@ -50,7 +50,6 @@ func (di *DefaultPromoterImplementation) Snapshot(opts *options.Options, rii reg
 		return fmt.Errorf("invalid snapshot output format: %s", opts.OutputFormat)
 	}
 
-	// TODO: Maybe store the snapshot somewhere?
 	fmt.Println(snapshot)
 
 	return nil

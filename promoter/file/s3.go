@@ -188,7 +188,6 @@ func (s *s3SyncFilestore) UploadFile(ctx context.Context, dest, localFile string
 
 	req.ChecksumSHA256 = aws.String(base64.StdEncoding.EncodeToString(hashes.SHA256))
 
-	// TODO: Any more hashes?  Very cheap to compute now...
 	req.Metadata["content-hash-md5"] = hex.EncodeToString(hashes.MD5)
 	req.Metadata["content-hash-sha256"] = hex.EncodeToString(hashes.SHA256)
 	req.Metadata["content-hash-sha512"] = hex.EncodeToString(hashes.SHA512)

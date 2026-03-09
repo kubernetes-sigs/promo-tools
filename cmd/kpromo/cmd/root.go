@@ -32,8 +32,7 @@ import (
 	"sigs.k8s.io/promo-tools/v4/cmd/kpromo/cmd/sigcheck"
 )
 
-// rootCmd represents the base command when called without any subcommands
-// TODO: Update command description.
+// rootCmd represents the base command when called without any subcommands.
 var rootCmd = &cobra.Command{
 	Use:   "kpromo",
 	Short: "Kubernetes project artifact promoter",

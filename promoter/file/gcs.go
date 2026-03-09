@@ -112,7 +112,14 @@ func (s *gcsSyncFilestore) UploadFile(ctx context.Context, dest, localFile strin
 	if _, err := io.Copy(w, in); err != nil {
 		if err2 := w.Close(); err2 != nil {
 			logrus.Warnf("error closing upload stream: %v", err2)
-			// TODO: Try to delete the possibly partially written file?
+		}
+
+		// Attempt to remove the partially written object so we don't
+		// leave corrupt data in the bucket.
+		if err2 := s.client.Bucket(s.bucket).Object(absolutePath).Delete(ctx); err2 != nil {
+			logrus.Warnf("failed to delete partial upload %s: %v", gcsURL, err2)
+		} else {
+			logrus.Infof("deleted partial upload %s", gcsURL)
 		}
 
 		return fmt.Errorf("error uploading to %q: %w", gcsURL, err)

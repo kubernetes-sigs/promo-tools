@@ -110,7 +110,6 @@ func init() {
 		&promoteOpts.tags,
 		"tag",
 		"t",
-		// TODO: Parameterize
 		[]string{},
 		"version tag of the images we will promote",
 	)
@@ -141,7 +140,6 @@ func init() {
 		&promoteOpts.images,
 		"image",
 		"",
-		// TODO: Parameterize
 		[]string{},
 		"image to promote. If not specified, all images matching the tag will be promoted",
 	)
@@ -150,7 +148,6 @@ func init() {
 		&promoteOpts.digests,
 		"digests",
 		"",
-		// TODO: Parameterize
 		[]string{},
 		"digests to promote. If not specified, all images matching the tag will be promoted",
 	)
