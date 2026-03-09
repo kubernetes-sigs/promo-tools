@@ -17,7 +17,7 @@ limitations under the License.
 package imagepromoter
 
 import (
-	"errors"
+	"fmt"
 	"time"
 
 	"github.com/google/go-containerregistry/pkg/crane"
@@ -123,10 +123,8 @@ func defaultSignerOptions(opts *options.Options) *sign.Options {
 
 // ValidateOptions checks an options set.
 func (di *DefaultPromoterImplementation) ValidateOptions(opts *options.Options) error {
-	if opts.Snapshot == "" && opts.ManifestBasedSnapshotOf == "" {
-		if opts.Manifest == "" && opts.ThinManifestDir == "" {
-			return errors.New("either a manifest or a thin manifest dir have to be set")
-		}
+	if err := opts.Validate(); err != nil {
+		return fmt.Errorf("validating options: %w", err)
 	}
 
 	return nil
