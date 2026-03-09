@@ -36,14 +36,13 @@ endif
 
 PKG=sigs.k8s.io/release-utils/version
 LDFLAGS='"-X $(PKG).gitVersion=$(GIT_VERSION) -X $(PKG).gitCommit=$(GIT_HASH) -X $(PKG).gitTreeState=$(GIT_TREESTATE) -X $(PKG).buildDate=$(BUILD_DATE)"'
-export CGO_ENABLED=1
+export CGO_ENABLED=0
 
 .PHONY: kpromo
 kpromo:
 	go build \
 		-trimpath \
-		-ldflags '-s -w -buildid= -linkmode=external $(LDFLAGS)' \
-		-tags osusergo \
+		-ldflags '-s -w -buildid= $(LDFLAGS)' \
 		-o ./bin/kpromo \
 		./cmd/kpromo
 

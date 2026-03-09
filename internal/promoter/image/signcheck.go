@@ -34,10 +34,10 @@ import (
 	"github.com/sigstore/sigstore/pkg/cryptoutils"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
-	yaml "gopkg.in/yaml.v2"
 	"sigs.k8s.io/release-sdk/sign"
 	"sigs.k8s.io/release-utils/http"
 	"sigs.k8s.io/release-utils/version"
+	"sigs.k8s.io/yaml"
 
 	"sigs.k8s.io/promo-tools/v4/image/consts"
 	checkresults "sigs.k8s.io/promo-tools/v4/promoter/image/checkresults"
@@ -98,9 +98,9 @@ func (di *DefaultPromoterImplementation) getMirrors() ([]string, error) {
 
 		type entriesList struct {
 			Registries []struct {
-				Name string `yaml:"name,omitempty"`
-				Src  bool   `yaml:"src,omitempty"`
-			} `yaml:"registries"`
+				Name string `json:"name,omitempty" yaml:"name,omitempty"`
+				Src  bool   `json:"src,omitempty"  yaml:"src,omitempty"`
+			} `json:"registries" yaml:"registries"`
 		}
 
 		entries := entriesList{}

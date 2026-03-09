@@ -131,9 +131,3 @@ func (o *Options) Validate() error {
 
 	return nil
 }
-
-// RunOptions capture the options of a run.
-type RunOptions struct {
-	// Confirm
-	Confirm bool
-}
