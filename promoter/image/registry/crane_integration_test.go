@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 
 	"github.com/google/go-containerregistry/pkg/crane"
@@ -248,7 +249,7 @@ func TestCraneProviderWithTransport(t *testing.T) {
 	err := p.CopyImage(context.Background(), srcRef, dstRef)
 	require.NoError(t, err)
 
-	require.Positive(t, counter.count, "custom transport was not used")
+	require.Positive(t, counter.count.Load(), "custom transport was not used")
 
 	gotDigest, err := crane.Digest(dstRef, crane.Insecure)
 	require.NoError(t, err)
@@ -357,11 +358,11 @@ func TestCraneProviderCopyImageIndex(t *testing.T) {
 // countingTransport wraps an http.RoundTripper and counts requests.
 type countingTransport struct {
 	base  http.RoundTripper
-	count int
+	count atomic.Int64
 }
 
 func (c *countingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	c.count++
+	c.count.Add(1)
 
 	resp, err := c.base.RoundTrip(req)
 	if err != nil {
