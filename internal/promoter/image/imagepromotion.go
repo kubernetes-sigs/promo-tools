@@ -66,7 +66,7 @@ func (di *DefaultPromoterImplementation) ParseManifests(opts *options.Options) (
 // them the promotion edges, ie the images that need to be
 // promoted.
 func (di *DefaultPromoterImplementation) GetPromotionEdges(
-	opts *options.Options, mfests []schema.Manifest,
+	ctx context.Context, opts *options.Options, mfests []schema.Manifest,
 ) (map[promotion.Edge]any, error) {
 	// Convert manifests to edges
 	edges, err := promotion.ToEdges(mfests)
@@ -88,8 +88,6 @@ func (di *DefaultPromoterImplementation) GetPromotionEdges(
 	}
 
 	// Read registry inventories (non-recursive, specific repos only)
-	ctx := context.Background()
-
 	inv, err := di.registryProvider.ReadRegistries(ctx, configs, false, baseConfigs)
 	if err != nil {
 		return nil, fmt.Errorf("reading registries: %w", err)
@@ -121,6 +119,7 @@ func (di *DefaultPromoterImplementation) EdgesFromManifests(
 
 // PromoteImages copies images for a set of promotion edges.
 func (di *DefaultPromoterImplementation) PromoteImages(
+	ctx context.Context,
 	opts *options.Options,
 	edges map[promotion.Edge]any,
 ) error {
@@ -149,7 +148,6 @@ func (di *DefaultPromoterImplementation) PromoteImages(
 
 	var completed atomic.Int64
 
-	ctx := context.Background()
 	g, ctx := errgroup.WithContext(ctx)
 	g.SetLimit(opts.Threads)
 

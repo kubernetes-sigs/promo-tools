@@ -245,9 +245,11 @@ func runPromoteCmd(opts *options.Options) error {
 		opts.SignCheckIdentity, opts.SignCheckIdentityRegexp, opts.SignCheckIssuer, opts.SignCheckIssuerRegexp,
 	)
 
+	ctx := context.Background()
+
 	// Snapshots
 	if opts.Snapshot != "" || opts.ManifestBasedSnapshotOf != "" {
-		if err := cip.Snapshot(opts); err != nil {
+		if err := cip.Snapshot(ctx, opts); err != nil {
 			return fmt.Errorf("snapshot: %w", err)
 		}
 
@@ -256,7 +258,7 @@ func runPromoteCmd(opts *options.Options) error {
 
 	// Security scan
 	if opts.SeverityThreshold >= 0 {
-		if err := cip.SecurityScan(opts); err != nil {
+		if err := cip.SecurityScan(ctx, opts); err != nil {
 			return fmt.Errorf("security scan: %w", err)
 		}
 
@@ -264,7 +266,7 @@ func runPromoteCmd(opts *options.Options) error {
 	}
 
 	// Image promotion
-	if err := cip.PromoteImages(context.Background(), opts); err != nil {
+	if err := cip.PromoteImages(ctx, opts); err != nil {
 		return fmt.Errorf("promote images: %w", err)
 	}
 

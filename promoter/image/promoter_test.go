@@ -388,9 +388,9 @@ func TestSnapshot(t *testing.T) {
 
 			opts := &options.Options{Snapshot: "gcr.io/test"}
 			if tc.shouldErr {
-				require.Error(t, sut.Snapshot(opts), tc.msg)
+				require.Error(t, sut.Snapshot(context.Background(), opts), tc.msg)
 			} else {
-				require.NoError(t, sut.Snapshot(opts), tc.msg)
+				require.NoError(t, sut.Snapshot(context.Background(), opts), tc.msg)
 			}
 		})
 	}
@@ -451,9 +451,9 @@ func TestSecurityScan(t *testing.T) {
 			sut.SetImplementation(&mock)
 
 			if tc.shouldErr {
-				require.Error(t, sut.SecurityScan(tc.opts), tc.msg)
+				require.Error(t, sut.SecurityScan(context.Background(), tc.opts), tc.msg)
 			} else {
-				require.NoError(t, sut.SecurityScan(tc.opts), tc.msg)
+				require.NoError(t, sut.SecurityScan(context.Background(), tc.opts), tc.msg)
 			}
 		})
 	}
@@ -465,7 +465,7 @@ func TestSecurityScanParseOnly(t *testing.T) {
 	sut.SetImplementation(&mock)
 
 	opts := &options.Options{ParseOnly: true, SeverityThreshold: 3}
-	require.NoError(t, sut.SecurityScan(opts))
+	require.NoError(t, sut.SecurityScan(context.Background(), opts))
 
 	require.Equal(t, 1, mock.ParseManifestsCallCount())
 	require.Equal(t, 0, mock.ScanEdgesCallCount())
@@ -477,7 +477,7 @@ func TestSecurityScanDryRun(t *testing.T) {
 	sut.SetImplementation(&mock)
 
 	opts := &options.Options{Confirm: false, SeverityThreshold: 3}
-	require.NoError(t, sut.SecurityScan(opts))
+	require.NoError(t, sut.SecurityScan(context.Background(), opts))
 
 	require.Equal(t, 1, mock.GetPromotionEdgesCallCount())
 	require.Equal(t, 0, mock.ScanEdgesCallCount())
@@ -539,9 +539,9 @@ func TestCheckSignatures(t *testing.T) {
 
 			opts := &options.Options{}
 			if tc.shouldErr {
-				require.Error(t, sut.CheckSignatures(opts), tc.msg)
+				require.Error(t, sut.CheckSignatures(context.Background(), opts), tc.msg)
 			} else {
-				require.NoError(t, sut.CheckSignatures(opts), tc.msg)
+				require.NoError(t, sut.CheckSignatures(context.Background(), opts), tc.msg)
 			}
 		})
 	}
@@ -556,7 +556,7 @@ func TestCheckSignaturesAllConsistent(t *testing.T) {
 	}, nil)
 	sut.SetImplementation(&mock)
 
-	require.NoError(t, sut.CheckSignatures(&options.Options{}))
+	require.NoError(t, sut.CheckSignatures(context.Background(), &options.Options{}))
 
 	// Should not attempt to fix anything
 	require.Equal(t, 0, mock.FixMissingSignaturesCallCount())

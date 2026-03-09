@@ -48,6 +48,9 @@ cd "${REPO_ROOT}"
 
 mkdir -p "${ARTIFACTS}"
 
+# The race detector requires cgo
+export CGO_ENABLED=1
+
 go_test_flags=(
     -v
     -count=1

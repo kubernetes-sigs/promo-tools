@@ -102,26 +102,26 @@ type promoterImplementation interface {
 
 	// Methods for promotion mode:
 	ParseManifests(*options.Options) ([]schema.Manifest, error)
-	GetPromotionEdges(*options.Options, []schema.Manifest) (map[promotion.Edge]any, error)
+	GetPromotionEdges(context.Context, *options.Options, []schema.Manifest) (map[promotion.Edge]any, error)
 	EdgesFromManifests([]schema.Manifest) (map[promotion.Edge]any, error)
-	PromoteImages(*options.Options, map[promotion.Edge]any) error
+	PromoteImages(context.Context, *options.Options, map[promotion.Edge]any) error
 
 	// Methods for snapshot mode:
 	GetSnapshotSourceRegistry(*options.Options) (*registry.Context, error)
 	GetSnapshotManifests(*options.Options) ([]schema.Manifest, error)
 	AppendManifestToSnapshot(*options.Options, []schema.Manifest) ([]schema.Manifest, error)
-	GetRegistryImageInventory(*options.Options, []schema.Manifest) (registry.RegInvImage, error)
+	GetRegistryImageInventory(context.Context, *options.Options, []schema.Manifest) (registry.RegInvImage, error)
 	Snapshot(*options.Options, registry.RegInvImage) error
 
 	// Methods for image vulnerability scans:
-	ScanEdges(*options.Options, map[promotion.Edge]any) error
+	ScanEdges(context.Context, *options.Options, map[promotion.Edge]any) error
 
 	// Methods for image signing and replication
-	PrewarmTUFCache() error
+	PrewarmTUFCache(context.Context) error
 	ValidateStagingSignatures(map[promotion.Edge]any) (map[promotion.Edge]any, error)
 	SignImages(*options.Options, map[promotion.Edge]any) error
 	ReplicateSignatures(*options.Options, map[promotion.Edge]any) error
-	WriteProvenanceAttestations(*options.Options, map[promotion.Edge]any, provenance.Generator) error
+	WriteProvenanceAttestations(context.Context, *options.Options, map[promotion.Edge]any, provenance.Generator) error
 
 	// Methods for checking signatures
 	GetLatestImages(*options.Options) ([]string, error)
@@ -146,12 +146,12 @@ func (p *Promoter) PromoteImages(ctx context.Context, opts *options.Options) err
 	pipe := pipeline.New()
 
 	// Setup phase: validate and prewarm caches.
-	pipe.AddPhase(pipeline.NewPhase("setup", func(_ context.Context) error {
+	pipe.AddPhase(pipeline.NewPhase("setup", func(ctx context.Context) error {
 		if err := p.impl.ValidateOptions(opts); err != nil {
 			return fmt.Errorf("validating options: %w", err)
 		}
 
-		if err := p.impl.PrewarmTUFCache(); err != nil {
+		if err := p.impl.PrewarmTUFCache(ctx); err != nil {
 			return fmt.Errorf("prewarming TUF cache: %w", err)
 		}
 
@@ -159,7 +159,7 @@ func (p *Promoter) PromoteImages(ctx context.Context, opts *options.Options) err
 	}))
 
 	// Plan phase: parse manifests and compute edges.
-	pipe.AddPhase(pipeline.NewPhase("plan", func(_ context.Context) error {
+	pipe.AddPhase(pipeline.NewPhase("plan", func(ctx context.Context) error {
 		var err error
 
 		mfests, err = p.impl.ParseManifests(opts)
@@ -169,7 +169,7 @@ func (p *Promoter) PromoteImages(ctx context.Context, opts *options.Options) err
 
 		p.impl.PrintVersion()
 
-		promotionEdges, err = p.impl.GetPromotionEdges(opts, mfests)
+		promotionEdges, err = p.impl.GetPromotionEdges(ctx, opts, mfests)
 		if err != nil {
 			return fmt.Errorf("computing promotion edges: %w", err)
 		}
@@ -226,8 +226,8 @@ func (p *Promoter) PromoteImages(ctx context.Context, opts *options.Options) err
 	}))
 
 	// Promote phase: copy images.
-	pipe.AddPhase(pipeline.NewPhase("promote", func(_ context.Context) error {
-		if err := p.impl.PromoteImages(opts, promotionEdges); err != nil {
+	pipe.AddPhase(pipeline.NewPhase("promote", func(ctx context.Context) error {
+		if err := p.impl.PromoteImages(ctx, opts, promotionEdges); err != nil {
 			return fmt.Errorf("running promotion: %w", err)
 		}
 
@@ -244,8 +244,8 @@ func (p *Promoter) PromoteImages(ctx context.Context, opts *options.Options) err
 	}))
 
 	// Attest phase: generate and push provenance attestations.
-	pipe.AddPhase(pipeline.NewPhase("attest", func(_ context.Context) error {
-		if err := p.impl.WriteProvenanceAttestations(opts, promotionEdges, p.provenanceGenerator); err != nil {
+	pipe.AddPhase(pipeline.NewPhase("attest", func(ctx context.Context) error {
+		if err := p.impl.WriteProvenanceAttestations(ctx, opts, promotionEdges, p.provenanceGenerator); err != nil {
 			return fmt.Errorf("writing provenance attestations: %w", err)
 		}
 
@@ -263,7 +263,7 @@ func (p *Promoter) PromoteImages(ctx context.Context, opts *options.Options) err
 }
 
 // Snapshot runs the steps to output a representation in json or yaml of a registry.
-func (p *Promoter) Snapshot(opts *options.Options) error {
+func (p *Promoter) Snapshot(ctx context.Context, opts *options.Options) error {
 	if err := p.impl.ValidateOptions(opts); err != nil {
 		return fmt.Errorf("validating options: %w", err)
 	}
@@ -280,7 +280,7 @@ func (p *Promoter) Snapshot(opts *options.Options) error {
 		return fmt.Errorf("adding the specified manifest to the snapshot context: %w", err)
 	}
 
-	rii, err := p.impl.GetRegistryImageInventory(opts, mfests)
+	rii, err := p.impl.GetRegistryImageInventory(ctx, opts, mfests)
 	if err != nil {
 		return fmt.Errorf("getting registry image inventory: %w", err)
 	}
@@ -295,7 +295,7 @@ func (p *Promoter) Snapshot(opts *options.Options) error {
 // SecurityScan runs just like an image promotion, but instead of
 // actually copying the new detected images, it will run a vulnerability
 // scan on them.
-func (p *Promoter) SecurityScan(opts *options.Options) error {
+func (p *Promoter) SecurityScan(ctx context.Context, opts *options.Options) error {
 	if err := p.impl.ValidateOptions(opts); err != nil {
 		return fmt.Errorf("validating options: %w", err)
 	}
@@ -308,7 +308,7 @@ func (p *Promoter) SecurityScan(opts *options.Options) error {
 	p.impl.PrintVersion()
 	p.impl.PrintSecDisclaimer()
 
-	promotionEdges, err := p.impl.GetPromotionEdges(opts, mfests)
+	promotionEdges, err := p.impl.GetPromotionEdges(ctx, opts, mfests)
 	if err != nil {
 		return fmt.Errorf("filtering edges: %w", err)
 	}
@@ -326,7 +326,7 @@ func (p *Promoter) SecurityScan(opts *options.Options) error {
 		return nil
 	}
 
-	if err := p.impl.ScanEdges(opts, promotionEdges); err != nil {
+	if err := p.impl.ScanEdges(ctx, opts, promotionEdges); err != nil {
 		return fmt.Errorf("running vulnerability scan: %w", err)
 	}
 
@@ -334,7 +334,7 @@ func (p *Promoter) SecurityScan(opts *options.Options) error {
 }
 
 // CheckSignatures checks the consistency of a set of images.
-func (p *Promoter) CheckSignatures(opts *options.Options) error {
+func (p *Promoter) CheckSignatures(_ context.Context, opts *options.Options) error {
 	logrus.Info("Fetching latest promoted images")
 
 	images, err := p.impl.GetLatestImages(opts)
@@ -380,12 +380,12 @@ func (p *Promoter) ReplicateSignatures(ctx context.Context, opts *options.Option
 	pipe := pipeline.New()
 
 	// Setup phase: validate and prewarm caches.
-	pipe.AddPhase(pipeline.NewPhase("setup", func(_ context.Context) error {
+	pipe.AddPhase(pipeline.NewPhase("setup", func(ctx context.Context) error {
 		if err := p.impl.ValidateOptions(opts); err != nil {
 			return fmt.Errorf("validating options: %w", err)
 		}
 
-		if err := p.impl.PrewarmTUFCache(); err != nil {
+		if err := p.impl.PrewarmTUFCache(ctx); err != nil {
 			return fmt.Errorf("prewarming TUF cache: %w", err)
 		}
 

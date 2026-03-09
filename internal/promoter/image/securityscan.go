@@ -30,6 +30,7 @@ import (
 // ScanEdges runs vulnerability scans on the new images detected by the
 // promoter using the configured vuln.Scanner.
 func (di *DefaultPromoterImplementation) ScanEdges(
+	ctx context.Context,
 	opts *options.Options,
 	promotionEdges map[promotion.Edge]any,
 ) error {
@@ -40,7 +41,6 @@ func (di *DefaultPromoterImplementation) ScanEdges(
 	}
 
 	threshold := vuln.Severity(opts.SeverityThreshold)
-	ctx := context.Background()
 
 	for edge := range promotionEdges {
 		ref := edge.SrcReference()
