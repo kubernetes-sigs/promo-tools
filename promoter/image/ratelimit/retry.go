@@ -29,11 +29,16 @@ import (
 )
 
 // retryBackoff defines the exponential backoff for transient registry errors.
+// With Duration=30s, Factor=2, Steps=6, Cap=5m the retry delays are roughly:
+// 30s, 60s, 120s, 240s, 300s (capped) for a total budget of ~12.5 minutes.
+// This is generous enough to outlast per-minute Artifact Registry quotas even
+// when 80 concurrent workers compete for the same quota.
 var retryBackoff = wait.Backoff{
 	Duration: 30 * time.Second,
 	Factor:   2,
 	Jitter:   0.1,
-	Steps:    3,
+	Steps:    6,
+	Cap:      5 * time.Minute,
 }
 
 // IsTransient returns true for errors that indicate a temporary failure
