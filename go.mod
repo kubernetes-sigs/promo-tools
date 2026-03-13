@@ -5,11 +5,11 @@ go 1.25.6
 require (
 	cloud.google.com/go/containeranalysis v0.14.2
 	cloud.google.com/go/iam v1.5.3
-	cloud.google.com/go/storage v1.61.1
+	cloud.google.com/go/storage v1.61.2
 	github.com/aws/aws-sdk-go-v2 v1.41.3
 	github.com/aws/aws-sdk-go-v2/config v1.32.11
-	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.22.6
-	github.com/aws/aws-sdk-go-v2/service/s3 v1.96.4
+	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.22.7
+	github.com/aws/aws-sdk-go-v2/service/s3 v1.97.0
 	github.com/go-git/go-git/v5 v5.17.0
 	github.com/google/go-containerregistry v0.21.2
 	github.com/in-toto/attestation v1.1.2
