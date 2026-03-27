@@ -264,6 +264,12 @@ func ParseThinManifestsFromDir(
 		if err != nil {
 			return nil, fmt.Errorf("get prow diff files: %w", err)
 		}
+
+		if len(digestsToCheck) == 0 {
+			logrus.Info("No digests found in prow diff, nothing to promote")
+
+			return []Manifest{}, nil
+		}
 	}
 
 	// Check that the thin manifests dir follows a regular, predefined format.

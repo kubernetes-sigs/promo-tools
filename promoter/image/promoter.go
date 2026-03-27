@@ -167,6 +167,12 @@ func (p *Promoter) PromoteImages(ctx context.Context, opts *options.Options) err
 			return fmt.Errorf("parsing manifests: %w", err)
 		}
 
+		if len(mfests) == 0 {
+			logrus.Info("No manifests to process, nothing to promote")
+
+			return pipeline.ErrStopPipeline
+		}
+
 		p.impl.PrintVersion()
 
 		promotionEdges, err = p.impl.GetPromotionEdges(ctx, opts, mfests)

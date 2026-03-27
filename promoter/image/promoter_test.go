@@ -30,8 +30,15 @@ import (
 	"sigs.k8s.io/promo-tools/v4/promoter/image/promotion"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/provenance"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/registry"
+	"sigs.k8s.io/promo-tools/v4/promoter/image/schema"
 	"sigs.k8s.io/promo-tools/v4/types/image"
 )
+
+// nonEmptyManifests returns a minimal manifest slice so that the pipeline
+// does not stop early due to an empty manifest list.
+func nonEmptyManifests() []schema.Manifest {
+	return []schema.Manifest{{}}
+}
 
 func TestPromoteImages(t *testing.T) {
 	sut := imagepromoter.Promoter{}
@@ -51,7 +58,9 @@ func TestPromoteImages(t *testing.T) {
 			// No errors
 			shouldErr: false,
 			msg:       "No errors",
-			prepare:   func(_ *imagefakes.FakePromoterImplementation) {},
+			prepare: func(fpi *imagefakes.FakePromoterImplementation) {
+				fpi.ParseManifestsReturns(nonEmptyManifests(), nil)
+			},
 		},
 		{
 			// ValidateOptions fails
@@ -78,6 +87,7 @@ func TestPromoteImages(t *testing.T) {
 			// GetPromotionEdges fails
 			shouldErr: true,
 			prepare: func(fpi *imagefakes.FakePromoterImplementation) {
+				fpi.ParseManifestsReturns(nonEmptyManifests(), nil)
 				fpi.GetPromotionEdgesReturns(nil, testErr)
 			},
 		},
@@ -85,6 +95,7 @@ func TestPromoteImages(t *testing.T) {
 			// ValidateStagingSignatures fails
 			shouldErr: true,
 			prepare: func(fpi *imagefakes.FakePromoterImplementation) {
+				fpi.ParseManifestsReturns(nonEmptyManifests(), nil)
 				fpi.ValidateStagingSignaturesReturns(nil, testErr)
 			},
 		},
@@ -92,6 +103,7 @@ func TestPromoteImages(t *testing.T) {
 			// PromoteImages fails
 			shouldErr: true,
 			prepare: func(fpi *imagefakes.FakePromoterImplementation) {
+				fpi.ParseManifestsReturns(nonEmptyManifests(), nil)
 				fpi.PromoteImagesReturns(testErr)
 			},
 		},
@@ -99,6 +111,7 @@ func TestPromoteImages(t *testing.T) {
 			// SignImages fails
 			shouldErr: true,
 			prepare: func(fpi *imagefakes.FakePromoterImplementation) {
+				fpi.ParseManifestsReturns(nonEmptyManifests(), nil)
 				fpi.SignImagesReturns(testErr)
 			},
 		},
@@ -107,6 +120,7 @@ func TestPromoteImages(t *testing.T) {
 			shouldErr: true,
 			msg:       "WriteProvenanceAttestations fails",
 			prepare: func(fpi *imagefakes.FakePromoterImplementation) {
+				fpi.ParseManifestsReturns(nonEmptyManifests(), nil)
 				fpi.WriteProvenanceAttestationsReturns(testErr)
 			},
 		},
@@ -126,6 +140,7 @@ func TestPromoteImages(t *testing.T) {
 func TestPromoteImagesParseOnly(t *testing.T) {
 	sut := imagepromoter.Promoter{}
 	mock := imagefakes.FakePromoterImplementation{}
+	mock.ParseManifestsReturns(nonEmptyManifests(), nil)
 	sut.SetImplementation(&mock)
 
 	// ParseOnly should stop after plan phase with no error
@@ -141,6 +156,7 @@ func TestPromoteImagesParseOnly(t *testing.T) {
 func TestPromoteImagesNonConfirm(t *testing.T) {
 	sut := imagepromoter.Promoter{}
 	mock := imagefakes.FakePromoterImplementation{}
+	mock.ParseManifestsReturns(nonEmptyManifests(), nil)
 	sut.SetImplementation(&mock)
 	sut.SetProvenanceVerifier(&fakeVerifier{
 		result: &provenance.Result{Verified: true},
@@ -156,9 +172,25 @@ func TestPromoteImagesNonConfirm(t *testing.T) {
 	require.Equal(t, 0, mock.PromoteImagesCallCount())
 }
 
+func TestPromoteImagesEmptyManifests(t *testing.T) {
+	sut := imagepromoter.Promoter{}
+	mock := imagefakes.FakePromoterImplementation{}
+	// Return empty manifests (e.g., prow diff found no digests)
+	mock.ParseManifestsReturns([]schema.Manifest{}, nil)
+	sut.SetImplementation(&mock)
+
+	opts := &options.Options{Confirm: true}
+	require.NoError(t, sut.PromoteImages(context.Background(), opts))
+
+	// No downstream phases should have been called
+	require.Equal(t, 0, mock.GetPromotionEdgesCallCount())
+	require.Equal(t, 0, mock.PromoteImagesCallCount())
+}
+
 func TestPromoteImagesProvenanceAlwaysRuns(t *testing.T) {
 	sut := imagepromoter.Promoter{}
 	mock := imagefakes.FakePromoterImplementation{}
+	mock.ParseManifestsReturns(nonEmptyManifests(), nil)
 	mock.GetPromotionEdgesReturns(map[promotion.Edge]any{
 		testEdge(): nil,
 	}, nil)
@@ -199,6 +231,7 @@ func testEdge() promotion.Edge {
 func TestPromoteImagesProvenanceFails(t *testing.T) {
 	sut := imagepromoter.Promoter{}
 	mock := imagefakes.FakePromoterImplementation{}
+	mock.ParseManifestsReturns(nonEmptyManifests(), nil)
 	// Return a non-empty edge set so provenance has something to check
 	mock.GetPromotionEdgesReturns(map[promotion.Edge]any{
 		testEdge(): nil,
@@ -223,6 +256,7 @@ func TestPromoteImagesProvenanceFails(t *testing.T) {
 func TestPromoteImagesProvenanceVerifierError(t *testing.T) {
 	sut := imagepromoter.Promoter{}
 	mock := imagefakes.FakePromoterImplementation{}
+	mock.ParseManifestsReturns(nonEmptyManifests(), nil)
 	mock.GetPromotionEdgesReturns(map[promotion.Edge]any{
 		testEdge(): nil,
 	}, nil)
@@ -325,6 +359,7 @@ func TestNewPromoter(t *testing.T) {
 	// Verify that a promoter created via New() has the verifier and
 	// generator configured by running a full pipeline with a mock impl.
 	mock := imagefakes.FakePromoterImplementation{}
+	mock.ParseManifestsReturns(nonEmptyManifests(), nil)
 	p.SetImplementation(&mock)
 
 	require.NoError(t, p.PromoteImages(context.Background(), &options.Options{Confirm: true}))
