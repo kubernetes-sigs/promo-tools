@@ -51,9 +51,15 @@ func (p *s3Provider) Scheme() string {
 type s3SyncFilestore struct {
 	provider  *s3Provider
 	filestore *api.Filestore
-	client    *s3.Client
+	client    s3APIClient
 	bucket    string
 	prefix    string
+}
+
+type s3APIClient interface {
+	GetObject(ctx context.Context, params *s3.GetObjectInput, optFns ...func(*s3.Options)) (*s3.GetObjectOutput, error)
+	PutObject(ctx context.Context, params *s3.PutObjectInput, optFns ...func(*s3.Options)) (*s3.PutObjectOutput, error)
+	ListObjectsV2(ctx context.Context, params *s3.ListObjectsV2Input, optFns ...func(*s3.Options)) (*s3.ListObjectsV2Output, error)
 }
 
 // openS3Filestore opens a filestore backed by Amazon S3 (S3).
@@ -269,16 +275,18 @@ func (s *s3SyncFilestore) ListFiles(
 		return nil
 	}
 
-	page, err := s.client.ListObjectsV2(ctx, req)
-	if err != nil {
-		return nil, fmt.Errorf("error listing objects: %w", err)
-	}
-
-	for _, obj := range page.Contents {
-		err := objectCallback(obj)
+	paginator := s3.NewListObjectsV2Paginator(s.client, req)
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
 		if err != nil {
-			// stop iteration immediately on error
-			return nil, err
+			return nil, fmt.Errorf("error listing objects: %w", err)
+		}
+
+		for _, obj := range page.Contents {
+			if err := objectCallback(obj); err != nil {
+				// stop iteration immediately on error
+				return nil, err
+			}
 		}
 	}
 
