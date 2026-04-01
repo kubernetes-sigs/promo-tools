@@ -8,9 +8,9 @@ require (
 	cloud.google.com/go/storage v1.61.3
 	github.com/aws/aws-sdk-go-v2 v1.41.5
 	github.com/aws/aws-sdk-go-v2/config v1.32.13
-	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.22.10
-	github.com/aws/aws-sdk-go-v2/service/s3 v1.97.3
-	github.com/go-git/go-git/v5 v5.17.1
+	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.22.11
+	github.com/aws/aws-sdk-go-v2/service/s3 v1.98.0
+	github.com/go-git/go-git/v5 v5.17.2
 	github.com/google/go-containerregistry v0.21.3
 	github.com/in-toto/attestation v1.2.0
 	github.com/maxbrunsfeld/counterfeiter/v6 v6.12.1
@@ -23,14 +23,14 @@ require (
 	golang.org/x/oauth2 v0.36.0
 	golang.org/x/sync v0.20.0
 	golang.org/x/time v0.15.0
-	google.golang.org/api v0.273.0
+	google.golang.org/api v0.273.1
 	google.golang.org/genproto v0.0.0-20260316180232-0b37fe3546d5
 	google.golang.org/protobuf v1.36.11
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/apimachinery v0.35.3
 	k8s.io/utils v0.0.0-20260210185600-b8788abfbbc2
 	sigs.k8s.io/release-sdk v0.12.6
-	sigs.k8s.io/release-utils v0.12.3
+	sigs.k8s.io/release-utils v0.12.4
 	sigs.k8s.io/yaml v1.6.0
 )
 
@@ -107,9 +107,8 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/chrismellard/docker-credential-acr-env v0.0.0-20230304212654-82a0ddb27589 // indirect
 	github.com/clbanning/mxj/v2 v2.7.0 // indirect
-	github.com/clipperhouse/displaywidth v0.6.0 // indirect
-	github.com/clipperhouse/stringish v0.1.1 // indirect
-	github.com/clipperhouse/uax29/v2 v2.3.0 // indirect
+	github.com/clipperhouse/displaywidth v0.10.0 // indirect
+	github.com/clipperhouse/uax29/v2 v2.6.0 // indirect
 	github.com/cloudflare/circl v1.6.3 // indirect
 	github.com/cncf/xds/go v0.0.0-20251210132809-ee656c7534f5 // indirect
 	github.com/cockroachdb/apd/v3 v3.2.1 // indirect
@@ -215,9 +214,9 @@ require (
 	github.com/oklog/ulid/v2 v2.1.1 // indirect
 	github.com/oleiade/reflections v1.1.0 // indirect
 	github.com/olekukonko/cat v0.0.0-20250911104152-50322a0618f6 // indirect
-	github.com/olekukonko/errors v1.1.0 // indirect
-	github.com/olekukonko/ll v0.1.3 // indirect
-	github.com/olekukonko/tablewriter v1.1.2 // indirect
+	github.com/olekukonko/errors v1.2.0 // indirect
+	github.com/olekukonko/ll v0.1.6 // indirect
+	github.com/olekukonko/tablewriter v1.1.4 // indirect
 	github.com/open-policy-agent/opa v1.8.0 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.1 // indirect
