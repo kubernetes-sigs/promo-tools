@@ -11,8 +11,8 @@ cloud.google.com/go/auth/oauth2adapt v0.2.8 h1:keo8NaayQZ6wimpNSmW5OPc283g65QNIi
 cloud.google.com/go/auth/oauth2adapt v0.2.8/go.mod h1:XQ9y31RkqZCcwJWNSx2Xvric3RrU88hAYYbjDWYDL+c=
 cloud.google.com/go/compute/metadata v0.9.0 h1:pDUj4QMoPejqq20dK0Pg2N4yG9zIkYGdBtwLoEkH9Zs=
 cloud.google.com/go/compute/metadata v0.9.0/go.mod h1:E0bWwX5wTnLPedCKqk3pJmVgCBSM6qQI1yTBdEb3C10=
-cloud.google.com/go/containeranalysis v0.15.0 h1:yNQvV+y0zmxcMU1ILyVqq8U42MF63mTDF63EHGO/gvA=
-cloud.google.com/go/containeranalysis v0.15.0/go.mod h1:CgPFsUrNm5vZDlxW4DBdeYTW9KVtZVJLzHOtERyuEVc=
+cloud.google.com/go/containeranalysis v0.16.0 h1:v+Q3ZBOf5LdmQ9uiAcxqwTZfGCBpQ6ZniG0iZK398js=
+cloud.google.com/go/containeranalysis v0.16.0/go.mod h1:4bj+b/9SrnbGoxOVRaPwr1DlKxeRPHFWDZE3We/l8ng=
 cloud.google.com/go/grafeas v0.3.17 h1:eTq1l4Czo48O39e2ZKSvaRwn0klCeUPf4CvbA+2R4IY=
 cloud.google.com/go/grafeas v0.3.17/go.mod h1:MLYFFap01tm1Rbcd0AT6V2NW1ho45dbX+AxNEcprExY=
 cloud.google.com/go/iam v1.7.0 h1:JD3zh0C6LHl16aCn5Akff0+GELdp1+4hmh6ndoFLl8U=
@@ -1051,8 +1051,8 @@ google.golang.org/genproto v0.0.0-20180817151627-c66870c02cf8/go.mod h1:JiN7NxoA
 google.golang.org/genproto v0.0.0-20190819201941-24fa4b261c55/go.mod h1:DMBHOl98Agz4BDEuKkezgsaosCRResVns1a3J2ZsMNc=
 google.golang.org/genproto v0.0.0-20260319201613-d00831a3d3e7 h1:XzmzkmB14QhVhgnawEVsOn6OFsnpyxNPRY9QV01dNB0=
 google.golang.org/genproto v0.0.0-20260319201613-d00831a3d3e7/go.mod h1:L43LFes82YgSonw6iTXTxXUX1OlULt4AQtkik4ULL/I=
-google.golang.org/genproto/googleapis/api v0.0.0-20260401001100-f93e5f3e9f0f h1:K3zPU40OFjwD5YKADLMLoiL0L7JJpBgEdLqGuCNPfp0=
-google.golang.org/genproto/googleapis/api v0.0.0-20260401001100-f93e5f3e9f0f/go.mod h1:EIQZ5bFCfRQDV4MhRle7+OgjNtZ6P1PiZBgAKuxXu/Y=
+google.golang.org/genproto/googleapis/api v0.0.0-20260401024825-9d38bb4040a9 h1:VPWxll4HlMw1Vs/qXtN7BvhZqsS9cdAittCNvVENElA=
+google.golang.org/genproto/googleapis/api v0.0.0-20260401024825-9d38bb4040a9/go.mod h1:7QBABkRtR8z+TEnmXTqIqwJLlzrZKVfAUm7tY3yGv0M=
 google.golang.org/genproto/googleapis/rpc v0.0.0-20260401024825-9d38bb4040a9 h1:m8qni9SQFH0tJc1X0vmnpw/0t+AImlSvp30sEupozUg=
 google.golang.org/genproto/googleapis/rpc v0.0.0-20260401024825-9d38bb4040a9/go.mod h1:4Hqkh8ycfw05ld/3BWL7rJOSfebL2Q+DVDeRgYgxUU8=
 google.golang.org/grpc v1.19.0/go.mod h1:mqu4LbDTu4XGKhr4mRzUsmM4RtVoemTSY81AxZiDr8c=
