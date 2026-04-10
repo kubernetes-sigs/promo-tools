@@ -3,7 +3,7 @@ module sigs.k8s.io/promo-tools/v4
 go 1.25.7
 
 require (
-	cloud.google.com/go/containeranalysis v0.15.0
+	cloud.google.com/go/containeranalysis v0.16.0
 	cloud.google.com/go/iam v1.7.0
 	cloud.google.com/go/storage v1.62.0
 	github.com/aws/aws-sdk-go-v2 v1.41.5
@@ -290,7 +290,7 @@ require (
 	golang.org/x/term v0.41.0 // indirect
 	golang.org/x/text v0.35.0 // indirect
 	golang.org/x/tools v0.43.0 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20260401001100-f93e5f3e9f0f // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20260401024825-9d38bb4040a9 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260401024825-9d38bb4040a9 // indirect
 	google.golang.org/grpc v1.80.0 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
