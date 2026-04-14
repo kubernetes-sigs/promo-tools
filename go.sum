@@ -15,8 +15,8 @@ cloud.google.com/go/containeranalysis v0.16.0 h1:v+Q3ZBOf5LdmQ9uiAcxqwTZfGCBpQ6Z
 cloud.google.com/go/containeranalysis v0.16.0/go.mod h1:4bj+b/9SrnbGoxOVRaPwr1DlKxeRPHFWDZE3We/l8ng=
 cloud.google.com/go/grafeas v0.3.17 h1:eTq1l4Czo48O39e2ZKSvaRwn0klCeUPf4CvbA+2R4IY=
 cloud.google.com/go/grafeas v0.3.17/go.mod h1:MLYFFap01tm1Rbcd0AT6V2NW1ho45dbX+AxNEcprExY=
-cloud.google.com/go/iam v1.8.0 h1:e5QOdN1zQ3MTWYtXIf2buX+jxqvo2sKqBCOLrteLd1M=
-cloud.google.com/go/iam v1.8.0/go.mod h1:IkWUaEeLK91WQqTKa/fi5xdHJbL49kv2j/vlAZQSJ+k=
+cloud.google.com/go/iam v1.9.0 h1:89wyjxT6DL4b5rk/Nk8eBC9DHqf+JiMstrn5IEYxFw4=
+cloud.google.com/go/iam v1.9.0/go.mod h1:KP+nKGugNJW4LcLx1uEZcq1ok5sQHFaQehQNl4QDgV4=
 cloud.google.com/go/kms v1.26.0 h1:cK9mN2cf+9V63D3H1f6koxTatWy39aTI/hCjz1I+adU=
 cloud.google.com/go/kms v1.26.0/go.mod h1:pHKOdFJm63hxBsiPkYtowZPltu9dW0MWvBa6IA4HM58=
 cloud.google.com/go/logging v1.13.2 h1:qqlHCBvieJT9Cdq4QqYx1KPadCQ2noD4FK02eNqHAjA=
