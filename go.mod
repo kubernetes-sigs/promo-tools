@@ -10,7 +10,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/config v1.32.14
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.22.13
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.99.0
-	github.com/go-git/go-git/v5 v5.17.2
+	github.com/go-git/go-git/v5 v5.18.0
 	github.com/google/go-containerregistry v0.21.5
 	github.com/in-toto/attestation v1.2.0
 	github.com/maxbrunsfeld/counterfeiter/v6 v6.12.2
