@@ -16,7 +16,7 @@
 
 ARG GO_VERSION
 ARG OS_CODENAME
-FROM golang:1.25-trixie AS builder
+FROM golang:1.26-trixie AS builder
 
 # Copy the sources
 WORKDIR /go/src/app
