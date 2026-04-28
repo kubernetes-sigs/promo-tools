@@ -103,7 +103,6 @@ type promoterImplementation interface {
 	// Methods for promotion mode:
 	ParseManifests(*options.Options) ([]schema.Manifest, error)
 	GetPromotionEdges(context.Context, *options.Options, []schema.Manifest) (map[promotion.Edge]any, error)
-	EdgesFromManifests([]schema.Manifest) (map[promotion.Edge]any, error)
 	PromoteImages(context.Context, *options.Options, map[promotion.Edge]any) error
 
 	// Methods for snapshot mode:
@@ -116,11 +115,10 @@ type promoterImplementation interface {
 	// Methods for image vulnerability scans:
 	ScanEdges(context.Context, *options.Options, map[promotion.Edge]any) error
 
-	// Methods for image signing and replication
+	// Methods for image signing
 	PrewarmTUFCache(context.Context) error
 	ValidateStagingSignatures(map[promotion.Edge]any) (map[promotion.Edge]any, error)
 	SignImages(*options.Options, map[promotion.Edge]any) error
-	ReplicateSignatures(*options.Options, map[promotion.Edge]any) error
 	WriteProvenanceAttestations(context.Context, *options.Options, map[promotion.Edge]any, provenance.Generator) error
 
 	// Methods for checking signatures
@@ -255,9 +253,6 @@ func (p *Promoter) PromoteImages(ctx context.Context, opts *options.Options) err
 			return fmt.Errorf("writing provenance attestations: %w", err)
 		}
 
-		logrus.Info("Signature replication to mirror registries is handled by the periodic Prow job: " +
-			"https://prow.k8s.io/job-history/gs/kubernetes-ci-logs/logs/ci-k8sio-image-signature-replication")
-
 		return nil
 	}))
 
@@ -371,69 +366,6 @@ func (p *Promoter) CheckSignatures(_ context.Context, opts *options.Options) err
 
 	if err := p.impl.FixPartialSignatures(opts, results); err != nil {
 		return fmt.Errorf("fixing partial signatures: %w", err)
-	}
-
-	return nil
-}
-
-// ReplicateSignatures is a standalone mode that copies image signatures
-// from the primary destination registry to all mirror registries.
-// It reads ALL edges from manifests (not just unsynced ones) so it can
-// run independently of the promotion job.
-func (p *Promoter) ReplicateSignatures(ctx context.Context, opts *options.Options) error {
-	var promotionEdges map[promotion.Edge]any
-
-	pipe := pipeline.New()
-
-	// Setup phase: validate and prewarm caches.
-	pipe.AddPhase(pipeline.NewPhase("setup", func(ctx context.Context) error {
-		if err := p.impl.ValidateOptions(opts); err != nil {
-			return fmt.Errorf("validating options: %w", err)
-		}
-
-		if err := p.impl.PrewarmTUFCache(ctx); err != nil {
-			return fmt.Errorf("prewarming TUF cache: %w", err)
-		}
-
-		return nil
-	}))
-
-	// Plan phase: parse manifests, compute all edges (unfiltered).
-	pipe.AddPhase(pipeline.NewPhase("plan", func(_ context.Context) error {
-		mfests, err := p.impl.ParseManifests(opts)
-		if err != nil {
-			return fmt.Errorf("parsing manifests: %w", err)
-		}
-
-		p.impl.PrintVersion()
-
-		promotionEdges, err = p.impl.EdgesFromManifests(mfests)
-		if err != nil {
-			return fmt.Errorf("computing edges from manifests: %w", err)
-		}
-
-		logrus.Infof("Found %d edges for signature replication", len(promotionEdges))
-
-		if !opts.Confirm {
-			logrus.Info("Dry run complete (use --confirm to replicate)")
-
-			return pipeline.ErrStopPipeline
-		}
-
-		return nil
-	}))
-
-	// Replicate phase: batch-list tags and copy only missing signatures.
-	pipe.AddPhase(pipeline.NewPhase("replicate", func(_ context.Context) error {
-		if err := p.impl.ReplicateSignatures(opts, promotionEdges); err != nil {
-			return fmt.Errorf("replicating signatures: %w", err)
-		}
-
-		return nil
-	}))
-
-	if err := pipe.Run(ctx); err != nil {
-		return fmt.Errorf("running replication pipeline: %w", err)
 	}
 
 	return nil

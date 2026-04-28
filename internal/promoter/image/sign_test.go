@@ -173,57 +173,6 @@ func TestTargetIdentity(t *testing.T) {
 	}
 }
 
-func TestComputeSigCopiesReplicatesAllSigTags(t *testing.T) {
-	t.Parallel()
-
-	digest := image.Digest("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
-
-	mkEdge := func(dstReg string) promotion.Edge {
-		return promotion.Edge{
-			SrcRegistry: registry.Context{Name: "staging", Src: true},
-			SrcImageTag: promotion.ImageTag{Name: "app", Tag: "v1.0"},
-			Digest:      digest,
-			DstRegistry: registry.Context{Name: image.Registry(dstReg)},
-			DstImageTag: promotion.ImageTag{Name: "app", Tag: "v1.0"},
-		}
-	}
-
-	// Simulate tag listings: source has two .sig tags, mirror has only one.
-	sigTag1 := "sha256-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.sig"
-	sigTag2 := "sha256-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.sig"
-
-	srcKey := repoKey{"us-central1-docker.pkg.dev/k8s-artifacts-prod/images", "app"}
-	dstKey := repoKey{"us-east1-docker.pkg.dev/k8s-artifacts-prod/images", "app"}
-
-	allTags := map[repoKey]map[string]struct{}{
-		srcKey: {
-			sigTag1: {},
-			sigTag2: {},
-			"v1.0":  {},
-		},
-		dstKey: {
-			sigTag1: {}, // already replicated
-			"v1.0":  {},
-			// missing sigTag2
-		},
-	}
-
-	signed := []signedGroup{{
-		group: []promotion.Edge{
-			mkEdge("us-central1-docker.pkg.dev/k8s-artifacts-prod/images"),
-			mkEdge("us-east1-docker.pkg.dev/k8s-artifacts-prod/images"),
-		},
-		sigTag: sigTag1,
-	}}
-
-	copies := computeSigCopies(signed, allTags)
-
-	// Should produce exactly one copy: the .sig tag missing from the mirror.
-	require.Len(t, copies, 1)
-	require.Contains(t, copies[0].src, sigTag2)
-	require.Contains(t, copies[0].dst, sigTag2)
-}
-
 func TestGroupEdgesByIdentityDigest(t *testing.T) {
 	t.Parallel()
 
@@ -245,6 +194,9 @@ func TestGroupEdgesByIdentityDigest(t *testing.T) {
 
 	edges := map[promotion.Edge]any{
 		// Same normalized identity + digest, different registries → same group.
+		// asia-east1 sorts alphabetically before us-central1, but us-central1
+		// must be the primary (first) because it is the canonical registry.
+		mkEdge("asia-east1-docker.pkg.dev/k8s-artifacts-prod/images", "app", digest1, "v1.0"):  nil,
 		mkEdge("us-central1-docker.pkg.dev/k8s-artifacts-prod/images", "app", digest1, "v1.0"): nil,
 		mkEdge("us-east1-docker.pkg.dev/k8s-artifacts-prod/images", "app", digest1, "v1.0"):    nil,
 		mkEdge("us-west1-docker.pkg.dev/k8s-artifacts-prod/images", "app", digest1, "v1.0"):    nil,
@@ -267,12 +219,13 @@ func TestGroupEdgesByIdentityDigest(t *testing.T) {
 		return groups[i][0].Digest < groups[j][0].Digest
 	})
 
-	// Group 1: digest1 with 3 edges (us-central1, us-east1, us-west1).
-	require.Len(t, groups[0], 3)
-	// Edges should be sorted by destination registry name.
+	// Group 1: digest1 with 4 edges. The canonical registry (us-central1)
+	// must be first regardless of alphabetical ordering.
+	require.Len(t, groups[0], 4)
 	require.Equal(t, image.Registry("us-central1-docker.pkg.dev/k8s-artifacts-prod/images"), groups[0][0].DstRegistry.Name)
-	require.Equal(t, image.Registry("us-east1-docker.pkg.dev/k8s-artifacts-prod/images"), groups[0][1].DstRegistry.Name)
-	require.Equal(t, image.Registry("us-west1-docker.pkg.dev/k8s-artifacts-prod/images"), groups[0][2].DstRegistry.Name)
+	require.Equal(t, image.Registry("asia-east1-docker.pkg.dev/k8s-artifacts-prod/images"), groups[0][1].DstRegistry.Name)
+	require.Equal(t, image.Registry("us-east1-docker.pkg.dev/k8s-artifacts-prod/images"), groups[0][2].DstRegistry.Name)
+	require.Equal(t, image.Registry("us-west1-docker.pkg.dev/k8s-artifacts-prod/images"), groups[0][3].DstRegistry.Name)
 
 	// Group 2: digest2 with 1 edge.
 	require.Len(t, groups[1], 1)

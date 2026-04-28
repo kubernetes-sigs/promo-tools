@@ -55,8 +55,11 @@ const (
 	productionImagePath      = "k8s-artifacts-prod"
 	productionRepositoryPath = productionImagePath + "/images"
 
-	// scanRegistry is the one we index to search for images.
-	scanRegistry = "us-central1-docker.pkg.dev"
+	// canonicalRegistry is the primary Artifact Registry region used for
+	// indexing images and as the signing target. This must match the
+	// SIGNATURE_UPSTREAM_ENDPOINT configured in archeio so that signature
+	// lookups via registry.k8s.io are routed to the correct backend.
+	canonicalRegistry = "us-central1-docker.pkg.dev"
 )
 
 func (di *DefaultPromoterImplementation) GetLatestImages(opts *options.Options) ([]string, error) {
@@ -436,7 +439,7 @@ func (di *DefaultPromoterImplementation) readLatestImages(opts *options.Options)
 
 	images := []string{}
 
-	repo, err := name.NewRepository(scanRegistry+"/"+productionRepositoryPath, name.WeakValidation)
+	repo, err := name.NewRepository(canonicalRegistry+"/"+productionRepositoryPath, name.WeakValidation)
 	if err != nil {
 		return nil, fmt.Errorf("creating repo: %w", err)
 	}
@@ -481,7 +484,7 @@ func (di *DefaultPromoterImplementation) readLatestImages(opts *options.Options)
 
 			images = append(images, strings.ReplaceAll(
 				fmt.Sprintf("%s:%s", repo, manifest.Tags[0]),
-				scanRegistry+"/"+productionRepositoryPath, consts.ProdRegistry),
+				canonicalRegistry+"/"+productionRepositoryPath, consts.ProdRegistry),
 			)
 			mt.Unlock()
 		}
