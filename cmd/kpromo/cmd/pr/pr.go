@@ -66,6 +66,7 @@ type promoteOptions struct {
 	useSSH          bool
 	interactiveMode bool
 	project         string
+	stagingRepo     string
 	userFork        string
 	reviewers       string
 	tags            []string
@@ -104,6 +105,14 @@ func init() {
 		"project",
 		defaultProject,
 		"the name of the project to promote images for",
+	)
+
+	PRCmd.PersistentFlags().StringVar(
+		&promoteOpts.stagingRepo,
+		"staging-repo",
+		"",
+		"the full staging repo URL, overrides the default gcr.io/k8s-staging-<project> format "+
+			"(e.g. us-central1-docker.pkg.dev/k8s-staging-images/my-project)",
 	)
 
 	PRCmd.PersistentFlags().StringSliceVarP(
@@ -225,11 +234,34 @@ func runPromote(opts *promoteOptions) error {
 		}
 	}()
 
-	// Path to the promoter image list
+	stagingRepo := consts.StagingRepoPrefix + opts.project
+	if opts.stagingRepo != "" {
+		stagingRepo = opts.stagingRepo
+	}
+
+	opt := manifest.GrowOptions{}
+	if err := opt.Populate(
+		filepath.Join(repo.Dir(), consts.ProdRegistry),
+		stagingRepo, opts.images, opts.digests, opts.tags); err != nil {
+		return fmt.Errorf("populating image promoter options for tag %s with image filter %s: %w", opts.tags, opts.images, err)
+	}
+
+	if err := opt.Validate(); err != nil {
+		return fmt.Errorf("validate promoter options tag %s with image filter %s: %w", opts.tags, opts.images, err)
+	}
+
+	// Find the matching manifest to derive the correct images list path
+	mfest, err := manifest.Find(&opt)
+	if err != nil {
+		return fmt.Errorf("finding manifest for staging repo %s: %w", stagingRepo, err)
+	}
+
+	// Path to the promoter image list, derived from the manifest location
+	manifestDir := filepath.Base(filepath.Dir(mfest.Filepath))
 	imagesListPath := filepath.Join(
 		consts.ProdRegistry,
 		"images",
-		filepath.Base(consts.StagingRepoPrefix)+opts.project,
+		manifestDir,
 		"images.yaml",
 	)
 
@@ -245,17 +277,6 @@ func runPromote(opts *promoteOptions) error {
 			if err != nil {
 				return fmt.Errorf("while reading the current promoter image list: %w", err)
 			}
-		}
-
-		opt := manifest.GrowOptions{}
-		if err := opt.Populate(
-			filepath.Join(repo.Dir(), consts.ProdRegistry),
-			consts.StagingRepoPrefix+opts.project, opts.images, opts.digests, opts.tags); err != nil {
-			return fmt.Errorf("populating image promoter options for tag %s with image filter %s: %w", opts.tags, opts.images, err)
-		}
-
-		if err := opt.Validate(); err != nil {
-			return fmt.Errorf("validate promoter options tag %s with image filter %s: %w", opts.tags, opts.images, err)
 		}
 
 		logrus.Infof("Growing manifests for images matching filter %s and matching tag %s", opts.images, opts.tags)
@@ -391,6 +412,10 @@ func generatePRBody(opts *promoteOptions) string {
 
 	if opts.project != defaultProject {
 		args += " --project " + opts.project
+	}
+
+	if opts.stagingRepo != "" {
+		args += " --staging-repo " + opts.stagingRepo
 	}
 
 	if opts.reviewers != defaultReviewers {

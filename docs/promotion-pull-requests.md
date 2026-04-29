@@ -49,18 +49,26 @@ Usage:
   kpromo pr [flags]
 
 Flags:
-      --fork string        the user's fork of kubernetes/k8s.io
-  -h, --help               help for pr
-  -i, --interactive        interactive mode, asks before every step
-      --project string     the name of the project to promote images for (default "kubernetes")
-      --reviewers string   the list of GitHub users or teams to assign to the PR (default "@kubernetes/release-engineering")
-  -t, --tag strings        version tag of the images we will promote
+      --fork string           the user's fork of kubernetes/k8s.io
+  -h, --help                  help for pr
+  -i, --interactive           interactive mode, asks before every step
+      --project string        the name of the project to promote images for (default "kubernetes")
+      --reviewers string      the list of GitHub users or teams to assign to the PR (default "@kubernetes/release-engineering")
+      --staging-repo string   the full staging repo URL, overrides the default gcr.io/k8s-staging-<project> format
+  -t, --tag strings           version tag of the images we will promote
 ```
 
 Example:
 
 ```shell
 kpromo pr -i --fork=<your-github-username> --tag=v1.20.0-rc.0 --tag=v1.21.0-alpha.0
+```
+
+For projects using Artifact Registry instead of GCR, use the `--staging-repo` flag:
+
+```shell
+kpromo pr -i --fork=<your-github-username> --project=my-project --tag=v1.0.0 \
+  --staging-repo=us-central1-docker.pkg.dev/k8s-staging-images/my-project
 ```
 
 > [!NOTE]  
