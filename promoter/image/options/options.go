@@ -97,9 +97,6 @@ type Options struct {
 	// SignCheckIssuerRegexp can use a regex to match more than one signer OIDC tokens used to identify the signer
 	SignCheckIssuerRegexp string
 
-	// MaxSignatureCopies maximum number of concurrent signature copies
-	MaxSignatureCopies int
-
 	// MaxSignatureOps maximum number of concurrent signature operations
 	MaxSignatureOps int
 }
@@ -117,8 +114,7 @@ var DefaultOptions = &Options{
 	SignCheckIssuer:         "https://accounts.google.com",
 	SignCheckIdentityRegexp: "",
 	SignCheckIssuerRegexp:   "",
-	MaxSignatureCopies:      50, // Maximum number of concurrent signature copies
-	MaxSignatureOps:         50, // Maximum number of concurrent signature operations
+	MaxSignatureOps:         50,
 }
 
 func (o *Options) Validate() error {

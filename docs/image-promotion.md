@@ -16,7 +16,6 @@ and work with any OCI-compliant registry.
   - [Rate limiting](#rate-limiting)
 - [Server-side operations](#server-side-operations)
 - [Signing and attestation](#signing-and-attestation)
-- [Standalone signature replication](#standalone-signature-replication)
 - [Provenance verification](#provenance-verification)
 - [Vulnerability scanning](#vulnerability-scanning)
 - [Grabbing snapshots](#grabbing-snapshots)
@@ -199,9 +198,9 @@ pushed back up. This is important for two reasons:
 ## Signing and attestation
 
 After promotion, images are signed using [cosign](https://github.com/sigstore/cosign)
-with a keyless (OIDC) identity. Signatures are replicated to all mirror
-registries by a dedicated periodic Prow job (see
-[Standalone signature replication](#standalone-signature-replication)).
+with a keyless (OIDC) identity. Signatures are written to the canonical
+registry (`us-central1-docker.pkg.dev`) and served globally through
+registry.k8s.io via the `SIGNATURE_UPSTREAM_ENDPOINT` routing in archeio.
 The signing identity is configured with `--signer-account`.
 
 Promotion provenance attestations are stored as in-toto statement layers in the
@@ -216,34 +215,7 @@ Related flags:
 - `--signer-account` — service account identity for signing
 - `--certificate-identity` — identity to verify when checking signatures
 - `--certificate-oidc-issuer` — OIDC issuer for the signing identity
-- `--max-signature-copies` — max concurrent signature copies (default: `50`)
 - `--max-signature-ops` — max concurrent signature operations (default: `50`)
-
-## Standalone signature replication
-
-When images are promoted to multiple mirror registries, signatures must be
-replicated from the primary registry to all mirrors. This is handled by a
-dedicated periodic Prow job ([`ci-k8sio-image-signature-replication`](https://prow.k8s.io/?job=ci-k8sio-image-signature-replication)) using
-the `replicate-signatures` subcommand:
-
-```console
-kpromo cip replicate-signatures \
-  --thin-manifest-dir=/path/to/manifests \
-  --confirm
-```
-
-Without `--confirm` the command performs a dry run: it parses manifests and
-computes edges, but does not copy any signatures.
-
-The standalone mode reads **all** edges from the manifests (not just unsynced
-ones), so it works even when images were promoted long ago. All `.sig` tags in
-each source repository are replicated to the mirrors. Each copy is
-idempotent -- existing signatures are detected via batch tag listing and
-skipped. This makes it safe to run frequently via the periodic Prow job.
-
-Job health dashboards:
-- [sig-release-releng-informing](https://testgrid.k8s.io/sig-release-releng-informing#ci-k8sio-image-signature-replication)
-- [sig-k8s-infra-k8sio](https://testgrid.k8s.io/sig-k8s-infra-k8sio#ci-k8sio-image-signature-replication)
 
 ## Provenance verification
 

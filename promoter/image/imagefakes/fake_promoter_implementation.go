@@ -44,19 +44,6 @@ type FakePromoterImplementation struct {
 		result1 []schema.Manifest
 		result2 error
 	}
-	EdgesFromManifestsStub        func([]schema.Manifest) (map[promotion.Edge]any, error)
-	edgesFromManifestsMutex       sync.RWMutex
-	edgesFromManifestsArgsForCall []struct {
-		arg1 []schema.Manifest
-	}
-	edgesFromManifestsReturns struct {
-		result1 map[promotion.Edge]any
-		result2 error
-	}
-	edgesFromManifestsReturnsOnCall map[int]struct {
-		result1 map[promotion.Edge]any
-		result2 error
-	}
 	FixMissingSignaturesStub        func(*imagepromotera.Options, checkresults.Signature) error
 	fixMissingSignaturesMutex       sync.RWMutex
 	fixMissingSignaturesArgsForCall []struct {
@@ -209,18 +196,6 @@ type FakePromoterImplementation struct {
 	promoteImagesReturnsOnCall map[int]struct {
 		result1 error
 	}
-	ReplicateSignaturesStub        func(*imagepromotera.Options, map[promotion.Edge]any) error
-	replicateSignaturesMutex       sync.RWMutex
-	replicateSignaturesArgsForCall []struct {
-		arg1 *imagepromotera.Options
-		arg2 map[promotion.Edge]any
-	}
-	replicateSignaturesReturns struct {
-		result1 error
-	}
-	replicateSignaturesReturnsOnCall map[int]struct {
-		result1 error
-	}
 	ScanEdgesStub        func(context.Context, *imagepromotera.Options, map[promotion.Edge]any) error
 	scanEdgesMutex       sync.RWMutex
 	scanEdgesArgsForCall []struct {
@@ -366,75 +341,6 @@ func (fake *FakePromoterImplementation) AppendManifestToSnapshotReturnsOnCall(i 
 	}
 	fake.appendManifestToSnapshotReturnsOnCall[i] = struct {
 		result1 []schema.Manifest
-		result2 error
-	}{result1, result2}
-}
-
-func (fake *FakePromoterImplementation) EdgesFromManifests(arg1 []schema.Manifest) (map[promotion.Edge]any, error) {
-	var arg1Copy []schema.Manifest
-	if arg1 != nil {
-		arg1Copy = make([]schema.Manifest, len(arg1))
-		copy(arg1Copy, arg1)
-	}
-	fake.edgesFromManifestsMutex.Lock()
-	ret, specificReturn := fake.edgesFromManifestsReturnsOnCall[len(fake.edgesFromManifestsArgsForCall)]
-	fake.edgesFromManifestsArgsForCall = append(fake.edgesFromManifestsArgsForCall, struct {
-		arg1 []schema.Manifest
-	}{arg1Copy})
-	stub := fake.EdgesFromManifestsStub
-	fakeReturns := fake.edgesFromManifestsReturns
-	fake.recordInvocation("EdgesFromManifests", []interface{}{arg1Copy})
-	fake.edgesFromManifestsMutex.Unlock()
-	if stub != nil {
-		return stub(arg1)
-	}
-	if specificReturn {
-		return ret.result1, ret.result2
-	}
-	return fakeReturns.result1, fakeReturns.result2
-}
-
-func (fake *FakePromoterImplementation) EdgesFromManifestsCallCount() int {
-	fake.edgesFromManifestsMutex.RLock()
-	defer fake.edgesFromManifestsMutex.RUnlock()
-	return len(fake.edgesFromManifestsArgsForCall)
-}
-
-func (fake *FakePromoterImplementation) EdgesFromManifestsCalls(stub func([]schema.Manifest) (map[promotion.Edge]any, error)) {
-	fake.edgesFromManifestsMutex.Lock()
-	defer fake.edgesFromManifestsMutex.Unlock()
-	fake.EdgesFromManifestsStub = stub
-}
-
-func (fake *FakePromoterImplementation) EdgesFromManifestsArgsForCall(i int) []schema.Manifest {
-	fake.edgesFromManifestsMutex.RLock()
-	defer fake.edgesFromManifestsMutex.RUnlock()
-	argsForCall := fake.edgesFromManifestsArgsForCall[i]
-	return argsForCall.arg1
-}
-
-func (fake *FakePromoterImplementation) EdgesFromManifestsReturns(result1 map[promotion.Edge]any, result2 error) {
-	fake.edgesFromManifestsMutex.Lock()
-	defer fake.edgesFromManifestsMutex.Unlock()
-	fake.EdgesFromManifestsStub = nil
-	fake.edgesFromManifestsReturns = struct {
-		result1 map[promotion.Edge]any
-		result2 error
-	}{result1, result2}
-}
-
-func (fake *FakePromoterImplementation) EdgesFromManifestsReturnsOnCall(i int, result1 map[promotion.Edge]any, result2 error) {
-	fake.edgesFromManifestsMutex.Lock()
-	defer fake.edgesFromManifestsMutex.Unlock()
-	fake.EdgesFromManifestsStub = nil
-	if fake.edgesFromManifestsReturnsOnCall == nil {
-		fake.edgesFromManifestsReturnsOnCall = make(map[int]struct {
-			result1 map[promotion.Edge]any
-			result2 error
-		})
-	}
-	fake.edgesFromManifestsReturnsOnCall[i] = struct {
-		result1 map[promotion.Edge]any
 		result2 error
 	}{result1, result2}
 }
@@ -1199,68 +1105,6 @@ func (fake *FakePromoterImplementation) PromoteImagesReturnsOnCall(i int, result
 		})
 	}
 	fake.promoteImagesReturnsOnCall[i] = struct {
-		result1 error
-	}{result1}
-}
-
-func (fake *FakePromoterImplementation) ReplicateSignatures(arg1 *imagepromotera.Options, arg2 map[promotion.Edge]any) error {
-	fake.replicateSignaturesMutex.Lock()
-	ret, specificReturn := fake.replicateSignaturesReturnsOnCall[len(fake.replicateSignaturesArgsForCall)]
-	fake.replicateSignaturesArgsForCall = append(fake.replicateSignaturesArgsForCall, struct {
-		arg1 *imagepromotera.Options
-		arg2 map[promotion.Edge]any
-	}{arg1, arg2})
-	stub := fake.ReplicateSignaturesStub
-	fakeReturns := fake.replicateSignaturesReturns
-	fake.recordInvocation("ReplicateSignatures", []interface{}{arg1, arg2})
-	fake.replicateSignaturesMutex.Unlock()
-	if stub != nil {
-		return stub(arg1, arg2)
-	}
-	if specificReturn {
-		return ret.result1
-	}
-	return fakeReturns.result1
-}
-
-func (fake *FakePromoterImplementation) ReplicateSignaturesCallCount() int {
-	fake.replicateSignaturesMutex.RLock()
-	defer fake.replicateSignaturesMutex.RUnlock()
-	return len(fake.replicateSignaturesArgsForCall)
-}
-
-func (fake *FakePromoterImplementation) ReplicateSignaturesCalls(stub func(*imagepromotera.Options, map[promotion.Edge]any) error) {
-	fake.replicateSignaturesMutex.Lock()
-	defer fake.replicateSignaturesMutex.Unlock()
-	fake.ReplicateSignaturesStub = stub
-}
-
-func (fake *FakePromoterImplementation) ReplicateSignaturesArgsForCall(i int) (*imagepromotera.Options, map[promotion.Edge]any) {
-	fake.replicateSignaturesMutex.RLock()
-	defer fake.replicateSignaturesMutex.RUnlock()
-	argsForCall := fake.replicateSignaturesArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2
-}
-
-func (fake *FakePromoterImplementation) ReplicateSignaturesReturns(result1 error) {
-	fake.replicateSignaturesMutex.Lock()
-	defer fake.replicateSignaturesMutex.Unlock()
-	fake.ReplicateSignaturesStub = nil
-	fake.replicateSignaturesReturns = struct {
-		result1 error
-	}{result1}
-}
-
-func (fake *FakePromoterImplementation) ReplicateSignaturesReturnsOnCall(i int, result1 error) {
-	fake.replicateSignaturesMutex.Lock()
-	defer fake.replicateSignaturesMutex.Unlock()
-	fake.ReplicateSignaturesStub = nil
-	if fake.replicateSignaturesReturnsOnCall == nil {
-		fake.replicateSignaturesReturnsOnCall = make(map[int]struct {
-			result1 error
-		})
-	}
-	fake.replicateSignaturesReturnsOnCall[i] = struct {
 		result1 error
 	}{result1}
 }
