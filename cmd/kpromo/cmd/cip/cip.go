@@ -206,13 +206,6 @@ network from a registry, it reads from the local manifests only`,
 	)
 
 	CipCmd.PersistentFlags().IntVar(
-		&runOpts.MaxSignatureCopies,
-		"max-signature-copies",
-		options.DefaultOptions.MaxSignatureCopies,
-		"maximum number of concurrent signature copies",
-	)
-
-	CipCmd.PersistentFlags().IntVar(
 		&runOpts.MaxSignatureOps,
 		"max-signature-ops",
 		options.DefaultOptions.MaxSignatureOps,
