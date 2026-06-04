@@ -196,7 +196,7 @@ func Find(o *GrowOptions) (schema.Manifest, error) {
 		manifests []schema.Manifest
 	)
 
-	manifests, err = schema.ParseThinManifestsFromDir(o.BaseDir, false)
+	manifests, err = schema.ParseThinManifestsFromDir(o.BaseDir, false, "")
 	if err != nil {
 		return schema.Manifest{}, fmt.Errorf("parsing thin manifests from %s: %w", o.BaseDir, err)
 	}

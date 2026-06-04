@@ -33,6 +33,10 @@ type Options struct {
 	// Use only the latest diff for the manifests. Works only when running in prow.
 	UseProwManifestDiff bool
 
+	// ManifestDiffSince limits promotion to digests added within this
+	// duration (uses git date format, e.g. "7 days", "24 hours").
+	ManifestDiffSince string
+
 	// Manifest is the path of a manifest file
 	Manifest string
 

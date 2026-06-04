@@ -17,6 +17,7 @@ limitations under the License.
 package schema
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -42,7 +43,7 @@ func TestParseThinManifestsFromDirPostsubmit(t *testing.T) {
 
 	for _, onlyProwDiff := range []bool{true, false} {
 		manifests, err := ParseThinManifestsFromDir(
-			filepath.Join(testDir, "k8s.gcr.io"), onlyProwDiff,
+			filepath.Join(testDir, "k8s.gcr.io"), onlyProwDiff, "",
 		)
 
 		require.NoError(t, err)
@@ -64,4 +65,77 @@ func TestParseThinManifestsFromDirPostsubmit(t *testing.T) {
 		assert.Equal(t, expectedDigestCount, digestCount)
 		assert.Equal(t, 623, imageCount)
 	}
+}
+
+func TestDiffSinceFiles(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+
+	const git = "git"
+
+	require.NoError(t, command.NewWithWorkDir(tmpDir, git, "init").RunSilentSuccess())
+	require.NoError(t, command.NewWithWorkDir(tmpDir, git, "config", "user.email", "test@test.com").RunSilentSuccess())
+	require.NoError(t, command.NewWithWorkDir(tmpDir, git, "config", "user.name", "test").RunSilentSuccess())
+	require.NoError(t, command.NewWithWorkDir(tmpDir, git, "config", "commit.gpgsign", "false").RunSilentSuccess())
+
+	imagesDir := filepath.Join(tmpDir, "images", "test")
+	require.NoError(t, os.MkdirAll(imagesDir, 0o755))
+
+	imagesFile := filepath.Join(imagesDir, "images.yaml")
+	require.NoError(t, os.WriteFile(imagesFile, []byte("initial\n"), 0o600))
+
+	require.NoError(t, command.NewWithWorkDir(tmpDir, git, "add", ".").RunSilentSuccess())
+
+	require.NoError(t, command.NewWithWorkDir(tmpDir, git, "commit", "-m", "initial",
+		"--date", "2020-01-01T00:00:00Z").
+		Env("GIT_COMMITTER_DATE=2020-01-01T00:00:00Z").
+		RunSilentSuccess())
+
+	contentA := `- name: test-image
+  dmap:
+    "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": ["v1.0"]
+`
+	require.NoError(t, os.WriteFile(imagesFile, []byte(contentA), 0o600))
+
+	require.NoError(t, command.NewWithWorkDir(tmpDir, git, "add", ".").RunSilentSuccess())
+	require.NoError(t, command.NewWithWorkDir(tmpDir, git, "commit", "-m", "add digest A").RunSilentSuccess())
+
+	contentB := `- name: test-image
+  dmap:
+    "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": ["v1.0"]
+    "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": ["v2.0"]
+`
+	require.NoError(t, os.WriteFile(imagesFile, []byte(contentB), 0o600))
+
+	require.NoError(t, command.NewWithWorkDir(tmpDir, git, "add", ".").RunSilentSuccess())
+	require.NoError(t, command.NewWithWorkDir(tmpDir, git, "commit", "-m", "add digest B").RunSilentSuccess())
+
+	digests, err := diffSinceFiles(tmpDir, "1 day")
+	require.NoError(t, err)
+	assert.Len(t, digests, 2)
+	assert.Contains(t, digests, "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+	assert.Contains(t, digests, "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
+}
+
+func TestDiffSinceFilesNoChanges(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+
+	const git = "git"
+
+	require.NoError(t, command.NewWithWorkDir(tmpDir, git, "init").RunSilentSuccess())
+	require.NoError(t, command.NewWithWorkDir(tmpDir, git, "config", "user.email", "test@test.com").RunSilentSuccess())
+	require.NoError(t, command.NewWithWorkDir(tmpDir, git, "config", "user.name", "test").RunSilentSuccess())
+	require.NoError(t, command.NewWithWorkDir(tmpDir, git, "config", "commit.gpgsign", "false").RunSilentSuccess())
+
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "file.txt"), []byte("test\n"), 0o600))
+
+	require.NoError(t, command.NewWithWorkDir(tmpDir, git, "add", ".").RunSilentSuccess())
+	require.NoError(t, command.NewWithWorkDir(tmpDir, git, "commit", "-m", "initial").RunSilentSuccess())
+
+	digests, err := diffSinceFiles(tmpDir, "1 second")
+	require.NoError(t, err)
+	assert.Empty(t, digests)
 }

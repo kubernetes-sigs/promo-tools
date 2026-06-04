@@ -51,7 +51,7 @@ func (di *DefaultPromoterImplementation) ParseManifests(opts *options.Options) (
 
 	// The thin manifests
 	if opts.ThinManifestDir != "" {
-		mfests, err := schema.ParseThinManifestsFromDir(opts.ThinManifestDir, opts.UseProwManifestDiff)
+		mfests, err := schema.ParseThinManifestsFromDir(opts.ThinManifestDir, opts.UseProwManifestDiff, opts.ManifestDiffSince)
 		if err != nil {
 			return nil, fmt.Errorf("parsing thin manifest directory: %w", err)
 		}
