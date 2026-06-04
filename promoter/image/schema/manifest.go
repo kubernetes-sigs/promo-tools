@@ -251,13 +251,14 @@ func (m *Manifest) srcRegistryName() image.Registry {
 // We effectively have to create a map of manifests, keyed by the source
 // registry (there can only be 1 source registry).
 func ParseThinManifestsFromDir(
-	dir string, onlyProwDiff bool,
+	dir string, onlyProwDiff bool, diffSince string,
 ) ([]Manifest, error) {
 	var mfests []Manifest
 
 	digestsToCheck := []string{}
 
-	if onlyProwDiff {
+	switch {
+	case onlyProwDiff:
 		var err error
 
 		digestsToCheck, err = diffProwFiles(dir)
@@ -267,6 +268,20 @@ func ParseThinManifestsFromDir(
 
 		if len(digestsToCheck) == 0 {
 			logrus.Info("No digests found in prow diff, nothing to promote")
+
+			return []Manifest{}, nil
+		}
+
+	case diffSince != "":
+		var err error
+
+		digestsToCheck, err = diffSinceFiles(dir, diffSince)
+		if err != nil {
+			return nil, fmt.Errorf("get diff since %s: %w", diffSince, err)
+		}
+
+		if len(digestsToCheck) == 0 {
+			logrus.Infof("No digests found in the last %s, nothing to promote", diffSince)
 
 			return []Manifest{}, nil
 		}
@@ -344,7 +359,6 @@ func diffProwFiles(dir string) ([]string, error) {
 	logrus.Info("Using prow diff")
 
 	const (
-		git               = "git"
 		pullBaseSHAEnv    = "PULL_BASE_SHA"
 		jobTypeEnv        = "JOB_TYPE"
 		jobTypePostsubmit = "postsubmit"
@@ -373,6 +387,53 @@ func diffProwFiles(dir string) ([]string, error) {
 		return nil, fmt.Errorf("unknown job type: %s", jobType)
 	}
 
+	return digestsFromDiff(dir, base)
+}
+
+func diffSinceFiles(dir, since string) ([]string, error) {
+	logrus.Infof("Using manifest diff since %s", since)
+
+	const git = "git"
+
+	workdirRes, err := command.NewWithWorkDir(
+		dir, git, "rev-parse", "--show-toplevel",
+	).RunSilentSuccessOutput()
+	if err != nil {
+		return nil, fmt.Errorf("running git rev-parse: %w", err)
+	}
+
+	workdir := workdirRes.OutputTrimNL()
+
+	logRes, err := command.NewWithWorkDir(
+		workdir, git, "log", "--since="+since, "--format=%H",
+	).RunSilentSuccessOutput()
+	if err != nil {
+		return nil, fmt.Errorf("running git log: %w", err)
+	}
+
+	lines := strings.TrimSpace(logRes.OutputTrimNL())
+	if lines == "" {
+		return nil, nil
+	}
+
+	commits := strings.Split(lines, "\n")
+	oldest := commits[len(commits)-1]
+
+	parentRes, err := command.NewWithWorkDir(
+		workdir, git, "rev-parse", "--verify", oldest+"~1",
+	).RunSilentSuccessOutput()
+
+	base := oldest
+	if err == nil {
+		base = parentRes.OutputTrimNL()
+	}
+
+	return digestsFromDiff(dir, base)
+}
+
+func digestsFromDiff(dir, base string) ([]string, error) {
+	const git = "git"
+
 	workdirRes, err := command.NewWithWorkDir(
 		dir, git, "rev-parse", "--show-toplevel",
 	).RunSilentSuccessOutput()
@@ -389,7 +450,6 @@ func diffProwFiles(dir string) ([]string, error) {
 		return nil, fmt.Errorf("running git diff: %w", err)
 	}
 
-	// Normalize the digests
 	var digests []string
 
 	for line := range strings.SplitSeq(diff.OutputTrimNL(), "\n") {

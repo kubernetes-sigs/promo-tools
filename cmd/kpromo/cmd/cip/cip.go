@@ -91,6 +91,13 @@ the 'images: ...' contents`,
 		"use only the latest diff for the manifest dir. Works only on prow.",
 	)
 
+	CipCmd.PersistentFlags().StringVar(
+		&runOpts.ManifestDiffSince,
+		"manifest-diff-since",
+		"",
+		`only promote digests from manifests changed within this duration (uses git date format, e.g. "7 days", "24 hours", "1 week")`,
+	)
+
 	CipCmd.PersistentFlags().BoolVar(
 		&runOpts.ParseOnly,
 		"parse-only",
