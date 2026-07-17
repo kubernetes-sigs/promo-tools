@@ -8,8 +8,8 @@ require (
 	cloud.google.com/go/storage v1.63.1
 	github.com/aws/aws-sdk-go-v2 v1.42.1
 	github.com/aws/aws-sdk-go-v2/config v1.32.30
-	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.22.33
-	github.com/aws/aws-sdk-go-v2/service/s3 v1.105.1
+	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.22.34
+	github.com/aws/aws-sdk-go-v2/service/s3 v1.105.2
 	github.com/go-git/go-git/v5 v5.19.1
 	github.com/google/go-containerregistry v0.21.7
 	github.com/in-toto/attestation v1.2.0
