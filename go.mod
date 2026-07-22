@@ -6,7 +6,7 @@ require (
 	cloud.google.com/go/containeranalysis v0.19.0
 	cloud.google.com/go/iam v1.12.0
 	cloud.google.com/go/storage v1.63.1
-	github.com/aws/aws-sdk-go-v2 v1.42.1
+	github.com/aws/aws-sdk-go-v2 v1.43.0
 	github.com/aws/aws-sdk-go-v2/config v1.32.30
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.22.34
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.105.2
