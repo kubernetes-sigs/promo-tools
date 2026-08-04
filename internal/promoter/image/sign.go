@@ -29,11 +29,12 @@ import (
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1/remote/transport"
 	"github.com/google/go-containerregistry/pkg/v1/types"
+	"github.com/sigstore/cosign/v2/pkg/cosign/env"
 	ocimutate "github.com/sigstore/cosign/v2/pkg/oci/mutate"
 	ociremote "github.com/sigstore/cosign/v2/pkg/oci/remote"
 	"github.com/sigstore/cosign/v2/pkg/oci/static"
 	ctypes "github.com/sigstore/cosign/v2/pkg/types"
-	"github.com/sigstore/sigstore/pkg/tuf"
+	"github.com/sigstore/sigstore-go/pkg/tuf"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -53,6 +54,10 @@ const (
 	signatureTagSuffix = ".sig"
 
 	TestSigningAccount = "k8s-infra-promoter-test-signer@k8s-cip-test-prod.iam.gserviceaccount.com"
+
+	// trustedRootTarget is the TUF target holding the sigstore trusted root,
+	// the same one sigstore-go's root.NewLiveTrustedRoot fetches by default.
+	trustedRootTarget = "trusted_root.json"
 )
 
 // ValidateStagingSignatures checks if edges (images) have a signature
@@ -492,10 +497,24 @@ func craneCopyWithTimeout(ctx context.Context, src, dst string, timeout time.Dur
 // PrewarmTUFCache initializes the TUF cache so that threads do not have to compete
 // against each other creating the TUF database.
 func (di *DefaultPromoterImplementation) PrewarmTUFCache(ctx context.Context) error {
-	if err := tuf.Initialize(
-		ctx, tuf.DefaultRemoteRoot, nil,
-	); err != nil {
+	// Get the cache path to prewarm the cache at that location
+	opts := tuf.DefaultOptions().WithContext(ctx)
+	if cacheDir := env.Getenv(env.VariableTUFRootDir); cacheDir != "" {
+		opts.CachePath = cacheDir
+	}
+
+	// Sigstore go's client prewarms the cache, so just creating it should
+	// replace the custom logic we had here to account for weak tuf root
+	// handling in the very early cosign releases.
+	client, err := tuf.New(opts)
+	if err != nil {
 		return fmt.Errorf("initializing TUF client: %w", err)
+	}
+
+	// Pull the trusted root target as well. That is the file cosign reads from
+	// the cache to assemble the trusted material when verifying signatures.
+	if _, err := client.GetTarget(trustedRootTarget); err != nil {
+		return fmt.Errorf("fetching trusted root: %w", err)
 	}
 
 	return nil
