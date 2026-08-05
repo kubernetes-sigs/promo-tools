@@ -43,7 +43,9 @@ import (
 func newTLSTestRegistry(t *testing.T) (string, *DefaultPromoterImplementation) {
 	t.Helper()
 
-	s := httptest.NewTLSServer(registry.New())
+	// Referrers support matches production (Artifact Registry implements
+	// the OCI 1.1 referrers API), which attestation bundles are attached with.
+	s := httptest.NewTLSServer(registry.New(registry.WithReferrersSupport(true)))
 	t.Cleanup(s.Close)
 
 	host := s.Listener.Addr().String()
@@ -147,6 +149,18 @@ func (f *fakeGenerator) Generate(_ context.Context, _ *provenance.PromotionRecor
 	return f.data, nil
 }
 
+// fakeStatementSigner is a statementSigner that returns a fixed bundle.
+type fakeStatementSigner struct {
+	bundle []byte
+	calls  int
+}
+
+func (f *fakeStatementSigner) SignStatement(_ []byte) ([]byte, error) {
+	f.calls++
+
+	return f.bundle, nil
+}
+
 func TestPushAttestation(t *testing.T) {
 	t.Parallel()
 
@@ -164,6 +178,7 @@ func TestPushAttestation(t *testing.T) {
 	}
 
 	gen := &fakeGenerator{data: []byte(`{"test": "attestation"}`)}
+	di.attSigner = &fakeStatementSigner{bundle: []byte(`{"test": "bundle"}`)}
 
 	err := di.pushAttestation(context.Background(), &edge, gen, record)
 	require.NoError(t, err)
@@ -172,9 +187,8 @@ func TestPushAttestation(t *testing.T) {
 	digestRef, err := name.NewDigest(fmt.Sprintf("%s/production/myimage@%s", host, digest))
 	require.NoError(t, err)
 
-	remoteOpt := ociremote.WithRemoteOptions(remote.WithTransport(di.getTransport()))
-	require.True(t, hasPredicateType(digestRef, provenance.PredicateType, remoteOpt),
-		"attestation with predicate type should exist")
+	require.True(t, di.hasBundleForPredicate(digestRef, provenance.PredicateType),
+		"attestation bundle with predicate type should exist")
 }
 
 func TestPushAttestationIdempotent(t *testing.T) {
@@ -194,6 +208,8 @@ func TestPushAttestationIdempotent(t *testing.T) {
 	}
 
 	gen := &fakeGenerator{data: []byte(`{"test": "attestation"}`)}
+	fakeSigner := &fakeStatementSigner{bundle: []byte(`{"test": "bundle"}`)}
+	di.attSigner = fakeSigner
 
 	// First push should succeed.
 	err := di.pushAttestation(context.Background(), &edge, gen, record)
@@ -202,20 +218,17 @@ func TestPushAttestationIdempotent(t *testing.T) {
 	// Second push should skip because predicate type already exists.
 	err = di.pushAttestation(context.Background(), &edge, gen, record)
 	require.NoError(t, err)
+	require.Equal(t, 1, fakeSigner.calls, "second push should not sign again")
 
-	// Verify exactly one attestation layer exists (not duplicated).
+	// Verify exactly one attestation bundle referrer exists (not duplicated).
 	digestRef, err := name.NewDigest(fmt.Sprintf("%s/production/myimage@%s", host, digest))
 	require.NoError(t, err)
 
 	remoteOpt := ociremote.WithRemoteOptions(remote.WithTransport(di.getTransport()))
-	se := ociremote.SignedUnknown(digestRef, remoteOpt)
 
-	atts, err := se.Attestations()
+	idx, err := ociremote.Referrers(digestRef, "", remoteOpt)
 	require.NoError(t, err)
-
-	sigs, err := atts.Get()
-	require.NoError(t, err)
-	require.Len(t, sigs, 1, "should have exactly one attestation layer")
+	require.Len(t, idx.Manifests, 1, "should have exactly one attestation referrer")
 }
 
 // --- Integration test for the full promotion flow with CraneProvider ---
@@ -301,7 +314,9 @@ func TestWriteProvenanceAttestationsIdempotent(t *testing.T) {
 	srcRegistry := image.Registry(host + "/staging")
 	dstRegistry := image.Registry(host + "/production")
 
-	digest := pushTestImage(t, di, fmt.Sprintf("%s/app:v1.0", srcRegistry))
+	// The attestation referrer attaches to the promoted image, so it must
+	// exist in the production registry.
+	digest := pushTestImage(t, di, fmt.Sprintf("%s/app:v1.0", dstRegistry))
 
 	edges := map[promotion.Edge]any{
 		{
@@ -314,10 +329,12 @@ func TestWriteProvenanceAttestationsIdempotent(t *testing.T) {
 	}
 
 	opts := &options.Options{
+		SignImages:      true,
 		MaxSignatureOps: 10,
 	}
 
 	gen := &fakeGenerator{data: []byte(`{"test": "attestation"}`)}
+	di.attSigner = &fakeStatementSigner{bundle: []byte(`{"test": "bundle"}`)}
 
 	// Run twice — both should succeed without error.
 	for i := range 2 {
@@ -329,7 +346,6 @@ func TestWriteProvenanceAttestationsIdempotent(t *testing.T) {
 	digestRef, err := name.NewDigest(fmt.Sprintf("%s/app@%s", dstRegistry, digest))
 	require.NoError(t, err)
 
-	remoteOpt := ociremote.WithRemoteOptions(remote.WithTransport(di.getTransport()))
-	require.True(t, hasPredicateType(digestRef, provenance.PredicateType, remoteOpt),
-		"attestation should exist in production")
+	require.True(t, di.hasBundleForPredicate(digestRef, provenance.PredicateType),
+		"attestation bundle should exist in production")
 }
