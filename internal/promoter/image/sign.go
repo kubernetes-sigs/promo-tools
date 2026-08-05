@@ -18,6 +18,7 @@ package imagepromoter
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -27,13 +28,10 @@ import (
 
 	"github.com/google/go-containerregistry/pkg/crane"
 	"github.com/google/go-containerregistry/pkg/name"
+	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/google/go-containerregistry/pkg/v1/remote/transport"
-	"github.com/google/go-containerregistry/pkg/v1/types"
 	"github.com/sigstore/cosign/v2/pkg/cosign/env"
-	ocimutate "github.com/sigstore/cosign/v2/pkg/oci/mutate"
 	ociremote "github.com/sigstore/cosign/v2/pkg/oci/remote"
-	"github.com/sigstore/cosign/v2/pkg/oci/static"
-	ctypes "github.com/sigstore/cosign/v2/pkg/types"
 	"github.com/sigstore/sigstore-go/pkg/tuf"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -58,6 +56,10 @@ const (
 	// trustedRootTarget is the TUF target holding the sigstore trusted root,
 	// the same one sigstore-go's root.NewLiveTrustedRoot fetches by default.
 	trustedRootTarget = "trusted_root.json"
+
+	// bundlePredicateTypeAnnotation is the referrer manifest annotation where
+	// cosign records the predicate type of an attached attestation bundle.
+	bundlePredicateTypeAnnotation = "dev.sigstore.bundle.predicateType"
 )
 
 // ValidateStagingSignatures checks if edges (images) have a signature
@@ -141,7 +143,6 @@ func (di *DefaultPromoterImplementation) SignImages(
 	// internal Signer structs. Without that, the identity token wouldn't be
 	// used at all and images would be signed with a wrong identity.
 	di.signer = sign.New(signOpts)
-	di.signOpts = signOpts
 
 	// We only sign the first normalized image per digest of each edge.
 	grouped := groupEdgesByIdentityDigest(edges)
@@ -328,18 +329,30 @@ func (di *DefaultPromoterImplementation) GetIdentityToken(
 	return token, nil
 }
 
-// WriteProvenanceAttestations generates SLSA provenance attestations for
-// promoted images and pushes them as .att tags to the destination registry.
+// WriteProvenanceAttestations generates promotion record attestations for
+// promoted images, signs them into sigstore bundles, and attaches them
+// to the destination image as an OCI 1.1 artifact using the referrers API.
 func (di *DefaultPromoterImplementation) WriteProvenanceAttestations(
 	ctx context.Context,
 	opts *options.Options,
 	edges map[promotion.Edge]any,
 	generator provenance.Generator,
 ) error {
+	// Do no write the attestation if signing is disabled
+	if !opts.SignImages {
+		logrus.Info("Not writing promotion record attestations (--sign=false)")
+		return nil
+	}
+
 	if len(edges) == 0 {
 		logrus.Info("No images were promoted. No provenance to generate.")
 
 		return nil
+	}
+
+	//nolint:contextcheck
+	if err := di.ensureAttestationSigner(opts); err != nil {
+		return fmt.Errorf("initializing attestation signer: %w", err)
 	}
 
 	builderID := "https://k8s.io/promo-tools"
@@ -385,10 +398,10 @@ func (di *DefaultPromoterImplementation) WriteProvenanceAttestations(
 	return nil
 }
 
-// pushAttestation generates and pushes a provenance attestation as a
-// layer in the .att image for the destination digest. The layer includes
-// a predicateType annotation for idempotency checking and compatibility
-// with cosign's attestation conventions.
+// pushAttestation generates a provenance attestation, signs it into a
+// sigstore bundle, and attaches it to the destination digest as an OCI 1.1
+// referrer artifact (as cosign does now). The referrer manifest carries
+// a predicateType annotation to look it up quickly.
 func (di *DefaultPromoterImplementation) pushAttestation(
 	ctx context.Context,
 	edge *promotion.Edge,
@@ -413,35 +426,23 @@ func (di *DefaultPromoterImplementation) pushAttestation(
 	remoteOpt := ociremote.WithRemoteOptions(di.remoteOptions()...)
 
 	// Check if our predicate type already exists (idempotent).
-	if hasPredicateType(digest, provenance.PredicateType, remoteOpt) {
+	if di.hasBundleForPredicate(digest, provenance.PredicateType) {
 		logrus.Debugf("Attestation for %s already exists, skipping", dstDigestRef)
 
 		return nil
 	}
 
-	// Create the attestation layer with predicate type annotation.
-	att, err := static.NewAttestation(payload,
-		static.WithLayerMediaType(types.MediaType(ctypes.IntotoPayloadType)),
-		static.WithAnnotations(map[string]string{
-			"predicateType": provenance.PredicateType,
-		}),
-	)
+	bundleJSON, err := di.attSigner.SignStatement(payload)
 	if err != nil {
-		return fmt.Errorf("creating attestation: %w", err)
+		return fmt.Errorf("signing attestation for %s: %w", dstDigestRef, err)
 	}
 
-	// Get the existing signed entity for this digest and append.
-	se := ociremote.SignedUnknown(digest, remoteOpt)
-
-	newSE, err := ocimutate.AttachAttestationToEntity(se, att)
-	if err != nil {
-		return fmt.Errorf("attaching attestation: %w", err)
-	}
-
-	logrus.Infof("Provenance attestation: pushing for %s", dstDigestRef)
+	logrus.Infof("Promotion record attestation: pushing for %s", dstDigestRef)
 
 	if err := ratelimit.WithRetry(func() error {
-		return ociremote.WriteAttestations(digest.Context(), newSE, remoteOpt)
+		return ociremote.WriteAttestationNewBundleFormat(
+			digest, bundleJSON, provenance.PredicateType, remoteOpt,
+		)
 	}); err != nil {
 		return fmt.Errorf("pushing attestation for %s: %w", dstDigestRef, err)
 	}
@@ -449,28 +450,52 @@ func (di *DefaultPromoterImplementation) pushAttestation(
 	return nil
 }
 
-// hasPredicateType checks if the .att image for the given digest already
-// contains a layer with the specified predicateType annotation.
-func hasPredicateType(digest name.Digest, predicateType string, opts ...ociremote.Option) bool {
-	se := ociremote.SignedUnknown(digest, opts...)
-
-	atts, err := se.Attestations()
+// hasBundleForPredicate checks if the given digest already has an
+// attestation bundle referrer with the specified predicate type.
+//
+// When dealing with descriptors without annotations, we fetching the
+// referrer manifest itself.
+func (di *DefaultPromoterImplementation) hasBundleForPredicate(
+	digest name.Digest, predicateType string,
+) bool {
+	idx, err := ociremote.Referrers(
+		digest, "", ociremote.WithRemoteOptions(di.remoteOptions()...),
+	)
 	if err != nil {
 		return false
 	}
 
-	sigs, err := atts.Get()
-	if err != nil {
-		return false
-	}
+	// Cycle all the manifest descriptors
+	for i := range idx.Manifests {
+		desc := &idx.Manifests[i]
 
-	for _, sig := range sigs {
-		ann, err := sig.Annotations()
+		// Best case scenario: we find the cosign annotation
+		if desc.Annotations[bundlePredicateTypeAnnotation] == predicateType {
+			return true
+		}
+
+		if len(desc.Annotations) > 0 {
+			continue
+		}
+
+		// No annotations in the descriptor fetch thethe manifest and check it
+		raw, err := remote.Get(
+			digest.Context().Digest(desc.Digest.String()), di.remoteOptions()...,
+		)
 		if err != nil {
 			continue
 		}
 
-		if ann["predicateType"] == predicateType {
+		// Parsse the manifest to find the predicate type annotation
+		var manifest struct {
+			Annotations map[string]string `json:"annotations"`
+		}
+
+		if err := json.Unmarshal(raw.Manifest, &manifest); err != nil {
+			continue
+		}
+
+		if manifest.Annotations[bundlePredicateTypeAnnotation] == predicateType {
 			return true
 		}
 	}
