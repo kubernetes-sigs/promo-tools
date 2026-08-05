@@ -341,6 +341,7 @@ func (di *DefaultPromoterImplementation) WriteProvenanceAttestations(
 	// Do no write the attestation if signing is disabled
 	if !opts.SignImages {
 		logrus.Info("Not writing promotion record attestations (--sign=false)")
+
 		return nil
 	}
 
