@@ -33,7 +33,7 @@ const (
 	// PredicateType is the predicate type for promotion provenance
 	// attestations. Using a custom type (rather than the generic SLSA
 	// provenance type) makes it easy to distinguish promoter attestations
-	// from build-time attestations in the same .att image.
+	// from build-time attestations attached to the same image.
 	PredicateType = "https://k8s.io/promo-tools/promotion/v1"
 )
 
