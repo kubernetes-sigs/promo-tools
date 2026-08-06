@@ -59,7 +59,7 @@ func (cs *carabinerSigner) SignStatement(statement []byte) ([]byte, error) {
 // already set. The signing token comes from the promoter's identity token
 // provider for --signer-account which is the same identity that signs the
 // promoted images. This controls that attestations are only signed with the
-// token and never falling back unintentionally to ambien credentials, etc.
+// token and never falling back unintentionally to ambient credentials, etc.
 func (di *DefaultPromoterImplementation) ensureAttestationSigner(opts *options.Options) error {
 	if di.attSigner != nil {
 		return nil

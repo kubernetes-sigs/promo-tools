@@ -338,7 +338,7 @@ func (di *DefaultPromoterImplementation) WriteProvenanceAttestations(
 	edges map[promotion.Edge]any,
 	generator provenance.Generator,
 ) error {
-	// Do no write the attestation if signing is disabled
+	// Do not write the attestation if signing is disabled
 	if !opts.SignImages {
 		logrus.Info("Not writing promotion record attestations (--sign=false)")
 
@@ -454,7 +454,7 @@ func (di *DefaultPromoterImplementation) pushAttestation(
 // hasBundleForPredicate checks if the given digest already has an
 // attestation bundle referrer with the specified predicate type.
 //
-// When dealing with descriptors without annotations, we fetching the
+// When dealing with descriptors without annotations, we fetch the
 // referrer manifest itself.
 func (di *DefaultPromoterImplementation) hasBundleForPredicate(
 	digest name.Digest, predicateType string,
@@ -479,7 +479,7 @@ func (di *DefaultPromoterImplementation) hasBundleForPredicate(
 			continue
 		}
 
-		// No annotations in the descriptor fetch thethe manifest and check it
+		// No annotations in the descriptor, fetch the manifest and check it
 		raw, err := remote.Get(
 			digest.Context().Digest(desc.Digest.String()), di.remoteOptions()...,
 		)
@@ -487,7 +487,7 @@ func (di *DefaultPromoterImplementation) hasBundleForPredicate(
 			continue
 		}
 
-		// Parsse the manifest to find the predicate type annotation
+		// Parse the manifest to find the predicate type annotation
 		var manifest struct {
 			Annotations map[string]string `json:"annotations"`
 		}
