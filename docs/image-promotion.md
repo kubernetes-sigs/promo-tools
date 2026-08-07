@@ -203,11 +203,17 @@ registry (`us-central1-docker.pkg.dev`) and served globally through
 registry.k8s.io via the `SIGNATURE_UPSTREAM_ENDPOINT` routing in archeio.
 The signing identity is configured with `--signer-account`.
 
-Promotion provenance attestations are stored as in-toto statement layers in the
-cosign `.att` image for each promoted digest. Each layer carries a
-`predicateType` annotation (`https://k8s.io/promo-tools/promotion/v1`) to
-distinguish promoter attestations from build-time attestations and to enable
-predicate-type-aware idempotency.
+Promotion provenance attestations are signed into sigstore bundles and
+attached to each promoted digest as OCI 1.1 referrer artifacts (cosign's
+"new bundle format") — no `.att` or other tags are created for them.
+Attestations are signed with the same identity token flow as image
+signatures: the token obtained for `--signer-account` is the only
+credential source. The referrer manifest carries the predicate type in
+its `dev.sigstore.bundle.predicateType` annotation
+(`https://k8s.io/promo-tools/promotion/v1`), which distinguishes promoter
+attestations from build-time attestations and makes attesting idempotent:
+when a referrer with the promoter predicate type already exists, the
+digest is not attested again.
 
 Related flags:
 
@@ -219,19 +225,25 @@ Related flags:
 
 ## Provenance verification
 
-The promoter verifies SLSA provenance attestations on staging images before
-promotion using verify-if-present semantics: if an attestation tag exists on a
-staging image, it is cryptographically verified using cosign against the
-configured signing identity and OIDC issuer. If no attestation is found, a
+The promoter verifies build-time (SLSA) provenance attestations on staging
+images before promotion using verify-if-present semantics: if an attestation
+tag exists on a staging image (the legacy cosign `.att` tag convention used
+by the staging builds), it is cryptographically verified using cosign against
+the configured signing identity and OIDC issuer. If no attestation is found, a
 warning is logged and the image is still promoted. This allows progressive
 adoption without blocking images that do not yet have attestations.
 
 ## Provenance generation
 
-The promoter generates SLSA v1.0 provenance attestations for promoted images.
-It pushes an `.att` tag for each promoted image containing an in-toto statement
-with the promotion metadata (source/destination registries, digest, builder
-identity, timestamp).
+The promoter generates a promotion record attestation for each promoted
+image: an in-toto statement with the
+`https://k8s.io/promo-tools/promotion/v1` predicate type recording the
+promotion metadata (source/destination references, digest, builder
+identity, timestamp). The statement is signed into a sigstore bundle and
+attached to the promoted digest through the OCI referrers API as
+described in [Signing and attestation](#signing-and-attestation).
+Attestations can be verified with
+`cosign verify-attestation --new-bundle-format`.
 
 ## Vulnerability scanning
 

@@ -211,6 +211,10 @@ func TestGroupEdgesByIdentityDigest(t *testing.T) {
 
 	groups := groupEdgesByIdentityDigest(edges)
 
+	// The edges array must not be mutated if we drain it, it silently skips
+	// the attestation generation.
+	require.Len(t, edges, 8)
+
 	// Should have 2 groups (digest1 and digest2), metadata/tagless skipped.
 	require.Len(t, groups, 2)
 

@@ -18,16 +18,25 @@ package imagepromoter
 
 import (
 	"context"
+	"crypto"
+	"encoding/hex"
 	"fmt"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/registry"
 	"github.com/google/go-containerregistry/pkg/v1/random"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
+	"github.com/sigstore/cosign/v2/pkg/cosign"
 	ociremote "github.com/sigstore/cosign/v2/pkg/oci/remote"
+	"github.com/sigstore/sigstore-go/pkg/root"
+	sgsign "github.com/sigstore/sigstore-go/pkg/sign"
+	sgverify "github.com/sigstore/sigstore-go/pkg/verify"
+	"github.com/sigstore/sigstore/pkg/signature"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/encoding/protojson"
 
 	options "sigs.k8s.io/promo-tools/v4/promoter/image/options"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/promotion"
@@ -43,7 +52,9 @@ import (
 func newTLSTestRegistry(t *testing.T) (string, *DefaultPromoterImplementation) {
 	t.Helper()
 
-	s := httptest.NewTLSServer(registry.New())
+	// Referrers support matches production (Artifact Registry implements
+	// the OCI 1.1 referrers API), which attestation bundles are attached with.
+	s := httptest.NewTLSServer(registry.New(registry.WithReferrersSupport(true)))
 	t.Cleanup(s.Close)
 
 	host := s.Listener.Addr().String()
@@ -147,6 +158,18 @@ func (f *fakeGenerator) Generate(_ context.Context, _ *provenance.PromotionRecor
 	return f.data, nil
 }
 
+// fakeStatementSigner is a statementSigner that returns a fixed bundle.
+type fakeStatementSigner struct {
+	bundle []byte
+	calls  int
+}
+
+func (f *fakeStatementSigner) SignStatement(_ []byte) ([]byte, error) {
+	f.calls++
+
+	return f.bundle, nil
+}
+
 func TestPushAttestation(t *testing.T) {
 	t.Parallel()
 
@@ -164,6 +187,7 @@ func TestPushAttestation(t *testing.T) {
 	}
 
 	gen := &fakeGenerator{data: []byte(`{"test": "attestation"}`)}
+	di.attSigner = &fakeStatementSigner{bundle: []byte(`{"test": "bundle"}`)}
 
 	err := di.pushAttestation(context.Background(), &edge, gen, record)
 	require.NoError(t, err)
@@ -172,9 +196,8 @@ func TestPushAttestation(t *testing.T) {
 	digestRef, err := name.NewDigest(fmt.Sprintf("%s/production/myimage@%s", host, digest))
 	require.NoError(t, err)
 
-	remoteOpt := ociremote.WithRemoteOptions(remote.WithTransport(di.getTransport()))
-	require.True(t, hasPredicateType(digestRef, provenance.PredicateType, remoteOpt),
-		"attestation with predicate type should exist")
+	require.True(t, di.hasBundleForPredicate(digestRef, provenance.PredicateType),
+		"attestation bundle with predicate type should exist")
 }
 
 func TestPushAttestationIdempotent(t *testing.T) {
@@ -194,6 +217,8 @@ func TestPushAttestationIdempotent(t *testing.T) {
 	}
 
 	gen := &fakeGenerator{data: []byte(`{"test": "attestation"}`)}
+	fakeSigner := &fakeStatementSigner{bundle: []byte(`{"test": "bundle"}`)}
+	di.attSigner = fakeSigner
 
 	// First push should succeed.
 	err := di.pushAttestation(context.Background(), &edge, gen, record)
@@ -202,20 +227,126 @@ func TestPushAttestationIdempotent(t *testing.T) {
 	// Second push should skip because predicate type already exists.
 	err = di.pushAttestation(context.Background(), &edge, gen, record)
 	require.NoError(t, err)
+	require.Equal(t, 1, fakeSigner.calls, "second push should not sign again")
 
-	// Verify exactly one attestation layer exists (not duplicated).
+	// Verify exactly one attestation bundle referrer exists (not duplicated).
 	digestRef, err := name.NewDigest(fmt.Sprintf("%s/production/myimage@%s", host, digest))
 	require.NoError(t, err)
 
 	remoteOpt := ociremote.WithRemoteOptions(remote.WithTransport(di.getTransport()))
-	se := ociremote.SignedUnknown(digestRef, remoteOpt)
 
-	atts, err := se.Attestations()
+	idx, err := ociremote.Referrers(digestRef, "", remoteOpt)
+	require.NoError(t, err)
+	require.Len(t, idx.Manifests, 1, "should have exactly one attestation referrer")
+}
+
+// keyBundleSigner is a statementSigner that signs statements into real
+// sigstore bundles using an ephemeral test key. It stands in for the
+// keyless production signer so that pushed attestations can be verified
+// cryptographically without contacting Fulcio or Rekor.
+type keyBundleSigner struct {
+	keypair *sgsign.EphemeralKeypair
+}
+
+func (k *keyBundleSigner) SignStatement(statement []byte) ([]byte, error) {
+	bndl, err := sgsign.Bundle(
+		&sgsign.DSSEData{Data: statement, PayloadType: "application/vnd.in-toto+json"},
+		k.keypair,
+		sgsign.BundleOptions{},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("signing test bundle: %w", err)
+	}
+
+	data, err := protojson.Marshal(bndl)
+	if err != nil {
+		return nil, fmt.Errorf("serializing test bundle: %w", err)
+	}
+
+	return data, nil
+}
+
+// TestPushAttestationCosignVerify pushes an attestation signed into a real
+// sigstore bundle and verifies it back from the registry with cosign,
+// following the same read path as `cosign verify-attestation`: enumerate
+// the referrers of the image digest, load the bundle from the referrer
+// manifest and run bundle verification against it.
+func TestPushAttestationCosignVerify(t *testing.T) {
+	t.Parallel()
+
+	host, di := newTLSTestRegistry(t)
+
+	imgRef := host + "/production/myimage:v1.0"
+	digest := pushTestImage(t, di, imgRef)
+
+	edge := testEdgeForHost(host, image.Digest(digest))
+	record := &provenance.PromotionRecord{
+		SrcRef:    edge.SrcReference(),
+		DstRef:    edge.DstReference(),
+		Digest:    string(edge.Digest),
+		BuilderId: "https://k8s.io/promo-tools@test",
+	}
+
+	keypair, err := sgsign.NewEphemeralKeypair(nil)
 	require.NoError(t, err)
 
-	sigs, err := atts.Get()
+	di.attSigner = &keyBundleSigner{keypair: keypair}
+
+	// Push through the production code path with the real generator so
+	// the statement subject carries the promoted image digest.
+	err = di.pushAttestation(context.Background(), &edge, &provenance.PromotionGenerator{}, record)
 	require.NoError(t, err)
-	require.Len(t, sigs, 1, "should have exactly one attestation layer")
+
+	digestRef, err := name.NewDigest(fmt.Sprintf("%s/production/myimage@%s", host, digest))
+	require.NoError(t, err)
+
+	remoteOpt := ociremote.WithRemoteOptions(di.remoteOptions()...)
+
+	idx, err := ociremote.Referrers(digestRef, "", remoteOpt)
+	require.NoError(t, err)
+	require.Len(t, idx.Manifests, 1)
+
+	bndl, err := ociremote.Bundle(
+		digestRef.Context().Digest(idx.Manifests[0].Digest.String()), remoteOpt,
+	)
+	require.NoError(t, err, "referrer must hold a well-formed sigstore bundle")
+
+	// Verify with cosign against the test public key. As with the
+	// production bundles, there is no Rekor entry or signed timestamp.
+	verifier, err := signature.LoadVerifier(keypair.GetPublicKey(), crypto.SHA256)
+	require.NoError(t, err)
+
+	checkOpts := &cosign.CheckOpts{
+		SigVerifier:     verifier,
+		TrustedMaterial: root.TrustedMaterialCollection{},
+		IgnoreTlog:      true,
+		IgnoreSCT:       true,
+	}
+
+	digestBytes, err := hex.DecodeString(strings.TrimPrefix(digest, "sha256:"))
+	require.NoError(t, err)
+
+	result, err := cosign.VerifyNewBundle(
+		context.Background(), checkOpts,
+		sgverify.WithArtifactDigest("sha256", digestBytes), bndl,
+	)
+	require.NoError(t, err, "pushed attestation must verify with cosign")
+
+	// The verified statement must be the promotion attestation of the image.
+	require.Equal(t, provenance.PredicateType, result.Statement.GetPredicateType())
+	require.Len(t, result.Statement.GetSubject(), 1)
+	require.Equal(t, edge.DstReference(), result.Statement.GetSubject()[0].GetName())
+
+	// The same bundle must not verify for a different subject digest,
+	// proving verification binds the attestation to the promoted image.
+	wrongDigest, err := hex.DecodeString(strings.Repeat("ab", 32))
+	require.NoError(t, err)
+
+	_, err = cosign.VerifyNewBundle(
+		context.Background(), checkOpts,
+		sgverify.WithArtifactDigest("sha256", wrongDigest), bndl,
+	)
+	require.Error(t, err, "attestation must not verify for another digest")
 }
 
 // --- Integration test for the full promotion flow with CraneProvider ---
@@ -301,7 +432,9 @@ func TestWriteProvenanceAttestationsIdempotent(t *testing.T) {
 	srcRegistry := image.Registry(host + "/staging")
 	dstRegistry := image.Registry(host + "/production")
 
-	digest := pushTestImage(t, di, fmt.Sprintf("%s/app:v1.0", srcRegistry))
+	// The attestation referrer attaches to the promoted image, so it must
+	// exist in the production registry.
+	digest := pushTestImage(t, di, fmt.Sprintf("%s/app:v1.0", dstRegistry))
 
 	edges := map[promotion.Edge]any{
 		{
@@ -314,10 +447,12 @@ func TestWriteProvenanceAttestationsIdempotent(t *testing.T) {
 	}
 
 	opts := &options.Options{
+		SignImages:      true,
 		MaxSignatureOps: 10,
 	}
 
 	gen := &fakeGenerator{data: []byte(`{"test": "attestation"}`)}
+	di.attSigner = &fakeStatementSigner{bundle: []byte(`{"test": "bundle"}`)}
 
 	// Run twice — both should succeed without error.
 	for i := range 2 {
@@ -329,7 +464,6 @@ func TestWriteProvenanceAttestationsIdempotent(t *testing.T) {
 	digestRef, err := name.NewDigest(fmt.Sprintf("%s/app@%s", dstRegistry, digest))
 	require.NoError(t, err)
 
-	remoteOpt := ociremote.WithRemoteOptions(remote.WithTransport(di.getTransport()))
-	require.True(t, hasPredicateType(digestRef, provenance.PredicateType, remoteOpt),
-		"attestation should exist in production")
+	require.True(t, di.hasBundleForPredicate(digestRef, provenance.PredicateType),
+		"attestation bundle should exist in production")
 }
