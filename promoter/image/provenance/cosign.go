@@ -27,7 +27,7 @@ import (
 	"github.com/google/go-containerregistry/pkg/gcrane"
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1/remote/transport"
-	cosignverify "github.com/sigstore/cosign/v2/cmd/cosign/cli/verify"
+	cosignverify "github.com/sigstore/cosign/v3/cmd/cosign/cli/verify"
 	"github.com/sirupsen/logrus"
 
 	"sigs.k8s.io/promo-tools/v4/types/image"
@@ -75,7 +75,8 @@ func (v *CosignVerifier) Verify(ctx context.Context, ref string) (*Result, error
 	}
 
 	attTag := digestToAttestationTag(image.Digest(digest.DigestStr()))
-	attRef := fmt.Sprintf("%s/%s:%s",
+	attRef := fmt.Sprintf(
+		"%s/%s:%s",
 		digest.Context().RegistryStr(),
 		digest.Context().RepositoryStr(),
 		attTag,
