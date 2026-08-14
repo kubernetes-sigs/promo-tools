@@ -27,7 +27,7 @@ require (
 	golang.org/x/time v0.15.0
 	google.golang.org/api v0.292.0
 	google.golang.org/genproto v0.0.0-20260519071638-aa98bba5eb94
-	google.golang.org/protobuf v1.36.12-0.20260120151049-f2248ac996af
+	google.golang.org/protobuf v1.36.12
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/apimachinery v0.36.3
 	k8s.io/utils v0.0.0-20260210185600-b8788abfbbc2
