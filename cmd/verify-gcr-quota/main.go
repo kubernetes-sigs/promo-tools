@@ -113,7 +113,7 @@ func worker(c chan message) {
 		return
 	}
 
-	resp, err := http.DefaultClient.Do(req) //nolint:gosec // URL constructed from trusted config
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		fmt.Println("Encountered an error during HTTP GET request: ", err)
 	}

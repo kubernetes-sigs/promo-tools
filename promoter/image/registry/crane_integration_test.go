@@ -124,14 +124,14 @@ func TestCraneProviderCopyMultipleTagsSameDigest(t *testing.T) {
 	// Promote the same digest to multiple tags in destination, simulating
 	// a manifest with dmap: {"sha256:...": ["v1.0", "latest"]}.
 	srcVertex := host + "/staging/myimage@" + digest
-	for _, tag := range []string{"v1.0", "latest"} {
+	for _, tag := range []string{testTagV1, testTagLatest} {
 		dstVertex := fmt.Sprintf("%s/production/myimage:%s", host, tag)
 		err := p.CopyImage(context.Background(), srcVertex, dstVertex)
 		require.NoError(t, err)
 	}
 
 	// Both tags should resolve to the same digest.
-	for _, tag := range []string{"v1.0", "latest"} {
+	for _, tag := range []string{testTagV1, testTagLatest} {
 		ref := fmt.Sprintf("%s/production/myimage:%s", host, tag)
 		gotDigest, err := crane.Digest(ref, crane.Insecure)
 		require.NoError(t, err)
@@ -140,7 +140,7 @@ func TestCraneProviderCopyMultipleTagsSameDigest(t *testing.T) {
 
 	tags, err := crane.ListTags(host+"/production/myimage", crane.Insecure)
 	require.NoError(t, err)
-	require.ElementsMatch(t, []string{"v1.0", "latest"}, tags)
+	require.ElementsMatch(t, []string{testTagV1, testTagLatest}, tags)
 }
 
 func TestCraneProviderCopyNonexistentSource(t *testing.T) {
@@ -289,9 +289,9 @@ func TestCraneProviderPromoteImages(t *testing.T) {
 	}
 
 	entries := []imageEntry{
-		{name: "app", tag: "v1.0"},
+		{name: "app", tag: testTagV1},
 		{name: "app", tag: "v2.0"},
-		{name: "web", tag: "latest"},
+		{name: "web", tag: testTagLatest},
 	}
 
 	// Push all test images to the staging registry.
@@ -324,7 +324,7 @@ func TestCraneProviderPromoteImages(t *testing.T) {
 	// Verify tag listing for a multi-tag image.
 	tags, err := crane.ListTags(fmt.Sprintf("%s/app", dstRegistry), crane.Insecure)
 	require.NoError(t, err)
-	require.ElementsMatch(t, []string{"v1.0", "v2.0"}, tags)
+	require.ElementsMatch(t, []string{testTagV1, "v2.0"}, tags)
 }
 
 func TestCraneProviderCopyImageIndex(t *testing.T) {

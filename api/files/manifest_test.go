@@ -23,6 +23,8 @@ import (
 	"sigs.k8s.io/promo-tools/v4/api/files"
 )
 
+const testFileName = "foo"
+
 func TestValidateFilestores(t *testing.T) {
 	tests := []struct {
 		filestores    []files.Filestore
@@ -104,7 +106,7 @@ func TestValidateFiles(t *testing.T) {
 		},
 		{
 			files: []files.File{
-				{Name: "foo", SHA256: oksha},
+				{Name: testFileName, SHA256: oksha},
 			},
 		},
 		{
@@ -115,19 +117,19 @@ func TestValidateFiles(t *testing.T) {
 		},
 		{
 			files: []files.File{
-				{Name: "foo", SHA256: "bad"},
+				{Name: testFileName, SHA256: "bad"},
 			},
 			expectedError: "sha256 was not valid (not hex)",
 		},
 		{
 			files: []files.File{
-				{Name: "foo"},
+				{Name: testFileName},
 			},
 			expectedError: "sha256 is required",
 		},
 		{
 			files: []files.File{
-				{Name: "foo", SHA256: "abcd"},
+				{Name: testFileName, SHA256: "abcd"},
 			},
 			expectedError: "sha256 was not valid (bad length)",
 		},

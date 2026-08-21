@@ -26,6 +26,16 @@ import (
 	"sigs.k8s.io/promo-tools/v4/types/image"
 )
 
+const (
+	testImageFoo        = "foo"
+	testImageBar        = "bar"
+	testMyImage         = "myimage"
+	testMyImageTag      = "v1.0"
+	testTagLatest       = "latest"
+	testStagingRegistry = "gcr.io/k8s-staging-foo"
+	testProdRegistry    = "us-docker.pkg.dev/k8s-artifacts-prod/images/foo"
+)
+
 var (
 	testSrcRC = registry.Context{
 		Name:           "gcr.io/staging",
@@ -47,7 +57,7 @@ var (
 func TestEdgeSrcReference(t *testing.T) {
 	e := Edge{
 		SrcRegistry: testSrcRC,
-		SrcImageTag: ImageTag{Name: "foo", Tag: "v1"},
+		SrcImageTag: ImageTag{Name: testImageFoo, Tag: "v1"},
 		Digest:      testDigest1,
 	}
 	require.Equal(t, "gcr.io/staging/foo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", e.SrcReference())
@@ -59,7 +69,7 @@ func TestEdgeSrcReference(t *testing.T) {
 func TestEdgeDstReference(t *testing.T) {
 	e := Edge{
 		DstRegistry: testDstRC1,
-		DstImageTag: ImageTag{Name: "foo", Tag: "v1"},
+		DstImageTag: ImageTag{Name: testImageFoo, Tag: "v1"},
 		Digest:      testDigest1,
 	}
 	require.Equal(t, "us.gcr.io/prod/foo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", e.DstReference())
@@ -68,11 +78,11 @@ func TestEdgeDstReference(t *testing.T) {
 }
 
 func TestToFQIN(t *testing.T) {
-	require.Equal(t, "gcr.io/staging/foo@sha256:abc", ToFQIN("gcr.io/staging", "foo", "sha256:abc"))
+	require.Equal(t, "gcr.io/staging/foo@sha256:abc", ToFQIN("gcr.io/staging", testImageFoo, "sha256:abc"))
 }
 
 func TestToPQIN(t *testing.T) {
-	require.Equal(t, "gcr.io/staging/foo:v1", ToPQIN("gcr.io/staging", "foo", "v1"))
+	require.Equal(t, "gcr.io/staging/foo:v1", ToPQIN("gcr.io/staging", testImageFoo, "v1"))
 }
 
 func testManifest() schema.Manifest {
@@ -85,9 +95,9 @@ func testManifest() schema.Manifest {
 		},
 		Images: []registry.Image{
 			{
-				Name: "foo",
+				Name: testImageFoo,
 				Dmap: registry.DigestTags{
-					testDigest1: {"v1", "latest"},
+					testDigest1: {"v1", testTagLatest},
 				},
 			},
 		},
@@ -117,7 +127,7 @@ func TestToEdgesTagless(t *testing.T) {
 		},
 		Images: []registry.Image{
 			{
-				Name: "bar",
+				Name: testImageBar,
 				Dmap: registry.DigestTags{
 					testDigest1: {}, // tagless
 				},
@@ -137,10 +147,10 @@ func TestCheckOverlappingEdgesClean(t *testing.T) {
 	edges := map[Edge]any{
 		{
 			SrcRegistry: testSrcRC,
-			SrcImageTag: ImageTag{Name: "foo", Tag: "v1"},
+			SrcImageTag: ImageTag{Name: testImageFoo, Tag: "v1"},
 			Digest:      testDigest1,
 			DstRegistry: testDstRC1,
-			DstImageTag: ImageTag{Name: "foo", Tag: "v1"},
+			DstImageTag: ImageTag{Name: testImageFoo, Tag: "v1"},
 		}: nil,
 	}
 	checked, err := CheckOverlappingEdges(edges)
@@ -153,17 +163,17 @@ func TestCheckOverlappingEdgesConflict(t *testing.T) {
 	edges := map[Edge]any{
 		{
 			SrcRegistry: testSrcRC,
-			SrcImageTag: ImageTag{Name: "foo", Tag: "v1"},
+			SrcImageTag: ImageTag{Name: testImageFoo, Tag: "v1"},
 			Digest:      testDigest1,
 			DstRegistry: testDstRC1,
-			DstImageTag: ImageTag{Name: "foo", Tag: "v1"},
+			DstImageTag: ImageTag{Name: testImageFoo, Tag: "v1"},
 		}: nil,
 		{
 			SrcRegistry: testSrcRC,
-			SrcImageTag: ImageTag{Name: "foo", Tag: "v1"},
+			SrcImageTag: ImageTag{Name: testImageFoo, Tag: "v1"},
 			Digest:      testDigest2,
 			DstRegistry: testDstRC1,
-			DstImageTag: ImageTag{Name: "foo", Tag: "v1"},
+			DstImageTag: ImageTag{Name: testImageFoo, Tag: "v1"},
 		}: nil,
 	}
 	_, err := CheckOverlappingEdges(edges)
@@ -175,28 +185,28 @@ func TestGetPromotionCandidates(t *testing.T) {
 	edges := map[Edge]any{
 		{
 			SrcRegistry: testSrcRC,
-			SrcImageTag: ImageTag{Name: "foo", Tag: "v1"},
+			SrcImageTag: ImageTag{Name: testImageFoo, Tag: "v1"},
 			Digest:      testDigest1,
 			DstRegistry: testDstRC1,
-			DstImageTag: ImageTag{Name: "foo", Tag: "v1"},
+			DstImageTag: ImageTag{Name: testImageFoo, Tag: "v1"},
 		}: nil,
 		{
 			SrcRegistry: testSrcRC,
-			SrcImageTag: ImageTag{Name: "bar", Tag: "v2"},
+			SrcImageTag: ImageTag{Name: testImageBar, Tag: "v2"},
 			Digest:      testDigest2,
 			DstRegistry: testDstRC1,
-			DstImageTag: ImageTag{Name: "bar", Tag: "v2"},
+			DstImageTag: ImageTag{Name: testImageBar, Tag: "v2"},
 		}: nil,
 	}
 
 	// Inventory where "foo:v1" is already promoted but "bar:v2" is not.
 	inv := map[image.Registry]registry.RegInvImage{
 		testSrcRC.Name: {
-			"foo": registry.DigestTags{testDigest1: {"v1"}},
-			"bar": registry.DigestTags{testDigest2: {"v2"}},
+			testImageFoo: registry.DigestTags{testDigest1: {"v1"}},
+			testImageBar: registry.DigestTags{testDigest2: {"v2"}},
 		},
 		testDstRC1.Name: {
-			"foo": registry.DigestTags{testDigest1: {"v1"}}, // already promoted
+			testImageFoo: registry.DigestTags{testDigest1: {"v1"}}, // already promoted
 		},
 	}
 
@@ -205,27 +215,27 @@ func TestGetPromotionCandidates(t *testing.T) {
 	require.Len(t, candidates, 1)
 
 	for edge := range candidates {
-		require.Equal(t, image.Name("bar"), edge.DstImageTag.Name)
+		require.Equal(t, image.Name(testImageBar), edge.DstImageTag.Name)
 	}
 }
 
 func TestGetPromotionCandidatesTagMove(t *testing.T) {
 	edge := Edge{
 		SrcRegistry: testSrcRC,
-		SrcImageTag: ImageTag{Name: "foo", Tag: "v1"},
+		SrcImageTag: ImageTag{Name: testImageFoo, Tag: "v1"},
 		Digest:      testDigest1,
 		DstRegistry: testDstRC1,
-		DstImageTag: ImageTag{Name: "foo", Tag: "v1"},
+		DstImageTag: ImageTag{Name: testImageFoo, Tag: "v1"},
 	}
 	edges := map[Edge]any{edge: nil}
 
 	// Tag "v1" in dst points to a different digest — tag move.
 	inv := map[image.Registry]registry.RegInvImage{
 		testSrcRC.Name: {
-			"foo": registry.DigestTags{testDigest1: {"v1"}},
+			testImageFoo: registry.DigestTags{testDigest1: {"v1"}},
 		},
 		testDstRC1.Name: {
-			"foo": registry.DigestTags{testDigest2: {"v1"}},
+			testImageFoo: registry.DigestTags{testDigest2: {"v1"}},
 		},
 	}
 
@@ -237,18 +247,18 @@ func TestGetPromotionCandidatesTagMove(t *testing.T) {
 func TestVertexProps(t *testing.T) {
 	edge := Edge{
 		SrcRegistry: testSrcRC,
-		SrcImageTag: ImageTag{Name: "foo", Tag: "v1"},
+		SrcImageTag: ImageTag{Name: testImageFoo, Tag: "v1"},
 		Digest:      testDigest1,
 		DstRegistry: testDstRC1,
-		DstImageTag: ImageTag{Name: "foo", Tag: "v1"},
+		DstImageTag: ImageTag{Name: testImageFoo, Tag: "v1"},
 	}
 
 	inv := map[image.Registry]registry.RegInvImage{
 		testSrcRC.Name: {
-			"foo": registry.DigestTags{testDigest1: {"v1"}},
+			testImageFoo: registry.DigestTags{testDigest1: {"v1"}},
 		},
 		testDstRC1.Name: {
-			"foo": registry.DigestTags{testDigest1: {"v1"}},
+			testImageFoo: registry.DigestTags{testDigest1: {"v1"}},
 		},
 	}
 
@@ -262,15 +272,15 @@ func TestVertexProps(t *testing.T) {
 func TestVertexPropsNotPromoted(t *testing.T) {
 	edge := Edge{
 		SrcRegistry: testSrcRC,
-		SrcImageTag: ImageTag{Name: "foo", Tag: "v1"},
+		SrcImageTag: ImageTag{Name: testImageFoo, Tag: "v1"},
 		Digest:      testDigest1,
 		DstRegistry: testDstRC1,
-		DstImageTag: ImageTag{Name: "foo", Tag: "v1"},
+		DstImageTag: ImageTag{Name: testImageFoo, Tag: "v1"},
 	}
 
 	inv := map[image.Registry]registry.RegInvImage{
 		testSrcRC.Name: {
-			"foo": registry.DigestTags{testDigest1: {"v1"}},
+			testImageFoo: registry.DigestTags{testDigest1: {"v1"}},
 		},
 		// Destination registry is empty.
 	}
@@ -285,45 +295,45 @@ func TestEdgesToRegInvImage(t *testing.T) {
 	edges := map[Edge]any{
 		{
 			DstRegistry: testDstRC1,
-			DstImageTag: ImageTag{Name: "foo", Tag: "v1"},
+			DstImageTag: ImageTag{Name: testImageFoo, Tag: "v1"},
 			Digest:      testDigest1,
 		}: nil,
 		{
 			DstRegistry: testDstRC1,
-			DstImageTag: ImageTag{Name: "foo", Tag: "v2"},
+			DstImageTag: ImageTag{Name: testImageFoo, Tag: "v2"},
 			Digest:      testDigest1,
 		}: nil,
 		{
 			DstRegistry: testDstRC2,
-			DstImageTag: ImageTag{Name: "bar", Tag: "latest"},
+			DstImageTag: ImageTag{Name: testImageBar, Tag: testTagLatest},
 			Digest:      testDigest2,
 		}: nil,
 	}
 
 	rii := EdgesToRegInvImage(edges, "us.gcr.io/prod")
 	require.Len(t, rii, 1) // only "foo" from us.gcr.io/prod
-	require.Contains(t, rii, image.Name("foo"))
-	require.Len(t, rii["foo"][testDigest1], 2)
+	require.Contains(t, rii, image.Name(testImageFoo))
+	require.Len(t, rii[testImageFoo][testDigest1], 2)
 }
 
 func TestFilterByTag(t *testing.T) {
 	rii := registry.RegInvImage{
-		"foo": registry.DigestTags{
-			testDigest1: {"v1", "latest"},
+		testImageFoo: registry.DigestTags{
+			testDigest1: {"v1", testTagLatest},
 			testDigest2: {"v2"},
 		},
 	}
 
 	filtered := FilterByTag(rii, "v1")
 	require.Len(t, filtered, 1)
-	require.Contains(t, filtered, image.Name("foo"))
-	require.Len(t, filtered["foo"], 1)
-	require.Contains(t, filtered["foo"], testDigest1)
+	require.Contains(t, filtered, image.Name(testImageFoo))
+	require.Len(t, filtered[testImageFoo], 1)
+	require.Contains(t, filtered[testImageFoo], testDigest1)
 }
 
 func TestFilterByTagNoMatch(t *testing.T) {
 	rii := registry.RegInvImage{
-		"foo": registry.DigestTags{
+		testImageFoo: registry.DigestTags{
 			testDigest1: {"v1"},
 		},
 	}
@@ -336,9 +346,9 @@ func TestGetRegistriesToRead(t *testing.T) {
 	edges := map[Edge]any{
 		{
 			SrcRegistry: testSrcRC,
-			SrcImageTag: ImageTag{Name: "foo"},
+			SrcImageTag: ImageTag{Name: testImageFoo},
 			DstRegistry: testDstRC1,
-			DstImageTag: ImageTag{Name: "foo"},
+			DstImageTag: ImageTag{Name: testImageFoo},
 		}: nil,
 	}
 
@@ -358,15 +368,15 @@ func TestGetBaseRegistries(t *testing.T) {
 	edges := map[Edge]any{
 		{
 			SrcRegistry: testSrcRC,
-			SrcImageTag: ImageTag{Name: "foo"},
+			SrcImageTag: ImageTag{Name: testImageFoo},
 			DstRegistry: testDstRC1,
-			DstImageTag: ImageTag{Name: "foo"},
+			DstImageTag: ImageTag{Name: testImageFoo},
 		}: nil,
 		{
 			SrcRegistry: testSrcRC,
-			SrcImageTag: ImageTag{Name: "bar"},
+			SrcImageTag: ImageTag{Name: testImageBar},
 			DstRegistry: testDstRC2,
-			DstImageTag: ImageTag{Name: "bar"},
+			DstImageTag: ImageTag{Name: testImageBar},
 		}: nil,
 	}
 
@@ -388,19 +398,19 @@ func TestGetPromotionCandidatesWithBaseRegistries(t *testing.T) {
 	// When ReadRegistries uses base registries for splitByKnownRegistries,
 	// the inventory is keyed correctly and digests are found.
 	srcReg := registry.Context{
-		Name: "gcr.io/k8s-staging-foo",
+		Name: testStagingRegistry,
 		Src:  true,
 	}
 	dstReg := registry.Context{
-		Name: "us-docker.pkg.dev/k8s-artifacts-prod/images/foo",
+		Name: testProdRegistry,
 	}
 
 	edges := map[Edge]any{
 		{
 			SrcRegistry: srcReg,
-			SrcImageTag: ImageTag{Name: "myimage", Tag: "v1.0"},
+			SrcImageTag: ImageTag{Name: testMyImage, Tag: testMyImageTag},
 			DstRegistry: dstReg,
-			DstImageTag: ImageTag{Name: "myimage", Tag: "v1.0"},
+			DstImageTag: ImageTag{Name: testMyImage, Tag: testMyImageTag},
 			Digest:      testDigest1,
 		}: nil,
 	}
@@ -409,14 +419,14 @@ func TestGetPromotionCandidatesWithBaseRegistries(t *testing.T) {
 	// (this is the correct keying produced when base registries are used).
 	// Both src and dst have the digest+tag → already promoted.
 	inv := map[image.Registry]registry.RegInvImage{
-		"gcr.io/k8s-staging-foo": {
-			"myimage": registry.DigestTags{
-				testDigest1: {"v1.0"},
+		testStagingRegistry: {
+			testMyImage: registry.DigestTags{
+				testDigest1: {testMyImageTag},
 			},
 		},
-		"us-docker.pkg.dev/k8s-artifacts-prod/images/foo": {
-			"myimage": registry.DigestTags{
-				testDigest1: {"v1.0"},
+		testProdRegistry: {
+			testMyImage: registry.DigestTags{
+				testDigest1: {testMyImageTag},
 			},
 		},
 	}
@@ -428,13 +438,13 @@ func TestGetPromotionCandidatesWithBaseRegistries(t *testing.T) {
 
 	// Now test with a digest that needs promotion (exists in src, not in dst).
 	inv = map[image.Registry]registry.RegInvImage{
-		"gcr.io/k8s-staging-foo": {
-			"myimage": registry.DigestTags{
-				testDigest1: {"v1.0"},
+		testStagingRegistry: {
+			testMyImage: registry.DigestTags{
+				testDigest1: {testMyImageTag},
 			},
 		},
-		"us-docker.pkg.dev/k8s-artifacts-prod/images/foo": {
-			"myimage": registry.DigestTags{},
+		testProdRegistry: {
+			testMyImage: registry.DigestTags{},
 		},
 	}
 
@@ -448,7 +458,7 @@ func TestGetPromotionCandidatesWithBaseRegistries(t *testing.T) {
 	invBadKeys := map[image.Registry]registry.RegInvImage{
 		"gcr.io/k8s-staging-foo/myimage": {
 			"": registry.DigestTags{
-				testDigest1: {"v1.0"},
+				testDigest1: {testMyImageTag},
 			},
 		},
 	}

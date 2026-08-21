@@ -31,11 +31,23 @@ import (
 	"sigs.k8s.io/promo-tools/v4/types/image"
 )
 
+const (
+	testServiceAccount = "sa@robot.com"
+	imageFoo           = "foo"
+	imageBar           = "bar"
+	tagLatest          = "latest"
+	tag1               = "1.0"
+	tag2               = "2.0"
+	tag3               = "3.0"
+	tag123             = "1.2.3"
+	digest000          = "sha256:000"
+	digest111          = "sha256:111"
+	digest222          = "sha256:222"
+)
+
 func testPath(paths ...string) string {
-	prefix := []string{
-		os.Getenv("PWD"),
-		"testdata",
-	}
+	prefix := make([]string, 0, 2+len(paths))
+	prefix = append(prefix, os.Getenv("PWD"), "testdata")
 
 	return filepath.Join(append(prefix, paths...)...)
 }
@@ -44,7 +56,7 @@ func TestFind(t *testing.T) {
 	pwd := testPath()
 	srcRC := registry.Context{
 		Name:           "gcr.io/foo-staging",
-		ServiceAccount: "sa@robot.com",
+		ServiceAccount: testServiceAccount,
 		Src:            true,
 	}
 
@@ -79,22 +91,22 @@ func TestFind(t *testing.T) {
 					srcRC,
 					{
 						Name:           "us.gcr.io/some-prod",
-						ServiceAccount: "sa@robot.com",
+						ServiceAccount: testServiceAccount,
 					},
 					{
 						Name:           "eu.gcr.io/some-prod",
-						ServiceAccount: "sa@robot.com",
+						ServiceAccount: testServiceAccount,
 					},
 					{
 						Name:           "asia.gcr.io/some-prod",
-						ServiceAccount: "sa@robot.com",
+						ServiceAccount: testServiceAccount,
 					},
 				},
 				Images: []registry.Image{
 					{
 						Name: "foo-controller",
 						Dmap: registry.DigestTags{
-							"sha256:c3d310f4741b3642497da8826e0986db5e02afc9777a2b8e668c8e41034128c1": {"1.0"},
+							"sha256:c3d310f4741b3642497da8826e0986db5e02afc9777a2b8e668c8e41034128c1": {tag1},
 						},
 					},
 				},
@@ -151,13 +163,13 @@ func TestApplyFilters(t *testing.T) {
 			"no filters --- same as input",
 			manifest.GrowOptions{},
 			registry.RegInvImage{
-				"foo": {
-					"sha256:000": {"2.0"},
+				imageFoo: {
+					digest000: {tag2},
 				},
 			},
 			registry.RegInvImage{
-				"foo": {
-					"sha256:000": {"2.0"},
+				imageFoo: {
+					digest000: {tag2},
 				},
 			},
 			nil,
@@ -166,13 +178,13 @@ func TestApplyFilters(t *testing.T) {
 			"remove 'latest' tag by default, even if no filters",
 			manifest.GrowOptions{},
 			registry.RegInvImage{
-				"foo": {
-					"sha256:000": {"latest", "2.0"},
+				imageFoo: {
+					digest000: {tagLatest, tag2},
 				},
 			},
 			registry.RegInvImage{
-				"foo": {
-					"sha256:000": {"2.0"},
+				imageFoo: {
+					digest000: {tag2},
 				},
 			},
 			nil,
@@ -180,19 +192,19 @@ func TestApplyFilters(t *testing.T) {
 		{
 			"filter on image name only",
 			manifest.GrowOptions{
-				FilterImages: []image.Name{"bar"},
+				FilterImages: []image.Name{imageBar},
 			},
 			registry.RegInvImage{
-				"foo": {
-					"sha256:000": {"latest", "2.0"},
+				imageFoo: {
+					digest000: {tagLatest, tag2},
 				},
-				"bar": {
-					"sha256:111": {"latest", "1.0"},
+				imageBar: {
+					digest111: {tagLatest, tag1},
 				},
 			},
 			registry.RegInvImage{
-				"bar": {
-					"sha256:111": {"1.0"},
+				imageBar: {
+					digest111: {tag1},
 				},
 			},
 			nil,
@@ -200,19 +212,19 @@ func TestApplyFilters(t *testing.T) {
 		{
 			"filter on tag only",
 			manifest.GrowOptions{
-				FilterTags: []image.Tag{"1.0"},
+				FilterTags: []image.Tag{tag1},
 			},
 			registry.RegInvImage{
-				"foo": {
-					"sha256:000": {"latest", "2.0"},
+				imageFoo: {
+					digest000: {tagLatest, tag2},
 				},
-				"bar": {
-					"sha256:111": {"latest", "1.0"},
+				imageBar: {
+					digest111: {tagLatest, tag1},
 				},
 			},
 			registry.RegInvImage{
-				"bar": {
-					"sha256:111": {"1.0"},
+				imageBar: {
+					digest111: {tag1},
 				},
 			},
 			nil,
@@ -220,14 +232,14 @@ func TestApplyFilters(t *testing.T) {
 		{
 			"filter on 'latest' tag",
 			manifest.GrowOptions{
-				FilterTags: []image.Tag{"latest"},
+				FilterTags: []image.Tag{tagLatest},
 			},
 			registry.RegInvImage{
-				"foo": {
-					"sha256:000": {"latest", "2.0"},
+				imageFoo: {
+					digest000: {tagLatest, tag2},
 				},
-				"bar": {
-					"sha256:111": {"latest", "1.0"},
+				imageBar: {
+					digest111: {tagLatest, tag1},
 				},
 			},
 			registry.RegInvImage{},
@@ -236,20 +248,20 @@ func TestApplyFilters(t *testing.T) {
 		{
 			"filter on digest",
 			manifest.GrowOptions{
-				FilterDigests: []image.Digest{"sha256:222"},
+				FilterDigests: []image.Digest{digest222},
 			},
 			registry.RegInvImage{
-				"foo": {
-					"sha256:000": {"latest", "2.0"},
-					"sha256:222": {"3.0"},
+				imageFoo: {
+					digest000: {tagLatest, tag2},
+					digest222: {tag3},
 				},
-				"bar": {
-					"sha256:111": {"latest", "1.0"},
+				imageBar: {
+					digest111: {tagLatest, tag1},
 				},
 			},
 			registry.RegInvImage{
-				"foo": {
-					"sha256:222": {"3.0"},
+				imageFoo: {
+					digest222: {tag3},
 				},
 			},
 			nil,
@@ -257,23 +269,23 @@ func TestApplyFilters(t *testing.T) {
 		{
 			"filter on shared tag (multiple images share same tag)",
 			manifest.GrowOptions{
-				FilterTags: []image.Tag{"1.2.3"},
+				FilterTags: []image.Tag{tag123},
 			},
 			registry.RegInvImage{
-				"foo": {
-					"sha256:000": {"latest", "1.2.3"},
-					"sha256:222": {"3.0"},
+				imageFoo: {
+					digest000: {tagLatest, tag123},
+					digest222: {tag3},
 				},
-				"bar": {
-					"sha256:111": {"latest", "1.2.3"},
+				imageBar: {
+					digest111: {tagLatest, tag123},
 				},
 			},
 			registry.RegInvImage{
-				"foo": {
-					"sha256:000": {"1.2.3"},
+				imageFoo: {
+					digest000: {tag123},
 				},
-				"bar": {
-					"sha256:111": {"1.2.3"},
+				imageBar: {
+					digest111: {tag123},
 				},
 			},
 			nil,
@@ -281,21 +293,21 @@ func TestApplyFilters(t *testing.T) {
 		{
 			"filter on shared tag and image name (multiple images share same tag)",
 			manifest.GrowOptions{
-				FilterImages: []image.Name{"foo"},
-				FilterTags:   []image.Tag{"1.2.3"},
+				FilterImages: []image.Name{imageFoo},
+				FilterTags:   []image.Tag{tag123},
 			},
 			registry.RegInvImage{
-				"foo": {
-					"sha256:000": {"latest", "1.2.3"},
-					"sha256:222": {"3.0"},
+				imageFoo: {
+					digest000: {tagLatest, tag123},
+					digest222: {tag3},
 				},
-				"bar": {
-					"sha256:111": {"latest", "1.2.3"},
+				imageBar: {
+					digest111: {tagLatest, tag123},
 				},
 			},
 			registry.RegInvImage{
-				"foo": {
-					"sha256:000": {"1.2.3"},
+				imageFoo: {
+					digest000: {tag123},
 				},
 			},
 			nil,
