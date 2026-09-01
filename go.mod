@@ -25,7 +25,7 @@ require (
 	golang.org/x/oauth2 v0.36.0
 	golang.org/x/sync v0.22.0
 	golang.org/x/time v0.15.0
-	google.golang.org/api v0.294.0
+	google.golang.org/api v0.295.0
 	google.golang.org/genproto v0.0.0-20260715232425-e75dac1f907d
 	google.golang.org/protobuf v1.36.12
 	gopkg.in/yaml.v2 v2.4.0
