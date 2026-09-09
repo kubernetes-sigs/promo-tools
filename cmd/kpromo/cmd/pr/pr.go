@@ -388,8 +388,8 @@ func mustRun(opts *promoteOptions, question string) bool {
 	if err != nil {
 		logrus.Error(err)
 
-		var userInputErr helpers.UserInputError
-		if errors.As(err, &userInputErr) {
+		//nolint:errcheck // only the type match matters, err is already logged
+		if _, ok := errors.AsType[helpers.UserInputError](err); ok {
 			os.Exit(1)
 		}
 

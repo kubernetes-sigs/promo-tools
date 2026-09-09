@@ -66,7 +66,7 @@ func TestRoundTripRateLimitsAllMethods(t *testing.T) {
 			t.Fatalf("creating %s request: %v", method, err)
 		}
 
-		resp, err := client.Do(req) //nolint:gosec // httptest URL
+		resp, err := client.Do(req)
 		if err != nil {
 			t.Fatalf("%s request failed: %v", method, err)
 		}
@@ -104,7 +104,7 @@ func TestAdaptiveBackoffOn429(t *testing.T) {
 		t.Fatalf("creating request: %v", err)
 	}
 
-	resp, reqErr := client.Do(req) //nolint:gosec // httptest URL
+	resp, reqErr := client.Do(req)
 	if reqErr != nil {
 		t.Fatalf("first request failed: %v", reqErr)
 	}
@@ -140,7 +140,7 @@ func TestStatsTracking(t *testing.T) {
 			t.Fatalf("creating request: %v", err)
 		}
 
-		resp, err := client.Do(req) //nolint:gosec // httptest URL
+		resp, err := client.Do(req)
 		if err != nil {
 			t.Fatalf("request failed: %v", err)
 		}

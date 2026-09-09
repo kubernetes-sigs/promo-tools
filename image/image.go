@@ -43,7 +43,7 @@ func NewManifestListFromFile(manifestPath string) (*ManifestList, error) {
 		return nil, errors.New("could not find image promoter manifest")
 	}
 
-	yamlCode, err := os.ReadFile(filepath.Clean(manifestPath)) //nolint:gosec // path already sanitized via filepath.Clean
+	yamlCode, err := os.ReadFile(filepath.Clean(manifestPath))
 	if err != nil {
 		return nil, fmt.Errorf("reading yaml code from file: %w", err)
 	}
@@ -72,7 +72,7 @@ func (imagesList *ManifestList) Write(filePath string) error {
 		return fmt.Errorf("while marshalling image list: %w", err)
 	}
 	// Write the yaml into the specified file
-	if err := os.WriteFile(filepath.Clean(filePath), yamlCode, os.FileMode(0o644)); err != nil { //nolint:gosec // path already sanitized via filepath.Clean
+	if err := os.WriteFile(filepath.Clean(filePath), yamlCode, os.FileMode(0o644)); err != nil {
 		return fmt.Errorf("writing yaml code into file: %w", err)
 	}
 

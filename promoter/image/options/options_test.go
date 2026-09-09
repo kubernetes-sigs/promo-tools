@@ -22,6 +22,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const testRegistry = "gcr.io/test"
+
 func TestOptionsValidate(t *testing.T) {
 	for _, tc := range []struct {
 		name      string
@@ -40,17 +42,17 @@ func TestOptionsValidate(t *testing.T) {
 		},
 		{
 			name:      "snapshot set",
-			opts:      Options{Snapshot: "gcr.io/test"},
+			opts:      Options{Snapshot: testRegistry},
 			shouldErr: false,
 		},
 		{
 			name:      "manifest based snapshot set",
-			opts:      Options{ManifestBasedSnapshotOf: "gcr.io/test"},
+			opts:      Options{ManifestBasedSnapshotOf: testRegistry},
 			shouldErr: false,
 		},
 		{
 			name:      "snapshot bypasses manifest check",
-			opts:      Options{Snapshot: "gcr.io/test"},
+			opts:      Options{Snapshot: testRegistry},
 			shouldErr: false,
 		},
 		{
