@@ -60,6 +60,16 @@ const (
 	// bundlePredicateTypeAnnotation is the referrer manifest annotation where
 	// cosign records the predicate type of an attached attestation bundle.
 	bundlePredicateTypeAnnotation = "dev.sigstore.bundle.predicateType"
+
+	// artifactRegistryHostSuffix is the host suffix of a regional Artifact
+	// Registry, for example us-central1-docker.pkg.dev.
+	artifactRegistryHostSuffix = "-docker.pkg.dev"
+
+	// skipTagless and withTagless select whether
+	// groupEdgesByIdentityDigest covers edges that promote a digest
+	// without a tag.
+	skipTagless = false
+	withTagless = true
 )
 
 // ValidateStagingSignatures checks if edges (images) have a signature
@@ -145,7 +155,7 @@ func (di *DefaultPromoterImplementation) SignImages(
 	di.signer = sign.New(signOpts)
 
 	// We only sign the first normalized image per digest of each edge.
-	grouped := groupEdgesByIdentityDigest(edges)
+	grouped := groupEdgesByIdentityDigest(edges, skipTagless)
 
 	g := new(errgroup.Group)
 	g.SetLimit(opts.MaxSignatureOps)
@@ -226,7 +236,13 @@ func targetIdentity(edge *promotion.Edge) string {
 // registry (canonicalRegistry) comes first, with remaining registries in
 // alphabetical order. The first edge in each group is used as the signing
 // target.
-func groupEdgesByIdentityDigest(edges map[promotion.Edge]any) [][]promotion.Edge {
+//
+// Tagless edges address a digest that is promoted without a tag, usually a
+// child of an index. They are included when includeTagless is set, which
+// attestations do because they are attached to a digest, not to a tag.
+func groupEdgesByIdentityDigest(
+	edges map[promotion.Edge]any, includeTagless bool,
+) [][]promotion.Edge {
 	type key struct {
 		identity string
 		digest   image.Digest
@@ -237,8 +253,11 @@ func groupEdgesByIdentityDigest(edges map[promotion.Edge]any) [][]promotion.Edge
 	for edge := range edges {
 		// Skip metadata layers
 		if strings.HasSuffix(string(edge.DstImageTag.Tag), ".sig") ||
-			strings.HasSuffix(string(edge.DstImageTag.Tag), ".att") ||
-			edge.DstImageTag.Tag == "" {
+			strings.HasSuffix(string(edge.DstImageTag.Tag), ".att") {
+			continue
+		}
+
+		if edge.DstImageTag.Tag == "" && !includeTagless {
 			continue
 		}
 
@@ -363,21 +382,27 @@ func (di *DefaultPromoterImplementation) WriteProvenanceAttestations(
 
 	now := time.Now()
 
+	// One attestation per target identity and digest, written to the
+	// canonical registry. Grouping keeps the tags of a digest from racing
+	// each other on the exists check, which would attach a referrer per
+	// tag, and the regional edges of a digest from attaching one referrer
+	// per region.
+	grouped := groupEdgesByIdentityDigest(edges, withTagless)
+
 	g := new(errgroup.Group)
 	g.SetLimit(opts.MaxSignatureOps)
 
-	for edge := range edges {
-		// Skip metadata layers
-		tag := string(edge.DstImageTag.Tag)
-		if strings.HasSuffix(tag, ".sig") ||
-			strings.HasSuffix(tag, ".att") ||
-			tag == "" {
-			continue
-		}
+	for _, group := range grouped {
+		edge := group[0]
+
+		// The production name, not the regional one: cosign v3 bundles
+		// carry no docker-reference, so the subject name is the only
+		// place that records it.
+		identity := targetIdentity(&edge)
 
 		record := provenance.PromotionRecord{
 			SrcRef:    edge.SrcReference(),
-			DstRef:    edge.DstReference(),
+			DstRef:    identity,
 			Digest:    string(edge.Digest),
 			Timestamp: timestamppb.New(now),
 			BuilderId: builderID,
@@ -385,7 +410,7 @@ func (di *DefaultPromoterImplementation) WriteProvenanceAttestations(
 
 		g.Go(func() error {
 			if err := di.pushAttestation(ctx, &edge, generator, &record); err != nil {
-				return fmt.Errorf("writing provenance for %s: %w", edge.DstReference(), err)
+				return fmt.Errorf("writing provenance for %s: %w", identity, err)
 			}
 
 			return nil
@@ -414,10 +439,7 @@ func (di *DefaultPromoterImplementation) pushAttestation(
 		return fmt.Errorf("generating attestation: %w", err)
 	}
 
-	// Build the digest reference for the destination image.
-	dstDigestRef := fmt.Sprintf(
-		"%s/%s@%s", edge.DstRegistry.Name, edge.DstImageTag.Name, edge.Digest,
-	)
+	dstDigestRef := canonicalDigestRef(edge)
 
 	digest, err := name.NewDigest(dstDigestRef)
 	if err != nil {
@@ -449,6 +471,29 @@ func (di *DefaultPromoterImplementation) pushAttestation(
 	}
 
 	return nil
+}
+
+// canonicalDigestRef returns the digest reference of an edge on the
+// canonical registry. Attestations are written there only and served
+// through registry.k8s.io, so an edge that promotes to another region
+// still gets its attestation on us-central1. This also covers digests
+// whose canonical edge is not a promotion candidate, because the image
+// is already promoted there.
+//
+// References outside the production repository are returned unchanged,
+// because only there is every region, including us-central1, guaranteed
+// to hold the image.
+func canonicalDigestRef(edge *promotion.Edge) string {
+	registryName := string(edge.DstRegistry.Name)
+
+	if strings.Contains(registryName, productionRepositoryPath) {
+		if host, path, ok := strings.Cut(registryName, "/"); ok &&
+			strings.HasSuffix(host, artifactRegistryHostSuffix) {
+			registryName = canonicalRegistry + "/" + path
+		}
+	}
+
+	return fmt.Sprintf("%s/%s@%s", registryName, edge.DstImageTag.Name, edge.Digest)
 }
 
 // hasBundleForPredicate checks if the given digest already has an
