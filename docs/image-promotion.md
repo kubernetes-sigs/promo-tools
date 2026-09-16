@@ -3,8 +3,11 @@
 The Container Image Promoter promotes OCI images from a source (staging)
 registry to one or more destination (production) registries. The set of images
 to promote is defined by promoter manifests in YAML. Image operations use
-[crane](https://github.com/google/go-containerregistry/tree/main/cmd/crane)
-and work with any OCI-compliant registry.
+[crane](https://github.com/google/go-containerregistry/tree/main/cmd/crane).
+Registry inventory reads use crane's Google-specific extensions
+([`pkg/v1/google`][ggcr-google]), which rely on the GCR/Artifact Registry
+tags-list API, so the promoter does not work with arbitrary OCI-compliant
+registries.
 
 - [Promoting images](#promoting-images)
   - [Promoter manifests](#promoter-manifests)
@@ -14,9 +17,10 @@ and work with any OCI-compliant registry.
 - [How promotion works](#how-promotion-works)
   - [Pipeline phases](#pipeline-phases)
   - [Rate limiting](#rate-limiting)
-- [Server-side operations](#server-side-operations)
+- [Image copying](#image-copying)
 - [Signing and attestation](#signing-and-attestation)
 - [Provenance verification](#provenance-verification)
+- [Provenance generation](#provenance-generation)
 - [Vulnerability scanning](#vulnerability-scanning)
 - [Grabbing snapshots](#grabbing-snapshots)
   - [Snapshots of promoter manifests](#snapshots-of-promoter-manifests)
@@ -166,9 +170,9 @@ The promotion flow is organized into sequential pipeline phases:
 
 | Phase | Name | Description |
 |-------|------|-------------|
-| 1 | **setup** | Validate options, activate service accounts, prewarm TUF cache |
+| 1 | **setup** | Validate options, prewarm TUF cache |
 | 2 | **plan** | Parse manifests, read registry inventories, compute promotion edges |
-| 3 | **provenance** | SLSA provenance verification (see [Provenance verification](#provenance-verification)) |
+| 3 | **provenance** | Verify build-time provenance attestations (verify-if-present, see [Provenance verification](#provenance-verification)) |
 | 4 | **validate** | Validate staging image signatures |
 | 5 | **promote** | Copy images from staging to production |
 | 6 | **sign** | Sign promoted images with cosign (primary registry only) |
@@ -180,47 +184,70 @@ precheck). With `--parse-only`, it stops after parsing manifests.
 ### Rate limiting
 
 HTTP requests are rate-limited to avoid 429 errors from registry quotas. The
-rate limiter covers all HTTP methods (not just reads) and uses adaptive backoff
-when 429 responses are received.
+whole pipeline uses a single rate limiter (50 requests per second, burst of
+5). The rate limiter covers all HTTP methods (not just reads) and uses
+adaptive backoff when 429 responses are received.
 
-The total request budget is split between promotion (70%) and signing (30%).
-After the promote phase completes, the full budget is rebalanced to signing.
+The limiter applies to image copies (`crane.Copy`) and copies of attached
+signature/attestation artifacts, but not to registry inventory reads (which
+use the Google-specific `google.Walk`/`google.List` API directly) nor to
+cosign's calls to sigstore services during signing.
 
-## Server-side operations
+## Image copying
 
-During promotion, all data resides on the server. No images are pulled and
-pushed back up. This is important for two reasons:
+Promotion copies are performed with `crane.Copy`, which streams the image
+manifest and blobs from the source registry to the destination registry
+through the promoter process. Copy operations are therefore *not*
+server-side: the source registry never transfers data to the destination
+registry directly.
 
-1. **Performance**: Images can be gigabytes in size.
-2. **Digest preservation**: Pulling/pushing can change the digest because layers
-   might get gzipped differently. Server-side operations preserve the digest.
+- **Digest preservation**: crane forwards the original manifest and layer
+  bytes unchanged, so the digest is preserved. Re-encoding layers (for
+  example by gzipping them differently) would change the digest, which is
+  why images are never unpacked and repacked by the promoter.
+- **Performance**: every destination receives a full copy of the image,
+  which can be gigabytes in size.
 
 ## Signing and attestation
 
 After promotion, images are signed using [cosign](https://github.com/sigstore/cosign)
-with a keyless (OIDC) identity. Signatures are written to the canonical
-registry (`us-central1-docker.pkg.dev`) and served globally through
+with a keyless (OIDC) identity. For destinations under the Kubernetes
+production path (`k8s-artifacts-prod/images`), signatures use the production
+(`registry.k8s.io`) reference of the image as their subject. When the
+canonical registry (`us-central1-docker.pkg.dev`) is among the promotion
+candidates, signatures are pushed there and served globally through
 registry.k8s.io via the `SIGNATURE_UPSTREAM_ENDPOINT` routing in archeio.
 The signing identity is configured with `--signer-account`.
 
 Promotion provenance attestations are signed into sigstore bundles and
-attached to each promoted digest as OCI 1.1 referrer artifacts (cosign's
-"new bundle format") — no `.att` or other tags are created for them.
+attached as OCI 1.1 referrer artifacts (cosign's "new bundle format") — no
+`.att` or other tags are created for them. One attestation is written per
+*promotion edge* (source/destination registry pair, image, digest and tag),
+using the destination registry reference as the attestation subject; a
+digest promoted to several regions or with several tags therefore produces
+multiple attestations. [#1944][issue-1944] tracks writing a single
+attestation per digest to the canonical registry instead.
 Attestations are signed with the same identity token flow as image
 signatures: the token obtained for `--signer-account` is the only
 credential source. The referrer manifest carries the predicate type in
 its `dev.sigstore.bundle.predicateType` annotation
 (`https://k8s.io/promo-tools/promotion/v1`), which distinguishes promoter
 attestations from build-time attestations and makes attesting idempotent:
-when a referrer with the promoter predicate type already exists, the
-digest is not attested again.
+when a referrer with the promoter predicate type already exists for a
+destination digest, it is not attested again (the existence check and push
+are not atomic, so concurrent tags of the same digest can still race; see
+[#1944][issue-1944]).
 
 Related flags:
 
 - `--sign` — enable/disable signing (default: `true`)
 - `--signer-account` — service account identity for signing
 - `--certificate-identity` — identity to verify when checking signatures
+- `--certificate-identity-regexp` — Go regex alternative to
+  `--certificate-identity`
 - `--certificate-oidc-issuer` — OIDC issuer for the signing identity
+- `--certificate-oidc-issuer-regexp` — Go regex alternative to
+  `--certificate-oidc-issuer`
 - `--max-signature-ops` — max concurrent signature operations (default: `50`)
 
 ## Provenance verification
@@ -228,19 +255,26 @@ Related flags:
 The promoter verifies build-time (SLSA) provenance attestations on staging
 images before promotion using verify-if-present semantics: if an attestation
 tag exists on a staging image (the legacy cosign `.att` tag convention used
-by the staging builds), it is cryptographically verified using cosign against
-the configured signing identity and OIDC issuer. If no attestation is found, a
-warning is logged and the image is still promoted. This allows progressive
-adoption without blocking images that do not yet have attestations.
+by the staging builds), it is verified using cosign against the configured
+signing identity (`--certificate-identity` or `--certificate-identity-regexp`)
+and OIDC issuer (`--certificate-oidc-issuer` or
+`--certificate-oidc-issuer-regexp`). If no attestation is found, a warning is
+logged and the image is still promoted. This allows progressive adoption
+without blocking images that do not yet have attestations.
+
+The current implementation has known limitations tracked in
+[#1943][issue-1943]: the expected predicate type is not passed to cosign and
+attestations signed by identities other than the configured one are not
+distinguished from verification failures.
 
 ## Provenance generation
 
-The promoter generates a promotion record attestation for each promoted
-image: an in-toto statement with the
-`https://k8s.io/promo-tools/promotion/v1` predicate type recording the
-promotion metadata (source/destination references, digest, builder
-identity, timestamp). The statement is signed into a sigstore bundle and
-attached to the promoted digest through the OCI referrers API as
+The promoter generates a promotion record attestation per promotion edge
+(see [Signing and attestation](#signing-and-attestation)): an in-toto
+statement with the `https://k8s.io/promo-tools/promotion/v1` predicate type
+recording the promotion metadata (source/destination references, digest,
+builder identity, timestamp). The statement is signed into a sigstore bundle
+and attached to the destination digest through the OCI referrers API as
 described in [Signing and attestation](#signing-and-attestation).
 Attestations can be verified with
 `cosign verify-attestation --new-bundle-format`.
@@ -287,4 +321,7 @@ kpromo cip \
   --output=csv | wc -l
 ```
 
+[ggcr-google]: https://pkg.go.dev/github.com/google/go-containerregistry/pkg/v1/google
+[issue-1943]: https://github.com/kubernetes-sigs/promo-tools/issues/1943
+[issue-1944]: https://github.com/kubernetes-sigs/promo-tools/issues/1944
 [k8sio-manifests-dir]: https://git.k8s.io/k8s.io/registry.k8s.io
