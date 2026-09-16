@@ -238,23 +238,43 @@ func makeTagRecorder(
 
 // splitByKnownRegistries splits a full image path into the registry name
 // and image name components based on known registries.
+//
+// Registries can be nested: k8s-staging-kubernetes and k8s-staging-etcd
+// promote to <region>-docker.pkg.dev/k8s-artifacts-prod/images, which is a
+// path prefix of every other subproject destination. The longest match wins,
+// so an image is always keyed under the most specific registry it belongs to,
+// no matter in which order the registries are passed.
 func splitByKnownRegistries(
 	fullName image.Registry, registries []RegistryConfig,
 ) (image.Registry, image.Name, error) {
+	fn := string(fullName)
+
+	var (
+		bestReg image.Registry
+		bestImg image.Name
+		bestLen = -1
+	)
+
 	for _, r := range registries {
 		rn := string(r.Name)
 
-		fn := string(fullName)
-		if len(fn) > len(rn) && fn[:len(rn)] == rn && fn[len(rn)] == '/' {
-			return r.Name, image.Name(fn[len(rn)+1:]), nil
+		if len(rn) <= bestLen {
+			continue
 		}
 
-		if fn == rn {
-			return r.Name, "", nil
+		switch {
+		case fn == rn:
+			bestReg, bestImg, bestLen = r.Name, "", len(rn)
+		case len(fn) > len(rn) && fn[:len(rn)] == rn && fn[len(rn)] == '/':
+			bestReg, bestImg, bestLen = r.Name, image.Name(fn[len(rn)+1:]), len(rn)
 		}
 	}
 
-	return "", "", fmt.Errorf("could not determine registry for %s", fullName)
+	if bestLen < 0 {
+		return "", "", fmt.Errorf("could not determine registry for %s", fullName)
+	}
+
+	return bestReg, bestImg, nil
 }
 
 // supportedMediaType returns the appropriate MediaType, or an error if
