@@ -50,6 +50,12 @@ type Result struct {
 	// (e.g., "https://github.com/kubernetes/kubernetes").
 	SourceRepo string
 
-	// Errors lists any issues found during verification.
+	// Errors lists the issues that made the verification fail. It is
+	// empty when Verified is true.
 	Errors []string
+
+	// Warnings lists what was found but not verified, for example an
+	// attestation signed by an identity other than the configured one.
+	// It can be populated while Verified is true.
+	Warnings []string
 }

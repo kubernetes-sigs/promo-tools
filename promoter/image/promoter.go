@@ -71,6 +71,7 @@ func New(opts *options.Options) *Promoter {
 			CertIdentityRegexp:   opts.SignCheckIdentityRegexp,
 			CertOidcIssuer:       opts.SignCheckIssuer,
 			CertOidcIssuerRegexp: opts.SignCheckIssuerRegexp,
+			Transport:            rt,
 		},
 		provenanceGenerator: &provenance.PromotionGenerator{},
 	}
@@ -194,11 +195,21 @@ func (p *Promoter) PromoteImages(ctx context.Context, opts *options.Options) err
 			return errors.New("provenance verifier not configured")
 		}
 
+		// Edges repeat the same source digest once per destination region
+		// and tag, so verify each source reference only once.
+		seen := make(map[string]struct{}, len(promotionEdges))
+
 		for edge := range promotionEdges {
 			ref := edge.SrcReference()
 			if ref == "" {
 				continue
 			}
+
+			if _, ok := seen[ref]; ok {
+				continue
+			}
+
+			seen[ref] = struct{}{}
 
 			result, err := verifier.Verify(ctx, ref)
 			if err != nil {
