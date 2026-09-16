@@ -24,9 +24,15 @@ import (
 	"sigs.k8s.io/promo-tools/v4/types/image"
 )
 
+const (
+	testTagV1           = "v1.0"
+	testTagLatest       = "latest"
+	testStagingRegistry = "gcr.io/k8s-staging-foo"
+)
+
 func TestRegistryConfigFromContext(t *testing.T) {
 	rc := Context{
-		Name:           "gcr.io/k8s-staging-foo",
+		Name:           testStagingRegistry,
 		ServiceAccount: "sa@project.iam.gserviceaccount.com",
 		Src:            true,
 	}
@@ -85,7 +91,7 @@ func TestFakeProviderAddImage(t *testing.T) {
 	reg := image.Registry("gcr.io/test")
 	name := image.Name("myimage")
 	digest := image.Digest("sha256:abc123")
-	tags := []image.Tag{"v1.0", "latest"}
+	tags := []image.Tag{testTagV1, testTagLatest}
 
 	f.AddImage(reg, name, digest, tags...)
 
@@ -156,7 +162,7 @@ func TestFakeProviderCopyImageError(t *testing.T) {
 
 func TestSplitByKnownRegistries(t *testing.T) {
 	registries := []RegistryConfig{
-		{Name: "gcr.io/k8s-staging-foo"},
+		{Name: testStagingRegistry},
 		{Name: "us-docker.pkg.dev/k8s-artifacts-prod/images"},
 	}
 
@@ -168,12 +174,12 @@ func TestSplitByKnownRegistries(t *testing.T) {
 	}{
 		{
 			fullName: "gcr.io/k8s-staging-foo/myimage",
-			wantReg:  "gcr.io/k8s-staging-foo",
+			wantReg:  testStagingRegistry,
 			wantImg:  "myimage",
 		},
 		{
 			fullName: "gcr.io/k8s-staging-foo/sub/path/image",
-			wantReg:  "gcr.io/k8s-staging-foo",
+			wantReg:  testStagingRegistry,
 			wantImg:  "sub/path/image",
 		},
 		{

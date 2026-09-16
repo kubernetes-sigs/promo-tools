@@ -46,6 +46,12 @@ import (
 	"sigs.k8s.io/promo-tools/v4/types/image"
 )
 
+const (
+	testTagV1     = "v1.0"
+	testImageApp  = "app"
+	testBuilderID = "https://k8s.io/promo-tools@test"
+)
+
 // newTLSTestRegistry starts an in-process OCI registry over TLS and returns
 // the host:port address and a DefaultPromoterImplementation configured with
 // a transport that trusts the test server's certificate.
@@ -93,10 +99,10 @@ func pushTestImage(t *testing.T, di *DefaultPromoterImplementation, ref string) 
 func testEdgeForHost(host string, digest image.Digest) promotion.Edge {
 	return promotion.Edge{
 		SrcRegistry: reg.Context{Name: image.Registry(host + "/staging"), Src: true},
-		SrcImageTag: promotion.ImageTag{Name: "myimage", Tag: "v1.0"},
+		SrcImageTag: promotion.ImageTag{Name: "myimage", Tag: testTagV1},
 		Digest:      digest,
 		DstRegistry: reg.Context{Name: image.Registry(host + "/production")},
-		DstImageTag: promotion.ImageTag{Name: "myimage", Tag: "v1.0"},
+		DstImageTag: promotion.ImageTag{Name: "myimage", Tag: testTagV1},
 	}
 }
 
@@ -183,7 +189,7 @@ func TestPushAttestation(t *testing.T) {
 		SrcRef:    edge.SrcReference(),
 		DstRef:    edge.DstReference(),
 		Digest:    string(edge.Digest),
-		BuilderId: "https://k8s.io/promo-tools@test",
+		BuilderId: testBuilderID,
 	}
 
 	gen := &fakeGenerator{data: []byte(`{"test": "attestation"}`)}
@@ -213,7 +219,7 @@ func TestPushAttestationIdempotent(t *testing.T) {
 		SrcRef:    edge.SrcReference(),
 		DstRef:    edge.DstReference(),
 		Digest:    string(edge.Digest),
-		BuilderId: "https://k8s.io/promo-tools@test",
+		BuilderId: testBuilderID,
 	}
 
 	gen := &fakeGenerator{data: []byte(`{"test": "attestation"}`)}
@@ -284,7 +290,7 @@ func TestPushAttestationCosignVerify(t *testing.T) {
 		SrcRef:    edge.SrcReference(),
 		DstRef:    edge.DstReference(),
 		Digest:    string(edge.Digest),
-		BuilderId: "https://k8s.io/promo-tools@test",
+		BuilderId: testBuilderID,
 	}
 
 	keypair, err := sgsign.NewEphemeralKeypair(nil)
@@ -371,8 +377,8 @@ func TestPromoteImagesCraneProvider(t *testing.T) {
 	}
 
 	entries := []entry{
-		{imgName: "app", tag: "v1.0"},
-		{imgName: "app", tag: "v2.0"},
+		{imgName: testImageApp, tag: testTagV1},
+		{imgName: testImageApp, tag: "v2.0"},
 		{imgName: "web", tag: "latest"},
 	}
 
@@ -418,7 +424,7 @@ func TestPromoteImagesCraneProvider(t *testing.T) {
 
 	tags, err := remote.List(repo, remote.WithTransport(di.getTransport()))
 	require.NoError(t, err)
-	require.ElementsMatch(t, []string{"v1.0", "v2.0"}, tags)
+	require.ElementsMatch(t, []string{testTagV1, "v2.0"}, tags)
 }
 
 // TestWriteProvenanceAttestationsIdempotent verifies that running
@@ -439,10 +445,10 @@ func TestWriteProvenanceAttestationsIdempotent(t *testing.T) {
 	edges := map[promotion.Edge]any{
 		{
 			SrcRegistry: reg.Context{Name: srcRegistry, Src: true},
-			SrcImageTag: promotion.ImageTag{Name: "app", Tag: "v1.0"},
+			SrcImageTag: promotion.ImageTag{Name: testImageApp, Tag: testTagV1},
 			Digest:      image.Digest(digest),
 			DstRegistry: reg.Context{Name: dstRegistry},
-			DstImageTag: promotion.ImageTag{Name: "app", Tag: "v1.0"},
+			DstImageTag: promotion.ImageTag{Name: testImageApp, Tag: testTagV1},
 		}: nil,
 	}
 

@@ -32,6 +32,8 @@ import (
 	"sigs.k8s.io/promo-tools/v4/types/image"
 )
 
+const testDigest = "sha256:709e17a9c17018997724ed19afc18dbf576e9af10dfe78c13b34175027916d8f"
+
 func TestDigestToSignatureTag(t *testing.T) {
 	t.Parallel()
 
@@ -42,7 +44,7 @@ func TestDigestToSignatureTag(t *testing.T) {
 	}{
 		{
 			name:   "standard sha256 digest",
-			digest: "sha256:709e17a9c17018997724ed19afc18dbf576e9af10dfe78c13b34175027916d8f",
+			digest: testDigest,
 			want:   "sha256-709e17a9c17018997724ed19afc18dbf576e9af10dfe78c13b34175027916d8f.sig",
 		},
 		{
@@ -132,7 +134,7 @@ func TestTargetIdentity(t *testing.T) {
 			edge: &promotion.Edge{
 				DstRegistry: registry.Context{Name: "us-west2-docker.pkg.dev/k8s-artifacts-prod/images/kubernetes"},
 				DstImageTag: promotion.ImageTag{Name: "conformance-arm64"},
-				Digest:      "sha256:709e17a9c17018997724ed19afc18dbf576e9af10dfe78c13b34175027916d8f",
+				Digest:      testDigest,
 			},
 			assert: func(res string) {
 				require.Equal(t, "registry.k8s.io/kubernetes/conformance-arm64", res)
@@ -154,7 +156,7 @@ func TestTargetIdentity(t *testing.T) {
 			edge: &promotion.Edge{
 				DstRegistry: registry.Context{Name: "foo-bar"},
 				DstImageTag: promotion.ImageTag{Name: "conformance-arm64"},
-				Digest:      "sha256:709e17a9c17018997724ed19afc18dbf576e9af10dfe78c13b34175027916d8f",
+				Digest:      testDigest,
 			},
 			assert: func(res string) {
 				require.Equal(t, "foo-bar/conformance-arm64", res)

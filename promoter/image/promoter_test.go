@@ -34,6 +34,11 @@ import (
 	"sigs.k8s.io/promo-tools/v4/types/image"
 )
 
+const (
+	testImageRef = "img@sha256:abc"
+	testMirror   = "mirror1"
+)
+
 // nonEmptyManifests returns a minimal manifest slice so that the pipeline
 // does not stop early due to an empty manifest list.
 func nonEmptyManifests() []schema.Manifest {
@@ -469,7 +474,7 @@ func TestCheckSignatures(t *testing.T) {
 			msg:       "FixMissingSignatures fails",
 			prepare: func(fpi *imagefakes.FakePromoterImplementation) {
 				fpi.GetSignatureStatusReturns(checkresults.Signature{
-					"img@sha256:abc": {Missing: []string{"mirror1"}},
+					testImageRef: {Missing: []string{testMirror}},
 				}, nil)
 				fpi.FixMissingSignaturesReturns(testErr)
 			},
@@ -479,7 +484,7 @@ func TestCheckSignatures(t *testing.T) {
 			msg:       "FixPartialSignatures fails",
 			prepare: func(fpi *imagefakes.FakePromoterImplementation) {
 				fpi.GetSignatureStatusReturns(checkresults.Signature{
-					"img@sha256:abc": {Signed: []string{"primary"}, Missing: []string{"mirror1"}},
+					testImageRef: {Signed: []string{"primary"}, Missing: []string{testMirror}},
 				}, nil)
 				fpi.FixPartialSignaturesReturns(testErr)
 			},
@@ -506,7 +511,7 @@ func TestCheckSignaturesAllConsistent(t *testing.T) {
 	mock := imagefakes.FakePromoterImplementation{}
 	// Return a result with no missing signatures
 	mock.GetSignatureStatusReturns(checkresults.Signature{
-		"img@sha256:abc": {Signed: []string{"primary", "mirror1"}},
+		testImageRef: {Signed: []string{"primary", testMirror}},
 	}, nil)
 	sut.SetImplementation(&mock)
 

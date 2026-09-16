@@ -24,6 +24,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	digest03427 = "sha256:03427dcf5ab5fc5fd3cdfb24170373e8afbed13356270666c823573d7e2a1342"
+	digest594b8 = "sha256:594b8333e79ecca96c9ff0cb72a001db181c199d83274ffbe5ccdaedca23bfd7"
+	digest37cfe = "sha256:37cfe133a6ff3fc3aa4aa5ab9fda127861902940b8e8078fff7191c7a81be8d8"
+	digestAa2e2 = "sha256:aa2e259dfe202b601b2a94a8b2e1b203a0fe92a601947da3d0c510be4e54c352"
+	tagV210     = "v2.1.0"
+)
+
 func TestNewManifestListFromFile(t *testing.T) {
 	listYAML := "- name: pause\n"
 	listYAML += "  dmap:\n"
@@ -78,7 +86,7 @@ func TestPromoterImageToYAML(t *testing.T) {
 			Name: "hyperkube",
 			DMap: map[string][]string{
 				"sha256:54cdd8d3b74f9c577c8bb4f43e50813f0190006e66efe861bd810ee3f5e7cc7d": {"v1.18.8"},
-				"sha256:03427dcf5ab5fc5fd3cdfb24170373e8afbed13356270666c823573d7e2a1342": {"v1.16.16-rc.0"},
+				digest03427: {"v1.16.16-rc.0"},
 				"sha256:9f35b65ee834239ffbbd0ddfb54e0317cf99f10a75d8e8af372af45286d069ab": {"v1.17.10"},
 			},
 		},
@@ -127,8 +135,8 @@ func TestPromoterImageWrite(t *testing.T) {
 		}{
 			Name: "kube-controller-manager-s390x",
 			DMap: map[string][]string{
-				"sha256:594b8333e79ecca96c9ff0cb72a001db181c199d83274ffbe5ccdaedca23bfd7": {"v1.19.1"},
-				"sha256:03427dcf5ab5fc5fd3cdfb24170373e8afbed13356270666c823573d7e2a1342": {"v1.19.2"},
+				digest594b8: {"v1.19.1"},
+				digest03427: {"v1.19.2"},
 			},
 		},
 		struct {
@@ -156,7 +164,7 @@ func TestPromoterImageWrite(t *testing.T) {
 	require.NoError(t, err, "writing data to disk")
 
 	// Read back the file to see if it correct
-	fileContents, err := os.ReadFile(tempFileSorted.Name()) //nolint:gosec // test file from os.CreateTemp
+	fileContents, err := os.ReadFile(tempFileSorted.Name())
 	require.NoError(t, err, "reading temporary file")
 
 	require.Equal(t, expectedFile, string(fileContents))
@@ -171,23 +179,23 @@ func Test_sortImageDigestMapByTag(t *testing.T) {
 		{
 			name: "image digests are sorted by tags",
 			dmap: map[string][]string{
-				"sha256:03427dcf5ab5fc5fd3cdfb24170373e8afbed13356270666c823573d7e2a1342": {"v1.1.2"},
-				"sha256:594b8333e79ecca96c9ff0cb72a001db181c199d83274ffbe5ccdaedca23bfd7": {"v1.1.1"},
+				digest03427: {"v1.1.2"},
+				digest594b8: {"v1.1.1"},
 			},
 			want: []string{
-				"sha256:594b8333e79ecca96c9ff0cb72a001db181c199d83274ffbe5ccdaedca23bfd7",
-				"sha256:03427dcf5ab5fc5fd3cdfb24170373e8afbed13356270666c823573d7e2a1342",
+				digest594b8,
+				digest03427,
 			},
 		},
 		{
 			name: "multiple tags by image",
 			dmap: map[string][]string{
-				"sha256:37cfe133a6ff3fc3aa4aa5ab9fda127861902940b8e8078fff7191c7a81be8d8": {"v2.1.0", "v2.1.3"},
-				"sha256:aa2e259dfe202b601b2a94a8b2e1b203a0fe92a601947da3d0c510be4e54c352": {"v2.1.1", "v2.1.2"},
+				digest37cfe: {tagV210, "v2.1.3"},
+				digestAa2e2: {"v2.1.1", "v2.1.2"},
 			},
 			want: []string{
-				"sha256:37cfe133a6ff3fc3aa4aa5ab9fda127861902940b8e8078fff7191c7a81be8d8",
-				"sha256:aa2e259dfe202b601b2a94a8b2e1b203a0fe92a601947da3d0c510be4e54c352",
+				digest37cfe,
+				digestAa2e2,
 			},
 		},
 		{
@@ -200,11 +208,11 @@ func Test_sortImageDigestMapByTag(t *testing.T) {
 				"sha256:248087165d8f4d901e27a799f10fe4b7b4458469191120385317ad32aa5e3382": {"buster-v1.10.0"},
 				"sha256:2f37650255a457d0fc3a5c685ac1eecb5e0f16c63b58b82e52a585fff0aabff6": {"buster-v1.7.2"},
 				"sha256:36652ef8e4dd6715de02e9b68e5c122ed8ee06c75f83f5c574b97301e794c3fb": {"buster-v1.4.0"},
-				"sha256:37cfe133a6ff3fc3aa4aa5ab9fda127861902940b8e8078fff7191c7a81be8d8": {"buster-v1.1.3", "v2.1.3"},
+				digest37cfe: {"buster-v1.1.3", "v2.1.3"},
 				"sha256:51af4a1e8821f550a5639096f48b88c746118a65832465fc6d22de73cea99985": {"buster-v1.5.0"},
 			},
 			want: []string{
-				"sha256:37cfe133a6ff3fc3aa4aa5ab9fda127861902940b8e8078fff7191c7a81be8d8",
+				digest37cfe,
 				"sha256:248087165d8f4d901e27a799f10fe4b7b4458469191120385317ad32aa5e3382",
 				"sha256:36652ef8e4dd6715de02e9b68e5c122ed8ee06c75f83f5c574b97301e794c3fb",
 				"sha256:51af4a1e8821f550a5639096f48b88c746118a65832465fc6d22de73cea99985",
@@ -218,12 +226,12 @@ func Test_sortImageDigestMapByTag(t *testing.T) {
 		{
 			name: "two images with same tag",
 			dmap: map[string][]string{
-				"sha256:37cfe133a6ff3fc3aa4aa5ab9fda127861902940b8e8078fff7191c7a81be8d8": {"v2.1.0"},
-				"sha256:aa2e259dfe202b601b2a94a8b2e1b203a0fe92a601947da3d0c510be4e54c352": {"v2.1.0"},
+				digest37cfe: {tagV210},
+				digestAa2e2: {tagV210},
 			},
 			want: []string{
-				"sha256:37cfe133a6ff3fc3aa4aa5ab9fda127861902940b8e8078fff7191c7a81be8d8",
-				"sha256:aa2e259dfe202b601b2a94a8b2e1b203a0fe92a601947da3d0c510be4e54c352",
+				digest37cfe,
+				digestAa2e2,
 			},
 		},
 	}
