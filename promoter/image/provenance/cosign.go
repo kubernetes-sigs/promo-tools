@@ -108,14 +108,13 @@ func (v *CosignVerifier) Verify(ctx context.Context, ref string) (*Result, error
 	logrus.Infof("Verifying attestation for %s", ref)
 
 	cmd := cosignverify.VerifyAttestationCommand{
-		CheckClaims: true,
-		IgnoreTlog:  false,
+		CheckClaims:          true,
+		IgnoreTlog:           false,
+		CertIdentity:         v.CertIdentity,
+		CertIdentityRegexp:   v.CertIdentityRegexp,
+		CertOidcIssuer:       v.CertOidcIssuer,
+		CertOidcIssuerRegexp: v.CertOidcIssuerRegexp,
 	}
-
-	cmd.CertIdentity = v.CertIdentity
-	cmd.CertIdentityRegexp = v.CertIdentityRegexp
-	cmd.CertOidcIssuer = v.CertOidcIssuer
-	cmd.CertOidcIssuerRegexp = v.CertOidcIssuerRegexp
 
 	if err := cmd.Exec(ctx, []string{ref}); err != nil {
 		result.Verified = false
