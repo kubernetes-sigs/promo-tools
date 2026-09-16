@@ -184,17 +184,14 @@ precheck). With `--parse-only`, it stops after parsing manifests.
 ### Rate limiting
 
 HTTP requests are rate-limited to avoid 429 errors from registry quotas. The
-whole pipeline uses a single rate limiter (50 requests per second, plus a
-small burst allowance). The rate limiter covers all HTTP methods (not just
-reads) and uses adaptive backoff when 429 responses are received.
+whole pipeline uses a single rate limiter (50 requests per second, burst of
+5). The rate limiter covers all HTTP methods (not just reads) and uses
+adaptive backoff when 429 responses are received.
 
 The limiter applies to image copies (`crane.Copy`) and copies of attached
 signature/attestation artifacts, but not to registry inventory reads (which
 use the Google-specific `google.Walk`/`google.List` API directly) nor to
 cosign's calls to sigstore services during signing.
-
-There is no split of the request budget between promotion and signing: a
-single limit applies for the entire run.
 
 ## Image copying
 
@@ -214,7 +211,8 @@ registry directly.
 ## Signing and attestation
 
 After promotion, images are signed using [cosign](https://github.com/sigstore/cosign)
-with a keyless (OIDC) identity. Signatures use the production
+with a keyless (OIDC) identity. For destinations under the Kubernetes
+production path (`k8s-artifacts-prod/images`), signatures use the production
 (`registry.k8s.io`) reference of the image as their subject. When the
 canonical registry (`us-central1-docker.pkg.dev`) is among the promotion
 candidates, signatures are pushed there and served globally through
