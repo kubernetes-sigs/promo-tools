@@ -46,6 +46,8 @@ type Manifest struct {
 	// storing this information in YAML.
 	SrcRegistry *registry.Context
 	Filepath    string
+	// ImagesFilepath is the file listing the images of a thin manifest.
+	ImagesFilepath string
 }
 
 // ThinManifest is a more secure Manifest because it does not define the
@@ -546,6 +548,7 @@ func ParseThinManifestFromFile(filePath string, digestsToCheck []string) (Manife
 	}
 
 	mfest.Filepath = filePath
+	mfest.ImagesFilepath = imagesPath
 	mfest.Images = images
 	mfest.Registries = thinManifest.Registries
 

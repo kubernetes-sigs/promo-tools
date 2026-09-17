@@ -120,7 +120,7 @@ type promoterImplementation interface {
 	PrewarmTUFCache(context.Context) error
 	ValidateStagingSignatures(map[promotion.Edge]any) (map[promotion.Edge]any, error)
 	SignImages(*options.Options, map[promotion.Edge]any) error
-	WriteProvenanceAttestations(context.Context, *options.Options, map[promotion.Edge]any, provenance.Generator) error
+	WriteProvenanceAttestations(context.Context, *options.Options, []schema.Manifest, map[promotion.Edge]any, provenance.Generator) error
 
 	// Methods for checking signatures
 	GetLatestImages(*options.Options) ([]string, error)
@@ -260,7 +260,7 @@ func (p *Promoter) PromoteImages(ctx context.Context, opts *options.Options) err
 
 	// Attest phase: generate and push provenance attestations.
 	pipe.AddPhase(pipeline.NewPhase("attest", func(ctx context.Context) error {
-		if err := p.impl.WriteProvenanceAttestations(ctx, opts, promotionEdges, p.provenanceGenerator); err != nil {
+		if err := p.impl.WriteProvenanceAttestations(ctx, opts, mfests, promotionEdges, p.provenanceGenerator); err != nil {
 			return fmt.Errorf("writing provenance attestations: %w", err)
 		}
 

@@ -109,11 +109,14 @@ update-mocks: ## Update all generated mocks
 		mv $$t $$f ;\
 	done
 
+update-proto: ## Regenerate the Go code of the protobuf definitions
+	./hack/update-proto.sh
+
 ##@ Verify
 
-.PHONY: verify verify-boilerplate verify-build verify-dependencies verify-golangci-lint verify-go-mod
+.PHONY: verify verify-boilerplate verify-build verify-dependencies verify-golangci-lint verify-go-mod verify-proto
 
-verify: verify-boilerplate verify-dependencies verify-golangci-lint verify-go-mod verify-mocks verify-build ## Runs verification scripts to ensure correct execution
+verify: verify-boilerplate verify-dependencies verify-golangci-lint verify-go-mod verify-mocks verify-proto verify-build ## Runs verification scripts to ensure correct execution
 
 verify-boilerplate: ## Runs the file header check
 	./hack/verify-boilerplate.sh
@@ -132,6 +135,9 @@ verify-golangci-lint: ## Runs all golang linters
 
 verify-mocks: ## Verify that mocks do not require updates
 	./hack/verify-mocks.sh
+
+verify-proto: ## Verify that the generated protobuf code is up to date
+	./hack/verify-proto.sh
 
 ##@ Helpers
 

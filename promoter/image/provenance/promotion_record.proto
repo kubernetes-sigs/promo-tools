@@ -38,4 +38,66 @@ message PromotionRecord {
   // builder_id identifies the promotion system
   // (e.g., "https://k8s.io/promo-tools@v4.0.8").
   string builder_id = 5;
+
+  // tags are the tags promoted for the digest, sorted. Empty when the
+  // digest was promoted without a tag.
+  repeated string tags = 6;
+
+  // source is the promoted staging image.
+  ResourceDescriptor source = 7;
+
+  // destination is the production image, named by its registry.k8s.io
+  // reference.
+  ResourceDescriptor destination = 8;
+
+  // manifest is the promoter manifest the digest was read from, with the
+  // commit of the repository holding it. Unset when the manifest is not
+  // known.
+  ResourceDescriptor manifest = 9;
+
+  // promoter describes the promoter binary.
+  Promoter promoter = 10;
+
+  // job describes the CI job running the promotion. Unset outside of Prow.
+  Job job = 11;
+}
+
+// ResourceDescriptor mirrors the fields of the in-toto attestation
+// ResourceDescriptor used here, so that they serialize the same way:
+// https://github.com/in-toto/attestation/blob/main/spec/v1/resource_descriptor.md
+message ResourceDescriptor {
+  // name identifies the resource, for example an image reference or a
+  // file path relative to the repository root.
+  string name = 1;
+
+  // uri locates the resource, for example the repository URL.
+  string uri = 2;
+
+  // digest maps algorithms to digests, for example "sha256" or
+  // "gitCommit".
+  map<string, string> digest = 3;
+}
+
+// Promoter describes the promoter binary.
+message Promoter {
+  // version is the promoter version (e.g., "v4.6.0").
+  string version = 1;
+
+  // git_commit is the promoter source commit.
+  string git_commit = 2;
+}
+
+// Job describes the Prow job running the promotion.
+message Job {
+  // name is the Prow job name (JOB_NAME).
+  string name = 1;
+
+  // type is the Prow job type (JOB_TYPE), for example "postsubmit".
+  string type = 2;
+
+  // build_id is the Prow build ID (BUILD_ID).
+  string build_id = 3;
+
+  // prow_job_id is the Prow job ID (PROW_JOB_ID).
+  string prow_job_id = 4;
 }

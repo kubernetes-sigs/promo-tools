@@ -25,6 +25,13 @@ dependencies:
     - path: Dockerfile
       match: FROM golang:\d+.\d+(alpha|beta|rc)?\.?(\d+)-(trixie)
 
+  # buf
+  - name: "buf"
+    version: 1.72.0
+    refPaths:
+    - path: hack/update-proto.sh
+      match: BUF_VERSION=v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)
+
   # golangci-lint
   - name: "golangci-lint"
     version: 2.13.1
