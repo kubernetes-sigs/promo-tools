@@ -67,6 +67,43 @@ func TestParseThinManifestsFromDirPostsubmit(t *testing.T) {
 	}
 }
 
+func TestParseThinManifestsFromDirPath(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	manifestDir := filepath.Join(tmpDir, "manifests", "test")
+	require.NoError(t, os.MkdirAll(manifestDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(manifestDir, "promoter-manifest.yaml"), []byte(`registries:
+- name: gcr.io/k8s-staging-test
+  src: true
+- name: us-central1-docker.pkg.dev/k8s-artifacts-prod/images/test
+  service-account: k8s-infra-gcr-promoter@k8s-artifacts-prod.iam.gserviceaccount.com
+`), 0o600))
+
+	imagesDir := filepath.Join(tmpDir, "images", "test")
+	require.NoError(t, os.MkdirAll(imagesDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(imagesDir, "images.yaml"), []byte(`- name: test-image
+  dmap:
+    "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": ["v1.0"]
+`), 0o600))
+
+	t.Chdir(tmpDir)
+
+	for _, dir := range []string{
+		tmpDir,
+		tmpDir + string(filepath.Separator),
+		".",
+		"." + string(filepath.Separator),
+		filepath.Join("..", filepath.Base(tmpDir)),
+	} {
+		t.Run(dir, func(t *testing.T) {
+			manifests, err := ParseThinManifestsFromDir(dir, false, "")
+			require.NoError(t, err)
+			require.Len(t, manifests, 1)
+			require.Len(t, manifests[0].Images, 1)
+		})
+	}
+}
+
 func TestDiffSinceFiles(t *testing.T) {
 	t.Parallel()
 

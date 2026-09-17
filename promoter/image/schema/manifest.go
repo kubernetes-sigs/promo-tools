@@ -320,10 +320,14 @@ func ParseThinManifestsFromDir(
 
 		// If there are any files named "promoter-manifest.yaml", they must be
 		// inside a subfolder within "manifests/<dir>" --- any other paths are
-		// forbidden.
-		shortened := strings.TrimPrefix(path, dir)
+		// forbidden. The path is made relative to dir, so that dir may be
+		// relative or end with a separator.
+		relative, relErr := filepath.Rel(dir, path)
+		if relErr != nil {
+			return fmt.Errorf("getting relative manifest path: %w", relErr)
+		}
 
-		shortenedList := strings.Split(shortened, "/")
+		shortenedList := strings.Split("/"+filepath.ToSlash(relative), "/")
 		if len(shortenedList) != ThinManifestDepth {
 			return fmt.Errorf("unexpected manifest path %q",
 				path)
