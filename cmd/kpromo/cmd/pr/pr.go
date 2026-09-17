@@ -31,6 +31,7 @@ import (
 	"github.com/spf13/cobra"
 	"sigs.k8s.io/release-sdk/git"
 	"sigs.k8s.io/release-sdk/github"
+	"sigs.k8s.io/release-utils/command"
 	"sigs.k8s.io/release-utils/helpers"
 
 	"sigs.k8s.io/promo-tools/v4/image"
@@ -348,6 +349,10 @@ func runPromote(opts *promoteOptions) error {
 	// add the modified manifest to staging
 	logrus.Debugf("Adding %s to staging area", imagesListPath)
 
+	if err := disableIndexSkipHash(repo.Dir()); err != nil {
+		return fmt.Errorf("configuring the git index of %s: %w", repo.Dir(), err)
+	}
+
 	if err := repo.Add(imagesListPath); err != nil {
 		return fmt.Errorf("adding image manifest to staging area: %w", err)
 	}
@@ -396,6 +401,20 @@ func runPromote(opts *promoteOptions) error {
 	}
 
 	// Success!
+	return nil
+}
+
+// disableIndexSkipHash makes git write the index checksum in the repository
+// at dir. The manifest is added with the git CLI but committed with go-git,
+// which rejects an index without checksum as written with index.skipHash,
+// for example when the user enabled feature.manyFiles.
+func disableIndexSkipHash(dir string) error {
+	if err := command.NewWithWorkDir(
+		dir, "git", "config", "--local", "index.skipHash", "false",
+	).RunSilentSuccess(); err != nil {
+		return fmt.Errorf("disabling index.skipHash: %w", err)
+	}
+
 	return nil
 }
 

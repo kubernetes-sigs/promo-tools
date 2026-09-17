@@ -17,8 +17,14 @@ limitations under the License.
 package pr
 
 import (
+	"bytes"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"testing"
 
+	gogit "github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing/format/index"
 	"github.com/stretchr/testify/require"
 	"sigs.k8s.io/release-sdk/github"
 )
@@ -177,4 +183,80 @@ func TestGeneratePRBody(t *testing.T) {
 			require.Equal(t, tc.expected, generatePRBody(&tc.opts))
 		})
 	}
+}
+
+// TestDisableIndexSkipHash checks that go-git can read the index after
+// git added a file in a repository with index.skipHash enabled, as
+// feature.manyFiles does.
+func TestDisableIndexSkipHash(t *testing.T) {
+	t.Parallel()
+
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git is not available")
+	}
+
+	for _, tc := range []struct {
+		name    string
+		disable bool
+	}{
+		{name: "skip hash enabled", disable: false},
+		{name: "skip hash disabled", disable: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			dir := t.TempDir()
+
+			git := func(args ...string) {
+				t.Helper()
+
+				cmd := exec.CommandContext(t.Context(), "git", args...)
+				cmd.Dir = dir
+				// Keep the user's global and system configuration out.
+				cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_NOSYSTEM=1")
+
+				out, err := cmd.CombinedOutput()
+				require.NoError(t, err, string(out))
+			}
+
+			git("init", "-q")
+			git("config", "index.skipHash", "true")
+
+			if tc.disable {
+				require.NoError(t, disableIndexSkipHash(dir))
+			}
+
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "images.yaml"), []byte("- name: kpromo\n"), 0o600))
+			git("add", "images.yaml")
+
+			if !tc.disable && !indexChecksumSkipped(t, dir) {
+				t.Skip("git does not support index.skipHash")
+			}
+
+			repo, err := gogit.PlainOpen(dir)
+			require.NoError(t, err)
+
+			_, err = repo.Storer.Index()
+			if tc.disable {
+				require.NoError(t, err)
+			} else {
+				require.ErrorIs(t, err, index.ErrInvalidChecksum)
+			}
+		})
+	}
+}
+
+// indexChecksumSkipped reports whether git wrote the index of the repository
+// at dir without checksum, which git 2.40 and later do with index.skipHash.
+func indexChecksumSkipped(t *testing.T, dir string) bool {
+	t.Helper()
+
+	data, err := os.ReadFile(filepath.Join(dir, ".git", "index"))
+	require.NoError(t, err)
+
+	const checksumSize = 20
+
+	require.Greater(t, len(data), checksumSize)
+
+	return bytes.Equal(data[len(data)-checksumSize:], make([]byte, checksumSize))
 }
