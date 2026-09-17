@@ -44,6 +44,7 @@ const (
 	promotionBranchSuffix = "-image-promotion"
 	defaultProject        = consts.StagingRepoSuffix
 	defaultReviewers      = "@kubernetes/release-engineering"
+	githubHost            = "github.com"
 )
 
 // PRCmd is the kpromo subcommand to promote container images.
@@ -83,8 +84,11 @@ func (o *promoteOptions) Validate() error {
 
 	if o.issue != "" {
 		issueURL, err := url.Parse(o.issue)
-		if err != nil || (issueURL.Scheme != "http" && issueURL.Scheme != "https") || issueURL.Host == "" {
-			return fmt.Errorf("--issue must be a full URL to the issue (e.g. https://github.com/kubernetes/k8s.io/issues/1234), got %q", o.issue)
+		if err != nil || (issueURL.Scheme != "http" && issueURL.Scheme != "https") || issueURL.Host != githubHost {
+			return fmt.Errorf(
+				"--issue must be a full %s URL to the issue (e.g. https://github.com/kubernetes/k8s.io/issues/1234), got %q",
+				githubHost, o.issue,
+			)
 		}
 	}
 
@@ -440,7 +444,7 @@ func generatePRBody(opts *promoteOptions) string {
 	}
 
 	if opts.issue != "" {
-		args += " --issue " + opts.issue
+		args += " --issue \"" + opts.issue + "\""
 	}
 
 	var tagString strings.Builder
