@@ -222,11 +222,13 @@ The signing identity is configured with `--signer-account`.
 Promotion provenance attestations are signed into sigstore bundles and
 attached as OCI 1.1 referrer artifacts (cosign's "new bundle format") — no
 `.att` or other tags are created for them. One attestation is written per
-*promotion edge* (source/destination registry pair, image, digest and tag),
-using the destination registry reference as the attestation subject; a
-digest promoted to several regions or with several tags therefore produces
-multiple attestations. [#1944][issue-1944] tracks writing a single
-attestation per digest to the canonical registry instead.
+signing identity and digest, covering all regions and tags of that digest,
+including digests promoted without a tag. For destinations under the
+Kubernetes production path it is always written to the canonical registry
+(`us-central1-docker.pkg.dev`), whether or not the canonical registry is a
+promotion candidate, and uses the production (`registry.k8s.io`) reference
+as the attestation subject, because sigstore bundles carry no docker
+reference.
 Attestations are signed with the same identity token flow as image
 signatures: the token obtained for `--signer-account` is the only
 credential source. The referrer manifest carries the predicate type in
@@ -234,9 +236,7 @@ its `dev.sigstore.bundle.predicateType` annotation
 (`https://k8s.io/promo-tools/promotion/v1`), which distinguishes promoter
 attestations from build-time attestations and makes attesting idempotent:
 when a referrer with the promoter predicate type already exists for a
-destination digest, it is not attested again (the existence check and push
-are not atomic, so concurrent tags of the same digest can still race; see
-[#1944][issue-1944]).
+destination digest, it is not attested again.
 
 Related flags:
 
@@ -255,22 +255,26 @@ Related flags:
 The promoter verifies build-time (SLSA) provenance attestations on staging
 images before promotion using verify-if-present semantics: if an attestation
 tag exists on a staging image (the legacy cosign `.att` tag convention used
-by the staging builds), it is verified using cosign against the configured
-signing identity (`--certificate-identity` or `--certificate-identity-regexp`)
-and OIDC issuer (`--certificate-oidc-issuer` or
-`--certificate-oidc-issuer-regexp`). If no attestation is found, a warning is
+by the staging builds), it is verified once per source digest using cosign
+against the SLSA provenance v1 predicate type and the configured signing
+identity (`--certificate-identity` or `--certificate-identity-regexp`) and
+OIDC issuer (`--certificate-oidc-issuer` or
+`--certificate-oidc-issuer-regexp`). The regular expression flags take
+precedence over the exact ones. If no attestation is found, a warning is
 logged and the image is still promoted. This allows progressive adoption
 without blocking images that do not yet have attestations.
 
-The current implementation has known limitations tracked in
-[#1943][issue-1943]: the expected predicate type is not passed to cosign and
-attestations signed by identities other than the configured one are not
-distinguished from verification failures.
+Attestations signed by another identity, or with another predicate type,
+are logged and ignored. Promotion is blocked only when an attestation does
+not verify at all, which means it is malformed or was tampered with.
+Keyless attestations are supported; a third party attestation signed with a
+key still blocks promotion until per-project identities are supported
+([#1952][issue-1952]).
 
 ## Provenance generation
 
-The promoter generates a promotion record attestation per promotion edge
-(see [Signing and attestation](#signing-and-attestation)): an in-toto
+The promoter generates a promotion record attestation per signing identity
+and digest (see [Signing and attestation](#signing-and-attestation)): an in-toto
 statement with the `https://k8s.io/promo-tools/promotion/v1` predicate type
 recording the promotion metadata (source/destination references, digest,
 builder identity, timestamp). The statement is signed into a sigstore bundle
@@ -322,6 +326,5 @@ kpromo cip \
 ```
 
 [ggcr-google]: https://pkg.go.dev/github.com/google/go-containerregistry/pkg/v1/google
-[issue-1943]: https://github.com/kubernetes-sigs/promo-tools/issues/1943
-[issue-1944]: https://github.com/kubernetes-sigs/promo-tools/issues/1944
+[issue-1952]: https://github.com/kubernetes-sigs/promo-tools/issues/1952
 [k8sio-manifests-dir]: https://git.k8s.io/k8s.io/registry.k8s.io
