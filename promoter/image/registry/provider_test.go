@@ -19,6 +19,7 @@ package registry
 import (
 	"context"
 	"errors"
+	"slices"
 	"testing"
 
 	"sigs.k8s.io/promo-tools/v4/types/image"
@@ -214,6 +215,88 @@ func TestSplitByKnownRegistries(t *testing.T) {
 
 			if img != tt.wantImg {
 				t.Errorf("img = %q, want %q", img, tt.wantImg)
+			}
+		})
+	}
+}
+
+// TestSplitByKnownRegistriesNested covers destinations that are path
+// prefixes of each other: k8s-staging-kubernetes and k8s-staging-etcd
+// promote to the images repository, which is a prefix of every other
+// subproject destination.
+func TestSplitByKnownRegistriesNested(t *testing.T) {
+	const (
+		prodImages = "us-docker.pkg.dev/k8s-artifacts-prod/images"
+		prodKSM    = prodImages + "/kube-state-metrics"
+		prodStore  = prodImages + "/sig-storage"
+	)
+
+	registries := []RegistryConfig{
+		{Name: prodImages},
+		{Name: prodKSM},
+		{Name: prodStore},
+	}
+
+	tests := []struct {
+		fullName image.Registry
+		wantReg  image.Registry
+		wantImg  image.Name
+	}{
+		{
+			fullName: prodImages + "/kube-apiserver",
+			wantReg:  prodImages,
+			wantImg:  "kube-apiserver",
+		},
+		{
+			// The nested registry wins over the shorter images prefix.
+			fullName: prodKSM + "/kube-state-metrics",
+			wantReg:  prodKSM,
+			wantImg:  "kube-state-metrics",
+		},
+		{
+			fullName: prodStore + "/csi-provisioner",
+			wantReg:  prodStore,
+			wantImg:  "csi-provisioner",
+		},
+		{
+			// An exact match keeps the empty image name.
+			fullName: prodStore,
+			wantReg:  prodStore,
+			wantImg:  "",
+		},
+		{
+			// Sharing a path segment prefix is not a match.
+			fullName: prodImages + "/sig-storage-extra/csi",
+			wantReg:  prodImages,
+			wantImg:  "sig-storage-extra/csi",
+		},
+	}
+
+	// Base registries come from map iteration, so the result must not
+	// depend on the order in which they are passed.
+	orders := map[string][]RegistryConfig{
+		"ordered":  registries,
+		"reversed": slices.Clone(registries),
+	}
+	slices.Reverse(orders["reversed"])
+
+	for name, regs := range orders {
+		t.Run(name, func(t *testing.T) {
+			for _, tt := range tests {
+				t.Run(string(tt.fullName), func(t *testing.T) {
+					reg, img, err := splitByKnownRegistries(tt.fullName, regs)
+					if err != nil {
+						t.Fatalf("unexpected error: %v", err)
+					}
+
+					if reg != tt.wantReg {
+						t.Errorf("reg = %q, want %q", reg, tt.wantReg)
+					}
+
+					if img != tt.wantImg {
+						t.Errorf("img = %q, want %q", img, tt.wantImg)
+					}
+				})
 			}
 		})
 	}
