@@ -52,6 +52,7 @@ Flags:
       --fork string           the user's fork of kubernetes/k8s.io
   -h, --help                  help for pr
   -i, --interactive           interactive mode, asks before every step
+      --issue string          link to a GitHub issue to cross-reference in the PR body (e.g. https://github.com/kubernetes/k8s.io/issues/1234)
       --project string        the name of the project to promote images for (default "kubernetes")
       --reviewers string      the list of GitHub users or teams to assign to the PR (default "@kubernetes/release-engineering")
       --staging-repo string   the full staging repo URL, overrides the default gcr.io/k8s-staging-<project> format

@@ -21,6 +21,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -43,6 +44,7 @@ const (
 	promotionBranchSuffix = "-image-promotion"
 	defaultProject        = consts.StagingRepoSuffix
 	defaultReviewers      = "@kubernetes/release-engineering"
+	githubHost            = "github.com"
 )
 
 // PRCmd is the kpromo subcommand to promote container images.
@@ -69,6 +71,7 @@ type promoteOptions struct {
 	stagingRepo     string
 	userFork        string
 	reviewers       string
+	issue           string
 	tags            []string
 	images          []string
 	digests         []string
@@ -77,6 +80,16 @@ type promoteOptions struct {
 func (o *promoteOptions) Validate() error {
 	if len(o.tags) == 0 {
 		return errors.New("cannot start promotion --tag is required")
+	}
+
+	if o.issue != "" {
+		issueURL, err := url.Parse(o.issue)
+		if err != nil || (issueURL.Scheme != "http" && issueURL.Scheme != "https") || issueURL.Host != githubHost {
+			return fmt.Errorf(
+				"--issue must be a full %s URL to the issue (e.g. https://github.com/kubernetes/k8s.io/issues/1234), got %q",
+				githubHost, o.issue,
+			)
+		}
 	}
 
 	if o.userFork == "" {
@@ -135,6 +148,14 @@ func init() {
 		"reviewers",
 		defaultReviewers,
 		"the list of GitHub users or teams to assign to the PR",
+	)
+
+	PRCmd.PersistentFlags().StringVar(
+		&promoteOpts.issue,
+		"issue",
+		"",
+		"link to a GitHub issue to cross-reference in the PR body "+
+			"(e.g. https://github.com/kubernetes/k8s.io/issues/1234)",
 	)
 
 	PRCmd.PersistentFlags().BoolVarP(
@@ -422,6 +443,10 @@ func generatePRBody(opts *promoteOptions) string {
 		args += " --reviewers \"" + opts.reviewers + "\""
 	}
 
+	if opts.issue != "" {
+		args += " --issue \"" + opts.issue + "\""
+	}
+
 	var tagString strings.Builder
 	for _, tag := range opts.tags {
 		tagString.WriteString(" --tag " + tag)
@@ -440,6 +465,11 @@ func generatePRBody(opts *promoteOptions) string {
 	args += imageString.String()
 
 	prBody := fmt.Sprintf("Image promotion for %s %s\n", opts.project, strings.Join(opts.tags, " / "))
+
+	if opts.issue != "" {
+		prBody += "\nxref: " + opts.issue + "\n\n"
+	}
+
 	prBody += "This is an automated PR generated from `kpromo`\n"
 	prBody += fmt.Sprintf("```\nkpromo pr %s\n```\n\n", args)
 	prBody += fmt.Sprintf("/hold\ncc: %s\n", opts.reviewers)
