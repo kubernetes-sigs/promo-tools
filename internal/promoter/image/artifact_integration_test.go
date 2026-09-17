@@ -249,7 +249,7 @@ func TestWriteProvenanceAttestationsArtifacts(t *testing.T) {
 	di.attSigner = signer
 
 	opts := &options.Options{SignImages: true, MaxSignatureOps: 10}
-	require.NoError(t, di.WriteProvenanceAttestations(context.Background(), opts, artifactEdges(host, fixtures), gen))
+	require.NoError(t, di.WriteProvenanceAttestations(context.Background(), opts, nil, artifactEdges(host, fixtures), gen))
 
 	require.Len(t, gen.records, len(fixtures), "one attestation per artifact")
 	require.Equal(t, len(fixtures), signer.calls)

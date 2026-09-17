@@ -463,7 +463,7 @@ func TestWriteProvenanceAttestationsIdempotent(t *testing.T) {
 
 	// Run twice — both should succeed without error.
 	for i := range 2 {
-		err := di.WriteProvenanceAttestations(context.Background(), opts, edges, gen)
+		err := di.WriteProvenanceAttestations(context.Background(), opts, nil, edges, gen)
 		require.NoError(t, err, "run %d", i+1)
 	}
 
@@ -533,7 +533,7 @@ func TestWriteProvenanceAttestationsOncePerDigest(t *testing.T) {
 	signer := &fakeStatementSigner{bundle: []byte(`{"test": "bundle"}`)}
 	di.attSigner = signer
 
-	require.NoError(t, di.WriteProvenanceAttestations(context.Background(), opts, edges, gen))
+	require.NoError(t, di.WriteProvenanceAttestations(context.Background(), opts, nil, edges, gen))
 
 	require.Len(t, gen.records, 1, "one attestation per digest, not per tag")
 	require.Equal(t, 1, signer.calls, "the statement is signed once")

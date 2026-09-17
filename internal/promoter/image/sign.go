@@ -44,6 +44,7 @@ import (
 	"sigs.k8s.io/promo-tools/v4/promoter/image/promotion"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/provenance"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/ratelimit"
+	"sigs.k8s.io/promo-tools/v4/promoter/image/schema"
 	"sigs.k8s.io/promo-tools/v4/types/image"
 )
 
@@ -354,6 +355,7 @@ func (di *DefaultPromoterImplementation) GetIdentityToken(
 func (di *DefaultPromoterImplementation) WriteProvenanceAttestations(
 	ctx context.Context,
 	opts *options.Options,
+	mfests []schema.Manifest,
 	edges map[promotion.Edge]any,
 	generator provenance.Generator,
 ) error {
@@ -381,6 +383,7 @@ func (di *DefaultPromoterImplementation) WriteProvenanceAttestations(
 	}
 
 	now := time.Now()
+	recordContext := newRecordContext(mfests)
 
 	// One attestation per target identity and digest, written to the
 	// canonical registry. Grouping keeps the tags of a digest from racing
@@ -400,16 +403,12 @@ func (di *DefaultPromoterImplementation) WriteProvenanceAttestations(
 		// place that records it.
 		identity := targetIdentity(&edge)
 
-		record := provenance.PromotionRecord{
-			SrcRef:    edge.SrcReference(),
-			DstRef:    identity,
-			Digest:    string(edge.Digest),
-			Timestamp: timestamppb.New(now),
-			BuilderId: builderID,
-		}
+		record := recordContext.record(group, identity)
+		record.Timestamp = timestamppb.New(now)
+		record.BuilderId = builderID
 
 		g.Go(func() error {
-			if err := di.pushAttestation(ctx, &edge, generator, &record); err != nil {
+			if err := di.pushAttestation(ctx, &edge, generator, record); err != nil {
 				return fmt.Errorf("writing provenance for %s: %w", identity, err)
 			}
 

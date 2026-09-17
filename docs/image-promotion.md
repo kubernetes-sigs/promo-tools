@@ -276,8 +276,10 @@ key still blocks promotion until per-project identities are supported
 The promoter generates a promotion record attestation per signing identity
 and digest (see [Signing and attestation](#signing-and-attestation)): an in-toto
 statement with the `https://k8s.io/promo-tools/promotion/v1` predicate type
-recording the promotion metadata (source/destination references, digest,
-builder identity, timestamp). The statement is signed into a sigstore bundle
+recording the promotion metadata (source and destination, digest, tags,
+manifest and commit, promoter version, Prow job and timestamp, see the
+[predicate specification](./promotion-predicate.md)). The statement is signed
+into a sigstore bundle
 and attached to the destination digest through the OCI referrers API as
 described in [Signing and attestation](#signing-and-attestation).
 Attestations can be verified with

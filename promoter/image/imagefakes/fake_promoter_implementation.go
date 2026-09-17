@@ -257,13 +257,14 @@ type FakePromoterImplementation struct {
 		result1 map[promotion.Edge]any
 		result2 error
 	}
-	WriteProvenanceAttestationsStub        func(context.Context, *imagepromotera.Options, map[promotion.Edge]any, provenance.Generator) error
+	WriteProvenanceAttestationsStub        func(context.Context, *imagepromotera.Options, []schema.Manifest, map[promotion.Edge]any, provenance.Generator) error
 	writeProvenanceAttestationsMutex       sync.RWMutex
 	writeProvenanceAttestationsArgsForCall []struct {
 		arg1 context.Context
 		arg2 *imagepromotera.Options
-		arg3 map[promotion.Edge]any
-		arg4 provenance.Generator
+		arg3 []schema.Manifest
+		arg4 map[promotion.Edge]any
+		arg5 provenance.Generator
 	}
 	writeProvenanceAttestationsReturns struct {
 		result1 error
@@ -1421,21 +1422,27 @@ func (fake *FakePromoterImplementation) ValidateStagingSignaturesReturnsOnCall(i
 	}{result1, result2}
 }
 
-func (fake *FakePromoterImplementation) WriteProvenanceAttestations(arg1 context.Context, arg2 *imagepromotera.Options, arg3 map[promotion.Edge]any, arg4 provenance.Generator) error {
+func (fake *FakePromoterImplementation) WriteProvenanceAttestations(arg1 context.Context, arg2 *imagepromotera.Options, arg3 []schema.Manifest, arg4 map[promotion.Edge]any, arg5 provenance.Generator) error {
+	var arg3Copy []schema.Manifest
+	if arg3 != nil {
+		arg3Copy = make([]schema.Manifest, len(arg3))
+		copy(arg3Copy, arg3)
+	}
 	fake.writeProvenanceAttestationsMutex.Lock()
 	ret, specificReturn := fake.writeProvenanceAttestationsReturnsOnCall[len(fake.writeProvenanceAttestationsArgsForCall)]
 	fake.writeProvenanceAttestationsArgsForCall = append(fake.writeProvenanceAttestationsArgsForCall, struct {
 		arg1 context.Context
 		arg2 *imagepromotera.Options
-		arg3 map[promotion.Edge]any
-		arg4 provenance.Generator
-	}{arg1, arg2, arg3, arg4})
+		arg3 []schema.Manifest
+		arg4 map[promotion.Edge]any
+		arg5 provenance.Generator
+	}{arg1, arg2, arg3Copy, arg4, arg5})
 	stub := fake.WriteProvenanceAttestationsStub
 	fakeReturns := fake.writeProvenanceAttestationsReturns
-	fake.recordInvocation("WriteProvenanceAttestations", []interface{}{arg1, arg2, arg3, arg4})
+	fake.recordInvocation("WriteProvenanceAttestations", []interface{}{arg1, arg2, arg3Copy, arg4, arg5})
 	fake.writeProvenanceAttestationsMutex.Unlock()
 	if stub != nil {
-		return stub(arg1, arg2, arg3, arg4)
+		return stub(arg1, arg2, arg3, arg4, arg5)
 	}
 	if specificReturn {
 		return ret.result1
@@ -1449,17 +1456,17 @@ func (fake *FakePromoterImplementation) WriteProvenanceAttestationsCallCount() i
 	return len(fake.writeProvenanceAttestationsArgsForCall)
 }
 
-func (fake *FakePromoterImplementation) WriteProvenanceAttestationsCalls(stub func(context.Context, *imagepromotera.Options, map[promotion.Edge]any, provenance.Generator) error) {
+func (fake *FakePromoterImplementation) WriteProvenanceAttestationsCalls(stub func(context.Context, *imagepromotera.Options, []schema.Manifest, map[promotion.Edge]any, provenance.Generator) error) {
 	fake.writeProvenanceAttestationsMutex.Lock()
 	defer fake.writeProvenanceAttestationsMutex.Unlock()
 	fake.WriteProvenanceAttestationsStub = stub
 }
 
-func (fake *FakePromoterImplementation) WriteProvenanceAttestationsArgsForCall(i int) (context.Context, *imagepromotera.Options, map[promotion.Edge]any, provenance.Generator) {
+func (fake *FakePromoterImplementation) WriteProvenanceAttestationsArgsForCall(i int) (context.Context, *imagepromotera.Options, []schema.Manifest, map[promotion.Edge]any, provenance.Generator) {
 	fake.writeProvenanceAttestationsMutex.RLock()
 	defer fake.writeProvenanceAttestationsMutex.RUnlock()
 	argsForCall := fake.writeProvenanceAttestationsArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4, argsForCall.arg5
 }
 
 func (fake *FakePromoterImplementation) WriteProvenanceAttestationsReturns(result1 error) {
