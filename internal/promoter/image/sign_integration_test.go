@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/google/go-containerregistry/pkg/name"
@@ -472,4 +473,82 @@ func TestWriteProvenanceAttestationsIdempotent(t *testing.T) {
 
 	require.True(t, di.hasBundleForPredicate(digestRef, provenance.PredicateType),
 		"attestation bundle should exist in production")
+}
+
+// recordingGenerator captures the promotion records it is asked to
+// generate.
+type recordingGenerator struct {
+	mu      sync.Mutex
+	records []*provenance.PromotionRecord
+}
+
+func (r *recordingGenerator) Generate(
+	_ context.Context, record *provenance.PromotionRecord,
+) ([]byte, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.records = append(r.records, record)
+
+	return []byte(`{"test": "attestation"}`), nil
+}
+
+// TestWriteProvenanceAttestationsOncePerDigest verifies that all tags and
+// destinations of one digest produce a single attestation referrer, and
+// that the subject carries the production name rather than a regional one.
+func TestWriteProvenanceAttestationsOncePerDigest(t *testing.T) {
+	t.Parallel()
+
+	host, di := newTLSTestRegistry(t)
+
+	srcRegistry := image.Registry(host + "/staging")
+	dstRegistry := image.Registry(host + "/production")
+
+	digest := pushTestImage(t, di, fmt.Sprintf("%s/app:v1.0", dstRegistry))
+
+	mkEdge := func(tag image.Tag) promotion.Edge {
+		return promotion.Edge{
+			SrcRegistry: reg.Context{Name: srcRegistry, Src: true},
+			SrcImageTag: promotion.ImageTag{Name: "app", Tag: tag},
+			Digest:      image.Digest(digest),
+			DstRegistry: reg.Context{Name: dstRegistry},
+			DstImageTag: promotion.ImageTag{Name: "app", Tag: tag},
+		}
+	}
+
+	// Three tags and one tagless edge, all pointing at the same digest.
+	edges := map[promotion.Edge]any{
+		mkEdge("v1.0"):   nil,
+		mkEdge("v1"):     nil,
+		mkEdge("latest"): nil,
+		mkEdge(""):       nil,
+	}
+
+	opts := &options.Options{
+		SignImages:      true,
+		MaxSignatureOps: 10,
+	}
+
+	gen := &recordingGenerator{}
+	signer := &fakeStatementSigner{bundle: []byte(`{"test": "bundle"}`)}
+	di.attSigner = signer
+
+	require.NoError(t, di.WriteProvenanceAttestations(context.Background(), opts, edges, gen))
+
+	require.Len(t, gen.records, 1, "one attestation per digest, not per tag")
+	require.Equal(t, 1, signer.calls, "the statement is signed once")
+
+	// The subject name is the promotion target, without tag or digest.
+	edge := mkEdge("v1.0")
+	require.Equal(t, targetIdentity(&edge), gen.records[0].GetDstRef())
+	require.Equal(t, digest, gen.records[0].GetDigest())
+
+	digestRef, err := name.NewDigest(fmt.Sprintf("%s/app@%s", dstRegistry, digest))
+	require.NoError(t, err)
+
+	idx, err := ociremote.Referrers(
+		digestRef, "", ociremote.WithRemoteOptions(remote.WithTransport(di.getTransport())),
+	)
+	require.NoError(t, err)
+	require.Len(t, idx.Manifests, 1, "exactly one attestation referrer")
 }

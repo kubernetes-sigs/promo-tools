@@ -211,7 +211,7 @@ func TestGroupEdgesByIdentityDigest(t *testing.T) {
 		mkEdge("us-central1-docker.pkg.dev/k8s-artifacts-prod/images", "app", digest1, ""): nil,
 	}
 
-	groups := groupEdgesByIdentityDigest(edges)
+	groups := groupEdgesByIdentityDigest(edges, false)
 
 	// The edges array must not be mutated if we drain it, it silently skips
 	// the attestation generation.
@@ -236,4 +236,75 @@ func TestGroupEdgesByIdentityDigest(t *testing.T) {
 	// Group 2: digest2 with 1 edge.
 	require.Len(t, groups[1], 1)
 	require.Equal(t, digest2, groups[1][0].Digest)
+
+	// Attestations attach to a digest, so they also cover tagless edges.
+	// The tagless edge shares digest1 and identity with the tagged ones,
+	// so it joins their group instead of forming a new one.
+	withTagless := groupEdgesByIdentityDigest(edges, true)
+	require.Len(t, withTagless, 2)
+
+	sort.Slice(withTagless, func(i, j int) bool {
+		return withTagless[i][0].Digest < withTagless[j][0].Digest
+	})
+	require.Len(t, withTagless[0], 5)
+	require.Equal(t,
+		image.Registry("us-central1-docker.pkg.dev/k8s-artifacts-prod/images"),
+		withTagless[0][0].DstRegistry.Name,
+	)
+}
+
+func TestCanonicalDigestRef(t *testing.T) {
+	t.Parallel()
+
+	const digest = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
+	mkEdge := func(dstReg string) *promotion.Edge {
+		return &promotion.Edge{
+			Digest:      digest,
+			DstRegistry: registry.Context{Name: image.Registry(dstReg)},
+			// The tag is irrelevant, an attestation attaches to a digest.
+			DstImageTag: promotion.ImageTag{Name: "sig-storage/csi-provisioner"},
+		}
+	}
+
+	for _, tc := range []struct {
+		name   string
+		dstReg string
+		want   string
+	}{
+		{
+			name:   "regional destination is rewritten to the canonical registry",
+			dstReg: "asia-east1-docker.pkg.dev/k8s-artifacts-prod/images",
+			want:   "us-central1-docker.pkg.dev/k8s-artifacts-prod/images/sig-storage/csi-provisioner@" + digest,
+		},
+		{
+			name:   "canonical destination is kept",
+			dstReg: "us-central1-docker.pkg.dev/k8s-artifacts-prod/images",
+			want:   "us-central1-docker.pkg.dev/k8s-artifacts-prod/images/sig-storage/csi-provisioner@" + digest,
+		},
+		{
+			// Only the host is rewritten, so the repeated sig-storage is
+			// expected: one segment comes from the registry, the other
+			// from the image name.
+			name:   "nested production destination keeps its path",
+			dstReg: "europe-west1-docker.pkg.dev/k8s-artifacts-prod/images/sig-storage",
+			want:   "us-central1-docker.pkg.dev/k8s-artifacts-prod/images/sig-storage/sig-storage/csi-provisioner@" + digest,
+		},
+		{
+			name:   "non production destination is unchanged",
+			dstReg: "gcr.io/my-project",
+			want:   "gcr.io/my-project/sig-storage/csi-provisioner@" + digest,
+		},
+		{
+			name:   "test registry is unchanged",
+			dstReg: "127.0.0.1:5000/production",
+			want:   "127.0.0.1:5000/production/sig-storage/csi-provisioner@" + digest,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			require.Equal(t, tc.want, canonicalDigestRef(mkEdge(tc.dstReg)))
+		})
+	}
 }
