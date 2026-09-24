@@ -138,22 +138,10 @@ func (di *DefaultPromoterImplementation) SignImages(
 		return nil
 	}
 
-	// Options for the new signer
-	signOpts := defaultSignerOptions(opts)
-
-	// Get the identity token we will use
-	token, err := di.GetIdentityToken(opts, opts.SignerAccount)
+	signOpts, err := di.initSigner(opts)
 	if err != nil {
-		return fmt.Errorf("generating identity token: %w", err)
+		return err
 	}
-
-	signOpts.IdentityToken = token
-
-	// Creating a new Signer after setting the identity token is MANDATORY
-	// because that's the only way to propagate the identity token to the
-	// internal Signer structs. Without that, the identity token wouldn't be
-	// used at all and images would be signed with a wrong identity.
-	di.signer = sign.New(signOpts)
 
 	// We only sign the first normalized image per digest of each edge.
 	grouped := groupEdgesByIdentityDigest(edges, skipTagless)
@@ -174,10 +162,42 @@ func (di *DefaultPromoterImplementation) SignImages(
 	return nil
 }
 
+// initSigner returns the options to sign with the identity of
+// --signer-account and sets up the signer to use them.
+func (di *DefaultPromoterImplementation) initSigner(opts *options.Options) (*sign.Options, error) {
+	// Options for the new signer
+	signOpts := defaultSignerOptions(opts)
+
+	// Get the identity token we will use
+	token, err := di.GetIdentityToken(opts, opts.SignerAccount)
+	if err != nil {
+		return nil, fmt.Errorf("generating identity token: %w", err)
+	}
+
+	signOpts.IdentityToken = token
+
+	// Creating a new Signer after setting the identity token is MANDATORY
+	// because that's the only way to propagate the identity token to the
+	// internal Signer structs. Without that, the identity token wouldn't be
+	// used at all and images would be signed with a wrong identity.
+	di.signer = sign.New(signOpts)
+
+	return signOpts, nil
+}
+
 // signFirst signs the first (primary) image for a given identity+digest group.
 func (di *DefaultPromoterImplementation) signFirst(signOpts *sign.Options, identity string, edge *promotion.Edge) error {
-	imageRef := edge.DstReference()
+	// Carry over existing signatures from the staging repo
+	if err := di.copyAttachedObjects(edge); err != nil {
+		return fmt.Errorf("copying staging signatures: %w", err)
+	}
 
+	return di.signWithIdentity(signOpts, identity, edge.DstReference())
+}
+
+// signWithIdentity signs an image, and its children for an index, using
+// identity as the signed production reference.
+func (di *DefaultPromoterImplementation) signWithIdentity(signOpts *sign.Options, identity, imageRef string) error {
 	// Make a shallow copy so we can safely modify the options per go routine
 	signOptsCopy := *signOpts
 
@@ -192,11 +212,6 @@ func (di *DefaultPromoterImplementation) signFirst(signOpts *sign.Options, ident
 	}
 
 	logrus.Infof("Signing image %s", imageRef)
-
-	// Carry over existing signatures from the staging repo
-	if err := di.copyAttachedObjects(edge); err != nil {
-		return fmt.Errorf("copying staging signatures: %w", err)
-	}
 
 	// Sign the promoted image:
 	if _, err := di.signer.SignImageWithOptions(&signOptsCopy, imageRef); err != nil {
@@ -377,11 +392,7 @@ func (di *DefaultPromoterImplementation) WriteProvenanceAttestations(
 		return fmt.Errorf("initializing attestation signer: %w", err)
 	}
 
-	builderID := "https://k8s.io/promo-tools"
-	if v := version.GetVersionInfo().GitVersion; v != "" {
-		builderID += "@" + v
-	}
-
+	builderID := promotionBuilderID()
 	now := time.Now()
 	recordContext := newRecordContext(mfests)
 
@@ -423,29 +434,30 @@ func (di *DefaultPromoterImplementation) WriteProvenanceAttestations(
 	return nil
 }
 
-// pushAttestation generates a provenance attestation, signs it into a
-// sigstore bundle, and attaches it to the destination digest as an OCI 1.1
-// referrer artifact (as cosign does now). The referrer manifest carries
-// a predicateType annotation to look it up quickly.
+// promotionBuilderID returns the builder ID recorded in promotion records.
+func promotionBuilderID() string {
+	builderID := "https://k8s.io/promo-tools"
+	if v := version.GetVersionInfo().GitVersion; v != "" {
+		builderID += "@" + v
+	}
+
+	return builderID
+}
+
+// pushAttestation writes the provenance attestation of an edge to the
+// canonical registry, unless the digest already has one.
 func (di *DefaultPromoterImplementation) pushAttestation(
 	ctx context.Context,
 	edge *promotion.Edge,
 	generator provenance.Generator,
 	record *provenance.PromotionRecord,
 ) error {
-	payload, err := generator.Generate(ctx, record)
-	if err != nil {
-		return fmt.Errorf("generating attestation: %w", err)
-	}
-
 	dstDigestRef := canonicalDigestRef(edge)
 
 	digest, err := name.NewDigest(dstDigestRef)
 	if err != nil {
 		return fmt.Errorf("parsing digest reference %s: %w", dstDigestRef, err)
 	}
-
-	remoteOpt := ociremote.WithRemoteOptions(di.remoteOptions()...)
 
 	// Check if our predicate type already exists (idempotent).
 	if di.hasBundleForPredicate(digest, provenance.PredicateType) {
@@ -454,19 +466,39 @@ func (di *DefaultPromoterImplementation) pushAttestation(
 		return nil
 	}
 
-	bundleJSON, err := di.attSigner.SignStatement(payload)
+	return di.writeAttestation(ctx, digest, generator, record)
+}
+
+// writeAttestation generates a provenance attestation, signs it into a
+// sigstore bundle, and attaches it to the digest as an OCI 1.1 referrer
+// artifact (as cosign does now). The referrer manifest carries a
+// predicateType annotation to look it up quickly.
+func (di *DefaultPromoterImplementation) writeAttestation(
+	ctx context.Context,
+	digest name.Digest,
+	generator provenance.Generator,
+	record *provenance.PromotionRecord,
+) error {
+	payload, err := generator.Generate(ctx, record)
 	if err != nil {
-		return fmt.Errorf("signing attestation for %s: %w", dstDigestRef, err)
+		return fmt.Errorf("generating attestation: %w", err)
 	}
 
-	logrus.Infof("Promotion record attestation: pushing for %s", dstDigestRef)
+	bundleJSON, err := di.attSigner.SignStatement(payload)
+	if err != nil {
+		return fmt.Errorf("signing attestation for %s: %w", digest, err)
+	}
+
+	logrus.Infof("Promotion record attestation: pushing for %s", digest)
+
+	remoteOpt := ociremote.WithRemoteOptions(di.remoteOptions()...)
 
 	if err := ratelimit.WithRetry(func() error {
 		return ociremote.WriteAttestationNewBundleFormat(
 			digest, bundleJSON, provenance.PredicateType, remoteOpt,
 		)
 	}); err != nil {
-		return fmt.Errorf("pushing attestation for %s: %w", dstDigestRef, err)
+		return fmt.Errorf("pushing attestation for %s: %w", digest, err)
 	}
 
 	return nil
@@ -497,26 +529,41 @@ func canonicalDigestRef(edge *promotion.Edge) string {
 
 // hasBundleForPredicate checks if the given digest already has an
 // attestation bundle referrer with the specified predicate type.
-//
-// When dealing with descriptors without annotations, we fetch the
-// referrer manifest itself.
 func (di *DefaultPromoterImplementation) hasBundleForPredicate(
 	digest name.Digest, predicateType string,
 ) bool {
+	refs, err := di.bundleReferrers(digest, predicateType)
+
+	return err == nil && len(refs) > 0
+}
+
+// bundleReferrers returns the referrers of the given digest that hold an
+// attestation bundle with the specified predicate type.
+//
+// When dealing with descriptors without annotations, we fetch the
+// referrer manifest itself.
+func (di *DefaultPromoterImplementation) bundleReferrers(
+	digest name.Digest, predicateType string,
+) ([]name.Digest, error) {
 	idx, err := ociremote.Referrers(
 		digest, "", ociremote.WithRemoteOptions(di.remoteOptions()...),
 	)
 	if err != nil {
-		return false
+		return nil, fmt.Errorf("listing referrers of %s: %w", digest, err)
 	}
+
+	var refs []name.Digest
 
 	// Cycle all the manifest descriptors
 	for i := range idx.Manifests {
 		desc := &idx.Manifests[i]
+		ref := digest.Context().Digest(desc.Digest.String())
 
 		// Best case scenario: we find the cosign annotation
 		if desc.Annotations[bundlePredicateTypeAnnotation] == predicateType {
-			return true
+			refs = append(refs, ref)
+
+			continue
 		}
 
 		if len(desc.Annotations) > 0 {
@@ -524,9 +571,7 @@ func (di *DefaultPromoterImplementation) hasBundleForPredicate(
 		}
 
 		// No annotations in the descriptor, fetch the manifest and check it
-		raw, err := remote.Get(
-			digest.Context().Digest(desc.Digest.String()), di.remoteOptions()...,
-		)
+		raw, err := remote.Get(ref, di.remoteOptions()...)
 		if err != nil {
 			continue
 		}
@@ -541,11 +586,11 @@ func (di *DefaultPromoterImplementation) hasBundleForPredicate(
 		}
 
 		if manifest.Annotations[bundlePredicateTypeAnnotation] == predicateType {
-			return true
+			refs = append(refs, ref)
 		}
 	}
 
-	return false
+	return refs, nil
 }
 
 // craneCopyWithTimeout wraps crane.Copy with a per-request context timeout.

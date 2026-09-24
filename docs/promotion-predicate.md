@@ -25,15 +25,15 @@ keep their meaning.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `srcRef` | string | Staging reference including the digest, for example `gcr.io/k8s-staging-foo/foo@sha256:…`. |
+| `srcRef` | string | Staging reference including the digest, for example `gcr.io/k8s-staging-foo/foo@sha256:…`. Omitted when written by `kpromo sigcheck`. |
 | `dstRef` | string | Production reference without digest, for example `registry.k8s.io/foo`. |
 | `digest` | string | Promoted digest, for example `sha256:…`. |
-| `timestamp` | string | Time of the promotion run (RFC 3339). All records of a run share it. |
+| `timestamp` | string | Time of the promotion run (RFC 3339), or of the `kpromo sigcheck` run that wrote the record. All records of a run share it. |
 | `builderId` | string | Promoter identity and version, for example `https://k8s.io/promo-tools@v4.6.0`. |
-| `tags` | string list | Tags promoted for the digest, sorted. Omitted for digests promoted without a tag. |
-| `source` | [ResourceDescriptor](#resourcedescriptor) | Staging image: `name` is the staging repository, `digest` the promoted digest. |
+| `tags` | string list | Tags promoted for the digest, sorted. Omitted for digests promoted without a tag. `kpromo sigcheck` records the tags of the digest on the canonical registry. |
+| `source` | [ResourceDescriptor](#resourcedescriptor) | Staging image: `name` is the staging repository, `digest` the promoted digest. Omitted when written by `kpromo sigcheck`. |
 | `destination` | [ResourceDescriptor](#resourcedescriptor) | Production image: `name` is the production reference, `digest` the promoted digest. |
-| `manifest` | [ResourceDescriptor](#resourcedescriptor) | Promoter manifest listing the digest. For thin manifests this is the `images.yaml` file. `name` is the path relative to the repository root, `digest.gitCommit` the checked out commit and `uri` the `git+https` URL of the repository. Outside of a git repository only `name` is set, holding the path as passed to the promoter. Omitted when the digest can't be mapped to a manifest. |
+| `manifest` | [ResourceDescriptor](#resourcedescriptor) | Promoter manifest listing the digest. For thin manifests this is the `images.yaml` file. `name` is the path relative to the repository root, `digest.gitCommit` the checked out commit and `uri` the `git+https` URL of the repository. Outside of a git repository only `name` is set, holding the path as passed to the promoter. Omitted when the digest can't be mapped to a manifest, and when written by `kpromo sigcheck`. |
 | `promoter` | [Promoter](#promoter) | Promoter binary. |
 | `job` | [Job](#job) | Prow job running the promotion. Omitted when `JOB_NAME` is not set. |
 
@@ -66,6 +66,15 @@ Values of the environment variables Prow sets for the job.
 | `type` | string | `JOB_TYPE`, for example `postsubmit` or `periodic`. |
 | `buildId` | string | `BUILD_ID`. |
 | `prowJobId` | string | `PROW_JOB_ID`. |
+
+## Records written by sigcheck
+
+`kpromo sigcheck --confirm` attests promoted digests that have no promotion
+attestation, see
+[Checking signatures and attestations](./image-promotion.md#checking-signatures-and-attestations).
+It does not know the staging image or the manifest, so its records have no
+`srcRef`, `source` and `manifest`, and `job` names the job running
+`kpromo sigcheck`.
 
 ## Example
 
