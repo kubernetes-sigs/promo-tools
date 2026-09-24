@@ -64,7 +64,7 @@ func (di *DefaultPromoterImplementation) ParseManifests(opts *options.Options) (
 
 // GetPromotionEdges checks the manifests and determines from
 // them the promotion edges, ie the images that need to be
-// promoted.
+// promoted. It fails if any of them can't be promoted.
 func (di *DefaultPromoterImplementation) GetPromotionEdges(
 	ctx context.Context, opts *options.Options, mfests []schema.Manifest,
 ) (map[promotion.Edge]any, error) {
@@ -97,6 +97,11 @@ func (di *DefaultPromoterImplementation) GetPromotionEdges(
 	filtered, clean := promotion.GetPromotionCandidates(edges, inv.Images)
 	if !clean {
 		return nil, errors.New("encountered errors during edge filtering")
+	}
+
+	// Reject unsupported manifests before anything is copied or signed.
+	if err := di.validateSourceManifests(ctx, filtered, inv.MediaTypes); err != nil {
+		return nil, fmt.Errorf("validating source manifests: %w", err)
 	}
 
 	return filtered, nil

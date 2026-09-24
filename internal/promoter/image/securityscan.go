@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/sirupsen/logrus"
 
 	options "sigs.k8s.io/promo-tools/v4/promoter/image/options"
@@ -28,7 +29,8 @@ import (
 )
 
 // ScanEdges runs vulnerability scans on the new images detected by the
-// promoter using the configured vuln.Scanner.
+// promoter using the configured vuln.Scanner. Artifacts that contain no
+// container image are reported as not applicable and not scanned.
 func (di *DefaultPromoterImplementation) ScanEdges(
 	ctx context.Context,
 	opts *options.Options,
@@ -42,9 +44,37 @@ func (di *DefaultPromoterImplementation) ScanEdges(
 
 	threshold := vuln.Severity(opts.SeverityThreshold)
 
+	// Edges repeat the same source digest once per destination and tag.
+	applicable := make(map[string]bool, len(promotionEdges))
+
 	for edge := range promotionEdges {
 		ref := edge.SrcReference()
 		if ref == "" {
+			continue
+		}
+
+		isImage, ok := applicable[ref]
+		if !ok {
+			digest, err := name.NewDigest(ref)
+			if err != nil {
+				return fmt.Errorf("parsing reference %s: %w", ref, err)
+			}
+
+			isImage, err = di.isContainerImage(ctx, digest)
+			if err != nil {
+				return fmt.Errorf("inspecting %s: %w", ref, err)
+			}
+
+			applicable[ref] = isImage
+
+			if !isImage {
+				logrus.Infof("Vulnerability scan not applicable to %s: not a container image", ref)
+			}
+		}
+
+		// Artifacts like Helm charts have no image content, and scanners
+		// report them as clean, so don't scan them at all.
+		if !isImage {
 			continue
 		}
 
