@@ -404,10 +404,24 @@ func (di *DefaultPromoterImplementation) selectImages(
 
 	repo := di.signCheckRepository() + "/" + imgName
 
+	manifest := func(digest string) ([]byte, error) {
+		ref, err := name.NewDigest(repo + "@" + digest)
+		if err != nil {
+			return nil, fmt.Errorf("parsing digest reference %s@%s: %w", repo, digest, err)
+		}
+
+		desc, err := di.getManifest(ctx, ref)
+		if err != nil {
+			return nil, err
+		}
+
+		return desc.Manifest, nil
+	}
+
 	children := map[string]struct{}{}
 
 	for _, digest := range indexes {
-		raw, err := di.getManifest(ctx, repo+"@"+digest)
+		raw, err := manifest(digest)
 		if err != nil {
 			return nil, err
 		}
@@ -428,7 +442,7 @@ func (di *DefaultPromoterImplementation) selectImages(
 		}
 
 		if !types.MediaType(tags.Manifests[digest].MediaType).IsIndex() {
-			raw, err := di.getManifest(ctx, repo+"@"+digest)
+			raw, err := manifest(digest)
 			if err != nil {
 				return nil, err
 			}
@@ -444,21 +458,6 @@ func (di *DefaultPromoterImplementation) selectImages(
 	}
 
 	return images, nil
-}
-
-// getManifest returns the raw manifest of a reference.
-func (di *DefaultPromoterImplementation) getManifest(ctx context.Context, refString string) ([]byte, error) {
-	ref, err := name.ParseReference(refString)
-	if err != nil {
-		return nil, fmt.Errorf("parsing reference %s: %w", refString, err)
-	}
-
-	desc, err := remote.Get(ref, append(di.remoteOptions(), remote.WithContext(ctx))...)
-	if err != nil {
-		return nil, fmt.Errorf("getting manifest of %s: %w", refString, err)
-	}
-
-	return desc.Manifest, nil
 }
 
 // isMetadataTag reports whether one of the tags is a cosign signature,
