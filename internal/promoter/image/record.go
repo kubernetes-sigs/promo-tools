@@ -128,15 +128,21 @@ func (rc *recordContext) record(group []promotion.Edge, identity string) *proven
 
 	digest := digestMap(edge.Digest)
 
+	// The source is unknown when the record is written by sigcheck.
+	var source *provenance.ResourceDescriptor
+	if edge.SrcReference() != "" {
+		source = &provenance.ResourceDescriptor{
+			Name:   string(edge.SrcRegistry.Name) + "/" + string(edge.SrcImageTag.Name),
+			Digest: digest,
+		}
+	}
+
 	return &provenance.PromotionRecord{
 		SrcRef: edge.SrcReference(),
 		DstRef: identity,
 		Digest: string(edge.Digest),
 		Tags:   tags,
-		Source: &provenance.ResourceDescriptor{
-			Name:   string(edge.SrcRegistry.Name) + "/" + string(edge.SrcImageTag.Name),
-			Digest: digest,
-		},
+		Source: source,
 		Destination: &provenance.ResourceDescriptor{
 			Name:   identity,
 			Digest: digest,

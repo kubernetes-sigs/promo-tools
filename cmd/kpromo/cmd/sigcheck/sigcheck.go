@@ -18,6 +18,7 @@ package sigcheck
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/spf13/cobra"
 
@@ -29,11 +30,33 @@ func Add(parent *cobra.Command) {
 	opts := &promoteropts.Options{}
 	cmd := &cobra.Command{
 		Use:   "sigcheck",
-		Short: "Check image signature consistency",
-		Long: `sigcheck - Check signature consistency across the K8s mirrors
+		Short: "Check and repair image signatures and promotion attestations",
+		Long: fmt.Sprintf(`sigcheck - Check and repair image signatures and promotion attestations
 
-This subcommand checks the signature consistency across promoted images
-to ensure copies in all mirrors have their signatures attached.
+This subcommand checks that promoted images have their signature and their
+promotion attestation. Both are stored on the canonical registry only
+(us-central1-docker.pkg.dev/k8s-artifacts-prod/images), registry.k8s.io serves
+them from there for all mirrors.
+
+An image is signed when its signature tag has a signature of the identity
+set with --certificate-identity or --certificate-identity-regexp (and the
+OIDC issuer) for its registry.k8s.io reference. It is attested when it has a
+promotion attestation (predicate type https://k8s.io/promo-tools/promotion/v1)
+of that identity for its registry.k8s.io reference. Digests promoted without
+a tag are only checked for the attestation, because promotion does not sign
+them. Signatures, attestations and other artifacts attached to images are not
+checked themselves.
+
+Promotion writes attestations since kpromo v4.6.0, which was rolled out to the
+production promotion jobs on 2026-09-23. Images uploaded before
+--attestations-since (default %s, UTC) are only checked for their
+signature, so digests without a tag are not checked at all. Set it to an
+earlier date, or to an empty value, to check and repair the attestations of
+older images too.
+
+kpromo sigcheck fails when it finds images without a signature or an
+attestation. With --confirm, it signs and attests them with the identity of
+--signer-account, like promotion does, and fails only if problems remain.
 
 By default, kpromo sigcheck will look at all images promoted during the last
 %d days. You can change the default using --from-days and determine a range
@@ -41,6 +64,10 @@ using --to-days. For example, to verify all images promoted in an interval
 between 10 and 5 days ago run:
 
    kpromo sigcheck --from-days=10 --to-days=5
+
+To check specific images instead, pass their references:
+
+   kpromo sigcheck registry.k8s.io/kube-apiserver:v1.34.0
 
 To debug the signature checker, you can limit the number of images kpromo
 verifies using --limit. When no limit is specified, kpromo will check the
@@ -50,6 +77,9 @@ kpromo to the first three images it finds run:
    kpromo sigcheck --limit=3
 
     `,
+			promoteropts.DefaultOptions.SignCheckAttestationsSince,
+			promoteropts.DefaultOptions.SignCheckFromDays,
+		),
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(_ *cobra.Command, args []string) error {
@@ -67,7 +97,21 @@ kpromo to the first three images it finds run:
 		&opts.SignCheckFix,
 		"confirm",
 		false,
-		"when true, kpromo will sign and propagate missing signatures in images",
+		"when true, kpromo will sign and attest images missing a signature or a promotion attestation",
+	)
+
+	cmd.PersistentFlags().StringVar(
+		&opts.SignerAccount,
+		"signer-account",
+		promoteropts.DefaultOptions.SignerAccount,
+		"service account to use as signing identity",
+	)
+
+	cmd.PersistentFlags().IntVar(
+		&opts.MaxSignatureOps,
+		"max-signature-ops",
+		promoteropts.DefaultOptions.MaxSignatureOps,
+		"maximum number of concurrent signature operations (at least 1)",
 	)
 
 	cmd.PersistentFlags().IntVar(
@@ -84,6 +128,13 @@ kpromo to the first three images it finds run:
 		"check images --from-days ago to this many days ago (defaults to today)",
 	)
 
+	cmd.PersistentFlags().StringVar(
+		&opts.SignCheckAttestationsSince,
+		"attestations-since",
+		promoteropts.DefaultOptions.SignCheckAttestationsSince,
+		"check promotion attestations of images uploaded since this date (YYYY-MM-DD, UTC), empty for all images",
+	)
+
 	cmd.PersistentFlags().IntVar(
 		&opts.SignCheckMaxImages,
 		"limit",
@@ -95,7 +146,7 @@ kpromo to the first three images it finds run:
 		&opts.SignCheckIdentity,
 		"certificate-identity",
 		promoteropts.DefaultOptions.SignCheckIdentity,
-		"identity to look for when verifying signatures",
+		"identity to look for when verifying signatures and attestations",
 	)
 
 	cmd.PersistentFlags().StringVar(

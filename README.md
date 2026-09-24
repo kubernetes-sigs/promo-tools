@@ -70,7 +70,7 @@ Available Commands:
   manifest    Generate/modify a manifest for artifact promotion
   pr          Starts an image promotion for a given image tag
   run         Run artifact promotion
-  sigcheck    Check image signatures
+  sigcheck    Check and repair image signatures and promotion attestations
   version     Prints the version
 ```
 

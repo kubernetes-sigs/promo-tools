@@ -122,11 +122,11 @@ type promoterImplementation interface {
 	SignImages(*options.Options, map[promotion.Edge]any) error
 	WriteProvenanceAttestations(context.Context, *options.Options, []schema.Manifest, map[promotion.Edge]any, provenance.Generator) error
 
-	// Methods for checking signatures
-	GetLatestImages(*options.Options) ([]string, error)
-	GetSignatureStatus(*options.Options, []string) (checkresults.Signature, error)
-	FixMissingSignatures(*options.Options, checkresults.Signature) error
-	FixPartialSignatures(*options.Options, checkresults.Signature) error
+	// Methods for checking signatures and attestations
+	GetLatestImages(context.Context, *options.Options) ([]checkresults.Image, error)
+	GetSignatureStatus(context.Context, *options.Options, []checkresults.Image) (checkresults.Results, error)
+	FixMissingSignatures(context.Context, *options.Options, checkresults.Results) error
+	FixMissingAttestations(context.Context, *options.Options, checkresults.Results, provenance.Generator) error
 
 	// Utility functions
 	PrintVersion()
@@ -345,39 +345,69 @@ func (p *Promoter) SecurityScan(ctx context.Context, opts *options.Options) erro
 	return nil
 }
 
-// CheckSignatures checks the consistency of a set of images.
-func (p *Promoter) CheckSignatures(_ context.Context, opts *options.Options) error {
+// CheckSignatures checks the signatures and promotion attestations of
+// promoted images on the canonical registry. When opts.SignCheckFix is set,
+// it signs and attests the images missing them. It fails when problems are
+// found and not repaired.
+func (p *Promoter) CheckSignatures(ctx context.Context, opts *options.Options) error {
+	if err := opts.ValidateSignCheck(); err != nil {
+		return fmt.Errorf("validating options: %w", err)
+	}
+
 	logrus.Info("Fetching latest promoted images")
 
-	images, err := p.impl.GetLatestImages(opts)
+	images, err := p.impl.GetLatestImages(ctx, opts)
 	if err != nil {
 		return fmt.Errorf("getting latest promoted images: %w", err)
 	}
 
-	logrus.Info("Checking signatures")
+	logrus.Info("Checking signatures and attestations")
 
-	results, err := p.impl.GetSignatureStatus(opts, images)
+	results, err := p.impl.GetSignatureStatus(ctx, opts, images)
 	if err != nil {
 		return fmt.Errorf("checking signature status in images: %w", err)
 	}
 
-	if results.TotalPartial() == 0 && results.TotalUnsigned() == 0 {
+	problems := results.Problems()
+	if len(problems) == 0 {
 		logrus.Info("Signature consistency OK!")
 
 		return nil
 	}
 
-	logrus.Infof("Fixing %d unsigned images", results.TotalUnsigned())
+	unsigned, unattested := len(problems.Unsigned()), len(problems.Unattested())
 
-	if err := p.impl.FixMissingSignatures(opts, results); err != nil {
-		return fmt.Errorf("fixing missing signatures: %w", err)
+	if !opts.SignCheckFix {
+		return fmt.Errorf(
+			"found %d unsigned and %d unattested images, run with --confirm to repair them",
+			unsigned, unattested,
+		)
 	}
 
-	logrus.Infof("Fixing %d images with partial signatures", results.TotalPartial())
+	logrus.Infof("Repairing %d unsigned and %d unattested images", unsigned, unattested)
 
-	if err := p.impl.FixPartialSignatures(opts, results); err != nil {
-		return fmt.Errorf("fixing partial signatures: %w", err)
+	if err := errors.Join(
+		p.impl.FixMissingSignatures(ctx, opts, problems),
+		p.impl.FixMissingAttestations(ctx, opts, problems, p.provenanceGenerator),
+	); err != nil {
+		return fmt.Errorf("repairing images: %w", err)
 	}
+
+	logrus.Info("Checking repaired images")
+
+	results, err = p.impl.GetSignatureStatus(ctx, opts, problems.Images())
+	if err != nil {
+		return fmt.Errorf("checking signature status in repaired images: %w", err)
+	}
+
+	if remaining := results.Problems(); len(remaining) > 0 {
+		return fmt.Errorf(
+			"%d unsigned and %d unattested images remain after the repair",
+			len(remaining.Unsigned()), len(remaining.Unattested()),
+		)
+	}
+
+	logrus.Info("All images repaired")
 
 	return nil
 }
