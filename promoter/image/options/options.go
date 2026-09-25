@@ -18,6 +18,8 @@ package imagepromoter
 
 import (
 	"errors"
+	"fmt"
+	"time"
 )
 
 // Options capture the switches available to run the image promoter.
@@ -101,6 +103,11 @@ type Options struct {
 	// SignCheckIssuerRegexp can use a regex to match more than one signer OIDC tokens used to identify the signer
 	SignCheckIssuerRegexp string
 
+	// SignCheckAttestationsSince is the date (YYYY-MM-DD, UTC) from which
+	// on promoted images must have a promotion attestation. Images uploaded
+	// before are only checked for signatures. Empty checks all images.
+	SignCheckAttestationsSince string
+
 	// MaxSignatureOps maximum number of concurrent signature operations
 	MaxSignatureOps int
 }
@@ -118,7 +125,11 @@ var DefaultOptions = &Options{
 	SignCheckIssuer:         "https://accounts.google.com",
 	SignCheckIdentityRegexp: "",
 	SignCheckIssuerRegexp:   "",
-	MaxSignatureOps:         50,
+	// The production rollout of v4.6.0, the first version writing signed
+	// promotion attestations, was on 2026-09-23 20:22 UTC. The first
+	// promotion using it ran on 2026-09-24.
+	SignCheckAttestationsSince: "2026-09-24",
+	MaxSignatureOps:            50,
 }
 
 func (o *Options) Validate() error {
@@ -126,6 +137,21 @@ func (o *Options) Validate() error {
 	if o.Snapshot == "" && o.ManifestBasedSnapshotOf == "" {
 		if o.Manifest == "" && o.ThinManifestDir == "" {
 			return errors.New("at least a manifest file or thin manifest directory have to be specified")
+		}
+	}
+
+	return nil
+}
+
+// ValidateSignCheck checks the options of the signature checker.
+func (o *Options) ValidateSignCheck() error {
+	if o.MaxSignatureOps < 1 {
+		return fmt.Errorf("--max-signature-ops must be at least 1, got %d", o.MaxSignatureOps)
+	}
+
+	if o.SignCheckAttestationsSince != "" {
+		if _, err := time.Parse(time.DateOnly, o.SignCheckAttestationsSince); err != nil {
+			return fmt.Errorf("--attestations-since must have the format YYYY-MM-DD: %w", err)
 		}
 	}
 

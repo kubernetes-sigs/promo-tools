@@ -71,3 +71,44 @@ func TestOptionsValidate(t *testing.T) {
 		})
 	}
 }
+
+func TestOptionsValidateSignCheck(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		opts      Options
+		shouldErr bool
+	}{
+		{
+			name: "defaults",
+			opts: *DefaultOptions,
+		},
+		{
+			name: "all attestations",
+			opts: Options{MaxSignatureOps: 1},
+		},
+		{
+			name:      "no signature operations",
+			opts:      Options{MaxSignatureOps: 0},
+			shouldErr: true,
+		},
+		{
+			name:      "negative signature operations",
+			opts:      Options{MaxSignatureOps: -1},
+			shouldErr: true,
+		},
+		{
+			name:      "invalid attestations date",
+			opts:      Options{MaxSignatureOps: 1, SignCheckAttestationsSince: "2026-9-24"},
+			shouldErr: true,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.opts.ValidateSignCheck()
+			if tc.shouldErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
