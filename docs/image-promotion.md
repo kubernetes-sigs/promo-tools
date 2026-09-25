@@ -18,6 +18,7 @@ registries.
   - [Pipeline phases](#pipeline-phases)
   - [Rate limiting](#rate-limiting)
 - [Image copying](#image-copying)
+  - [OCI artifacts](#oci-artifacts)
 - [Signing and attestation](#signing-and-attestation)
 - [Provenance verification](#provenance-verification)
 - [Provenance generation](#provenance-generation)
@@ -171,7 +172,7 @@ The promotion flow is organized into sequential pipeline phases:
 | Phase | Name | Description |
 |-------|------|-------------|
 | 1 | **setup** | Validate options, prewarm TUF cache |
-| 2 | **plan** | Parse manifests, read registry inventories, compute promotion edges |
+| 2 | **plan** | Parse manifests, read registry inventories, compute promotion edges, reject [unsupported artifacts](#oci-artifacts) |
 | 3 | **provenance** | Verify build-time provenance attestations (verify-if-present, see [Provenance verification](#provenance-verification)) |
 | 4 | **validate** | Validate staging image signatures |
 | 5 | **promote** | Copy images from staging to production |
@@ -207,6 +208,17 @@ registry directly.
   why images are never unpacked and repacked by the promoter.
 - **Performance**: every destination receives a full copy of the image,
   which can be gigabytes in size.
+
+### OCI artifacts
+
+Besides container images, the promoter copies OCI artifacts that use the
+image manifest, like Helm charts or seccomp profiles with a custom config
+media type or `artifactType`, and indexes of them. Other shapes can't be
+signed recursively, for example the deprecated
+`application/vnd.oci.artifact.manifest.v1+json` media type or an index child
+that is neither an image manifest nor an index. The plan phase rejects them
+before anything is copied, with an error naming the image, the offending
+digest and its media type.
 
 ## Signing and attestation
 
@@ -289,8 +301,9 @@ Attestations can be verified with
 
 The promoter supports vulnerability scanning of staging images before promotion.
 The `--vuln-severity-threshold` flag sets the minimum severity level that causes
-the scan to fail (0=UNSPECIFIED through 5=CRITICAL). See [checks](./checks.md)
-for details.
+the scan to fail (0=UNSPECIFIED through 5=CRITICAL). Artifacts without a
+container image are not applicable and are not scanned. See
+[checks](./checks.md) for details.
 
 ## Grabbing snapshots
 

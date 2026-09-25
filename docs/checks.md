@@ -51,6 +51,12 @@ kpromo cip --thin-manifest-dir=<dir> --vuln-severity-threshold=4 --confirm
 
 This would reject any image with HIGH (4) or CRITICAL (5) vulnerabilities.
 
+Only container images are scanned. A manifest is a container image when it
+has an image config and no `artifactType`, and an index when at least one of
+its children is a container image. Other objects, like Helm charts or
+seccomp profiles, are logged as not applicable instead of being reported as
+clean, because scanners find no packages in them.
+
 Setting the threshold to `0` (default) disables the severity gate.
 
 ## Integration With Prow
