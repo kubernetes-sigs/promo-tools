@@ -559,6 +559,19 @@ func signCheckIdentity(opts *options.Options) (*verify.CertificateIdentity, erro
 	return &identity, nil
 }
 
+// signerIdentity returns the certificate identity of the signatures
+// promotion creates with --signer-account. Unlike signCheckIdentity it
+// does not depend on the signature check flags, and does not accept other
+// signers, such as the one of carried staging signatures.
+func signerIdentity(opts *options.Options) (*verify.CertificateIdentity, error) {
+	identity, err := verify.NewShortCertificateIdentity(signerIssuer, "", opts.SignerAccount, "")
+	if err != nil {
+		return nil, fmt.Errorf("creating signer identity: %w", err)
+	}
+
+	return &identity, nil
+}
+
 // checkSignerAccount ensures that --signer-account signs with an identity
 // sigcheck accepts. Otherwise every run would sign and attest the images
 // again without repairing them.
