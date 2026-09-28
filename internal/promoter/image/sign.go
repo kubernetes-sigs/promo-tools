@@ -33,6 +33,7 @@ import (
 	"github.com/sigstore/cosign/v3/pkg/cosign/env"
 	ociremote "github.com/sigstore/cosign/v3/pkg/oci/remote"
 	"github.com/sigstore/sigstore-go/pkg/tuf"
+	"github.com/sigstore/sigstore-go/pkg/verify"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -51,6 +52,10 @@ import (
 const (
 	oidcTokenAudience  = "sigstore"
 	signatureTagSuffix = ".sig"
+
+	// signerIssuer is the OIDC issuer of the identity tokens of
+	// --signer-account, a Google service account.
+	signerIssuer = "https://accounts.google.com"
 
 	TestSigningAccount = "k8s-infra-promoter-test-signer@k8s-cip-test-prod.iam.gserviceaccount.com"
 
@@ -138,6 +143,11 @@ func (di *DefaultPromoterImplementation) SignImages(
 		return nil
 	}
 
+	signer, err := signerIdentity(opts)
+	if err != nil {
+		return err
+	}
+
 	signOpts, err := di.initSigner(opts)
 	if err != nil {
 		return err
@@ -151,7 +161,7 @@ func (di *DefaultPromoterImplementation) SignImages(
 
 	for _, group := range grouped {
 		g.Go(func() error {
-			return di.signFirst(signOpts, targetIdentity(&group[0]), &group[0])
+			return di.signFirst(signOpts, signer, &group[0])
 		})
 	}
 
@@ -185,14 +195,44 @@ func (di *DefaultPromoterImplementation) initSigner(opts *options.Options) (*sig
 	return signOpts, nil
 }
 
-// signFirst signs the first (primary) image for a given identity+digest group.
-func (di *DefaultPromoterImplementation) signFirst(signOpts *sign.Options, identity string, edge *promotion.Edge) error {
+// signFirst signs the first (primary) image for a given identity+digest
+// group, unless the digest already has a signature of signer for its
+// production reference.
+func (di *DefaultPromoterImplementation) signFirst(
+	signOpts *sign.Options, signer *verify.CertificateIdentity, edge *promotion.Edge,
+) error {
+	// A digest promoted before, for example under another tag, is already
+	// signed. Keyless signatures never deduplicate, so signing it again
+	// would add another signature, and carrying over the staging
+	// signatures would replace the existing ones.
+	var signed bool
+
+	err := ratelimit.WithRetry(func() error {
+		ctx, cancel := context.WithTimeout(context.Background(), ratelimit.CopyTimeout)
+		defer cancel()
+
+		var err error
+
+		signed, err = di.hasSignature(ctx, signer, edge)
+
+		return err
+	})
+	if err != nil {
+		logrus.Warnf("Unable to check the existing signatures of %s, signing it: %v", edge.DstReference(), err)
+	}
+
+	if signed {
+		logrus.Infof("Image %s is already signed, not signing it again", edge.DstReference())
+
+		return nil
+	}
+
 	// Carry over existing signatures from the staging repo
 	if err := di.copyAttachedObjects(edge); err != nil {
 		return fmt.Errorf("copying staging signatures: %w", err)
 	}
 
-	return di.signWithIdentity(signOpts, identity, edge.DstReference())
+	return di.signWithIdentity(signOpts, targetIdentity(edge), edge.DstReference())
 }
 
 // signWithIdentity signs an image, and its children for an index, using

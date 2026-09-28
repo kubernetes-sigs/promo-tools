@@ -219,6 +219,10 @@ canonical registry (`us-central1-docker.pkg.dev`) is among the promotion
 candidates, signatures are pushed there and served globally through
 registry.k8s.io via the `SIGNATURE_UPSTREAM_ENDPOINT` routing in archeio.
 The signing identity is configured with `--signer-account`.
+A digest that already has a signature of that identity for its production
+reference on the canonical registry, for example because it was promoted
+before under another tag, is not signed again, and the staging signatures
+are not copied for it.
 
 Promotion provenance attestations are signed into sigstore bundles and
 attached as OCI 1.1 referrer artifacts (cosign's "new bundle format") — no

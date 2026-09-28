@@ -369,6 +369,32 @@ func TestSignCheckIdentity(t *testing.T) {
 	require.Error(t, err, "an identity is required")
 }
 
+func TestSignerIdentity(t *testing.T) {
+	t.Parallel()
+
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+
+	signer := testCertificate(t, key.Public(), testSignerIdentity)
+	other := testCertificate(t, key.Public(), testOtherIdentity)
+
+	// The signature check flags neither widen the signer identity, so
+	// carried staging signatures are not taken for promoter signatures,
+	// nor change its issuer.
+	opts := testSignCheckOptions()
+	opts.SignCheckIdentityRegexp = `(someone@example\.com)|(krel-trust@k8s-releng-prod\.iam\.gserviceaccount\.com)`
+	opts.SignCheckIssuer = ""
+	opts.SignCheckIssuerRegexp = `^https://token\.actions\.githubusercontent\.com$`
+
+	identity, err := signerIdentity(opts)
+	require.NoError(t, err)
+	require.True(t, matchesIdentity(identity, signer))
+	require.False(t, matchesIdentity(identity, other))
+
+	_, err = signerIdentity(&options.Options{})
+	require.Error(t, err, "a signer account is required")
+}
+
 func TestCheckSignerAccount(t *testing.T) {
 	t.Parallel()
 

@@ -20,6 +20,7 @@ import (
 	"context"
 	"crypto"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"net/http/httptest"
 	"strings"
@@ -38,6 +39,8 @@ import (
 	"github.com/sigstore/sigstore/pkg/signature"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/encoding/protojson"
+	"sigs.k8s.io/release-sdk/sign"
+	"sigs.k8s.io/release-sdk/sign/signfakes"
 
 	options "sigs.k8s.io/promo-tools/v4/promoter/image/options"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/promotion"
@@ -152,6 +155,61 @@ func TestCopyAttachedObjectsSignatureMissing(t *testing.T) {
 	// Should gracefully succeed when no signature exists (404 is not an error).
 	err := di.copyAttachedObjects(&edge)
 	require.NoError(t, err)
+}
+
+// --- signFirst tests ---
+
+func TestSignFirstAlreadySigned(t *testing.T) {
+	t.Parallel()
+
+	const imageName = "retagged"
+
+	repo, di := newSignCheckRegistry(t)
+	host := strings.TrimSuffix(repo, "/"+productionRepositoryPath)
+
+	digest := pushTestImage(t, di, host+"/staging/"+imageName+":"+testTagV1)
+
+	// Promoted before under another tag: signed by the promoter, and the
+	// staging signature would replace that signature if it was copied.
+	pushTestSignature(t, di, host+"/staging/"+imageName, digest, host+"/staging/"+imageName, testOtherIdentity)
+	pushTestSignature(t, di, repo+"/"+imageName, digest, "registry.k8s.io/"+imageName, testSignerIdentity)
+
+	edge := promotion.Edge{
+		SrcRegistry: reg.Context{Name: image.Registry(host + "/staging"), Src: true},
+		SrcImageTag: promotion.ImageTag{Name: imageName, Tag: testTagV1},
+		Digest:      image.Digest(digest),
+		DstRegistry: reg.Context{Name: image.Registry(repo)},
+		DstImageTag: promotion.ImageTag{Name: imageName, Tag: "v1.1"},
+	}
+
+	signer, err := signerIdentity(testSignCheckOptions())
+	require.NoError(t, err)
+
+	signOpts := sign.Default()
+	signOpts.IdentityToken = "token"
+
+	fakeSigner := &signfakes.FakeImpl{}
+	fakeSigner.SignImageInternalReturns(errors.New("signed again"))
+
+	di.signer = sign.New(signOpts)
+	di.signer.SetImpl(fakeSigner)
+
+	require.NoError(t, di.signFirst(signOpts, signer, &edge))
+	require.Zero(t, fakeSigner.SignImageInternalCallCount())
+
+	sigRef, err := name.ParseReference(repo + "/" + imageName + ":" + digestToSignatureTag(image.Digest(digest)))
+	require.NoError(t, err)
+
+	sigImage, err := remote.Image(sigRef, remote.WithTransport(di.getTransport()))
+	require.NoError(t, err)
+
+	layers, err := sigImage.Layers()
+	require.NoError(t, err)
+	require.Len(t, layers, 1, "the signature must neither be replaced nor signed again")
+
+	signed, err := di.hasSignature(context.Background(), signer, &edge)
+	require.NoError(t, err)
+	require.True(t, signed)
 }
 
 // --- pushAttestation tests ---
