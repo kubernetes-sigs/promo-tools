@@ -23,10 +23,13 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"maps"
+	"strings"
 	"testing"
 
 	"github.com/google/go-containerregistry/pkg/name"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
+	"github.com/google/go-containerregistry/pkg/v1/random"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/google/go-containerregistry/pkg/v1/static"
 	"github.com/google/go-containerregistry/pkg/v1/types"
@@ -39,6 +42,10 @@ import (
 	"sigs.k8s.io/promo-tools/v4/promoter/image/promotion"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/provenance"
 	reg "sigs.k8s.io/promo-tools/v4/promoter/image/registry"
+	"sigs.k8s.io/promo-tools/v4/promoter/image/registry/registryfakes"
+	"sigs.k8s.io/promo-tools/v4/promoter/image/schema"
+	"sigs.k8s.io/promo-tools/v4/promoter/image/vuln"
+	"sigs.k8s.io/promo-tools/v4/promoter/image/vuln/vulnfakes"
 	"sigs.k8s.io/promo-tools/v4/types/image"
 )
 
@@ -317,15 +324,172 @@ func walkForSigning(t *testing.T, di *DefaultPromoterImplementation, ref string)
 	return visited, nil
 }
 
+// pushLegacyIndex pushes an index whose child uses the deprecated OCI
+// artifact manifest to repo and returns the index and child descriptors.
+func pushLegacyIndex(t *testing.T, di *DefaultPromoterImplementation, repo, tag string) (v1.Descriptor, v1.Descriptor) {
+	t.Helper()
+
+	child := pushRawManifest(t, di, repo, "", deprecatedArtifactManifest, map[string]any{
+		"mediaType":    deprecatedArtifactManifest,
+		"artifactType": artifactTypeProfile,
+	})
+
+	index := pushRawManifest(t, di, repo, tag, types.OCIImageIndex, v1.IndexManifest{
+		SchemaVersion: 2,
+		MediaType:     types.OCIImageIndex,
+		Manifests:     []v1.Descriptor{child},
+	})
+
+	return index, child
+}
+
+// getDescriptor returns the manifest descriptor of ref.
+func getDescriptor(t *testing.T, di *DefaultPromoterImplementation, ref string) v1.Descriptor {
+	t.Helper()
+
+	r, err := name.ParseReference(ref)
+	require.NoError(t, err)
+
+	desc, err := remote.Get(r, remote.WithTransport(di.getTransport()))
+	require.NoError(t, err)
+
+	return desc.Descriptor
+}
+
+// planArtifacts runs GetPromotionEdges for fixtures in the staging
+// registry of host. The in-memory registry doesn't serve the Google tags
+// list extension, so the inventory comes from a fake provider, with the
+// given media types. Manifests are read from the registry.
+func planArtifacts(
+	t *testing.T, di *DefaultPromoterImplementation, host string, fixtures []artifactFixture,
+	mediaTypes map[image.Digest]types.MediaType,
+) (map[promotion.Edge]any, error) {
+	t.Helper()
+
+	src := reg.Context{Name: image.Registry(host + "/staging"), Src: true}
+	mfest := schema.Manifest{
+		Registries:  []reg.Context{src, {Name: image.Registry(host + "/production")}},
+		SrcRegistry: &src,
+	}
+
+	inv := reg.NewInventory()
+	inv.Images[src.Name] = reg.RegInvImage{}
+	maps.Copy(inv.MediaTypes, mediaTypes)
+
+	for _, f := range fixtures {
+		if _, ok := inv.Images[src.Name][f.name]; !ok {
+			inv.Images[src.Name][f.name] = reg.DigestTags{}
+		}
+
+		inv.Images[src.Name][f.name][image.Digest(f.digest)] = reg.TagSlice{f.tag}
+	}
+
+	for imgName, dmap := range inv.Images[src.Name] {
+		mfest.Images = append(mfest.Images, reg.Image{Name: imgName, Dmap: dmap})
+	}
+
+	provider := &registryfakes.FakeProvider{}
+	provider.ReadRegistriesReturns(inv, nil)
+	di.SetRegistryProvider(provider)
+
+	return di.GetPromotionEdges(context.Background(), &options.Options{}, []schema.Manifest{mfest})
+}
+
+// TestGetPromotionEdgesArtifacts checks that planning accepts images,
+// artifacts and (nested) indexes of them.
+func TestGetPromotionEdgesArtifacts(t *testing.T) {
+	t.Parallel()
+
+	host, di := newTLSTestRegistry(t)
+
+	fixtures := pushArtifactFixtures(t, di, host+"/staging")
+
+	app := pushTestImage(t, di, host+"/staging/app:v1")
+	fixtures = append(fixtures, artifactFixture{name: testImageApp, tag: "v1", digest: app})
+
+	// An index of the spoc index.
+	spoc := fixtures[2]
+	nested := pushRawManifest(t, di, host+"/staging/spoc", "nested", types.OCIImageIndex, v1.IndexManifest{
+		SchemaVersion: 2,
+		MediaType:     types.OCIImageIndex,
+		Manifests:     []v1.Descriptor{getDescriptor(t, di, fmt.Sprintf("%s/staging/spoc@%s", host, spoc.digest))},
+	})
+	fixtures = append(fixtures, artifactFixture{name: "spoc", tag: "nested", digest: nested.Digest.String()})
+
+	// Image manifests known from the inventory aren't fetched.
+	missing := "sha256:" + strings.Repeat("0", 64)
+	fixtures = append(fixtures, artifactFixture{name: "missing", tag: "v1", digest: missing})
+
+	edges, err := planArtifacts(t, di, host, fixtures, map[image.Digest]types.MediaType{
+		image.Digest(missing): types.OCIManifestSchema1,
+	})
+	require.NoError(t, err)
+	require.Len(t, edges, len(fixtures))
+}
+
+// TestGetPromotionEdgesUnsupportedArtifacts checks that planning rejects
+// objects recursive signing can't walk, and reports all of them.
+func TestGetPromotionEdgesUnsupportedArtifacts(t *testing.T) {
+	t.Parallel()
+
+	host, di := newTLSTestRegistry(t)
+
+	fixtures := pushArtifactFixtures(t, di, host+"/staging")
+
+	// A deprecated OCI artifact manifest.
+	top := pushRawManifest(t, di, host+"/staging/top", "v1", deprecatedArtifactManifest, map[string]any{
+		"mediaType":    deprecatedArtifactManifest,
+		"artifactType": artifactTypeProfile,
+	})
+
+	// An index with a deprecated OCI artifact manifest child.
+	legacy, legacyChild := pushLegacyIndex(t, di, host+"/staging/legacy", "v1")
+
+	// A nested index with a layer as grandchild and another one as child,
+	// both reported.
+	layer := descriptorFor(helmChartType, []byte("chart"))
+	sibling := descriptorFor(helmChartType, []byte("sibling"))
+	inner := pushRawManifest(t, di, host+"/staging/layer", "", types.OCIImageIndex, v1.IndexManifest{
+		SchemaVersion: 2,
+		MediaType:     types.OCIImageIndex,
+		Manifests:     []v1.Descriptor{layer},
+	})
+	outer := pushRawManifest(t, di, host+"/staging/layer", "v1", types.OCIImageIndex, v1.IndexManifest{
+		SchemaVersion: 2,
+		MediaType:     types.OCIImageIndex,
+		Manifests:     []v1.Descriptor{inner, sibling},
+	})
+
+	fixtures = append(fixtures,
+		artifactFixture{name: "top", tag: "v1", digest: top.Digest.String()},
+		artifactFixture{name: "legacy", tag: "v1", digest: legacy.Digest.String()},
+		artifactFixture{name: "layer", tag: "v1", digest: outer.Digest.String()},
+	)
+
+	_, err := planArtifacts(t, di, host, fixtures, nil)
+	require.ErrorIs(t, err, errUnsupportedMediaType)
+	require.ErrorContains(t, err, fmt.Sprintf("image %s/staging/top@%s: media type %q",
+		host, top.Digest, deprecatedArtifactManifest))
+	require.ErrorContains(t, err, fmt.Sprintf("image %s/staging/legacy@%s: index child %s has media type %q",
+		host, legacy.Digest, legacyChild.Digest, deprecatedArtifactManifest))
+	require.ErrorContains(t, err, fmt.Sprintf("image %s/staging/layer@%s: index child %s has media type %q",
+		host, outer.Digest, layer.Digest, helmChartType))
+	require.ErrorContains(t, err, fmt.Sprintf("image %s/staging/layer@%s: index child %s has media type %q",
+		host, outer.Digest, sibling.Digest, helmChartType))
+
+	for _, f := range fixtures[:3] {
+		require.NotContains(t, err.Error(), f.digest, "%s is supported", f.name)
+	}
+}
+
 // TestRecursiveSigningWalkArtifacts checks that the walk recursive signing
-// uses accepts artifacts and indexes of artifacts. It also documents that
-// an index child with an unsupported media type is copied by the promote
-// phase, and only fails afterwards, when signing walks the index.
+// uses accepts artifacts and indexes of artifacts. An index child with an
+// unsupported media type fails the walk, so planning rejects such an index
+// before the promote phase copies it.
 func TestRecursiveSigningWalkArtifacts(t *testing.T) {
 	t.Parallel()
 
 	host, di := newTLSTestRegistry(t)
-	di.SetRegistryProvider(reg.NewCraneProvider(reg.WithTransport(di.getTransport())))
 
 	fixtures := pushArtifactFixtures(t, di, host+"/staging")
 
@@ -336,35 +500,61 @@ func TestRecursiveSigningWalkArtifacts(t *testing.T) {
 	}
 
 	// An index whose child uses the deprecated OCI artifact manifest.
-	artifactManifest := map[string]any{
-		"mediaType":    deprecatedArtifactManifest,
-		"artifactType": artifactTypeProfile,
+	legacy, child := pushLegacyIndex(t, di, host+"/staging/legacy", "v1")
+
+	_, err := walkForSigning(t, di, host+"/staging/legacy:v1")
+	require.ErrorContains(t, err, "unknown mime type: "+deprecatedArtifactManifest)
+
+	_, err = planArtifacts(t, di, host, []artifactFixture{{name: "legacy", tag: "v1", digest: legacy.Digest.String()}}, nil)
+	require.ErrorIs(t, err, errUnsupportedMediaType)
+	require.ErrorContains(t, err, fmt.Sprintf("image %s/staging/legacy@%s: index child %s has media type %q",
+		host, legacy.Digest, child.Digest, deprecatedArtifactManifest),
+		"planning rejects the index before it is copied and partially signed")
+}
+
+// TestScanEdgesArtifacts checks that vulnerability scans skip artifacts and
+// indexes of artifacts as not applicable, but scan images and indexes of
+// images.
+func TestScanEdgesArtifacts(t *testing.T) {
+	t.Parallel()
+
+	host, di := newTLSTestRegistry(t)
+
+	fixtures := pushArtifactFixtures(t, di, host+"/staging")
+
+	app := pushTestImage(t, di, host+"/staging/app:v1")
+
+	idx, err := random.Index(1024, 1, 2)
+	require.NoError(t, err)
+
+	multiRef, err := name.ParseReference(host + "/staging/multi:v1")
+	require.NoError(t, err)
+	require.NoError(t, remote.WriteIndex(multiRef, idx, remote.WithTransport(di.getTransport())))
+
+	multi, err := idx.Digest()
+	require.NoError(t, err)
+
+	fixtures = append(fixtures,
+		artifactFixture{name: testImageApp, tag: "v1", digest: app},
+		artifactFixture{name: "multi", tag: "v1", digest: multi.String()},
+	)
+
+	scanner := &vulnfakes.FakeScanner{}
+	scanner.ScanReturns(&vuln.ScanResult{}, nil)
+	di.SetVulnScanner(scanner)
+
+	opts := &options.Options{SeverityThreshold: int(vuln.SeverityHigh)}
+	require.NoError(t, di.ScanEdges(context.Background(), opts, artifactEdges(host, fixtures)))
+
+	scanned := make([]string, 0, scanner.ScanCallCount())
+
+	for i := range scanner.ScanCallCount() {
+		_, ref := scanner.ScanArgsForCall(i)
+		scanned = append(scanned, ref)
 	}
-	child := pushRawManifest(t, di, host+"/staging/legacy", "", deprecatedArtifactManifest, artifactManifest)
 
-	// go-containerregistry copies index children of unknown media types as
-	// blobs. Registries that store manifests as blobs, like Artifact
-	// Registry, serve them that way; the in-memory registry doesn't, so the
-	// child is pushed as a blob as well.
-	childData, err := json.Marshal(artifactManifest)
-	require.NoError(t, err)
-
-	legacyRepo, err := name.NewRepository(host + "/staging/legacy")
-	require.NoError(t, err)
-	require.NoError(t, remote.WriteLayer(legacyRepo, static.NewLayer(childData, deprecatedArtifactManifest),
-		remote.WithTransport(di.getTransport())))
-
-	legacy := pushRawManifest(t, di, host+"/staging/legacy", "v1", types.OCIImageIndex, v1.IndexManifest{
-		SchemaVersion: 2,
-		MediaType:     types.OCIImageIndex,
-		Manifests:     []v1.Descriptor{child},
-	})
-
-	edges := artifactEdges(host, []artifactFixture{{name: "legacy", tag: "v1", digest: legacy.Digest.String()}})
-	require.NoError(t, di.PromoteImages(context.Background(), &options.Options{Threads: 1}, edges),
-		"the promote phase copies the index")
-
-	_, err = walkForSigning(t, di, host+"/production/legacy:v1")
-	require.ErrorContains(t, err, "unknown mime type: "+deprecatedArtifactManifest,
-		"signing fails only after the copy, see kubernetes-sigs/promo-tools#1957")
+	require.ElementsMatch(t, []string{
+		fmt.Sprintf("%s/staging/app@%s", host, app),
+		fmt.Sprintf("%s/staging/multi@%s", host, multi),
+	}, scanned)
 }
