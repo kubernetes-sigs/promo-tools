@@ -21,6 +21,7 @@ registries.
 - [Signing and attestation](#signing-and-attestation)
 - [Provenance verification](#provenance-verification)
 - [Provenance generation](#provenance-generation)
+- [Checking signatures and attestations](#checking-signatures-and-attestations)
 - [Vulnerability scanning](#vulnerability-scanning)
 - [Grabbing snapshots](#grabbing-snapshots)
   - [Snapshots of promoter manifests](#snapshots-of-promoter-manifests)
@@ -284,6 +285,68 @@ and attached to the destination digest through the OCI referrers API as
 described in [Signing and attestation](#signing-and-attestation).
 Attestations can be verified with
 `cosign verify-attestation --new-bundle-format`.
+
+## Checking signatures and attestations
+
+Signing and attesting happen after the images are copied. If they fail, a
+rerun of the promotion skips the affected images because they already exist
+in production. `kpromo sigcheck` finds and repairs them:
+
+```console
+kpromo sigcheck --from-days=7
+```
+
+It lists the images uploaded to the canonical registry
+(`us-central1-docker.pkg.dev/k8s-artifacts-prod/images`) in the date range
+set with `--from-days` and `--to-days`, or checks the image references passed
+as arguments (`registry.k8s.io/…` or `*-docker.pkg.dev/k8s-artifacts-prod/images/…`).
+Only the canonical registry is checked, because signatures and attestations
+are not copied to the other regions and registry.k8s.io serves them from
+there. For each image it checks that:
+
+- the image has a signature with a certificate of the expected identity for
+  its `registry.k8s.io` reference and digest. Digests promoted without a tag
+  are not signed by the promoter, so this is only checked for images with
+  tags.
+- the digest has a promotion attestation (see
+  [Provenance generation](#provenance-generation)) with a certificate of the
+  expected identity, whose subject is the `registry.k8s.io` reference and the
+  digest. Tagged images and digests promoted without a tag are checked,
+  except for the children of an index.
+
+Promotion writes attestations since kpromo v4.6.0, so attestations are only
+checked for images uploaded since `--attestations-since` (`YYYY-MM-DD`, UTC).
+The default is `2026-09-24`: v4.6.0 was rolled out to the production promotion
+jobs on 2026-09-23 at 20:22 UTC, and first promoted images on 2026-09-24.
+Older images are only checked for their signature: their missing attestations
+are neither reported nor repaired, and digests promoted without a tag are not
+checked at all. This keeps `--confirm` from writing incomplete promotion
+records for all older images, which promotion would never replace. An earlier
+date, or an empty value, extends the attestation checks and repairs to older
+images.
+
+The expected identity is set with `--certificate-identity` or
+`--certificate-identity-regexp` and `--certificate-oidc-issuer` or
+`--certificate-oidc-issuer-regexp`; as in promotion, the regular expressions
+take precedence. The default is the identity the promoter signs with. The
+certificates are matched but not verified against the sigstore trust root; use
+`cosign verify` and `cosign verify-attestation` for that. Signatures,
+attestations and other sigstore artifacts (the `.sig`, `.att` and `.sbom`
+tags and sigstore bundle referrers) are not checked as images.
+
+Without `--confirm`, `kpromo sigcheck` fails when it finds a problem. With
+`--confirm`, it signs and attests the affected images on the canonical
+registry with the identity of `--signer-account`, through the same code as
+promotion: signatures use the `registry.k8s.io` reference and cover the
+children of an index, and one attestation is written per digest. The staging
+image and the manifest are not known to `kpromo sigcheck`, so its promotion
+records do not include them (see the [predicate](./promotion-predicate.md)).
+It then checks the repaired images again and fails if problems remain. It
+does not repair anything when `--signer-account` does not match the expected
+identity, because the new signatures and attestations would not be accepted.
+Repairing needs the same permissions as promotion: write access to the
+canonical registry and the ability to get identity tokens for
+`--signer-account`.
 
 ## Vulnerability scanning
 

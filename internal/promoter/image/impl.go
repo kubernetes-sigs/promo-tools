@@ -65,6 +65,10 @@ type DefaultPromoterImplementation struct {
 
 	// vulnScanner abstracts vulnerability scanning of container images.
 	vulnScanner vuln.Scanner
+
+	// signCheckRepo overrides the production repository on the canonical
+	// registry checked by sigcheck. It is only set by tests.
+	signCheckRepo string
 }
 
 // NewDefaultPromoterImplementation creates a new DefaultPromoterImplementation instance.

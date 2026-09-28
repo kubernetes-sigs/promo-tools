@@ -34,10 +34,8 @@ import (
 	"sigs.k8s.io/promo-tools/v4/types/image"
 )
 
-const (
-	testImageRef = "img@sha256:abc"
-	testMirror   = "mirror1"
-)
+// testImage is a tagged image checked by sigcheck.
+var testImage = checkresults.Image{Name: "img", Digest: "sha256:abc", Tags: []string{"v1.0"}, Attest: true}
 
 // nonEmptyManifests returns a minimal manifest slice so that the pipeline
 // does not stop early due to an empty manifest list.
@@ -445,15 +443,27 @@ func TestSecurityScanDryRun(t *testing.T) {
 func TestCheckSignatures(t *testing.T) {
 	testErr := errors.New("synthetic error")
 
+	unsigned := checkresults.Results{{Image: testImage, Attested: true}}
+	unattested := checkresults.Results{{Image: testImage, Signed: true}}
+	consistent := checkresults.Results{{Image: testImage, Signed: true, Attested: true}}
+
 	for _, tc := range []struct {
 		shouldErr bool
 		msg       string
+		confirm   bool
 		prepare   func(*imagefakes.FakePromoterImplementation)
 	}{
 		{
 			shouldErr: false,
-			msg:       "All signed",
+			msg:       "No images",
 			prepare:   func(_ *imagefakes.FakePromoterImplementation) {},
+		},
+		{
+			shouldErr: false,
+			msg:       "All signed and attested",
+			prepare: func(fpi *imagefakes.FakePromoterImplementation) {
+				fpi.GetSignatureStatusReturns(consistent, nil)
+			},
 		},
 		{
 			shouldErr: true,
@@ -471,22 +481,60 @@ func TestCheckSignatures(t *testing.T) {
 		},
 		{
 			shouldErr: true,
-			msg:       "FixMissingSignatures fails",
+			msg:       "Unsigned without confirm",
 			prepare: func(fpi *imagefakes.FakePromoterImplementation) {
-				fpi.GetSignatureStatusReturns(checkresults.Signature{
-					testImageRef: {Missing: []string{testMirror}},
-				}, nil)
+				fpi.GetSignatureStatusReturns(unsigned, nil)
+			},
+		},
+		{
+			shouldErr: true,
+			msg:       "Unattested without confirm",
+			prepare: func(fpi *imagefakes.FakePromoterImplementation) {
+				fpi.GetSignatureStatusReturns(unattested, nil)
+			},
+		},
+		{
+			shouldErr: true,
+			msg:       "FixMissingSignatures fails",
+			confirm:   true,
+			prepare: func(fpi *imagefakes.FakePromoterImplementation) {
+				fpi.GetSignatureStatusReturns(unsigned, nil)
 				fpi.FixMissingSignaturesReturns(testErr)
 			},
 		},
 		{
 			shouldErr: true,
-			msg:       "FixPartialSignatures fails",
+			msg:       "FixMissingAttestations fails",
+			confirm:   true,
 			prepare: func(fpi *imagefakes.FakePromoterImplementation) {
-				fpi.GetSignatureStatusReturns(checkresults.Signature{
-					testImageRef: {Signed: []string{"primary"}, Missing: []string{testMirror}},
-				}, nil)
-				fpi.FixPartialSignaturesReturns(testErr)
+				fpi.GetSignatureStatusReturns(unattested, nil)
+				fpi.FixMissingAttestationsReturns(testErr)
+			},
+		},
+		{
+			shouldErr: true,
+			msg:       "Problems remain after the repair",
+			confirm:   true,
+			prepare: func(fpi *imagefakes.FakePromoterImplementation) {
+				fpi.GetSignatureStatusReturns(unsigned, nil)
+			},
+		},
+		{
+			shouldErr: true,
+			msg:       "Check after the repair fails",
+			confirm:   true,
+			prepare: func(fpi *imagefakes.FakePromoterImplementation) {
+				fpi.GetSignatureStatusReturnsOnCall(0, unsigned, nil)
+				fpi.GetSignatureStatusReturnsOnCall(1, nil, testErr)
+			},
+		},
+		{
+			shouldErr: false,
+			msg:       "Repaired",
+			confirm:   true,
+			prepare: func(fpi *imagefakes.FakePromoterImplementation) {
+				fpi.GetSignatureStatusReturnsOnCall(0, unsigned, nil)
+				fpi.GetSignatureStatusReturnsOnCall(1, consistent, nil)
 			},
 		},
 	} {
@@ -496,7 +544,7 @@ func TestCheckSignatures(t *testing.T) {
 			tc.prepare(&mock)
 			sut.SetImplementation(&mock)
 
-			opts := &options.Options{}
+			opts := &options.Options{SignCheckFix: tc.confirm, MaxSignatureOps: 1}
 			if tc.shouldErr {
 				require.Error(t, sut.CheckSignatures(context.Background(), opts), tc.msg)
 			} else {
@@ -506,18 +554,66 @@ func TestCheckSignatures(t *testing.T) {
 	}
 }
 
+func TestCheckSignaturesInvalidOptions(t *testing.T) {
+	sut := imagepromoter.Promoter{}
+	mock := imagefakes.FakePromoterImplementation{}
+	sut.SetImplementation(&mock)
+
+	// errgroup blocks forever with a limit of 0.
+	require.Error(t, sut.CheckSignatures(context.Background(), &options.Options{SignCheckFix: true}))
+	require.Equal(t, 0, mock.GetLatestImagesCallCount())
+}
+
 func TestCheckSignaturesAllConsistent(t *testing.T) {
 	sut := imagepromoter.Promoter{}
 	mock := imagefakes.FakePromoterImplementation{}
-	// Return a result with no missing signatures
-	mock.GetSignatureStatusReturns(checkresults.Signature{
-		testImageRef: {Signed: []string{"primary", testMirror}},
+	tagless := checkresults.Image{Name: "img", Digest: "sha256:def", Attest: true}
+	old := checkresults.Image{Name: "old", Digest: "sha256:123", Tags: []string{"v0.1"}}
+	mock.GetSignatureStatusReturns(checkresults.Results{
+		{Image: testImage, Signed: true, Attested: true},
+		// Images without tags are not signed by promotion.
+		{Image: tagless, Attested: true},
+		// Images promoted before attestations are not attested.
+		{Image: old, Signed: true},
 	}, nil)
 	sut.SetImplementation(&mock)
 
-	require.NoError(t, sut.CheckSignatures(context.Background(), &options.Options{}))
+	require.NoError(t, sut.CheckSignatures(context.Background(), &options.Options{SignCheckFix: true, MaxSignatureOps: 1}))
 
 	// Should not attempt to fix anything
 	require.Equal(t, 0, mock.FixMissingSignaturesCallCount())
-	require.Equal(t, 0, mock.FixPartialSignaturesCallCount())
+	require.Equal(t, 0, mock.FixMissingAttestationsCallCount())
+}
+
+func TestCheckSignaturesRepair(t *testing.T) {
+	sut := imagepromoter.Promoter{}
+	sut.SetProvenanceGenerator(&provenance.PromotionGenerator{})
+
+	mock := imagefakes.FakePromoterImplementation{}
+
+	other := checkresults.Image{Name: "other", Digest: "sha256:def", Tags: []string{"v2.0"}, Attest: true}
+	signed := checkresults.Status{Image: testImage, Signed: true, Attested: true}
+	unsigned := checkresults.Status{Image: other, Attested: true}
+
+	mock.GetSignatureStatusReturnsOnCall(0, checkresults.Results{signed, unsigned}, nil)
+	mock.GetSignatureStatusReturnsOnCall(1, checkresults.Results{{
+		Image: unsigned.Image, Signed: true, Attested: true,
+	}}, nil)
+	sut.SetImplementation(&mock)
+
+	require.NoError(t, sut.CheckSignatures(context.Background(), &options.Options{SignCheckFix: true, MaxSignatureOps: 1}))
+
+	// Only the problems are repaired and checked again.
+	require.Equal(t, 1, mock.FixMissingSignaturesCallCount())
+	_, _, repaired := mock.FixMissingSignaturesArgsForCall(0)
+	require.Equal(t, checkresults.Results{unsigned}, repaired)
+
+	require.Equal(t, 1, mock.FixMissingAttestationsCallCount())
+	_, _, repaired, generator := mock.FixMissingAttestationsArgsForCall(0)
+	require.Equal(t, checkresults.Results{unsigned}, repaired)
+	require.NotNil(t, generator)
+
+	require.Equal(t, 2, mock.GetSignatureStatusCallCount())
+	_, _, rechecked := mock.GetSignatureStatusArgsForCall(1)
+	require.Equal(t, []checkresults.Image{unsigned.Image}, rechecked)
 }
