@@ -3,7 +3,7 @@ module sigs.k8s.io/promo-tools/v4
 go 1.27.0
 
 require (
-	cloud.google.com/go/containeranalysis v0.19.0
+	cloud.google.com/go/containeranalysis v0.20.0
 	cloud.google.com/go/iam v1.14.0
 	cloud.google.com/go/storage v1.68.0
 	github.com/aws/aws-sdk-go-v2 v1.47.1
@@ -43,7 +43,7 @@ require (
 	cloud.google.com/go/auth v0.23.3 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.8 // indirect
 	cloud.google.com/go/compute/metadata v0.9.1 // indirect
-	cloud.google.com/go/grafeas v0.3.17 // indirect
+	cloud.google.com/go/grafeas v0.5.0 // indirect
 	cloud.google.com/go/monitoring v1.30.0 // indirect
 	connectrpc.com/connect v1.20.0 // indirect
 	cuelabs.dev/go/oci/ociregistry v0.0.0-20251212221603-3adeb8663819 // indirect
