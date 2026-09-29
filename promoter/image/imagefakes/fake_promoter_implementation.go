@@ -44,6 +44,20 @@ type FakePromoterImplementation struct {
 		result1 []schema.Manifest
 		result2 error
 	}
+	CarryAttestationsStub        func(context.Context, *imagepromotera.Options, map[promotion.Edge]any, map[string]*provenance.ImageProvenance) error
+	carryAttestationsMutex       sync.RWMutex
+	carryAttestationsArgsForCall []struct {
+		arg1 context.Context
+		arg2 *imagepromotera.Options
+		arg3 map[promotion.Edge]any
+		arg4 map[string]*provenance.ImageProvenance
+	}
+	carryAttestationsReturns struct {
+		result1 error
+	}
+	carryAttestationsReturnsOnCall map[int]struct {
+		result1 error
+	}
 	FixMissingAttestationsStub        func(context.Context, *imagepromotera.Options, checkresults.Results, provenance.Generator) error
 	fixMissingAttestationsMutex       sync.RWMutex
 	fixMissingAttestationsArgsForCall []struct {
@@ -352,6 +366,70 @@ func (fake *FakePromoterImplementation) AppendManifestToSnapshotReturnsOnCall(i 
 		result1 []schema.Manifest
 		result2 error
 	}{result1, result2}
+}
+
+func (fake *FakePromoterImplementation) CarryAttestations(arg1 context.Context, arg2 *imagepromotera.Options, arg3 map[promotion.Edge]any, arg4 map[string]*provenance.ImageProvenance) error {
+	fake.carryAttestationsMutex.Lock()
+	ret, specificReturn := fake.carryAttestationsReturnsOnCall[len(fake.carryAttestationsArgsForCall)]
+	fake.carryAttestationsArgsForCall = append(fake.carryAttestationsArgsForCall, struct {
+		arg1 context.Context
+		arg2 *imagepromotera.Options
+		arg3 map[promotion.Edge]any
+		arg4 map[string]*provenance.ImageProvenance
+	}{arg1, arg2, arg3, arg4})
+	stub := fake.CarryAttestationsStub
+	fakeReturns := fake.carryAttestationsReturns
+	fake.recordInvocation("CarryAttestations", []interface{}{arg1, arg2, arg3, arg4})
+	fake.carryAttestationsMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2, arg3, arg4)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakePromoterImplementation) CarryAttestationsCallCount() int {
+	fake.carryAttestationsMutex.RLock()
+	defer fake.carryAttestationsMutex.RUnlock()
+	return len(fake.carryAttestationsArgsForCall)
+}
+
+func (fake *FakePromoterImplementation) CarryAttestationsCalls(stub func(context.Context, *imagepromotera.Options, map[promotion.Edge]any, map[string]*provenance.ImageProvenance) error) {
+	fake.carryAttestationsMutex.Lock()
+	defer fake.carryAttestationsMutex.Unlock()
+	fake.CarryAttestationsStub = stub
+}
+
+func (fake *FakePromoterImplementation) CarryAttestationsArgsForCall(i int) (context.Context, *imagepromotera.Options, map[promotion.Edge]any, map[string]*provenance.ImageProvenance) {
+	fake.carryAttestationsMutex.RLock()
+	defer fake.carryAttestationsMutex.RUnlock()
+	argsForCall := fake.carryAttestationsArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4
+}
+
+func (fake *FakePromoterImplementation) CarryAttestationsReturns(result1 error) {
+	fake.carryAttestationsMutex.Lock()
+	defer fake.carryAttestationsMutex.Unlock()
+	fake.CarryAttestationsStub = nil
+	fake.carryAttestationsReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakePromoterImplementation) CarryAttestationsReturnsOnCall(i int, result1 error) {
+	fake.carryAttestationsMutex.Lock()
+	defer fake.carryAttestationsMutex.Unlock()
+	fake.CarryAttestationsStub = nil
+	if fake.carryAttestationsReturnsOnCall == nil {
+		fake.carryAttestationsReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.carryAttestationsReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
 }
 
 func (fake *FakePromoterImplementation) FixMissingAttestations(arg1 context.Context, arg2 *imagepromotera.Options, arg3 checkresults.Results, arg4 provenance.Generator) error {

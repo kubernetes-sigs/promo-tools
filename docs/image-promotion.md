@@ -22,6 +22,7 @@ registries.
 - [Signing and attestation](#signing-and-attestation)
 - [Provenance verification](#provenance-verification)
   - [Provenance policies](#provenance-policies)
+  - [Carrying staging attestations](#carrying-staging-attestations)
   - [Attestation discovery](#attestation-discovery)
 - [Provenance generation](#provenance-generation)
 - [Checking signatures and attestations](#checking-signatures-and-attestations)
@@ -353,6 +354,29 @@ registry also applies to the repositories below it, so an image has to
 satisfy the policies of every manifest whose source registry contains it,
 whichever manifest promotes it. A policy without a `mode` is off, which is
 logged as a warning when it declares anything else.
+
+### Carrying staging attestations
+
+When an image is promoted, the staging attestations its provenance policies
+accepted are copied to the canonical registry: attestations whose signature
+verified, that are about the image digest, that one of the policy signers
+signed and, for build provenance, that passed the policy. Every enabled
+policy that applies to the image has to be satisfied and accept an
+attestation. The attestations are OCI referrers of the image digest, which
+promotion keeps, so they are copied digest-identical and stay verifiable as
+they are, next to the promotion record, and are served through
+registry.k8s.io like the signatures.
+
+Only referrers that hold exactly the accepted sigstore bundle, with the
+bundle artifact type, the empty config, the image digest as subject and the
+predicate type of the accepted attestation, are copied, so that no
+unverified content reaches production. Carrying is idempotent and, like the
+promotion records, needs signing. Images without an enabled policy carry
+nothing, attestations in legacy `.att` tags are not carried, and neither are
+promotion records or verification summaries, which the promoter writes
+itself. A failure to carry is reported without stopping the others, but
+promoted images are not promotion candidates in later runs, so it is not
+retried automatically.
 
 ### Attestation discovery
 

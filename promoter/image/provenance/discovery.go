@@ -96,6 +96,10 @@ type Attestation struct {
 	// Location is the digest of the referrer manifest, or the `.att` tag.
 	Location string
 
+	// Layer is the digest of the referrer layer that holds the envelope.
+	// It is empty for `.att` tags.
+	Layer string
+
 	// PredicateType is the predicate type of the statement.
 	PredicateType string
 

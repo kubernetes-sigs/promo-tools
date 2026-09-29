@@ -276,9 +276,9 @@ func (d *OCIDiscoverer) discoverReferrer(
 		}
 
 		for _, env := range envs {
-			discovery.Attestations = append(discovery.Attestations, d.newAttestation(
-				digest.DigestStr(), SourceReferrer, desc.Digest.String(), env,
-			))
+			att := d.newAttestation(digest.DigestStr(), SourceReferrer, desc.Digest.String(), env)
+			att.Layer = layer.String()
+			discovery.Attestations = append(discovery.Attestations, att)
 		}
 	}
 

@@ -17,6 +17,7 @@ limitations under the License.
 package provenance
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -290,8 +291,11 @@ func TestDiscoverNoAttestations(t *testing.T) {
 
 func TestDiscoverBundleReferrer(t *testing.T) {
 	ref := pushImage(t, newReferrersRepo(t))
-	loc := pushReferrer(t, ref, BundleArtifactType, BundleArtifactType,
-		sigstoreBundle(t, statement(t, ref, testPredicateType)))
+	bundle := sigstoreBundle(t, statement(t, ref, testPredicateType))
+	loc := pushReferrer(t, ref, BundleArtifactType, BundleArtifactType, bundle)
+
+	layer, _, err := v1.SHA256(bytes.NewReader(bundle))
+	require.NoError(t, err)
 
 	d := &OCIDiscoverer{
 		verifyFn: verifiedAs("builder@example.iam.gserviceaccount.com"),
@@ -305,6 +309,7 @@ func TestDiscoverBundleReferrer(t *testing.T) {
 	require.Equal(t, ref.DigestStr(), att.Digest)
 	require.Equal(t, SourceReferrer, att.Source)
 	require.Equal(t, loc.String(), att.Location)
+	require.Equal(t, layer.String(), att.Layer)
 	require.Equal(t, testPredicateType, att.PredicateType)
 	require.Equal(t, SignatureVerified, att.Status)
 	require.Equal(t, []string{testBundleSigner}, att.Signers)

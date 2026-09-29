@@ -140,6 +140,11 @@ func (o *Options) Validate() error {
 		}
 	}
 
+	// Signing, attesting and carrying run this many operations at once.
+	if o.SignImages && o.MaxSignatureOps < 1 {
+		return fmt.Errorf("--max-signature-ops must be at least 1 when signing, got %d", o.MaxSignatureOps)
+	}
+
 	return nil
 }
 
