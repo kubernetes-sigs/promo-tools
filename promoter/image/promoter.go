@@ -55,6 +55,10 @@ type Promoter struct {
 	// discoveries are the attestations discovered in the last promotion
 	// run, by source reference.
 	discoveries map[string]*provenance.Discovery
+
+	// stagingSignatures are the staging signature results of the last
+	// promotion run.
+	stagingSignatures promotion.StagingSignatures
 }
 
 func New(opts *options.Options) *Promoter {
@@ -126,7 +130,9 @@ type promoterImplementation interface {
 
 	// Methods for image signing
 	PrewarmTUFCache(context.Context) error
-	ValidateStagingSignatures(map[promotion.Edge]any) (map[promotion.Edge]any, error)
+	ValidateStagingSignatures(
+		context.Context, *options.Options, map[promotion.Edge]any, map[string]*provenance.Discovery,
+	) (promotion.StagingSignatures, error)
 	SignImages(*options.Options, map[promotion.Edge]any) error
 	WriteProvenanceAttestations(context.Context, *options.Options, []schema.Manifest, map[promotion.Edge]any, provenance.Generator) error
 
@@ -152,6 +158,7 @@ func (p *Promoter) PromoteImages(ctx context.Context, opts *options.Options) err
 
 	// Results of a previous run don't describe this one.
 	p.discoveries = nil
+	p.stagingSignatures = nil
 
 	pipe := pipeline.New()
 
@@ -207,8 +214,14 @@ func (p *Promoter) PromoteImages(ctx context.Context, opts *options.Options) err
 	}))
 
 	// Validate phase: check staging signatures.
-	pipe.AddPhase(pipeline.NewPhase("validate", func(_ context.Context) error {
-		if _, err := p.impl.ValidateStagingSignatures(promotionEdges); err != nil {
+	pipe.AddPhase(pipeline.NewPhase("validate", func(ctx context.Context) error {
+		// The results are kept when a signature is invalid, too.
+		signatures, err := p.impl.ValidateStagingSignatures(
+			ctx, opts, promotionEdges, p.discoveries,
+		)
+		p.stagingSignatures = signatures
+
+		if err != nil {
 			return fmt.Errorf("checking signatures in staging images: %w", err)
 		}
 

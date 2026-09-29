@@ -78,54 +78,6 @@ const (
 	withTagless = true
 )
 
-// ValidateStagingSignatures checks if edges (images) have a signature
-// applied during its staging run. If they do it verifies them and
-// returns an error if they are not valid.
-func (di *DefaultPromoterImplementation) ValidateStagingSignatures(
-	edges map[promotion.Edge]any,
-) (map[promotion.Edge]any, error) {
-	refsToEdges := map[string]promotion.Edge{}
-
-	for edge := range edges {
-		ref := edge.SrcReference()
-		refsToEdges[ref] = edge
-	}
-
-	refs := make([]string, 0, len(refsToEdges))
-	for ref := range refsToEdges {
-		refs = append(refs, ref)
-	}
-
-	res, err := di.signer.VerifyImages(refs...)
-	if err != nil {
-		return nil, fmt.Errorf("verify images: %w", err)
-	}
-
-	signedEdges := map[promotion.Edge]any{}
-
-	res.Range(func(key, _ any) bool {
-		ref, ok := key.(string)
-		if !ok {
-			logrus.Errorf("Interface conversion failed: key is not a string: %v", key)
-
-			return false
-		}
-
-		edge, ok := refsToEdges[ref]
-		if !ok {
-			logrus.Errorf("Reference %s is not in edge map", ref)
-
-			return true
-		}
-
-		signedEdges[edge] = nil
-
-		return true
-	})
-
-	return signedEdges, nil
-}
-
 // SignImages signs the promoted images and stores their signatures in
 // the registry.
 func (di *DefaultPromoterImplementation) SignImages(

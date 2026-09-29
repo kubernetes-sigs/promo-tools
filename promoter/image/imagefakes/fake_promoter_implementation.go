@@ -249,17 +249,20 @@ type FakePromoterImplementation struct {
 	validateOptionsReturnsOnCall map[int]struct {
 		result1 error
 	}
-	ValidateStagingSignaturesStub        func(map[promotion.Edge]any) (map[promotion.Edge]any, error)
+	ValidateStagingSignaturesStub        func(context.Context, *imagepromotera.Options, map[promotion.Edge]any, map[string]*provenance.Discovery) (promotion.StagingSignatures, error)
 	validateStagingSignaturesMutex       sync.RWMutex
 	validateStagingSignaturesArgsForCall []struct {
-		arg1 map[promotion.Edge]any
+		arg1 context.Context
+		arg2 *imagepromotera.Options
+		arg3 map[promotion.Edge]any
+		arg4 map[string]*provenance.Discovery
 	}
 	validateStagingSignaturesReturns struct {
-		result1 map[promotion.Edge]any
+		result1 promotion.StagingSignatures
 		result2 error
 	}
 	validateStagingSignaturesReturnsOnCall map[int]struct {
-		result1 map[promotion.Edge]any
+		result1 promotion.StagingSignatures
 		result2 error
 	}
 	WriteProvenanceAttestationsStub        func(context.Context, *imagepromotera.Options, []schema.Manifest, map[promotion.Edge]any, provenance.Generator) error
@@ -1378,18 +1381,21 @@ func (fake *FakePromoterImplementation) ValidateOptionsReturnsOnCall(i int, resu
 	}{result1}
 }
 
-func (fake *FakePromoterImplementation) ValidateStagingSignatures(arg1 map[promotion.Edge]any) (map[promotion.Edge]any, error) {
+func (fake *FakePromoterImplementation) ValidateStagingSignatures(arg1 context.Context, arg2 *imagepromotera.Options, arg3 map[promotion.Edge]any, arg4 map[string]*provenance.Discovery) (promotion.StagingSignatures, error) {
 	fake.validateStagingSignaturesMutex.Lock()
 	ret, specificReturn := fake.validateStagingSignaturesReturnsOnCall[len(fake.validateStagingSignaturesArgsForCall)]
 	fake.validateStagingSignaturesArgsForCall = append(fake.validateStagingSignaturesArgsForCall, struct {
-		arg1 map[promotion.Edge]any
-	}{arg1})
+		arg1 context.Context
+		arg2 *imagepromotera.Options
+		arg3 map[promotion.Edge]any
+		arg4 map[string]*provenance.Discovery
+	}{arg1, arg2, arg3, arg4})
 	stub := fake.ValidateStagingSignaturesStub
 	fakeReturns := fake.validateStagingSignaturesReturns
-	fake.recordInvocation("ValidateStagingSignatures", []interface{}{arg1})
+	fake.recordInvocation("ValidateStagingSignatures", []interface{}{arg1, arg2, arg3, arg4})
 	fake.validateStagingSignaturesMutex.Unlock()
 	if stub != nil {
-		return stub(arg1)
+		return stub(arg1, arg2, arg3, arg4)
 	}
 	if specificReturn {
 		return ret.result1, ret.result2
@@ -1403,41 +1409,41 @@ func (fake *FakePromoterImplementation) ValidateStagingSignaturesCallCount() int
 	return len(fake.validateStagingSignaturesArgsForCall)
 }
 
-func (fake *FakePromoterImplementation) ValidateStagingSignaturesCalls(stub func(map[promotion.Edge]any) (map[promotion.Edge]any, error)) {
+func (fake *FakePromoterImplementation) ValidateStagingSignaturesCalls(stub func(context.Context, *imagepromotera.Options, map[promotion.Edge]any, map[string]*provenance.Discovery) (promotion.StagingSignatures, error)) {
 	fake.validateStagingSignaturesMutex.Lock()
 	defer fake.validateStagingSignaturesMutex.Unlock()
 	fake.ValidateStagingSignaturesStub = stub
 }
 
-func (fake *FakePromoterImplementation) ValidateStagingSignaturesArgsForCall(i int) map[promotion.Edge]any {
+func (fake *FakePromoterImplementation) ValidateStagingSignaturesArgsForCall(i int) (context.Context, *imagepromotera.Options, map[promotion.Edge]any, map[string]*provenance.Discovery) {
 	fake.validateStagingSignaturesMutex.RLock()
 	defer fake.validateStagingSignaturesMutex.RUnlock()
 	argsForCall := fake.validateStagingSignaturesArgsForCall[i]
-	return argsForCall.arg1
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4
 }
 
-func (fake *FakePromoterImplementation) ValidateStagingSignaturesReturns(result1 map[promotion.Edge]any, result2 error) {
+func (fake *FakePromoterImplementation) ValidateStagingSignaturesReturns(result1 promotion.StagingSignatures, result2 error) {
 	fake.validateStagingSignaturesMutex.Lock()
 	defer fake.validateStagingSignaturesMutex.Unlock()
 	fake.ValidateStagingSignaturesStub = nil
 	fake.validateStagingSignaturesReturns = struct {
-		result1 map[promotion.Edge]any
+		result1 promotion.StagingSignatures
 		result2 error
 	}{result1, result2}
 }
 
-func (fake *FakePromoterImplementation) ValidateStagingSignaturesReturnsOnCall(i int, result1 map[promotion.Edge]any, result2 error) {
+func (fake *FakePromoterImplementation) ValidateStagingSignaturesReturnsOnCall(i int, result1 promotion.StagingSignatures, result2 error) {
 	fake.validateStagingSignaturesMutex.Lock()
 	defer fake.validateStagingSignaturesMutex.Unlock()
 	fake.ValidateStagingSignaturesStub = nil
 	if fake.validateStagingSignaturesReturnsOnCall == nil {
 		fake.validateStagingSignaturesReturnsOnCall = make(map[int]struct {
-			result1 map[promotion.Edge]any
+			result1 promotion.StagingSignatures
 			result2 error
 		})
 	}
 	fake.validateStagingSignaturesReturnsOnCall[i] = struct {
-		result1 map[promotion.Edge]any
+		result1 promotion.StagingSignatures
 		result2 error
 	}{result1, result2}
 }

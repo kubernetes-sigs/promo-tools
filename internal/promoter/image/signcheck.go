@@ -758,33 +758,53 @@ func (di *DefaultPromoterImplementation) hasSignature(
 // signedPayloadMatches reports whether a signature layer signs the given
 // production reference and digest.
 func signedPayloadMatches(sigImage v1.Image, layerDigest v1.Hash, identity, digest string) (bool, error) {
+	signed, ok, err := signaturePayload(sigImage, layerDigest)
+	if err != nil || !ok {
+		return false, err
+	}
+
+	return signed.Critical.Identity.DockerReference == identity &&
+		signed.Critical.Image.DockerManifestDigest == digest, nil
+}
+
+// maxSignaturePayloadSize limits how much of a signature payload is read.
+const maxSignaturePayloadSize = 1 << 20
+
+// signaturePayload reads the signed payload of a signature layer. It
+// reports false if the payload is not a cosign signature payload.
+func signaturePayload(sigImage v1.Image, layerDigest v1.Hash) (payload.SimpleContainerImage, bool, error) {
+	var signed payload.SimpleContainerImage
+
 	layer, err := sigImage.LayerByDigest(layerDigest)
 	if err != nil {
-		return false, fmt.Errorf("getting layer %s: %w", layerDigest, err)
+		return signed, false, fmt.Errorf("getting layer %s: %w", layerDigest, err)
 	}
 
 	// Uncompressed passes the plain payloads cosign writes through as they
 	// are and also handles compressed ones.
 	rc, err := layer.Uncompressed()
 	if err != nil {
-		return false, fmt.Errorf("reading layer %s: %w", layerDigest, err)
+		return signed, false, fmt.Errorf("reading layer %s: %w", layerDigest, err)
 	}
 	defer rc.Close()
 
-	data, err := io.ReadAll(rc)
+	// Staging layers are not trusted, and payloads are tiny.
+	data, err := io.ReadAll(io.LimitReader(rc, maxSignaturePayloadSize+1))
 	if err != nil {
-		return false, fmt.Errorf("reading layer %s: %w", layerDigest, err)
+		return signed, false, fmt.Errorf("reading layer %s: %w", layerDigest, err)
 	}
 
-	var signed payload.SimpleContainerImage
+	if len(data) > maxSignaturePayloadSize {
+		return signed, false, fmt.Errorf("layer %s is larger than %d bytes", layerDigest, maxSignaturePayloadSize)
+	}
+
 	if err := json.Unmarshal(data, &signed); err != nil {
 		logrus.Debugf("Unable to parse signature payload %s: %v", layerDigest, err)
 
-		return false, nil
+		return signed, false, nil
 	}
 
-	return signed.Critical.Identity.DockerReference == identity &&
-		signed.Critical.Image.DockerManifestDigest == digest, nil
+	return signed, true, nil
 }
 
 // hasAttestation reports whether the digest of an edge on the canonical
