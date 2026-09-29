@@ -25,6 +25,7 @@ registries.
   - [Carrying staging attestations](#carrying-staging-attestations)
   - [Attestation discovery](#attestation-discovery)
 - [Provenance generation](#provenance-generation)
+  - [Verification summaries](#verification-summaries)
 - [Checking signatures and attestations](#checking-signatures-and-attestations)
 - [Vulnerability scanning](#vulnerability-scanning)
 - [Grabbing snapshots](#grabbing-snapshots)
@@ -181,7 +182,7 @@ The promotion flow is organized into sequential pipeline phases:
 | 4 | **validate** | Validate staging image signatures |
 | 5 | **promote** | Copy images from staging to production |
 | 6 | **sign** | Sign promoted images with cosign (primary registry only) |
-| 7 | **attest** | Generate promotion provenance attestations |
+| 7 | **attest** | Generate promotion provenance attestations and, with `--verification-summaries`, [verification summaries](#verification-summaries) |
 
 Without `--confirm`, the pipeline stops after the validate phase (dry-run
 precheck). With `--parse-only`, it stops after parsing manifests.
@@ -431,6 +432,71 @@ described in [Signing and attestation](#signing-and-attestation).
 Attestations can be verified with
 `cosign verify-attestation --new-bundle-format`.
 
+### Verification summaries
+
+With `--verification-summaries` (off by default), the promoter also writes a
+signed [SLSA verification summary][slsa-vsa] (VSA) for each promoted digest,
+index and platform manifests alike, next to the promotion record: an in-toto
+statement with the `https://slsa.dev/verification_summary/v1` predicate
+type, signed into a sigstore bundle and attached to the digest on the
+canonical registry through the OCI referrers API. A digest keeps the summary
+of its first promotion; summaries of other verifiers, for example one a
+build attached in staging, don't count. The summary is made of what the
+[provenance verification](#provenance-verification) found for the staging
+images the digest was promoted from, usually one:
+
+- `verifier.id` is `https://k8s.io/promo-tools/verifier/v1`, and
+  `verifier.version.kpromo` the promoter version.
+- `resourceUri` is the `registry.k8s.io` reference of the digest, which is
+  also the subject.
+- `policy` is the promoter manifest the image was promoted from: its
+  repository and path as `uri` (for example
+  `git+https://github.com/kubernetes/k8s.io#registry.k8s.io/manifests/<project>/promoter-manifest.yaml`),
+  and the commit it was read from as `digest.gitCommit`. When the policies
+  that applied come from other manifests too, for example of a parent source
+  registry, the `uri` is the repository only. No summary is written for a
+  manifest that is not at a commit of a repository.
+- `verificationResult` is `PASSED` when every
+  [provenance policy](#provenance-policies) that applies to the staging
+  images is satisfied, and `FAILED` otherwise, which only happens in `warn`
+  mode, because `require` blocks the promotion. A failed summary has the
+  verified level `FAILED`.
+- `verifiedLevels` of a passed summary are the lowest SLSA build level the
+  policies verified (`SLSA_BUILD_LEVEL_<n>`), or
+  `SLSA_BUILD_LEVEL_UNEVALUATED` when a staging image had no policy or a
+  policy verified no level, plus `K8S_PROMOTION_MANIFEST_REVIEWED`.
+- `inputAttestations` are the attestations the policies accepted: their
+  location in the staging repository and the digest of their sigstore
+  bundle, or, for legacy `.att` tags, of their payload. Carried attestations
+  keep these digests in the production registry.
+- `slsaVersion` is `1.0`, the SLSA version whose build track the policies
+  are evaluated against.
+
+The summary of an index covers the index itself. Its platform manifests get
+summaries of their own: from their own provenance results when the promoter
+manifest lists them, and otherwise one that claims no build level
+(`SLSA_BUILD_LEVEL_UNEVALUATED`) and no input attestations, because the
+provenance of the index is not about them, and that fails when the summary
+of one of the indexes holding them fails. Attestation manifests BuildKit
+adds to an index get none. Evaluating the provenance of the platform
+manifests in that case is tracked in [#1998][issue-1998].
+
+The summaries are signed by the same identity as the promotion records,
+`--signer-account`. Which identity should sign them for consumers is not
+decided yet ([#1955][issue-1955]), which is why they are off by default.
+Consumers pin both the verifier and its signer, for example with the
+[SLSA verifier][slsa-verifier]:
+
+```console
+slsa-verifier vsa \
+  --verifier 'https://k8s.io/promo-tools/verifier/v1=sigstore::https://accounts.google.com::krel-trust@k8s-releng-prod.iam.gserviceaccount.com' \
+  --level SLSA_BUILD_LEVEL_3 vsa.sigstore.json
+```
+
+or with `cosign verify-attestation --new-bundle-format --type
+https://slsa.dev/verification_summary/v1` and the signer's identity and
+issuer.
+
 ## Checking signatures and attestations
 
 Signing and attesting happen after the images are copied. If they fail, a
@@ -541,3 +607,6 @@ kpromo cip \
 [k8sio-manifests-dir]: https://git.k8s.io/k8s.io/registry.k8s.io
 [signer-principals]: https://github.com/carabiner-dev/signer/blob/main/docs/principals.md
 [slsa-verifier]: https://github.com/slsa-framework/verifier
+[issue-1955]: https://github.com/kubernetes-sigs/promo-tools/issues/1955
+[issue-1998]: https://github.com/kubernetes-sigs/promo-tools/issues/1998
+[slsa-vsa]: https://slsa.dev/spec/v1.0/verification_summary

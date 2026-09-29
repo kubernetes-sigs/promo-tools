@@ -294,6 +294,22 @@ type FakePromoterImplementation struct {
 	writeProvenanceAttestationsReturnsOnCall map[int]struct {
 		result1 error
 	}
+	WriteVerificationSummariesStub        func(context.Context, *imagepromotera.Options, []schema.Manifest, map[promotion.Edge]any, map[string]*provenance.Discovery, map[string]*provenance.ImageProvenance) error
+	writeVerificationSummariesMutex       sync.RWMutex
+	writeVerificationSummariesArgsForCall []struct {
+		arg1 context.Context
+		arg2 *imagepromotera.Options
+		arg3 []schema.Manifest
+		arg4 map[promotion.Edge]any
+		arg5 map[string]*provenance.Discovery
+		arg6 map[string]*provenance.ImageProvenance
+	}
+	writeVerificationSummariesReturns struct {
+		result1 error
+	}
+	writeVerificationSummariesReturnsOnCall map[int]struct {
+		result1 error
+	}
 	invocations      map[string][][]interface{}
 	invocationsMutex sync.RWMutex
 }
@@ -1592,6 +1608,77 @@ func (fake *FakePromoterImplementation) WriteProvenanceAttestationsReturnsOnCall
 		})
 	}
 	fake.writeProvenanceAttestationsReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakePromoterImplementation) WriteVerificationSummaries(arg1 context.Context, arg2 *imagepromotera.Options, arg3 []schema.Manifest, arg4 map[promotion.Edge]any, arg5 map[string]*provenance.Discovery, arg6 map[string]*provenance.ImageProvenance) error {
+	var arg3Copy []schema.Manifest
+	if arg3 != nil {
+		arg3Copy = make([]schema.Manifest, len(arg3))
+		copy(arg3Copy, arg3)
+	}
+	fake.writeVerificationSummariesMutex.Lock()
+	ret, specificReturn := fake.writeVerificationSummariesReturnsOnCall[len(fake.writeVerificationSummariesArgsForCall)]
+	fake.writeVerificationSummariesArgsForCall = append(fake.writeVerificationSummariesArgsForCall, struct {
+		arg1 context.Context
+		arg2 *imagepromotera.Options
+		arg3 []schema.Manifest
+		arg4 map[promotion.Edge]any
+		arg5 map[string]*provenance.Discovery
+		arg6 map[string]*provenance.ImageProvenance
+	}{arg1, arg2, arg3Copy, arg4, arg5, arg6})
+	stub := fake.WriteVerificationSummariesStub
+	fakeReturns := fake.writeVerificationSummariesReturns
+	fake.recordInvocation("WriteVerificationSummaries", []interface{}{arg1, arg2, arg3Copy, arg4, arg5, arg6})
+	fake.writeVerificationSummariesMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2, arg3, arg4, arg5, arg6)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakePromoterImplementation) WriteVerificationSummariesCallCount() int {
+	fake.writeVerificationSummariesMutex.RLock()
+	defer fake.writeVerificationSummariesMutex.RUnlock()
+	return len(fake.writeVerificationSummariesArgsForCall)
+}
+
+func (fake *FakePromoterImplementation) WriteVerificationSummariesCalls(stub func(context.Context, *imagepromotera.Options, []schema.Manifest, map[promotion.Edge]any, map[string]*provenance.Discovery, map[string]*provenance.ImageProvenance) error) {
+	fake.writeVerificationSummariesMutex.Lock()
+	defer fake.writeVerificationSummariesMutex.Unlock()
+	fake.WriteVerificationSummariesStub = stub
+}
+
+func (fake *FakePromoterImplementation) WriteVerificationSummariesArgsForCall(i int) (context.Context, *imagepromotera.Options, []schema.Manifest, map[promotion.Edge]any, map[string]*provenance.Discovery, map[string]*provenance.ImageProvenance) {
+	fake.writeVerificationSummariesMutex.RLock()
+	defer fake.writeVerificationSummariesMutex.RUnlock()
+	argsForCall := fake.writeVerificationSummariesArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4, argsForCall.arg5, argsForCall.arg6
+}
+
+func (fake *FakePromoterImplementation) WriteVerificationSummariesReturns(result1 error) {
+	fake.writeVerificationSummariesMutex.Lock()
+	defer fake.writeVerificationSummariesMutex.Unlock()
+	fake.WriteVerificationSummariesStub = nil
+	fake.writeVerificationSummariesReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakePromoterImplementation) WriteVerificationSummariesReturnsOnCall(i int, result1 error) {
+	fake.writeVerificationSummariesMutex.Lock()
+	defer fake.writeVerificationSummariesMutex.Unlock()
+	fake.WriteVerificationSummariesStub = nil
+	if fake.writeVerificationSummariesReturnsOnCall == nil {
+		fake.writeVerificationSummariesReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.writeVerificationSummariesReturnsOnCall[i] = struct {
 		result1 error
 	}{result1}
 }
