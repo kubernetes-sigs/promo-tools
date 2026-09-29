@@ -502,6 +502,36 @@ func TestPolicyEvaluatorRealProvenance(t *testing.T) {
 	require.False(t, result.Satisfied)
 }
 
+func TestPolicyEvaluatorAccepted(t *testing.T) {
+	t.Parallel()
+
+	provenance := newAttestation(t, provenanceStatement(t, provenanceOptions{}), signed(t, testSigner))
+	sbom := newAttestation(t, sbomStatement(t, testDigest), signed(t, testSigner))
+
+	discovery := newDiscovery(
+		provenance,
+		sbom,
+		// Not accepted: another signer, unsigned, about another digest.
+		newAttestation(t, sbomStatement(t, testDigest), signed(t, foreignSigner)),
+		newAttestation(t, sbomStatement(t, testDigest), nil),
+		newAttestation(t, sbomStatement(t, otherDigest), signed(t, testSigner)),
+		// Not accepted: provenance by a policy signer that fails the
+		// policy, from another source or an untrusted builder.
+		newAttestation(t, provenanceStatement(t, provenanceOptions{source: "git+https://" + otherSourceRepo + "@refs/heads/main"}),
+			signed(t, testSigner)),
+		newAttestation(t, provenanceStatement(t, provenanceOptions{builder: "https://prow.k8s.io/untrusted"}),
+			signed(t, testSigner)),
+	)
+
+	evaluator, err := NewPolicyEvaluator()
+	require.NoError(t, err)
+
+	result, err := evaluator.Evaluate(context.Background(), discovery, testPolicy(PolicyModeRequire))
+	require.NoError(t, err)
+	require.True(t, result.Satisfied, result.Violations)
+	require.Equal(t, []*Attestation{&discovery.Attestations[0], &discovery.Attestations[1]}, result.Accepted)
+}
+
 func TestPolicyEvaluatorEvaluateErrors(t *testing.T) {
 	t.Parallel()
 
@@ -545,14 +575,20 @@ func TestPolicyCheckerCheck(t *testing.T) {
 	failed := func(*testing.T) *Discovery { return nil }
 
 	for _, tc := range []struct {
-		name      string
-		mode      PolicyMode
-		discovery func(t *testing.T) *Discovery
-		wantErr   string
+		name          string
+		mode          PolicyMode
+		discovery     func(t *testing.T) *Discovery
+		wantErr       string
+		wantSatisfied bool
+		wantAccepted  int
+		wantNoResult  bool
 	}{
-		{name: "off ignores the discovery", mode: PolicyModeOff, discovery: failed},
-		{name: "require satisfied", mode: PolicyModeRequire, discovery: good},
-		{name: "warn satisfied", mode: PolicyModeWarn, discovery: good},
+		{name: "off ignores the discovery", mode: PolicyModeOff, discovery: failed, wantNoResult: true},
+		{
+			name: "require satisfied", mode: PolicyModeRequire, discovery: good,
+			wantSatisfied: true, wantAccepted: 1,
+		},
+		{name: "warn satisfied", mode: PolicyModeWarn, discovery: good, wantSatisfied: true, wantAccepted: 1},
 		{
 			name: "require violated", mode: PolicyModeRequire, discovery: unsigned,
 			wantErr: "provenance policy not satisfied for " + testRef,
@@ -569,12 +605,23 @@ func TestPolicyCheckerCheck(t *testing.T) {
 
 			checker := &PolicyChecker{}
 
-			err := checker.Check(context.Background(), testRef, testPolicy(tc.mode), tc.discovery(t))
+			result, err := checker.Check(context.Background(), testRef, testPolicy(tc.mode), tc.discovery(t))
 			if tc.wantErr == "" {
 				require.NoError(t, err)
 			} else {
 				require.ErrorContains(t, err, tc.wantErr)
 			}
+
+			if tc.wantNoResult {
+				require.Nil(t, result)
+
+				return
+			}
+
+			// The result is returned in require mode as well.
+			require.NotNil(t, result)
+			require.Equal(t, tc.wantSatisfied, result.Satisfied)
+			require.Len(t, result.Accepted, tc.wantAccepted)
 		})
 	}
 }
@@ -589,10 +636,8 @@ func TestPolicyCheckerOtherImage(t *testing.T) {
 		checker := &PolicyChecker{}
 
 		for _, mode := range []PolicyMode{PolicyModeWarn, PolicyModeRequire} {
-			require.ErrorContains(t,
-				checker.Check(context.Background(), testRef, testPolicy(mode), discovery),
-				"returned another image",
-			)
+			_, err := checker.Check(context.Background(), testRef, testPolicy(mode), discovery)
+			require.ErrorContains(t, err, "returned another image")
 		}
 	}
 }
@@ -602,5 +647,7 @@ func TestPolicyCheckerWithoutPolicy(t *testing.T) {
 
 	checker := &PolicyChecker{}
 
-	require.NoError(t, checker.Check(context.Background(), testRef, nil, nil))
+	result, err := checker.Check(context.Background(), testRef, nil, nil)
+	require.NoError(t, err)
+	require.Nil(t, result)
 }

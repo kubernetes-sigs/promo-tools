@@ -62,6 +62,21 @@ type PolicyResult struct {
 	// Violations explain why the policy is not satisfied. It is empty
 	// when Satisfied is true.
 	Violations []string
+
+	// Accepted are the attestations of the image the policy trusts:
+	// their signature verified, they are about the image digest, one of
+	// the policy signers signed them and, for build provenance, they
+	// passed the policy. They point into the discovery.
+	Accepted []*Attestation
+}
+
+// ImageProvenance is what the provenance phase concluded for one staging
+// image.
+type ImageProvenance struct {
+	// Policies are the enabled provenance policies that apply to the
+	// image, and Results their outcome, in the same order.
+	Policies []*Policy
+	Results  []*PolicyResult
 }
 
 // PolicyEvaluator evaluates provenance policies against the attestations
@@ -119,8 +134,11 @@ func (e *PolicyEvaluator) Evaluate(
 	var (
 		rejected  []string
 		satisfied bool
+		passed    = map[*Attestation]bool{}
 	)
 
+	// Every build provenance is verified, so that only those that pass
+	// count as accepted.
 	for i := range discovery.Attestations {
 		att := &discovery.Attestations[i]
 		if !slices.Contains(buildProvenanceTypes, att.PredicateType) {
@@ -134,12 +152,14 @@ func (e *PolicyEvaluator) Evaluate(
 			continue
 		}
 
-		result.Provenance = att.Location
-		result.SLSALevel = level
-		result.Notice = notice
-		satisfied = true
+		passed[att] = true
 
-		break
+		if !satisfied {
+			result.Provenance = att.Location
+			result.SLSALevel = level
+			result.Notice = notice
+			satisfied = true
+		}
 	}
 
 	if !satisfied {
@@ -150,8 +170,17 @@ func (e *PolicyEvaluator) Evaluate(
 		result.Violations = append(result.Violations, rejected...)
 	}
 
+	// Build provenance counts only when it passed the policy.
+	for _, att := range trustedAttestations(discovery, signers, expected) {
+		if !slices.Contains(buildProvenanceTypes, att.PredicateType) || passed[att] {
+			result.Accepted = append(result.Accepted, att)
+		}
+	}
+
 	for _, predicateType := range policy.PredicateTypes {
-		if !hasTrustedAttestation(discovery, predicateType, signers, expected) {
+		if !slices.ContainsFunc(result.Accepted, func(att *Attestation) bool {
+			return att.PredicateType == predicateType
+		}) {
 			result.Violations = append(result.Violations, fmt.Sprintf(
 				"no attestation of type %s about %s signed by a trusted signer",
 				predicateType, expected.Name,
@@ -165,8 +194,8 @@ func (e *PolicyEvaluator) Evaluate(
 }
 
 // verifyProvenance verifies one build provenance against the policy and
-// returns the SLSA build level it reached and the verifier's notice. It passes when it verifies for
-// any of the policy sources.
+// returns the SLSA build level it reached and the verifier's notice. It
+// passes when it verifies for any of the policy sources.
 func (e *PolicyEvaluator) verifyProvenance(
 	ctx context.Context,
 	att *Attestation,
@@ -246,18 +275,16 @@ func failureReason(res *slsa.Result) string {
 	return strings.Join(reasons, ", ")
 }
 
-// hasTrustedAttestation reports whether the discovery holds an
-// attestation of the predicate type about the expected subject whose
-// signature verified and was made by one of the signers.
-func hasTrustedAttestation(
-	discovery *Discovery, predicateType string, signers []*sapi.Identity, expected *subject.Expected,
-) bool {
+// trustedAttestations returns the attestations of the discovery whose
+// signature verified, that one of the signers signed and that are about
+// the expected subject.
+func trustedAttestations(
+	discovery *Discovery, signers []*sapi.Identity, expected *subject.Expected,
+) []*Attestation {
+	var trusted []*Attestation
+
 	for i := range discovery.Attestations {
 		att := &discovery.Attestations[i]
-		if att.PredicateType != predicateType {
-			continue
-		}
-
 		if att.Envelope == nil || att.Envelope.GetStatement() == nil {
 			continue
 		}
@@ -277,11 +304,11 @@ func hasTrustedAttestation(
 
 		matches := subject.MatchAll([]*subject.Expected{expected}, statement.GetSubjects())
 		if len(matches) == 1 && matches[0].Matched {
-			return true
+			trusted = append(trusted, att)
 		}
 	}
 
-	return false
+	return trusted
 }
 
 // sameImage reports whether the discovery is about the image at the
@@ -313,17 +340,18 @@ type PolicyChecker struct {
 }
 
 // Check evaluates the policy for the image at the digest reference against
-// the attestations discovered for it. A nil discovery means the discovery
-// failed. A violation fails the check in require mode and is logged in
-// warn mode. Errors that prevent the evaluation, like an invalid policy,
-// fail the check in both modes.
+// the attestations discovered for it and returns the result, which is nil
+// for a policy that is off. A nil discovery means the discovery failed. A
+// violation fails the check in require mode, along with the result, and is
+// logged in warn mode. Errors that prevent the evaluation, like an invalid
+// policy, fail the check in both modes.
 func (c *PolicyChecker) Check(
 	ctx context.Context, ref string, policy *Policy, discovery *Discovery,
-) error {
+) (*PolicyResult, error) {
 	logrus.Infof("Provenance policy for %s: %s", ref, policy)
 
 	if !policy.Enabled() {
-		return nil
+		return nil, nil //nolint:nilnil // a policy that is off has no result
 	}
 
 	c.once.Do(func() {
@@ -331,7 +359,7 @@ func (c *PolicyChecker) Check(
 	})
 
 	if c.err != nil {
-		return c.err
+		return nil, c.err
 	}
 
 	var (
@@ -343,11 +371,11 @@ func (c *PolicyChecker) Check(
 	case discovery == nil:
 		result = &PolicyResult{Violations: []string{"attestation discovery failed"}}
 	case !sameImage(discovery, ref):
-		return fmt.Errorf("discovering attestations of %s returned another image", ref)
+		return nil, fmt.Errorf("discovering attestations of %s returned another image", ref)
 	default:
 		result, err = c.evaluator.Evaluate(ctx, discovery, policy)
 		if err != nil {
-			return fmt.Errorf("evaluating provenance policy for %s: %w", ref, err)
+			return nil, fmt.Errorf("evaluating provenance policy for %s: %w", ref, err)
 		}
 	}
 
@@ -361,11 +389,11 @@ func (c *PolicyChecker) Check(
 			logrus.Infof("Provenance of %s: %s", ref, result.Notice)
 		}
 
-		return nil
+		return result, nil
 	}
 
 	if policy.Mode == PolicyModeRequire {
-		return fmt.Errorf(
+		return result, fmt.Errorf(
 			"provenance policy not satisfied for %s: %s",
 			ref, strings.Join(result.Violations, "; "),
 		)
@@ -375,5 +403,5 @@ func (c *PolicyChecker) Check(
 		logrus.Warnf("Provenance policy not satisfied for %s: %s", ref, violation)
 	}
 
-	return nil
+	return result, nil
 }

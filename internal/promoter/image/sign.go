@@ -316,7 +316,7 @@ func (di *DefaultPromoterImplementation) copyAttachedObjects(edge *promotion.Edg
 	logrus.Infof("Signature pre copy: %s to %s", srcRefString, dstRefString)
 
 	if err := ratelimit.WithRetry(func() error {
-		return craneCopyWithTimeout(context.TODO(), srcRef.String(), dstRef.String(), ratelimit.CopyTimeout, di.craneOptions())
+		return craneCopyWithTimeout(context.TODO(), srcRef.String(), dstRef.String(), di.craneOptions())
 	}); err != nil {
 		// If the signature layer does not exist it means that the src image
 		// is not signed, so we catch the error and return nil
@@ -585,10 +585,11 @@ func (di *DefaultPromoterImplementation) bundleReferrers(
 	return refs, nil
 }
 
-// craneCopyWithTimeout wraps crane.Copy with a per-request context timeout.
-// It copies the opts slice to avoid mutating the caller's backing array.
-func craneCopyWithTimeout(ctx context.Context, src, dst string, timeout time.Duration, opts []crane.Option) error {
-	ctx, cancel := context.WithTimeout(ctx, timeout)
+// craneCopyWithTimeout wraps crane.Copy with the per-request context
+// timeout ratelimit.CopyTimeout. It copies the opts slice to avoid mutating
+// the caller's backing array.
+func craneCopyWithTimeout(ctx context.Context, src, dst string, opts []crane.Option) error {
+	ctx, cancel := context.WithTimeout(ctx, ratelimit.CopyTimeout)
 	defer cancel()
 
 	withCtx := make([]crane.Option, len(opts), len(opts)+1)

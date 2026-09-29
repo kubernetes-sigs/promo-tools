@@ -56,6 +56,10 @@ type Promoter struct {
 	// run, by source reference.
 	discoveries map[string]*provenance.Discovery
 
+	// provenance is what the provenance phase of the last promotion run
+	// concluded, by source reference.
+	provenance map[string]*provenance.ImageProvenance
+
 	// stagingSignatures are the staging signature results of the last
 	// promotion run.
 	stagingSignatures promotion.StagingSignatures
@@ -135,6 +139,7 @@ type promoterImplementation interface {
 	) (promotion.StagingSignatures, error)
 	SignImages(*options.Options, map[promotion.Edge]any) error
 	WriteProvenanceAttestations(context.Context, *options.Options, []schema.Manifest, map[promotion.Edge]any, provenance.Generator) error
+	CarryAttestations(context.Context, *options.Options, map[promotion.Edge]any, map[string]*provenance.ImageProvenance) error
 
 	// Methods for checking signatures and attestations
 	GetLatestImages(context.Context, *options.Options) ([]checkresults.Image, error)
@@ -158,6 +163,7 @@ func (p *Promoter) PromoteImages(ctx context.Context, opts *options.Options) err
 
 	// Results of a previous run don't describe this one.
 	p.discoveries = nil
+	p.provenance = nil
 	p.stagingSignatures = nil
 
 	pipe := pipeline.New()
@@ -252,13 +258,22 @@ func (p *Promoter) PromoteImages(ctx context.Context, opts *options.Options) err
 		return nil
 	}))
 
-	// Attest phase: generate and push provenance attestations.
+	// Attest phase: generate and push provenance attestations, and carry
+	// the accepted staging attestations. The promoted images are not
+	// promotion candidates in later runs, so one failing does not skip the
+	// other.
 	pipe.AddPhase(pipeline.NewPhase("attest", func(ctx context.Context) error {
+		var errs []error
+
 		if err := p.impl.WriteProvenanceAttestations(ctx, opts, mfests, promotionEdges, p.provenanceGenerator); err != nil {
-			return fmt.Errorf("writing provenance attestations: %w", err)
+			errs = append(errs, fmt.Errorf("writing provenance attestations: %w", err))
 		}
 
-		return nil
+		if err := p.impl.CarryAttestations(ctx, opts, promotionEdges, p.provenance); err != nil {
+			errs = append(errs, fmt.Errorf("carrying staging attestations: %w", err))
+		}
+
+		return errors.Join(errs...)
 	}))
 
 	if err := pipe.Run(ctx); err != nil {
@@ -428,6 +443,7 @@ func (p *Promoter) checkProvenance(
 	// and tag, and manifests can share images, so collect the distinct
 	// policies of every source reference.
 	refPolicies := make(map[string][]*provenance.Policy, len(edges))
+	p.provenance = make(map[string]*provenance.ImageProvenance, len(edges))
 
 	for edge := range edges {
 		ref := edge.SrcReference()
@@ -470,15 +486,23 @@ func (p *Promoter) checkImageProvenance(
 ) error {
 	if len(policies) == 0 {
 		// Logs that no policy applies.
-		if err := checker.Check(ctx, ref, nil, p.discoveries[ref]); err != nil {
+		if _, err := checker.Check(ctx, ref, nil, p.discoveries[ref]); err != nil {
 			return fmt.Errorf("checking provenance policy: %w", err)
 		}
 	}
 
 	verify := len(policies) == 0
+	outcome := &provenance.ImageProvenance{}
+	p.provenance[ref] = outcome
 
 	for _, policy := range policies {
-		if err := checker.Check(ctx, ref, policy, p.discoveries[ref]); err != nil {
+		result, err := checker.Check(ctx, ref, policy, p.discoveries[ref])
+		if result != nil {
+			outcome.Policies = append(outcome.Policies, policy)
+			outcome.Results = append(outcome.Results, result)
+		}
+
+		if err != nil {
 			return fmt.Errorf("checking provenance policy: %w", err)
 		}
 

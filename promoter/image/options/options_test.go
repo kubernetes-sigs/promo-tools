@@ -22,7 +22,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const testRegistry = "gcr.io/test"
+const (
+	testRegistry = "gcr.io/test"
+	testDir      = "path/to/dir"
+)
 
 func TestOptionsValidate(t *testing.T) {
 	for _, tc := range []struct {
@@ -37,7 +40,7 @@ func TestOptionsValidate(t *testing.T) {
 		},
 		{
 			name:      "thin manifest dir set",
-			opts:      Options{ThinManifestDir: "path/to/dir"},
+			opts:      Options{ThinManifestDir: testDir},
 			shouldErr: false,
 		},
 		{
@@ -59,6 +62,16 @@ func TestOptionsValidate(t *testing.T) {
 			name:      "nothing set",
 			opts:      Options{},
 			shouldErr: true,
+		},
+		{
+			name:      "signing without concurrency",
+			opts:      Options{ThinManifestDir: testDir, SignImages: true},
+			shouldErr: true,
+		},
+		{
+			name:      "signing",
+			opts:      Options{ThinManifestDir: testDir, SignImages: true, MaxSignatureOps: 1},
+			shouldErr: false,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

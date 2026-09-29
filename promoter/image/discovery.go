@@ -46,6 +46,14 @@ func (p *Promoter) Discoveries() map[string]*provenance.Discovery {
 	return p.discoveries
 }
 
+// Provenance returns what the provenance phase of the last promotion run
+// concluded for each staging image, by source digest reference: the
+// provenance policies that apply and their results. It is nil if that run
+// stopped before the provenance phase.
+func (p *Promoter) Provenance() map[string]*provenance.ImageProvenance {
+	return p.provenance
+}
+
 // discoverStagingImages discovers and logs the attestations of the source
 // images of the edges, by source reference. It returns nil without a
 // discoverer. Discovery only reports: a failure is logged as a warning,

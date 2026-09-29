@@ -502,6 +502,59 @@ func TestPromoteImagesProvenancePolicyAllViolations(t *testing.T) {
 	require.ErrorContains(t, err, second.SrcReference())
 }
 
+func TestPromoteImagesAttestPhaseErrors(t *testing.T) {
+	// A failure to carry attestations does not skip the promotion records.
+	sut := imagepromoter.Promoter{}
+	mock := imagefakes.FakePromoterImplementation{}
+	mock.ParseManifestsReturns(nonEmptyManifests(), nil)
+	mock.GetPromotionEdgesReturns(map[promotion.Edge]any{testEdge(): nil}, nil)
+	mock.CarryAttestationsReturns(errors.New("registry unavailable"))
+	sut.SetImplementation(&mock)
+	sut.SetProvenanceVerifier(&fakeVerifier{result: &provenance.Result{Verified: true}})
+
+	err := sut.PromoteImages(context.Background(), &options.Options{Confirm: true})
+	require.ErrorContains(t, err, "carrying staging attestations")
+	require.Equal(t, 1, mock.WriteProvenanceAttestationsCallCount())
+	require.Equal(t, 1, mock.CarryAttestationsCallCount())
+}
+
+func TestPromoteImagesProvenanceResults(t *testing.T) {
+	sut := imagepromoter.Promoter{}
+	mock := imagefakes.FakePromoterImplementation{}
+	policy := testProvenancePolicy(provenance.PolicyModeWarn)
+	mock.ParseManifestsReturns(policyManifests(policy), nil)
+	mock.GetPromotionEdgesReturns(map[promotion.Edge]any{testEdge(): nil}, nil)
+	sut.SetImplementation(&mock)
+	sut.SetProvenanceVerifier(&fakeVerifier{result: &provenance.Result{Verified: true}})
+
+	edge := testEdge()
+	ref := edge.SrcReference()
+
+	discoverer := &provenancefakes.FakeDiscoverer{}
+	discoverer.DiscoverReturns(&provenance.Discovery{Reference: ref}, nil)
+	sut.SetDiscoverer(discoverer)
+
+	require.NoError(t, sut.PromoteImages(context.Background(), &options.Options{Confirm: true}))
+
+	// The warn policy is not satisfied, and its result is kept.
+	require.Contains(t, sut.Provenance(), ref)
+	outcome := sut.Provenance()[ref]
+	require.Equal(t, []*provenance.Policy{policy}, outcome.Policies)
+	require.Len(t, outcome.Results, 1)
+	require.False(t, outcome.Results[0].Satisfied)
+
+	// The attest phase carries what the policies accepted.
+	require.Equal(t, 1, mock.CarryAttestationsCallCount())
+	_, _, carriedEdges, carried := mock.CarryAttestationsArgsForCall(0)
+	require.Len(t, carriedEdges, 1)
+	require.Equal(t, sut.Provenance(), carried)
+
+	// A new run starts without them.
+	mock.ParseManifestsReturns(nil, nil)
+	require.NoError(t, sut.PromoteImages(context.Background(), &options.Options{Confirm: true}))
+	require.Nil(t, sut.Provenance())
+}
+
 func TestPromoteImagesProvenancePolicyOff(t *testing.T) {
 	sut := imagepromoter.Promoter{}
 	mock := imagefakes.FakePromoterImplementation{}
