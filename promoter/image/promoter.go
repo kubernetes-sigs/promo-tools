@@ -48,6 +48,11 @@ type Promoter struct {
 	impl                promoterImplementation
 	provenanceVerifier  provenance.Verifier
 	provenanceGenerator provenance.Generator
+	discoverer          provenance.Discoverer
+
+	// discoveries are the attestations discovered in the last promotion
+	// run, by source reference.
+	discoveries map[string]*provenance.Discovery
 }
 
 func New(opts *options.Options) *Promoter {
@@ -74,6 +79,7 @@ func New(opts *options.Options) *Promoter {
 			Transport:            rt,
 		},
 		provenanceGenerator: &provenance.PromotionGenerator{},
+		discoverer:          &provenance.OCIDiscoverer{Transport: rt},
 	}
 
 	return p
@@ -142,6 +148,9 @@ func (p *Promoter) PromoteImages(ctx context.Context, opts *options.Options) err
 		promotionEdges map[promotion.Edge]any
 	)
 
+	// Results of a previous run don't describe this one.
+	p.discoveries = nil
+
 	pipe := pipeline.New()
 
 	// Setup phase: validate and prewarm caches.
@@ -194,6 +203,8 @@ func (p *Promoter) PromoteImages(ctx context.Context, opts *options.Options) err
 		if verifier == nil {
 			return errors.New("provenance verifier not configured")
 		}
+
+		p.discoveries = p.discoverStagingImages(ctx, promotionEdges)
 
 		// Edges repeat the same source digest once per destination region
 		// and tag, so verify each source reference only once.
