@@ -19,15 +19,18 @@ package schema
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 	"sigs.k8s.io/release-utils/command"
 
+	"sigs.k8s.io/promo-tools/v4/promoter/image/provenance"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/registry"
 	"sigs.k8s.io/promo-tools/v4/types/image"
 )
@@ -40,6 +43,10 @@ type Manifest struct {
 	// destination registries.
 	Registries []registry.Context `yaml:"registries,omitempty"`
 	Images     []registry.Image   `yaml:"images,omitempty"`
+
+	// Provenance is the provenance policy for the images promoted from
+	// the source registry.
+	Provenance *provenance.Policy `yaml:"provenance,omitempty"`
 
 	// Hidden fields; these are data structure optimizations that are populated
 	// from the fields above. As they are redundant, there is no point in
@@ -58,6 +65,11 @@ type Manifest struct {
 // src/destination repos or the credentials tied to them.
 type ThinManifest struct {
 	Registries []registry.Context `yaml:"registries,omitempty"`
+
+	// Provenance is the provenance policy for the images promoted from
+	// the source registry.
+	Provenance *provenance.Policy `yaml:"provenance,omitempty"`
+
 	// Store actual image data somewhere else.
 	//
 	// NOTE: "ImagesPath" is deprecated. It does nothing and will be
@@ -110,6 +122,10 @@ const (
 func (m *Manifest) Validate() error {
 	if err := validateRequiredComponents(m); err != nil {
 		return err
+	}
+
+	if err := m.Provenance.Validate(); err != nil {
+		return fmt.Errorf("validating provenance policy: %w", err)
 	}
 
 	return validateImages(m.Images)
@@ -215,6 +231,36 @@ func (m *Manifest) Finalize() error {
 	return nil
 }
 
+// ProvenancePolicies returns the provenance policies of the manifests,
+// keyed by their normalized source registry. Manifests without a policy map
+// to nil. Manifests sharing a source registry must declare the same policy.
+// Use ProvenancePolicy to look up the policy of an image.
+func ProvenancePolicies(mfests []Manifest) (map[image.Registry]*provenance.Policy, error) {
+	policies := make(map[image.Registry]*provenance.Policy, len(mfests))
+	sources := make(map[image.Registry]string, len(mfests))
+
+	for i := range mfests {
+		mfest := &mfests[i]
+
+		src := normalizeRegistry(mfest.srcRegistryName())
+		if src == "" {
+			continue
+		}
+
+		if existing, ok := policies[src]; ok && !existing.Equal(mfest.Provenance) {
+			return nil, fmt.Errorf(
+				"manifests %s and %s declare different provenance policies for source registry %s",
+				sources[src], mfest.Filepath, src,
+			)
+		}
+
+		policies[src] = mfest.Provenance
+		sources[src] = mfest.Filepath
+	}
+
+	return policies, nil
+}
+
 // ToRegInvImage converts a Manifest into a RegInvImage.
 func (m *Manifest) ToRegInvImage() registry.RegInvImage {
 	rii := make(registry.RegInvImage)
@@ -245,6 +291,43 @@ func (m *Manifest) srcRegistryName() image.Registry {
 	}
 
 	return image.Registry("")
+}
+
+// ApplicableProvenancePolicies returns the enabled provenance policies of
+// every manifest whose source registry contains the image repository,
+// ordered by source registry. Source registries can be nested, and every
+// policy of a registry applies to the repositories below it, so neither a
+// parent nor a nested manifest can promote an image without the policies
+// of the other.
+func ApplicableProvenancePolicies(
+	policies map[image.Registry]*provenance.Policy, registry image.Registry, name image.Name,
+) []*provenance.Policy {
+	repo := string(normalizeRegistry(registry)) + "/" + strings.Trim(string(name), "/")
+
+	var applicable []*provenance.Policy
+
+	for _, src := range slices.Sorted(maps.Keys(policies)) {
+		policy := policies[src]
+		if policy.Enabled() && (repo == string(src) || strings.HasPrefix(repo, string(src)+"/")) {
+			applicable = append(applicable, policy)
+		}
+	}
+
+	return applicable
+}
+
+// normalizeRegistry lowercases the host of a registry name and drops
+// trailing slashes, so that different spellings of a registry are the same
+// key.
+func normalizeRegistry(registry image.Registry) image.Registry {
+	name := strings.TrimRight(string(registry), "/")
+
+	host, path, found := strings.Cut(name, "/")
+	if !found {
+		return image.Registry(strings.ToLower(host))
+	}
+
+	return image.Registry(strings.ToLower(host) + "/" + path)
 }
 
 // Parsers
@@ -555,6 +638,7 @@ func ParseThinManifestFromFile(filePath string, digestsToCheck []string) (Manife
 	mfest.ImagesFilepath = imagesPath
 	mfest.Images = images
 	mfest.Registries = thinManifest.Registries
+	mfest.Provenance = thinManifest.Provenance
 
 	err = mfest.Finalize()
 	if err != nil {
@@ -584,6 +668,10 @@ func ParseThinManifestYAML(b []byte) (ThinManifest, error) {
 	var m ThinManifest
 	if err := yaml.UnmarshalStrict(b, &m); err != nil {
 		return m, fmt.Errorf("unmarshalling thin manifest YAML: %w", err)
+	}
+
+	if err := m.Provenance.Validate(); err != nil {
+		return m, fmt.Errorf("validating provenance policy: %w", err)
 	}
 
 	return m, nil
