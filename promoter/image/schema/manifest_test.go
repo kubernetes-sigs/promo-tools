@@ -19,11 +19,16 @@ package schema
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"sigs.k8s.io/release-utils/command"
+
+	"sigs.k8s.io/promo-tools/v4/promoter/image/provenance"
+	"sigs.k8s.io/promo-tools/v4/promoter/image/registry"
+	"sigs.k8s.io/promo-tools/v4/types/image"
 )
 
 func TestParseThinManifestsFromDirPostsubmit(t *testing.T) {
@@ -175,4 +180,198 @@ func TestDiffSinceFilesNoChanges(t *testing.T) {
 	digests, err := diffSinceFiles(tmpDir, "1 second")
 	require.NoError(t, err)
 	assert.Empty(t, digests)
+}
+
+const testPolicyYAML = `registries:
+- name: us-central1-docker.pkg.dev/k8s-staging-images/sp-operator
+  src: true
+- name: us-central1-docker.pkg.dev/k8s-artifacts-prod/images/security-profiles-operator
+provenance:
+  mode: require
+  signers:
+  - sigstore::https://accounts.google.com::sp-operator-sa@k8s-staging-images.iam.gserviceaccount.com
+  builders:
+  - https://prow.k8s.io/post-security-profiles-operator-push-image
+  sources:
+  - github.com/kubernetes-sigs/security-profiles-operator
+  predicateTypes:
+  - https://spdx.dev/Document
+  level: 2
+`
+
+func TestParseThinManifestYAMLProvenance(t *testing.T) {
+	t.Parallel()
+
+	m, err := ParseThinManifestYAML([]byte(testPolicyYAML))
+	require.NoError(t, err)
+	require.Equal(t, &provenance.Policy{
+		Mode:           provenance.PolicyModeRequire,
+		Signers:        []string{"sigstore::https://accounts.google.com::sp-operator-sa@k8s-staging-images.iam.gserviceaccount.com"},
+		Builders:       []string{"https://prow.k8s.io/post-security-profiles-operator-push-image"},
+		Sources:        []string{"github.com/kubernetes-sigs/security-profiles-operator"},
+		PredicateTypes: []string{"https://spdx.dev/Document"},
+		Level:          2,
+	}, m.Provenance)
+
+	// Without a policy section, the manifest has no policy.
+	m, err = ParseThinManifestYAML([]byte("registries:\n- name: gcr.io/staging\n  src: true\n"))
+	require.NoError(t, err)
+	require.Nil(t, m.Provenance)
+}
+
+func TestParseThinManifestYAMLProvenanceInvalid(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name    string
+		yaml    string
+		wantErr string
+	}{
+		{
+			name:    "unknown mode",
+			yaml:    strings.Replace(testPolicyYAML, "mode: require", "mode: enforce", 1),
+			wantErr: `mode must be "off", "warn" or "require"`,
+		},
+		{
+			name:    "unknown field",
+			yaml:    testPolicyYAML + "  identities: []\n",
+			wantErr: "field identities not found",
+		},
+		{
+			name:    "invalid signer",
+			yaml:    strings.Replace(testPolicyYAML, "sigstore::https", "unknown::https", 1),
+			wantErr: "invalid signer",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			_, err := ParseThinManifestYAML([]byte(tc.yaml))
+			require.ErrorContains(t, err, tc.wantErr)
+		})
+	}
+}
+
+func TestParseManifestYAMLProvenanceInvalid(t *testing.T) {
+	t.Parallel()
+
+	_, err := ParseManifestYAML([]byte(strings.Replace(testPolicyYAML, "mode: require", "mode: enforce", 1)))
+	require.ErrorContains(t, err, "validating provenance policy")
+}
+
+func TestParseThinManifestFromFileProvenance(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	manifestPath := filepath.Join(dir, "manifests", "sp-operator", "promoter-manifest.yaml")
+	imagesPath := filepath.Join(dir, "images", "sp-operator", "images.yaml")
+
+	require.NoError(t, os.MkdirAll(filepath.Dir(manifestPath), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Dir(imagesPath), 0o755))
+	require.NoError(t, os.WriteFile(manifestPath, []byte(testPolicyYAML), 0o600))
+	require.NoError(t, os.WriteFile(imagesPath, []byte("[]\n"), 0o600))
+
+	m, err := ParseThinManifestFromFile(manifestPath, nil)
+	require.NoError(t, err)
+	require.True(t, m.Provenance.Enabled())
+	require.Equal(t, provenance.PolicyModeRequire, m.Provenance.Mode)
+}
+
+// testPolicySrc and testPolicyImage name a source registry with a provenance
+// policy and an image in it.
+const (
+	testPolicySrc   = "gcr.io/a"
+	testPolicyImage = "img"
+)
+
+func TestProvenancePolicies(t *testing.T) {
+	t.Parallel()
+
+	requirePolicy := &provenance.Policy{
+		Mode:     provenance.PolicyModeRequire,
+		Signers:  []string{"sigstore::https://accounts.google.com::a@example.com"},
+		Builders: []string{"https://builder.example.com"},
+		Sources:  []string{"github.com/example/a"},
+	}
+	warn := &provenance.Policy{
+		Mode:     provenance.PolicyModeWarn,
+		Signers:  []string{"sigstore::https://accounts.google.com::a@example.com"},
+		Builders: []string{"https://builder.example.com"},
+		Sources:  []string{"github.com/example/a"},
+	}
+
+	manifest := func(src string, policy *provenance.Policy) Manifest {
+		return Manifest{
+			Registries: []registry.Context{
+				{Name: image.Registry(src), Src: true},
+				{Name: "us-central1-docker.pkg.dev/k8s-artifacts-prod/images"},
+			},
+			Provenance: policy,
+			Filepath:   src + "/promoter-manifest.yaml",
+		}
+	}
+
+	policies, err := ProvenancePolicies([]Manifest{
+		manifest(testPolicySrc, requirePolicy),
+		manifest("gcr.io/b", nil),
+		manifest(testPolicySrc, requirePolicy),
+		{},
+	})
+	require.NoError(t, err)
+	require.Equal(t, map[image.Registry]*provenance.Policy{
+		testPolicySrc: requirePolicy,
+		"gcr.io/b":    nil,
+	}, policies)
+
+	// Off and no policy are the same.
+	_, err = ProvenancePolicies([]Manifest{
+		manifest("gcr.io/b", nil),
+		manifest("gcr.io/b", &provenance.Policy{Mode: provenance.PolicyModeOff}),
+	})
+	require.NoError(t, err)
+
+	for _, conflict := range [][]Manifest{
+		{manifest(testPolicySrc, requirePolicy), manifest(testPolicySrc, warn)},
+		{manifest(testPolicySrc, nil), manifest(testPolicySrc, warn)},
+		{manifest(testPolicySrc, requirePolicy), manifest("GCR.io/a/", warn)},
+	} {
+		_, err = ProvenancePolicies(conflict)
+		require.ErrorContains(t, err, "declare different provenance policies for source registry gcr.io/a")
+	}
+}
+
+func TestApplicableProvenancePolicies(t *testing.T) {
+	t.Parallel()
+
+	parent := &provenance.Policy{Mode: provenance.PolicyModeWarn}
+	nested := &provenance.Policy{Mode: provenance.PolicyModeRequire}
+
+	policies, err := ProvenancePolicies([]Manifest{
+		{Registries: []registry.Context{{Name: "GCR.io/a/", Src: true}}, Provenance: parent},
+		{Registries: []registry.Context{{Name: "gcr.io/a/nested", Src: true}}, Provenance: nested},
+		// A nested manifest without a policy does not switch the parent's
+		// policy off.
+		{Registries: []registry.Context{{Name: "gcr.io/a/open", Src: true}}},
+	})
+	require.NoError(t, err)
+
+	for _, tc := range []struct {
+		registry image.Registry
+		name     image.Name
+		want     []*provenance.Policy
+	}{
+		{registry: testPolicySrc, name: testPolicyImage, want: []*provenance.Policy{parent}},
+		{registry: "gcr.io/a/", name: testPolicyImage, want: []*provenance.Policy{parent}},
+		{registry: "Gcr.io/a", name: testPolicyImage, want: []*provenance.Policy{parent}},
+		{registry: "gcr.io/a/nested", name: testPolicyImage, want: []*provenance.Policy{parent, nested}},
+		{registry: testPolicySrc, name: "nested/img", want: []*provenance.Policy{parent, nested}},
+		{registry: "gcr.io/a/open", name: testPolicyImage, want: []*provenance.Policy{parent}},
+		{registry: testPolicySrc, name: "nested-img", want: []*provenance.Policy{parent}},
+		{registry: "gcr.io/ab", name: testPolicyImage},
+		{registry: "gcr.io", name: "a/img", want: []*provenance.Policy{parent}},
+		{registry: "gcr.io/other", name: testPolicyImage},
+	} {
+		require.Equal(t, tc.want, ApplicableProvenancePolicies(policies, tc.registry, tc.name),
+			"%s %s", tc.registry, tc.name)
+	}
 }

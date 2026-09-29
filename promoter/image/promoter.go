@@ -22,6 +22,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
 
 	"github.com/sirupsen/logrus"
 
@@ -53,6 +55,10 @@ type Promoter struct {
 	// discoveries are the attestations discovered in the last promotion
 	// run, by source reference.
 	discoveries map[string]*provenance.Discovery
+
+	// stagingSignatures are the staging signature results of the last
+	// promotion run.
+	stagingSignatures promotion.StagingSignatures
 }
 
 func New(opts *options.Options) *Promoter {
@@ -124,7 +130,9 @@ type promoterImplementation interface {
 
 	// Methods for image signing
 	PrewarmTUFCache(context.Context) error
-	ValidateStagingSignatures(map[promotion.Edge]any) (map[promotion.Edge]any, error)
+	ValidateStagingSignatures(
+		context.Context, *options.Options, map[promotion.Edge]any, map[string]*provenance.Discovery,
+	) (promotion.StagingSignatures, error)
 	SignImages(*options.Options, map[promotion.Edge]any) error
 	WriteProvenanceAttestations(context.Context, *options.Options, []schema.Manifest, map[promotion.Edge]any, provenance.Generator) error
 
@@ -150,6 +158,7 @@ func (p *Promoter) PromoteImages(ctx context.Context, opts *options.Options) err
 
 	// Results of a previous run don't describe this one.
 	p.discoveries = nil
+	p.stagingSignatures = nil
 
 	pipe := pipeline.New()
 
@@ -199,46 +208,20 @@ func (p *Promoter) PromoteImages(ctx context.Context, opts *options.Options) err
 
 	// Provenance phase: verify image provenance (verify-if-present).
 	pipe.AddPhase(pipeline.NewPhase("provenance", func(ctx context.Context) error {
-		verifier := p.provenanceVerifier
-		if verifier == nil {
-			return errors.New("provenance verifier not configured")
-		}
-
 		p.discoveries = p.discoverStagingImages(ctx, promotionEdges)
 
-		// Edges repeat the same source digest once per destination region
-		// and tag, so verify each source reference only once.
-		seen := make(map[string]struct{}, len(promotionEdges))
-
-		for edge := range promotionEdges {
-			ref := edge.SrcReference()
-			if ref == "" {
-				continue
-			}
-
-			if _, ok := seen[ref]; ok {
-				continue
-			}
-
-			seen[ref] = struct{}{}
-
-			result, err := verifier.Verify(ctx, ref)
-			if err != nil {
-				return fmt.Errorf("verifying provenance for %s: %w", ref, err)
-			}
-
-			if !result.Verified {
-				return fmt.Errorf("provenance verification failed for %s: %v",
-					ref, result.Errors)
-			}
-		}
-
-		return nil
+		return p.checkProvenance(ctx, mfests, promotionEdges)
 	}))
 
 	// Validate phase: check staging signatures.
-	pipe.AddPhase(pipeline.NewPhase("validate", func(_ context.Context) error {
-		if _, err := p.impl.ValidateStagingSignatures(promotionEdges); err != nil {
+	pipe.AddPhase(pipeline.NewPhase("validate", func(ctx context.Context) error {
+		// The results are kept when a signature is invalid, too.
+		signatures, err := p.impl.ValidateStagingSignatures(
+			ctx, opts, promotionEdges, p.discoveries,
+		)
+		p.stagingSignatures = signatures
+
+		if err != nil {
 			return fmt.Errorf("checking signatures in staging images: %w", err)
 		}
 
@@ -419,6 +402,103 @@ func (p *Promoter) CheckSignatures(ctx context.Context, opts *options.Options) e
 	}
 
 	logrus.Info("All images repaired")
+
+	return nil
+}
+
+// checkProvenance checks every source image against the provenance policies
+// that apply to it, and verifies the images without a require policy if
+// attestations are present.
+func (p *Promoter) checkProvenance(
+	ctx context.Context, mfests []schema.Manifest, edges map[promotion.Edge]any,
+) error {
+	verifier := p.provenanceVerifier
+	if verifier == nil {
+		return errors.New("provenance verifier not configured")
+	}
+
+	policies, err := schema.ProvenancePolicies(mfests)
+	if err != nil {
+		return fmt.Errorf("reading provenance policies: %w", err)
+	}
+
+	checker := &provenance.PolicyChecker{}
+
+	// Edges repeat the same source digest once per destination region
+	// and tag, and manifests can share images, so collect the distinct
+	// policies of every source reference.
+	refPolicies := make(map[string][]*provenance.Policy, len(edges))
+
+	for edge := range edges {
+		ref := edge.SrcReference()
+		if ref == "" {
+			continue
+		}
+
+		if _, ok := refPolicies[ref]; !ok {
+			refPolicies[ref] = nil
+		}
+
+		for _, policy := range schema.ApplicableProvenancePolicies(policies, edge.SrcRegistry.Name, edge.SrcImageTag.Name) {
+			if !slices.ContainsFunc(refPolicies[ref], policy.Equal) {
+				refPolicies[ref] = append(refPolicies[ref], policy)
+			}
+		}
+	}
+
+	// Every image is checked, so that all violations are reported at once.
+	var errs []error
+
+	for _, ref := range slices.Sorted(maps.Keys(refPolicies)) {
+		if err := p.checkImageProvenance(ctx, checker, verifier, ref, refPolicies[ref]); err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	return errors.Join(errs...)
+}
+
+// checkImageProvenance checks one source image against every policy that
+// applies to it. Only require mode replaces the verify-if-present check,
+// so that trying a policy in warn mode does not weaken the promotion.
+func (p *Promoter) checkImageProvenance(
+	ctx context.Context,
+	checker *provenance.PolicyChecker,
+	verifier provenance.Verifier,
+	ref string,
+	policies []*provenance.Policy,
+) error {
+	if len(policies) == 0 {
+		// Logs that no policy applies.
+		if err := checker.Check(ctx, ref, nil, p.discoveries[ref]); err != nil {
+			return fmt.Errorf("checking provenance policy: %w", err)
+		}
+	}
+
+	verify := len(policies) == 0
+
+	for _, policy := range policies {
+		if err := checker.Check(ctx, ref, policy, p.discoveries[ref]); err != nil {
+			return fmt.Errorf("checking provenance policy: %w", err)
+		}
+
+		if policy.Mode != provenance.PolicyModeRequire {
+			verify = true
+		}
+	}
+
+	if !verify {
+		return nil
+	}
+
+	result, err := verifier.Verify(ctx, ref)
+	if err != nil {
+		return fmt.Errorf("verifying provenance for %s: %w", ref, err)
+	}
+
+	if !result.Verified {
+		return fmt.Errorf("provenance verification failed for %s: %v", ref, result.Errors)
+	}
 
 	return nil
 }

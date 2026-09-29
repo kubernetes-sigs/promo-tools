@@ -21,6 +21,7 @@ registries.
   - [OCI artifacts](#oci-artifacts)
 - [Signing and attestation](#signing-and-attestation)
 - [Provenance verification](#provenance-verification)
+  - [Provenance policies](#provenance-policies)
   - [Attestation discovery](#attestation-discovery)
 - [Provenance generation](#provenance-generation)
 - [Checking signatures and attestations](#checking-signatures-and-attestations)
@@ -175,7 +176,7 @@ The promotion flow is organized into sequential pipeline phases:
 |-------|------|-------------|
 | 1 | **setup** | Validate options, prewarm TUF cache |
 | 2 | **plan** | Parse manifests, read registry inventories, compute promotion edges, reject [unsupported artifacts](#oci-artifacts) |
-| 3 | **provenance** | Verify build-time provenance attestations (verify-if-present, see [Provenance verification](#provenance-verification)) and log all attestations of the staging images ([Attestation discovery](#attestation-discovery)) |
+| 3 | **provenance** | Log all attestations of the staging images ([Attestation discovery](#attestation-discovery)), then verify build-time provenance attestations (verify-if-present, or the project's [provenance policy](#provenance-policies), see [Provenance verification](#provenance-verification)) |
 | 4 | **validate** | Validate staging image signatures |
 | 5 | **promote** | Copy images from staging to production |
 | 6 | **sign** | Sign promoted images with cosign (primary registry only) |
@@ -286,8 +287,72 @@ Attestations signed by another identity, or with another predicate type,
 are logged and ignored. Promotion is blocked only when an attestation does
 not verify at all, which means it is malformed or was tampered with.
 Keyless attestations are supported; a third party attestation signed with a
-key still blocks promotion until per-project identities are supported
-([#1952][issue-1952]).
+key still blocks promotion, unless the project declares a provenance policy.
+
+### Provenance policies
+
+A project can declare what its staging images must be attested with in the
+`provenance` section of its promoter manifest. The images promoted from its
+source registry, including nested repositories that have no manifest of
+their own, are then checked against that policy:
+
+```yaml
+registries:
+- name: us-central1-docker.pkg.dev/k8s-staging-images/sp-operator
+  src: true
+- name: us-central1-docker.pkg.dev/k8s-artifacts-prod/images/security-profiles-operator
+provenance:
+  mode: require
+  signers:
+  - sigstore::https://accounts.google.com::sp-operator-sa@k8s-staging-images.iam.gserviceaccount.com
+  builders:
+  - https://prow.k8s.io/job-history/gs/kubernetes-ci-logs/logs/post-security-profiles-operator-push-image
+  sources:
+  - github.com/kubernetes-sigs/security-profiles-operator
+  predicateTypes:
+  - https://spdx.dev/Document
+  level: 3
+```
+
+- `mode`: `off` (the default) keeps the verify-if-present check, `warn` logs
+  every violation and promotes anyway, and `require` blocks the promotion.
+  Only `require` replaces the verify-if-present check, so trying a policy in
+  `warn` mode never weakens the promotion.
+- `signers`: the identities trusted to sign the staging attestations, as
+  [signer identity specs][signer-principals], for example
+  `sigstore::<issuer>::<identity>`, or
+  `sigstore(identityMatch=regex)::<issuer>::<identity regexp>` to match
+  several. Only sigstore identities with both an issuer and an identity are
+  accepted. They are separate from the identity the promoter signs with.
+- `builders`: the trusted builder IDs of the SLSA build provenance. An ID
+  without `@` also matches the builder at any ref.
+- `sources`: the repositories the images may be built from, without a ref.
+- `predicateTypes` (optional): predicate types that must also be attested
+  for every image by one of the signers, for example an SBOM.
+- `level` (optional): the SLSA build level the provenance must reach, 2 or
+  3. By default every applicable SLSA build control has to pass. Lower
+  levels are not accepted, because they would not enforce the builders.
+
+`signers`, `builders` and `sources` are required unless the mode is `off`.
+
+An image satisfies the policy when it carries SLSA build provenance (v0.2
+or v1) that verifies with the [SLSA verifier][slsa-verifier]: its
+signature verified, it was signed by one of the signers, its subjects
+include the image digest, and it names one of the builders and one of the
+sources. Unsigned attestations, attestations whose signature does not
+verify, attestations by other signers and attestations about other digests
+never count. If discovering the attestations fails, the policy is not
+satisfied either. For an index, the provenance must be about the index
+digest itself: provenance attached to the platform images satisfies the
+policy of those images, when they are promoted on their own.
+
+Every run logs the effective policy per source image, so dry runs show
+which images are checked against which policy. Manifests that share a
+source registry must declare the same policy. The policy of a source
+registry also applies to the repositories below it, so an image has to
+satisfy the policies of every manifest whose source registry contains it,
+whichever manifest promotes it. A policy without a `mode` is off, which is
+logged as a warning when it declares anything else.
 
 ### Attestation discovery
 
@@ -323,9 +388,10 @@ referrers or statement layers that can't be read are logged as skipped,
 without hiding the attestations next to them. DSSE layers of an `.att` tag
 are read together: if one of them can't be read, the whole tag is logged as
 skipped, and layers whose payload is not an in-toto statement are left out.
-Discovery does not affect promotion yet: a failed discovery is logged as a
-warning, which tells it apart from an image without attestations. Per-project
-policies ([#1952][issue-1952]) will evaluate the discovered attestations.
+Without a [provenance policy](#provenance-policies), discovery does not
+affect promotion: a failed discovery is logged as a warning, which tells it
+apart from an image without attestations. With a policy, the discovered
+attestations are what the policy is evaluated against.
 
 ## Provenance generation
 
@@ -447,7 +513,7 @@ kpromo cip \
 ```
 
 [ggcr-google]: https://pkg.go.dev/github.com/google/go-containerregistry/pkg/v1/google
-[issue-1952]: https://github.com/kubernetes-sigs/promo-tools/issues/1952
 [signer]: https://github.com/carabiner-dev/signer
-[signer-principals]: https://github.com/carabiner-dev/signer/blob/main/docs/principals.md
 [k8sio-manifests-dir]: https://git.k8s.io/k8s.io/registry.k8s.io
+[signer-principals]: https://github.com/carabiner-dev/signer/blob/main/docs/principals.md
+[slsa-verifier]: https://github.com/slsa-framework/verifier

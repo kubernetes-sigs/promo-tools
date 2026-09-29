@@ -242,6 +242,8 @@ github.com/carabiner-dev/command v0.3.2 h1:lkmgr+Sj9OaPxKk2AHlitR76Mg+hqys6BK707
 github.com/carabiner-dev/command v0.3.2/go.mod h1:ABHTlUZbUUq7LF1Xmlx01ZY8xMCv4eqleuVEO/LIifU=
 github.com/carabiner-dev/hasher v0.2.4 h1:VaI04+FBHaNV/UEy0NmVoRg0pKLFeN76KPOHbTDvvhE=
 github.com/carabiner-dev/hasher v0.2.4/go.mod h1:W83zi1+E3he4Cpldss8yoXNj6GdDUpr3M45dOAzem/w=
+github.com/carabiner-dev/jsonl v0.2.2 h1:6uj/T0tZJYb2pdrS91JXDyMq0zj2QU8f5s/Rxblu0vs=
+github.com/carabiner-dev/jsonl v0.2.2/go.mod h1:AOOyOoXDVi3q4EJxrAjDjftHJej7f+yHq2kP4mb4CKw=
 github.com/carabiner-dev/openeox v1.0.0 h1:iVfs9jgu2s2Jrb95bJK5FWMx55qF3aHBk9RhUOkZKco=
 github.com/carabiner-dev/openeox v1.0.0/go.mod h1:+6i8M7PhtWk2jRtUC1anZnhmOr5cXKMLGYjwFcqPDa0=
 github.com/carabiner-dev/osv v0.1.2 h1:W5nZOGuygnqzB7YbGon6ab3iFHxFZZgzS3m7GEvYnfc=
@@ -250,8 +252,8 @@ github.com/carabiner-dev/policy v0.5.6 h1:zM203rdxnv2epn6czUs+CcAxQoyKqJDHqfiWLo
 github.com/carabiner-dev/policy v0.5.6/go.mod h1:E0KFvUp/xVj6ZCoFHdrPJ1i/G2uUDlwpFn26J+z6M+8=
 github.com/carabiner-dev/predicates v0.5.4 h1:koiNmcr0IbjHpjywI/k9OGeEilTIKdMQyh5LZZJt4ok=
 github.com/carabiner-dev/predicates v0.5.4/go.mod h1:zHcoDfyIfH7WMOS0zpEKD+lBPikEw+/BNg6988g8c2I=
-github.com/carabiner-dev/signer v0.6.2 h1:Tww40YP4RKjLSKdgT5nXVRiqd3Czjvkwd2WRDE7ecJ0=
-github.com/carabiner-dev/signer v0.6.2/go.mod h1:xIeR0GMK3Hp9gYsd7dGO9W8EwjftWBk3/+flEle6o0Y=
+github.com/carabiner-dev/signer v0.6.3-0.20260918053410-bc4fb95601f7 h1:FYQNsziGbXR5nlmGlUZfLPCBG55xLIV+3EvEoR3Fuck=
+github.com/carabiner-dev/signer v0.6.3-0.20260918053410-bc4fb95601f7/go.mod h1:m+2nthQ+dEZ8+9XtR5O3J61hAsPJ1VWCxuCaU1khhiU=
 github.com/carabiner-dev/spdx3 v0.1.0 h1:Q6nMLXV0BhtqDQuwRDOaJDZR670TK4jdOvZqvTW/ctY=
 github.com/carabiner-dev/spdx3 v0.1.0/go.mod h1:d/t010TrZvYZBeYGpvHeId6QpRvGLlqK7cy0E81npPA=
 github.com/carabiner-dev/vcslocator v0.5.0 h1:UpqilJXRJBgwzQHk0MsD03w+8/0GcyC1HbXxX0wZKcU=
@@ -780,6 +782,10 @@ github.com/sirupsen/logrus v1.10.2 h1:G2SED73/qrAu6YwbdxOD6peLkCBI3z7L+ykJFTXJBB
 github.com/sirupsen/logrus v1.10.2/go.mod h1:SLEg8TqYulVKKfIGHldVp2K2aYz2DKSVBq4g/H5bR7Q=
 github.com/skeema/knownhosts v1.3.2 h1:EDL9mgf4NzwMXCTfaxSD/o/a5fxDw/xL9nkU28JjdBg=
 github.com/skeema/knownhosts v1.3.2/go.mod h1:bEg3iQAuw+jyiw+484wwFJoKSLwcfd7fqRy+N0QTiow=
+github.com/slsa-framework/source-tool v0.7.0 h1:KtnKKP8AXSXsy78TYm8s8aBX/s8sj157ZN4P/ciBuuo=
+github.com/slsa-framework/source-tool v0.7.0/go.mod h1:32OhdH5r4Wzlf4NEmNztrldiuPdP+QeQCQMM6VE3Xpo=
+github.com/slsa-framework/verifier v0.1.0-alpha.5 h1:NVCRgWVdAJePDJKHUruzrn2KADs3oRoih9MckkMHh7U=
+github.com/slsa-framework/verifier v0.1.0-alpha.5/go.mod h1:wTrxAKta6rzJY1oXDYdrb9GLX7P8gb9HgQ2Fhiij310=
 github.com/smartystreets/assertions v0.0.0-20180927180507-b2de0cb4f26d/go.mod h1:OnSkiWE9lh6wB0YB77sQom3nweQdgAjqCqsofrRNTgc=
 github.com/smartystreets/assertions v1.1.0/go.mod h1:tcbTF8ujkAEcZ8TElKY+i30BzYlVhC/LOxJk7iOWnoo=
 github.com/smartystreets/goconvey v1.6.4/go.mod h1:syvi0/a8iFYH4r/RixwvyeAJjdLS9QV7WQ/tjFTllLA=

@@ -213,9 +213,12 @@ func TestPromoteImagesProvenanceAlwaysRuns(t *testing.T) {
 type fakeVerifier struct {
 	result *provenance.Result
 	err    error
+	calls  int
 }
 
 func (f *fakeVerifier) Verify(_ context.Context, _ string) (*provenance.Result, error) {
+	f.calls++
+
 	return f.result, f.err
 }
 
@@ -337,6 +340,206 @@ func TestPromoteImagesProvenanceVerifierError(t *testing.T) {
 
 	opts := &options.Options{Confirm: true}
 	require.Error(t, sut.PromoteImages(context.Background(), opts))
+}
+
+// policyManifests returns a manifest for the test edge's source registry
+// with the given provenance policy.
+func policyManifests(policy *provenance.Policy) []schema.Manifest {
+	return []schema.Manifest{{
+		Registries: []registry.Context{{Name: testEdge().SrcRegistry.Name, Src: true}},
+		Provenance: policy,
+		Filepath:   "manifests/test/promoter-manifest.yaml",
+	}}
+}
+
+// testProvenancePolicy returns a provenance policy in the given mode.
+func testProvenancePolicy(mode provenance.PolicyMode) *provenance.Policy {
+	return &provenance.Policy{
+		Mode:     mode,
+		Signers:  []string{"sigstore::https://accounts.google.com::builder@k8s-staging-test.iam.gserviceaccount.com"},
+		Builders: []string{"https://prow.k8s.io/test"},
+		Sources:  []string{"github.com/kubernetes/test"},
+	}
+}
+
+func TestPromoteImagesProvenancePolicy(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		mode        provenance.PolicyMode
+		verifierErr error
+		wantErr     string
+		wantVerify  int
+	}{
+		{
+			name: "require blocks the promotion", mode: provenance.PolicyModeRequire,
+			wantErr: "provenance policy not satisfied",
+		},
+		{name: "warn allows the promotion", mode: provenance.PolicyModeWarn, wantVerify: 1},
+		{
+			name: "warn keeps the verify-if-present check", mode: provenance.PolicyModeWarn,
+			verifierErr: errors.New("tampered attestation"), wantErr: "tampered attestation", wantVerify: 1,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			sut := imagepromoter.Promoter{}
+			mock := imagefakes.FakePromoterImplementation{}
+			mock.ParseManifestsReturns(policyManifests(testProvenancePolicy(tc.mode)), nil)
+			mock.GetPromotionEdgesReturns(map[promotion.Edge]any{
+				testEdge(): nil,
+			}, nil)
+			sut.SetImplementation(&mock)
+
+			// Only require mode replaces the verify-if-present check.
+			verifier := &fakeVerifier{result: &provenance.Result{Verified: true}, err: tc.verifierErr}
+			sut.SetProvenanceVerifier(verifier)
+
+			// No attestations found, so the policy is not satisfied.
+			edge := testEdge()
+
+			discoverer := &provenancefakes.FakeDiscoverer{}
+			discoverer.DiscoverReturns(&provenance.Discovery{Reference: edge.SrcReference()}, nil)
+			sut.SetDiscoverer(discoverer)
+
+			err := sut.PromoteImages(context.Background(), &options.Options{Confirm: true})
+
+			require.Equal(t, 1, discoverer.DiscoverCallCount())
+			require.Equal(t, tc.wantVerify, verifier.calls)
+
+			if tc.wantErr != "" {
+				require.ErrorContains(t, err, tc.wantErr)
+				require.Equal(t, 0, mock.PromoteImagesCallCount())
+
+				return
+			}
+
+			require.NoError(t, err)
+			require.Equal(t, 1, mock.PromoteImagesCallCount())
+		})
+	}
+}
+
+func TestPromoteImagesNestedSourceRegistryPolicy(t *testing.T) {
+	// A manifest with a parent source registry and a manifest with a
+	// nested one promote the same image. Whichever holds the policy, and
+	// whatever edge comes first, the policy applies.
+	parent := promotion.Edge{
+		SrcRegistry: registry.Context{Name: image.Registry("gcr.io/staging"), Src: true},
+		SrcImageTag: promotion.ImageTag{Name: image.Name("b/img"), Tag: image.Tag("v1")},
+		Digest:      testEdge().Digest,
+		DstRegistry: registry.Context{Name: image.Registry("gcr.io/prod-a")},
+	}
+	nested := promotion.Edge{
+		SrcRegistry: registry.Context{Name: image.Registry("gcr.io/staging/b"), Src: true},
+		SrcImageTag: promotion.ImageTag{Name: image.Name("img"), Tag: image.Tag("v1")},
+		Digest:      testEdge().Digest,
+		DstRegistry: registry.Context{Name: image.Registry("gcr.io/prod-b")},
+	}
+
+	requirePolicy := testProvenancePolicy(provenance.PolicyModeRequire)
+
+	for _, tc := range []struct {
+		name                 string
+		parentPol, nestedPol *provenance.Policy
+	}{
+		{name: "policy on the nested manifest", nestedPol: requirePolicy},
+		{name: "policy on the parent manifest", parentPol: requirePolicy},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			mfests := []schema.Manifest{
+				{
+					Registries: []registry.Context{parent.SrcRegistry},
+					Provenance: tc.parentPol,
+					Filepath:   "a/promoter-manifest.yaml",
+				},
+				{
+					Registries: []registry.Context{nested.SrcRegistry},
+					Provenance: tc.nestedPol,
+					Filepath:   "b/promoter-manifest.yaml",
+				},
+			}
+
+			for range 10 {
+				sut := imagepromoter.Promoter{}
+				mock := imagefakes.FakePromoterImplementation{}
+				mock.ParseManifestsReturns(mfests, nil)
+				mock.GetPromotionEdgesReturns(map[promotion.Edge]any{parent: nil, nested: nil}, nil)
+				sut.SetImplementation(&mock)
+				sut.SetProvenanceVerifier(&fakeVerifier{result: &provenance.Result{Verified: true}})
+
+				discoverer := &provenancefakes.FakeDiscoverer{}
+				discoverer.DiscoverReturns(&provenance.Discovery{Reference: parent.SrcReference()}, nil)
+				sut.SetDiscoverer(discoverer)
+
+				err := sut.PromoteImages(context.Background(), &options.Options{Confirm: true})
+				require.ErrorContains(t, err, "provenance policy not satisfied")
+				require.Equal(t, 0, mock.PromoteImagesCallCount())
+			}
+		})
+	}
+}
+
+func TestPromoteImagesProvenancePolicyAllViolations(t *testing.T) {
+	// Every image is checked, and all violations are reported at once.
+	first := testEdge()
+	second := testEdge()
+	second.SrcImageTag.Name = image.Name("other-image")
+
+	sut := imagepromoter.Promoter{}
+	mock := imagefakes.FakePromoterImplementation{}
+	mock.ParseManifestsReturns(policyManifests(testProvenancePolicy(provenance.PolicyModeRequire)), nil)
+	mock.GetPromotionEdgesReturns(map[promotion.Edge]any{first: nil, second: nil}, nil)
+	sut.SetImplementation(&mock)
+	sut.SetProvenanceVerifier(&fakeVerifier{result: &provenance.Result{Verified: true}})
+
+	discoverer := &provenancefakes.FakeDiscoverer{}
+	discoverer.DiscoverStub = func(_ context.Context, ref string) (*provenance.Discovery, error) {
+		return &provenance.Discovery{Reference: ref}, nil
+	}
+	sut.SetDiscoverer(discoverer)
+
+	err := sut.PromoteImages(context.Background(), &options.Options{Confirm: true})
+	require.ErrorContains(t, err, first.SrcReference())
+	require.ErrorContains(t, err, second.SrcReference())
+}
+
+func TestPromoteImagesProvenancePolicyOff(t *testing.T) {
+	sut := imagepromoter.Promoter{}
+	mock := imagefakes.FakePromoterImplementation{}
+	mock.ParseManifestsReturns(policyManifests(&provenance.Policy{Mode: provenance.PolicyModeOff}), nil)
+	mock.GetPromotionEdgesReturns(map[promotion.Edge]any{
+		testEdge(): nil,
+	}, nil)
+	sut.SetImplementation(&mock)
+
+	sut.SetProvenanceVerifier(&fakeVerifier{err: errors.New("verified without policy")})
+
+	discoverer := &provenancefakes.FakeDiscoverer{}
+	sut.SetDiscoverer(discoverer)
+
+	// Discovery always runs, without a policy the verifier decides.
+	err := sut.PromoteImages(context.Background(), &options.Options{Confirm: true})
+	require.ErrorContains(t, err, "verified without policy")
+	require.Equal(t, 1, discoverer.DiscoverCallCount())
+}
+
+func TestPromoteImagesConflictingProvenancePolicies(t *testing.T) {
+	sut := imagepromoter.Promoter{}
+	mock := imagefakes.FakePromoterImplementation{}
+
+	mfests := append(
+		policyManifests(testProvenancePolicy(provenance.PolicyModeRequire)),
+		policyManifests(testProvenancePolicy(provenance.PolicyModeWarn))...,
+	)
+	mock.ParseManifestsReturns(mfests, nil)
+	mock.GetPromotionEdgesReturns(map[promotion.Edge]any{
+		testEdge(): nil,
+	}, nil)
+	sut.SetImplementation(&mock)
+
+	sut.SetProvenanceVerifier(&fakeVerifier{result: &provenance.Result{Verified: true}})
+
+	err := sut.PromoteImages(context.Background(), &options.Options{Confirm: true})
+	require.ErrorContains(t, err, "declare different provenance policies")
 }
 
 func TestNewPromoter(t *testing.T) {
