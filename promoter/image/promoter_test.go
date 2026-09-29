@@ -29,6 +29,7 @@ import (
 	options "sigs.k8s.io/promo-tools/v4/promoter/image/options"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/promotion"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/provenance"
+	"sigs.k8s.io/promo-tools/v4/promoter/image/provenance/provenancefakes"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/registry"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/schema"
 	"sigs.k8s.io/promo-tools/v4/types/image"
@@ -228,6 +229,71 @@ func testEdge() promotion.Edge {
 			Tag:  image.Tag("v1"),
 		},
 		Digest: image.Digest("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
+	}
+}
+
+func TestPromoteImagesDiscovery(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		err     error
+		missing bool
+	}{
+		{name: "found", err: nil},
+		{name: "failed discovery does not block", err: errors.New("registry unavailable")},
+		{name: "missing discovery does not block", missing: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			sut := imagepromoter.Promoter{}
+			mock := imagefakes.FakePromoterImplementation{}
+			mock.ParseManifestsReturns(nonEmptyManifests(), nil)
+
+			// A second edge of the same image, promoted to another region.
+			other := testEdge()
+			other.DstRegistry = registry.Context{Name: image.Registry("gcr.io/other")}
+
+			mock.GetPromotionEdgesReturns(map[promotion.Edge]any{
+				testEdge(): nil,
+				other:      nil,
+			}, nil)
+			sut.SetImplementation(&mock)
+			sut.SetProvenanceVerifier(&fakeVerifier{
+				result: &provenance.Result{Verified: true},
+			})
+
+			discoverer := &provenancefakes.FakeDiscoverer{}
+			if !tc.missing {
+				discoverer.DiscoverReturns(&provenance.Discovery{
+					Attestations: []provenance.Attestation{{
+						Digest:        string(testEdge().Digest),
+						Source:        provenance.SourceReferrer,
+						PredicateType: provenance.DefaultPredicateType,
+						Status:        provenance.SignatureUnsigned,
+					}},
+				}, tc.err)
+			}
+
+			sut.SetDiscoverer(discoverer)
+
+			require.NoError(t, sut.PromoteImages(context.Background(), &options.Options{Confirm: true}))
+			require.Equal(t, 1, discoverer.DiscoverCallCount())
+
+			edge := testEdge()
+			_, ref := discoverer.DiscoverArgsForCall(0)
+			require.Equal(t, edge.SrcReference(), ref)
+			require.Equal(t, 1, mock.PromoteImagesCallCount())
+
+			if tc.err != nil || tc.missing {
+				require.Empty(t, sut.Discoveries())
+			} else {
+				require.Len(t, sut.Discoveries(), 1)
+				require.Contains(t, sut.Discoveries(), ref)
+			}
+
+			// A run that stops before the provenance phase has none.
+			mock.ParseManifestsReturns(nil, nil)
+			require.NoError(t, sut.PromoteImages(context.Background(), &options.Options{Confirm: true}))
+			require.Nil(t, sut.Discoveries())
+		})
 	}
 }
 

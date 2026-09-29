@@ -21,6 +21,7 @@ registries.
   - [OCI artifacts](#oci-artifacts)
 - [Signing and attestation](#signing-and-attestation)
 - [Provenance verification](#provenance-verification)
+  - [Attestation discovery](#attestation-discovery)
 - [Provenance generation](#provenance-generation)
 - [Checking signatures and attestations](#checking-signatures-and-attestations)
 - [Vulnerability scanning](#vulnerability-scanning)
@@ -174,7 +175,7 @@ The promotion flow is organized into sequential pipeline phases:
 |-------|------|-------------|
 | 1 | **setup** | Validate options, prewarm TUF cache |
 | 2 | **plan** | Parse manifests, read registry inventories, compute promotion edges, reject [unsupported artifacts](#oci-artifacts) |
-| 3 | **provenance** | Verify build-time provenance attestations (verify-if-present, see [Provenance verification](#provenance-verification)) |
+| 3 | **provenance** | Verify build-time provenance attestations (verify-if-present, see [Provenance verification](#provenance-verification)) and log all attestations of the staging images ([Attestation discovery](#attestation-discovery)) |
 | 4 | **validate** | Validate staging image signatures |
 | 5 | **promote** | Copy images from staging to production |
 | 6 | **sign** | Sign promoted images with cosign (primary registry only) |
@@ -287,6 +288,44 @@ not verify at all, which means it is malformed or was tampered with.
 Keyless attestations are supported; a third party attestation signed with a
 key still blocks promotion until per-project identities are supported
 ([#1952][issue-1952]).
+
+### Attestation discovery
+
+After the verification, the promoter lists every attestation of each staging
+image and logs it, dry runs included:
+
+- sigstore bundles attached as OCI referrers, as cosign v3 writes them for
+  signatures and attestations
+- DSSE envelopes and unsigned in-toto statements in legacy cosign `.att` tags
+
+For an index, the referrers and `.att` tags of its direct children in the same
+repository are listed too. Referrers are per repository, so attestations that
+a build attached to the platform images in their own repositories (for
+example `…-amd64`) are found when those repositories are promoted.
+
+Each attestation is verified cryptographically against the sigstore trust
+roots of [carabiner-dev/signer][signer] (the public good instance and
+GitHub's), without checking who signed it, and logged with its predicate
+type, location, signature status (`verified`, `unsigned`, `unverifiable` or
+`failed`) and the verified signers as
+[signer principals][signer-principals]. A verified attestation can be copied
+onto another image, so the log also says when a statement is not about the
+digest it is attached to:
+
+```text
+Attestations found for us-central1-docker.pkg.dev/k8s-staging-images/sp-operator/security-profiles-operator-amd64@sha256:d2a1…:
+  sha256:d2a1… referrer sha256:64e1…: https://slsa.dev/provenance/v1 (verified by sigstore::https://accounts.google.com::sp-operator-sa@k8s-staging-images.iam.gserviceaccount.com)
+  sha256:d2a1… referrer sha256:08f1…: https://sigstore.dev/cosign/sign/v1 (verified by sigstore::https://accounts.google.com::sp-operator-sa@k8s-staging-images.iam.gserviceaccount.com)
+```
+
+Referrers without an attestation are listed with their artifact type, and
+referrers or statement layers that can't be read are logged as skipped,
+without hiding the attestations next to them. DSSE layers of an `.att` tag
+are read together: if one of them can't be read, the whole tag is logged as
+skipped, and layers whose payload is not an in-toto statement are left out.
+Discovery does not affect promotion yet: a failed discovery is logged as a
+warning, which tells it apart from an image without attestations. Per-project
+policies ([#1952][issue-1952]) will evaluate the discovered attestations.
 
 ## Provenance generation
 
@@ -409,4 +448,6 @@ kpromo cip \
 
 [ggcr-google]: https://pkg.go.dev/github.com/google/go-containerregistry/pkg/v1/google
 [issue-1952]: https://github.com/kubernetes-sigs/promo-tools/issues/1952
+[signer]: https://github.com/carabiner-dev/signer
+[signer-principals]: https://github.com/carabiner-dev/signer/blob/main/docs/principals.md
 [k8sio-manifests-dir]: https://git.k8s.io/k8s.io/registry.k8s.io
