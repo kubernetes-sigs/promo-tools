@@ -555,6 +555,37 @@ func TestPromoteImagesProvenanceResults(t *testing.T) {
 	require.Nil(t, sut.Provenance())
 }
 
+func TestPromoteImagesVerificationSummaries(t *testing.T) {
+	sut := imagepromoter.Promoter{}
+	mock := imagefakes.FakePromoterImplementation{}
+	mock.ParseManifestsReturns(nonEmptyManifests(), nil)
+	mock.GetPromotionEdgesReturns(map[promotion.Edge]any{testEdge(): nil}, nil)
+	sut.SetImplementation(&mock)
+	sut.SetProvenanceVerifier(&fakeVerifier{result: &provenance.Result{Verified: true}})
+
+	edge := testEdge()
+	ref := edge.SrcReference()
+
+	discoverer := &provenancefakes.FakeDiscoverer{}
+	discoverer.DiscoverReturns(&provenance.Discovery{Reference: ref}, nil)
+	sut.SetDiscoverer(discoverer)
+
+	opts := &options.Options{Confirm: true, VerificationSummaries: true}
+	require.NoError(t, sut.PromoteImages(context.Background(), opts))
+
+	// The summaries are written after the promotion records, from the
+	// results of the provenance phase.
+	require.Equal(t, 1, mock.WriteProvenanceAttestationsCallCount())
+	require.Equal(t, 1, mock.WriteVerificationSummariesCallCount())
+
+	_, gotOpts, _, edges, discoveries, outcomes := mock.WriteVerificationSummariesArgsForCall(0)
+	require.Same(t, opts, gotOpts)
+	require.Len(t, edges, 1)
+	require.Equal(t, sut.Discoveries(), discoveries)
+	require.Equal(t, sut.Provenance(), outcomes)
+	require.Contains(t, outcomes, ref)
+}
+
 func TestPromoteImagesProvenancePolicyOff(t *testing.T) {
 	sut := imagepromoter.Promoter{}
 	mock := imagefakes.FakePromoterImplementation{}

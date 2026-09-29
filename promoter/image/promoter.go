@@ -140,6 +140,7 @@ type promoterImplementation interface {
 	SignImages(*options.Options, map[promotion.Edge]any) error
 	WriteProvenanceAttestations(context.Context, *options.Options, []schema.Manifest, map[promotion.Edge]any, provenance.Generator) error
 	CarryAttestations(context.Context, *options.Options, map[promotion.Edge]any, map[string]*provenance.ImageProvenance) error
+	WriteVerificationSummaries(context.Context, *options.Options, []schema.Manifest, map[promotion.Edge]any, map[string]*provenance.Discovery, map[string]*provenance.ImageProvenance) error
 
 	// Methods for checking signatures and attestations
 	GetLatestImages(context.Context, *options.Options) ([]checkresults.Image, error)
@@ -258,10 +259,10 @@ func (p *Promoter) PromoteImages(ctx context.Context, opts *options.Options) err
 		return nil
 	}))
 
-	// Attest phase: generate and push provenance attestations, and carry
-	// the accepted staging attestations. The promoted images are not
-	// promotion candidates in later runs, so one failing does not skip the
-	// other.
+	// Attest phase: generate and push provenance attestations, carry the
+	// accepted staging attestations and write the verification summaries.
+	// The promoted images are not promotion candidates in later runs, so
+	// one failing does not skip the others.
 	pipe.AddPhase(pipeline.NewPhase("attest", func(ctx context.Context) error {
 		var errs []error
 
@@ -271,6 +272,12 @@ func (p *Promoter) PromoteImages(ctx context.Context, opts *options.Options) err
 
 		if err := p.impl.CarryAttestations(ctx, opts, promotionEdges, p.provenance); err != nil {
 			errs = append(errs, fmt.Errorf("carrying staging attestations: %w", err))
+		}
+
+		if err := p.impl.WriteVerificationSummaries(
+			ctx, opts, mfests, promotionEdges, p.discoveries, p.provenance,
+		); err != nil {
+			errs = append(errs, fmt.Errorf("writing verification summaries: %w", err))
 		}
 
 		return errors.Join(errs...)

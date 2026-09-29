@@ -110,6 +110,11 @@ type Options struct {
 
 	// MaxSignatureOps maximum number of concurrent signature operations
 	MaxSignatureOps int
+
+	// VerificationSummaries when true, write a signed SLSA verification
+	// summary for each promoted digest. Off by default until the identity
+	// signing them is decided.
+	VerificationSummaries bool
 }
 
 var DefaultOptions = &Options{

@@ -212,6 +212,13 @@ network from a registry, it reads from the local manifests only`,
 		"when true, sign promoted images",
 	)
 
+	CipCmd.PersistentFlags().BoolVar(
+		&runOpts.VerificationSummaries,
+		"verification-summaries",
+		options.DefaultOptions.VerificationSummaries,
+		"when true, write a signed SLSA verification summary for each promoted digest (needs --sign)",
+	)
+
 	CipCmd.PersistentFlags().IntVar(
 		&runOpts.MaxSignatureOps,
 		"max-signature-ops",
