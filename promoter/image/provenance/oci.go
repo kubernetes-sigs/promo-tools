@@ -65,6 +65,13 @@ const (
 	// read in parallel.
 	referrerConcurrency = 4
 
+	// dockerReferenceTypeAnnotation and dockerAttestationManifest mark the
+	// attestation manifests BuildKit adds to an index, with the platform
+	// unknownPlatform/unknownPlatform.
+	dockerReferenceTypeAnnotation = "vnd.docker.reference.type"
+	dockerAttestationManifest     = "attestation-manifest"
+	unknownPlatform               = "unknown"
+
 	// maxLayerSize limits how much of an attestation layer is read.
 	// Bundles are a few KiB; SBOMs attested as bundles can be larger.
 	maxLayerSize = 64 << 20
@@ -120,6 +127,10 @@ func (d *OCIDiscoverer) Discover(ctx context.Context, ref string) (*Discovery, e
 
 	discovery := &Discovery{Reference: ref}
 
+	for _, child := range digests[1:] {
+		discovery.Children = append(discovery.Children, child.DigestStr())
+	}
+
 	for _, dg := range digests {
 		if err := d.discoverReferrers(dg, opts, discovery); err != nil {
 			return nil, err
@@ -133,8 +144,25 @@ func (d *OCIDiscoverer) Discover(ctx context.Context, ref string) (*Discovery, e
 	return discovery, nil
 }
 
+// IsPlatformManifest reports whether a child of an index is a platform
+// manifest: an image or an index that is not one of the attestation
+// manifests BuildKit adds. Those are marked by an annotation and have the
+// platform unknown/unknown, which no runtime pulls; an annotated child with
+// any other platform still counts, so that the annotation can't hide a
+// platform image from the provenance policies.
+func IsPlatformManifest(desc *v1.Descriptor) bool {
+	if !desc.MediaType.IsImage() && !desc.MediaType.IsIndex() {
+		return false
+	}
+
+	return desc.Annotations[dockerReferenceTypeAnnotation] != dockerAttestationManifest ||
+		desc.Platform == nil ||
+		desc.Platform.OS != unknownPlatform ||
+		desc.Platform.Architecture != unknownPlatform
+}
+
 // subjects returns the digest and, for an index, the digests of its
-// children that are images or indexes.
+// platform manifests (IsPlatformManifest).
 func subjects(digest name.Digest, opts []remote.Option) ([]name.Digest, error) {
 	desc, err := remote.Get(digest, opts...)
 	if err != nil {
@@ -159,7 +187,7 @@ func subjects(digest name.Digest, opts []remote.Option) ([]name.Digest, error) {
 
 	for i := range im.Manifests {
 		child := &im.Manifests[i]
-		if child.MediaType.IsImage() || child.MediaType.IsIndex() {
+		if IsPlatformManifest(child) {
 			digests = append(digests, digest.Context().Digest(child.Digest.String()))
 		}
 	}

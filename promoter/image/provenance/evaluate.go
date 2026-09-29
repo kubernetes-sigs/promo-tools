@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 	"sync"
@@ -68,6 +69,21 @@ type PolicyResult struct {
 	// the policy signers signed them and, for build provenance, they
 	// passed the policy. They point into the discovery.
 	Accepted []*Attestation
+
+	// Platforms are the results of the platform manifests of an index, by
+	// digest, evaluated against their own attestations. They are nil for
+	// an image.
+	Platforms map[string]*PolicyResult
+
+	// ThroughPlatforms is true when an index without build provenance of
+	// its own satisfies the policy because all its platform manifests do.
+	// Builders usually attest the platform images, not the index.
+	// SLSALevel is then the lowest level of the platform manifests.
+	ThroughPlatforms bool
+
+	// ownProvenance is true when build provenance about the digest was
+	// found, whether or not it passed the policy.
+	ownProvenance bool
 }
 
 // ImageProvenance is what the provenance phase concluded for one staging
@@ -99,6 +115,12 @@ func NewPolicyEvaluator() (*PolicyEvaluator, error) {
 // Evaluate checks the attestations in the discovery against the policy.
 // Only attestations whose signature verified, that were signed by one of
 // the policy signers and whose subjects include the image digest count.
+// For an index, each platform manifest is evaluated the same way against
+// its own digest, and the index satisfies the policy on its own or, when it
+// has no build provenance of its own, when all its platform manifests do.
+// Rejected provenance about the index is never outweighed by its platform
+// manifests. A nested index is evaluated against its own attestations
+// only, not through its platform manifests.
 func (e *PolicyEvaluator) Evaluate(
 	ctx context.Context, discovery *Discovery, policy *Policy,
 ) (*PolicyResult, error) {
@@ -124,9 +146,65 @@ func (e *PolicyEvaluator) Evaluate(
 		return nil, fmt.Errorf("parsing reference %q: %w", discovery.Reference, err)
 	}
 
-	expected, err := subject.Parse(digestRef.DigestStr())
+	result, err := e.evaluateDigest(ctx, discovery, policy, signers, digestRef.DigestStr())
 	if err != nil {
-		return nil, fmt.Errorf("parsing digest of %s: %w", discovery.Reference, err)
+		return nil, err
+	}
+
+	if len(discovery.Children) == 0 {
+		return result, nil
+	}
+
+	result.Platforms = make(map[string]*PolicyResult, len(discovery.Children))
+
+	var (
+		lowest     = -1
+		violations []string
+	)
+
+	for _, child := range discovery.Children {
+		platform, err := e.evaluateDigest(ctx, discovery, policy, signers, child)
+		if err != nil {
+			return nil, err
+		}
+
+		result.Platforms[child] = platform
+
+		if !platform.Satisfied {
+			for _, violation := range platform.Violations {
+				violations = append(violations, fmt.Sprintf("platform manifest %s: %s", child, violation))
+			}
+
+			continue
+		}
+
+		if lowest < 0 || platform.SLSALevel < lowest {
+			lowest = platform.SLSALevel
+		}
+	}
+
+	switch {
+	case result.Satisfied:
+	case len(violations) == 0 && !result.ownProvenance:
+		result.Satisfied = true
+		result.ThroughPlatforms = true
+		result.SLSALevel = lowest
+		result.Violations = nil
+	default:
+		result.Violations = append(result.Violations, violations...)
+	}
+
+	return result, nil
+}
+
+// evaluateDigest checks the attestations in the discovery that are about
+// the digest against the policy.
+func (e *PolicyEvaluator) evaluateDigest(
+	ctx context.Context, discovery *Discovery, policy *Policy, signers []*sapi.Identity, digest string,
+) (*PolicyResult, error) {
+	expected, err := subject.Parse(digest)
+	if err != nil {
+		return nil, fmt.Errorf("parsing digest %s of %s: %w", digest, discovery.Reference, err)
 	}
 
 	result := &PolicyResult{}
@@ -141,9 +219,11 @@ func (e *PolicyEvaluator) Evaluate(
 	// count as accepted.
 	for i := range discovery.Attestations {
 		att := &discovery.Attestations[i]
-		if !slices.Contains(buildProvenanceTypes, att.PredicateType) {
+		if !slices.Contains(buildProvenanceTypes, att.PredicateType) || !concerns(att, expected) {
 			continue
 		}
+
+		result.ownProvenance = true
 
 		level, notice, err := e.verifyProvenance(ctx, att, signers, expected, policy)
 		if err != nil {
@@ -237,6 +317,23 @@ func (e *PolicyEvaluator) verifyProvenance(
 	}
 
 	return 0, "", errors.Join(errs...)
+}
+
+// concerns reports whether the attestation is attached to the digest or
+// names it as a subject. The discovery of an index holds the attestations
+// of its platform manifests as well, which are not about the index.
+func concerns(att *Attestation, expected *subject.Expected) bool {
+	if att.Digest == expected.Name {
+		return true
+	}
+
+	if att.Envelope == nil || att.Envelope.GetStatement() == nil {
+		return false
+	}
+
+	matches := subject.MatchAll([]*subject.Expected{expected}, att.Envelope.GetStatement().GetSubjects())
+
+	return len(matches) == 1 && matches[0].Matched
 }
 
 // failureReason summarizes why a SLSA verification result failed.
@@ -380,13 +477,23 @@ func (c *PolicyChecker) Check(
 	}
 
 	if result.Satisfied {
-		logrus.Infof(
-			"Provenance policy satisfied for %s by %s (SLSA build level %d)",
-			ref, result.Provenance, result.SLSALevel,
-		)
+		by := result.Provenance
+		if result.ThroughPlatforms {
+			by = fmt.Sprintf("its %d platform manifests", len(result.Platforms))
+		}
+
+		logrus.Infof("Provenance policy satisfied for %s by %s (SLSA build level %d)", ref, by, result.SLSALevel)
 
 		if result.Notice != "" {
 			logrus.Infof("Provenance of %s: %s", ref, result.Notice)
+		}
+
+		if result.ThroughPlatforms {
+			for _, digest := range slices.Sorted(maps.Keys(result.Platforms)) {
+				if notice := result.Platforms[digest].Notice; notice != "" {
+					logrus.Infof("Provenance of platform manifest %s of %s: %s", digest, ref, notice)
+				}
+			}
 		}
 
 		return result, nil

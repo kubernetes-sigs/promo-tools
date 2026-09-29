@@ -34,6 +34,7 @@ import (
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/registry"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
+	"github.com/google/go-containerregistry/pkg/v1/mutate"
 	"github.com/google/go-containerregistry/pkg/v1/random"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/google/go-containerregistry/pkg/v1/static"
@@ -286,6 +287,7 @@ func TestDiscoverNoAttestations(t *testing.T) {
 	require.Equal(t, ref.String(), discovery.Reference)
 	require.Empty(t, discovery.Attestations)
 	require.Empty(t, discovery.Referrers)
+	require.Empty(t, discovery.Children)
 	require.Empty(t, discovery.Summary())
 }
 
@@ -354,8 +356,32 @@ func TestDiscoverOtherReferrer(t *testing.T) {
 func TestDiscoverIndexChildren(t *testing.T) {
 	repo := newReferrersRepo(t)
 
-	idx, err := random.Index(256, 1, 2)
+	platforms, err := random.Index(256, 1, 2)
 	require.NoError(t, err)
+
+	attestationManifest, err := random.Image(256, 1)
+	require.NoError(t, err)
+
+	annotated, err := random.Image(256, 1)
+	require.NoError(t, err)
+
+	annotations := map[string]string{dockerReferenceTypeAnnotation: dockerAttestationManifest}
+
+	// BuildKit adds attestation manifests to an index, which are no
+	// platform manifests. The annotation alone doesn't hide an image with
+	// a real platform.
+	idx := mutate.AppendManifests(platforms,
+		mutate.IndexAddendum{
+			Add:         attestationManifest,
+			Annotations: annotations,
+			Platform:    &v1.Platform{OS: unknownPlatform, Architecture: unknownPlatform},
+		},
+		mutate.IndexAddendum{
+			Add:         annotated,
+			Annotations: annotations,
+			Platform:    &v1.Platform{OS: "linux", Architecture: "arm64"},
+		},
+	)
 
 	idxDigest, err := idx.Digest()
 	require.NoError(t, err)
@@ -375,6 +401,9 @@ func TestDiscoverIndexChildren(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, discovery.Attestations, 1)
 	require.Equal(t, child.DigestStr(), discovery.Attestations[0].Digest)
+	require.Equal(t, []string{
+		im.Manifests[0].Digest.String(), child.DigestStr(), im.Manifests[3].Digest.String(),
+	}, discovery.Children)
 }
 
 func TestDiscoverAttestationTag(t *testing.T) {
@@ -597,6 +626,45 @@ func TestVerificationResult(t *testing.T) {
 			require.Equal(t, tc.status, status)
 			require.Equal(t, tc.signers, signers)
 			require.Equal(t, tc.reason, reason)
+		})
+	}
+}
+
+func TestIsPlatformManifest(t *testing.T) {
+	t.Parallel()
+
+	attestation := map[string]string{dockerReferenceTypeAnnotation: dockerAttestationManifest}
+	unknown := &v1.Platform{OS: unknownPlatform, Architecture: unknownPlatform}
+	arm64 := &v1.Platform{OS: "linux", Architecture: "arm64"}
+
+	for _, tc := range []struct {
+		name string
+		desc v1.Descriptor
+		want bool
+	}{
+		{name: "image", desc: v1.Descriptor{MediaType: types.OCIManifestSchema1, Platform: arm64}, want: true},
+		{name: "index", desc: v1.Descriptor{MediaType: types.OCIImageIndex}, want: true},
+		{name: "docker image", desc: v1.Descriptor{MediaType: types.DockerManifestSchema2}, want: true},
+		{name: "not a manifest", desc: v1.Descriptor{MediaType: types.OCILayer}},
+		{
+			name: "attestation manifest",
+			desc: v1.Descriptor{MediaType: types.OCIManifestSchema1, Annotations: attestation, Platform: unknown},
+		},
+		{
+			name: "annotated image with a real platform",
+			desc: v1.Descriptor{MediaType: types.OCIManifestSchema1, Annotations: attestation, Platform: arm64},
+			want: true,
+		},
+		{
+			name: "annotated image without a platform",
+			desc: v1.Descriptor{MediaType: types.OCIManifestSchema1, Annotations: attestation},
+			want: true,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			require.Equal(t, tc.want, IsPlatformManifest(&tc.desc))
 		})
 	}
 }

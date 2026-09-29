@@ -68,6 +68,11 @@ type Discovery struct {
 	// Reference is the digest reference that was inspected.
 	Reference string
 
+	// Children are the digests of the platform manifests of an index:
+	// the images and indexes it lists, without attestation manifests. It
+	// is empty for an image.
+	Children []string
+
 	// Attestations are the attestations found on the image and, for an
 	// index, on its children in the same repository.
 	Attestations []Attestation
