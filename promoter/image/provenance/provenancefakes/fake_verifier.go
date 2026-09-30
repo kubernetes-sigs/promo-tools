@@ -27,11 +27,8 @@ import (
 type FakeVerifier struct {
 	VerifyStub        func(context.Context, string) (*provenance.Result, error)
 	verifyMutex       sync.RWMutex
-	verifyArgsForCall []struct {
-		arg1 context.Context
-		arg2 string
-	}
-	verifyReturns struct {
+	verifyArgsForCall []FakeVerifierVerifyArgs
+	verifyReturns     struct {
 		result1 *provenance.Result
 		result2 error
 	}
@@ -40,16 +37,20 @@ type FakeVerifier struct {
 		result2 error
 	}
 	invocations      map[string][][]interface{}
+	callOrder        []string
 	invocationsMutex sync.RWMutex
+}
+
+// FakeVerifierVerifyArgs holds the arguments of one call to Verify.
+type FakeVerifierVerifyArgs struct {
+	Arg1 context.Context
+	Arg2 string
 }
 
 func (fake *FakeVerifier) Verify(arg1 context.Context, arg2 string) (*provenance.Result, error) {
 	fake.verifyMutex.Lock()
 	ret, specificReturn := fake.verifyReturnsOnCall[len(fake.verifyArgsForCall)]
-	fake.verifyArgsForCall = append(fake.verifyArgsForCall, struct {
-		arg1 context.Context
-		arg2 string
-	}{arg1, arg2})
+	fake.verifyArgsForCall = append(fake.verifyArgsForCall, FakeVerifierVerifyArgs{arg1, arg2})
 	stub := fake.VerifyStub
 	fakeReturns := fake.verifyReturns
 	fake.recordInvocation("Verify", []interface{}{arg1, arg2})
@@ -79,7 +80,15 @@ func (fake *FakeVerifier) VerifyArgsForCall(i int) (context.Context, string) {
 	fake.verifyMutex.RLock()
 	defer fake.verifyMutex.RUnlock()
 	argsForCall := fake.verifyArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2
+	return argsForCall.Arg1, argsForCall.Arg2
+}
+
+func (fake *FakeVerifier) VerifyArgs() []FakeVerifierVerifyArgs {
+	fake.verifyMutex.RLock()
+	defer fake.verifyMutex.RUnlock()
+	args := make([]FakeVerifierVerifyArgs, len(fake.verifyArgsForCall))
+	copy(args, fake.verifyArgsForCall)
+	return args
 }
 
 func (fake *FakeVerifier) VerifyReturns(result1 *provenance.Result, result2 error) {
@@ -118,9 +127,18 @@ func (fake *FakeVerifier) Invocations() map[string][][]interface{} {
 	return copiedInvocations
 }
 
+func (fake *FakeVerifier) CallOrder() []string {
+	fake.invocationsMutex.RLock()
+	defer fake.invocationsMutex.RUnlock()
+	order := make([]string, len(fake.callOrder))
+	copy(order, fake.callOrder)
+	return order
+}
+
 func (fake *FakeVerifier) recordInvocation(key string, args []interface{}) {
 	fake.invocationsMutex.Lock()
 	defer fake.invocationsMutex.Unlock()
+	fake.callOrder = append(fake.callOrder, key)
 	if fake.invocations == nil {
 		fake.invocations = map[string][][]interface{}{}
 	}

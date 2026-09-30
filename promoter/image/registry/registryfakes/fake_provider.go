@@ -27,12 +27,8 @@ import (
 type FakeProvider struct {
 	CopyImageStub        func(context.Context, string, string) error
 	copyImageMutex       sync.RWMutex
-	copyImageArgsForCall []struct {
-		arg1 context.Context
-		arg2 string
-		arg3 string
-	}
-	copyImageReturns struct {
+	copyImageArgsForCall []FakeProviderCopyImageArgs
+	copyImageReturns     struct {
 		result1 error
 	}
 	copyImageReturnsOnCall map[int]struct {
@@ -40,13 +36,8 @@ type FakeProvider struct {
 	}
 	ReadRegistriesStub        func(context.Context, []registry.RegistryConfig, bool, []registry.RegistryConfig) (*registry.Inventory, error)
 	readRegistriesMutex       sync.RWMutex
-	readRegistriesArgsForCall []struct {
-		arg1 context.Context
-		arg2 []registry.RegistryConfig
-		arg3 bool
-		arg4 []registry.RegistryConfig
-	}
-	readRegistriesReturns struct {
+	readRegistriesArgsForCall []FakeProviderReadRegistriesArgs
+	readRegistriesReturns     struct {
 		result1 *registry.Inventory
 		result2 error
 	}
@@ -55,17 +46,29 @@ type FakeProvider struct {
 		result2 error
 	}
 	invocations      map[string][][]interface{}
+	callOrder        []string
 	invocationsMutex sync.RWMutex
+}
+
+// FakeProviderCopyImageArgs holds the arguments of one call to CopyImage.
+type FakeProviderCopyImageArgs struct {
+	Arg1 context.Context
+	Arg2 string
+	Arg3 string
+}
+
+// FakeProviderReadRegistriesArgs holds the arguments of one call to ReadRegistries.
+type FakeProviderReadRegistriesArgs struct {
+	Arg1 context.Context
+	Arg2 []registry.RegistryConfig
+	Arg3 bool
+	Arg4 []registry.RegistryConfig
 }
 
 func (fake *FakeProvider) CopyImage(arg1 context.Context, arg2 string, arg3 string) error {
 	fake.copyImageMutex.Lock()
 	ret, specificReturn := fake.copyImageReturnsOnCall[len(fake.copyImageArgsForCall)]
-	fake.copyImageArgsForCall = append(fake.copyImageArgsForCall, struct {
-		arg1 context.Context
-		arg2 string
-		arg3 string
-	}{arg1, arg2, arg3})
+	fake.copyImageArgsForCall = append(fake.copyImageArgsForCall, FakeProviderCopyImageArgs{arg1, arg2, arg3})
 	stub := fake.CopyImageStub
 	fakeReturns := fake.copyImageReturns
 	fake.recordInvocation("CopyImage", []interface{}{arg1, arg2, arg3})
@@ -95,7 +98,15 @@ func (fake *FakeProvider) CopyImageArgsForCall(i int) (context.Context, string, 
 	fake.copyImageMutex.RLock()
 	defer fake.copyImageMutex.RUnlock()
 	argsForCall := fake.copyImageArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
+	return argsForCall.Arg1, argsForCall.Arg2, argsForCall.Arg3
+}
+
+func (fake *FakeProvider) CopyImageArgs() []FakeProviderCopyImageArgs {
+	fake.copyImageMutex.RLock()
+	defer fake.copyImageMutex.RUnlock()
+	args := make([]FakeProviderCopyImageArgs, len(fake.copyImageArgsForCall))
+	copy(args, fake.copyImageArgsForCall)
+	return args
 }
 
 func (fake *FakeProvider) CopyImageReturns(result1 error) {
@@ -134,12 +145,7 @@ func (fake *FakeProvider) ReadRegistries(arg1 context.Context, arg2 []registry.R
 	}
 	fake.readRegistriesMutex.Lock()
 	ret, specificReturn := fake.readRegistriesReturnsOnCall[len(fake.readRegistriesArgsForCall)]
-	fake.readRegistriesArgsForCall = append(fake.readRegistriesArgsForCall, struct {
-		arg1 context.Context
-		arg2 []registry.RegistryConfig
-		arg3 bool
-		arg4 []registry.RegistryConfig
-	}{arg1, arg2Copy, arg3, arg4Copy})
+	fake.readRegistriesArgsForCall = append(fake.readRegistriesArgsForCall, FakeProviderReadRegistriesArgs{arg1, arg2Copy, arg3, arg4Copy})
 	stub := fake.ReadRegistriesStub
 	fakeReturns := fake.readRegistriesReturns
 	fake.recordInvocation("ReadRegistries", []interface{}{arg1, arg2Copy, arg3, arg4Copy})
@@ -169,7 +175,15 @@ func (fake *FakeProvider) ReadRegistriesArgsForCall(i int) (context.Context, []r
 	fake.readRegistriesMutex.RLock()
 	defer fake.readRegistriesMutex.RUnlock()
 	argsForCall := fake.readRegistriesArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4
+	return argsForCall.Arg1, argsForCall.Arg2, argsForCall.Arg3, argsForCall.Arg4
+}
+
+func (fake *FakeProvider) ReadRegistriesArgs() []FakeProviderReadRegistriesArgs {
+	fake.readRegistriesMutex.RLock()
+	defer fake.readRegistriesMutex.RUnlock()
+	args := make([]FakeProviderReadRegistriesArgs, len(fake.readRegistriesArgsForCall))
+	copy(args, fake.readRegistriesArgsForCall)
+	return args
 }
 
 func (fake *FakeProvider) ReadRegistriesReturns(result1 *registry.Inventory, result2 error) {
@@ -208,9 +222,18 @@ func (fake *FakeProvider) Invocations() map[string][][]interface{} {
 	return copiedInvocations
 }
 
+func (fake *FakeProvider) CallOrder() []string {
+	fake.invocationsMutex.RLock()
+	defer fake.invocationsMutex.RUnlock()
+	order := make([]string, len(fake.callOrder))
+	copy(order, fake.callOrder)
+	return order
+}
+
 func (fake *FakeProvider) recordInvocation(key string, args []interface{}) {
 	fake.invocationsMutex.Lock()
 	defer fake.invocationsMutex.Unlock()
+	fake.callOrder = append(fake.callOrder, key)
 	if fake.invocations == nil {
 		fake.invocations = map[string][][]interface{}{}
 	}

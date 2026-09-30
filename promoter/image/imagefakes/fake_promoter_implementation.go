@@ -32,11 +32,8 @@ import (
 type FakePromoterImplementation struct {
 	AppendManifestToSnapshotStub        func(*imagepromotera.Options, []schema.Manifest) ([]schema.Manifest, error)
 	appendManifestToSnapshotMutex       sync.RWMutex
-	appendManifestToSnapshotArgsForCall []struct {
-		arg1 *imagepromotera.Options
-		arg2 []schema.Manifest
-	}
-	appendManifestToSnapshotReturns struct {
+	appendManifestToSnapshotArgsForCall []FakePromoterImplementationAppendManifestToSnapshotArgs
+	appendManifestToSnapshotReturns     struct {
 		result1 []schema.Manifest
 		result2 error
 	}
@@ -46,13 +43,8 @@ type FakePromoterImplementation struct {
 	}
 	CarryAttestationsStub        func(context.Context, *imagepromotera.Options, map[promotion.Edge]any, map[string]*provenance.ImageProvenance) error
 	carryAttestationsMutex       sync.RWMutex
-	carryAttestationsArgsForCall []struct {
-		arg1 context.Context
-		arg2 *imagepromotera.Options
-		arg3 map[promotion.Edge]any
-		arg4 map[string]*provenance.ImageProvenance
-	}
-	carryAttestationsReturns struct {
+	carryAttestationsArgsForCall []FakePromoterImplementationCarryAttestationsArgs
+	carryAttestationsReturns     struct {
 		result1 error
 	}
 	carryAttestationsReturnsOnCall map[int]struct {
@@ -60,13 +52,8 @@ type FakePromoterImplementation struct {
 	}
 	FixMissingAttestationsStub        func(context.Context, *imagepromotera.Options, checkresults.Results, provenance.Generator) error
 	fixMissingAttestationsMutex       sync.RWMutex
-	fixMissingAttestationsArgsForCall []struct {
-		arg1 context.Context
-		arg2 *imagepromotera.Options
-		arg3 checkresults.Results
-		arg4 provenance.Generator
-	}
-	fixMissingAttestationsReturns struct {
+	fixMissingAttestationsArgsForCall []FakePromoterImplementationFixMissingAttestationsArgs
+	fixMissingAttestationsReturns     struct {
 		result1 error
 	}
 	fixMissingAttestationsReturnsOnCall map[int]struct {
@@ -74,12 +61,8 @@ type FakePromoterImplementation struct {
 	}
 	FixMissingSignaturesStub        func(context.Context, *imagepromotera.Options, checkresults.Results) error
 	fixMissingSignaturesMutex       sync.RWMutex
-	fixMissingSignaturesArgsForCall []struct {
-		arg1 context.Context
-		arg2 *imagepromotera.Options
-		arg3 checkresults.Results
-	}
-	fixMissingSignaturesReturns struct {
+	fixMissingSignaturesArgsForCall []FakePromoterImplementationFixMissingSignaturesArgs
+	fixMissingSignaturesReturns     struct {
 		result1 error
 	}
 	fixMissingSignaturesReturnsOnCall map[int]struct {
@@ -87,11 +70,8 @@ type FakePromoterImplementation struct {
 	}
 	GetLatestImagesStub        func(context.Context, *imagepromotera.Options) ([]checkresults.Image, error)
 	getLatestImagesMutex       sync.RWMutex
-	getLatestImagesArgsForCall []struct {
-		arg1 context.Context
-		arg2 *imagepromotera.Options
-	}
-	getLatestImagesReturns struct {
+	getLatestImagesArgsForCall []FakePromoterImplementationGetLatestImagesArgs
+	getLatestImagesReturns     struct {
 		result1 []checkresults.Image
 		result2 error
 	}
@@ -101,12 +81,8 @@ type FakePromoterImplementation struct {
 	}
 	GetPromotionEdgesStub        func(context.Context, *imagepromotera.Options, []schema.Manifest) (map[promotion.Edge]any, error)
 	getPromotionEdgesMutex       sync.RWMutex
-	getPromotionEdgesArgsForCall []struct {
-		arg1 context.Context
-		arg2 *imagepromotera.Options
-		arg3 []schema.Manifest
-	}
-	getPromotionEdgesReturns struct {
+	getPromotionEdgesArgsForCall []FakePromoterImplementationGetPromotionEdgesArgs
+	getPromotionEdgesReturns     struct {
 		result1 map[promotion.Edge]any
 		result2 error
 	}
@@ -116,12 +92,8 @@ type FakePromoterImplementation struct {
 	}
 	GetRegistryImageInventoryStub        func(context.Context, *imagepromotera.Options, []schema.Manifest) (registry.RegInvImage, error)
 	getRegistryImageInventoryMutex       sync.RWMutex
-	getRegistryImageInventoryArgsForCall []struct {
-		arg1 context.Context
-		arg2 *imagepromotera.Options
-		arg3 []schema.Manifest
-	}
-	getRegistryImageInventoryReturns struct {
+	getRegistryImageInventoryArgsForCall []FakePromoterImplementationGetRegistryImageInventoryArgs
+	getRegistryImageInventoryReturns     struct {
 		result1 registry.RegInvImage
 		result2 error
 	}
@@ -131,12 +103,8 @@ type FakePromoterImplementation struct {
 	}
 	GetSignatureStatusStub        func(context.Context, *imagepromotera.Options, []checkresults.Image) (checkresults.Results, error)
 	getSignatureStatusMutex       sync.RWMutex
-	getSignatureStatusArgsForCall []struct {
-		arg1 context.Context
-		arg2 *imagepromotera.Options
-		arg3 []checkresults.Image
-	}
-	getSignatureStatusReturns struct {
+	getSignatureStatusArgsForCall []FakePromoterImplementationGetSignatureStatusArgs
+	getSignatureStatusReturns     struct {
 		result1 checkresults.Results
 		result2 error
 	}
@@ -146,10 +114,8 @@ type FakePromoterImplementation struct {
 	}
 	GetSnapshotManifestsStub        func(*imagepromotera.Options) ([]schema.Manifest, error)
 	getSnapshotManifestsMutex       sync.RWMutex
-	getSnapshotManifestsArgsForCall []struct {
-		arg1 *imagepromotera.Options
-	}
-	getSnapshotManifestsReturns struct {
+	getSnapshotManifestsArgsForCall []FakePromoterImplementationGetSnapshotManifestsArgs
+	getSnapshotManifestsReturns     struct {
 		result1 []schema.Manifest
 		result2 error
 	}
@@ -159,10 +125,8 @@ type FakePromoterImplementation struct {
 	}
 	GetSnapshotSourceRegistryStub        func(*imagepromotera.Options) (*registry.Context, error)
 	getSnapshotSourceRegistryMutex       sync.RWMutex
-	getSnapshotSourceRegistryArgsForCall []struct {
-		arg1 *imagepromotera.Options
-	}
-	getSnapshotSourceRegistryReturns struct {
+	getSnapshotSourceRegistryArgsForCall []FakePromoterImplementationGetSnapshotSourceRegistryArgs
+	getSnapshotSourceRegistryReturns     struct {
 		result1 *registry.Context
 		result2 error
 	}
@@ -172,10 +136,8 @@ type FakePromoterImplementation struct {
 	}
 	ParseManifestsStub        func(*imagepromotera.Options) ([]schema.Manifest, error)
 	parseManifestsMutex       sync.RWMutex
-	parseManifestsArgsForCall []struct {
-		arg1 *imagepromotera.Options
-	}
-	parseManifestsReturns struct {
+	parseManifestsArgsForCall []FakePromoterImplementationParseManifestsArgs
+	parseManifestsReturns     struct {
 		result1 []schema.Manifest
 		result2 error
 	}
@@ -185,10 +147,8 @@ type FakePromoterImplementation struct {
 	}
 	PrewarmTUFCacheStub        func(context.Context) error
 	prewarmTUFCacheMutex       sync.RWMutex
-	prewarmTUFCacheArgsForCall []struct {
-		arg1 context.Context
-	}
-	prewarmTUFCacheReturns struct {
+	prewarmTUFCacheArgsForCall []FakePromoterImplementationPrewarmTUFCacheArgs
+	prewarmTUFCacheReturns     struct {
 		result1 error
 	}
 	prewarmTUFCacheReturnsOnCall map[int]struct {
@@ -196,20 +156,14 @@ type FakePromoterImplementation struct {
 	}
 	PrintSecDisclaimerStub        func()
 	printSecDisclaimerMutex       sync.RWMutex
-	printSecDisclaimerArgsForCall []struct {
-	}
-	PrintVersionStub        func()
-	printVersionMutex       sync.RWMutex
-	printVersionArgsForCall []struct {
-	}
-	PromoteImagesStub        func(context.Context, *imagepromotera.Options, map[promotion.Edge]any) error
-	promoteImagesMutex       sync.RWMutex
-	promoteImagesArgsForCall []struct {
-		arg1 context.Context
-		arg2 *imagepromotera.Options
-		arg3 map[promotion.Edge]any
-	}
-	promoteImagesReturns struct {
+	printSecDisclaimerArgsForCall []struct{}
+	PrintVersionStub              func()
+	printVersionMutex             sync.RWMutex
+	printVersionArgsForCall       []struct{}
+	PromoteImagesStub             func(context.Context, *imagepromotera.Options, map[promotion.Edge]any) error
+	promoteImagesMutex            sync.RWMutex
+	promoteImagesArgsForCall      []FakePromoterImplementationPromoteImagesArgs
+	promoteImagesReturns          struct {
 		result1 error
 	}
 	promoteImagesReturnsOnCall map[int]struct {
@@ -217,12 +171,8 @@ type FakePromoterImplementation struct {
 	}
 	ScanEdgesStub        func(context.Context, *imagepromotera.Options, map[promotion.Edge]any) error
 	scanEdgesMutex       sync.RWMutex
-	scanEdgesArgsForCall []struct {
-		arg1 context.Context
-		arg2 *imagepromotera.Options
-		arg3 map[promotion.Edge]any
-	}
-	scanEdgesReturns struct {
+	scanEdgesArgsForCall []FakePromoterImplementationScanEdgesArgs
+	scanEdgesReturns     struct {
 		result1 error
 	}
 	scanEdgesReturnsOnCall map[int]struct {
@@ -230,11 +180,8 @@ type FakePromoterImplementation struct {
 	}
 	SignImagesStub        func(*imagepromotera.Options, map[promotion.Edge]any) error
 	signImagesMutex       sync.RWMutex
-	signImagesArgsForCall []struct {
-		arg1 *imagepromotera.Options
-		arg2 map[promotion.Edge]any
-	}
-	signImagesReturns struct {
+	signImagesArgsForCall []FakePromoterImplementationSignImagesArgs
+	signImagesReturns     struct {
 		result1 error
 	}
 	signImagesReturnsOnCall map[int]struct {
@@ -242,11 +189,8 @@ type FakePromoterImplementation struct {
 	}
 	SnapshotStub        func(*imagepromotera.Options, registry.RegInvImage) error
 	snapshotMutex       sync.RWMutex
-	snapshotArgsForCall []struct {
-		arg1 *imagepromotera.Options
-		arg2 registry.RegInvImage
-	}
-	snapshotReturns struct {
+	snapshotArgsForCall []FakePromoterImplementationSnapshotArgs
+	snapshotReturns     struct {
 		result1 error
 	}
 	snapshotReturnsOnCall map[int]struct {
@@ -254,10 +198,8 @@ type FakePromoterImplementation struct {
 	}
 	ValidateOptionsStub        func(*imagepromotera.Options) error
 	validateOptionsMutex       sync.RWMutex
-	validateOptionsArgsForCall []struct {
-		arg1 *imagepromotera.Options
-	}
-	validateOptionsReturns struct {
+	validateOptionsArgsForCall []FakePromoterImplementationValidateOptionsArgs
+	validateOptionsReturns     struct {
 		result1 error
 	}
 	validateOptionsReturnsOnCall map[int]struct {
@@ -265,13 +207,8 @@ type FakePromoterImplementation struct {
 	}
 	ValidateStagingSignaturesStub        func(context.Context, *imagepromotera.Options, map[promotion.Edge]any, map[string]*provenance.Discovery) (promotion.StagingSignatures, error)
 	validateStagingSignaturesMutex       sync.RWMutex
-	validateStagingSignaturesArgsForCall []struct {
-		arg1 context.Context
-		arg2 *imagepromotera.Options
-		arg3 map[promotion.Edge]any
-		arg4 map[string]*provenance.Discovery
-	}
-	validateStagingSignaturesReturns struct {
+	validateStagingSignaturesArgsForCall []FakePromoterImplementationValidateStagingSignaturesArgs
+	validateStagingSignaturesReturns     struct {
 		result1 promotion.StagingSignatures
 		result2 error
 	}
@@ -281,14 +218,8 @@ type FakePromoterImplementation struct {
 	}
 	WriteProvenanceAttestationsStub        func(context.Context, *imagepromotera.Options, []schema.Manifest, map[promotion.Edge]any, provenance.Generator) error
 	writeProvenanceAttestationsMutex       sync.RWMutex
-	writeProvenanceAttestationsArgsForCall []struct {
-		arg1 context.Context
-		arg2 *imagepromotera.Options
-		arg3 []schema.Manifest
-		arg4 map[promotion.Edge]any
-		arg5 provenance.Generator
-	}
-	writeProvenanceAttestationsReturns struct {
+	writeProvenanceAttestationsArgsForCall []FakePromoterImplementationWriteProvenanceAttestationsArgs
+	writeProvenanceAttestationsReturns     struct {
 		result1 error
 	}
 	writeProvenanceAttestationsReturnsOnCall map[int]struct {
@@ -296,22 +227,150 @@ type FakePromoterImplementation struct {
 	}
 	WriteVerificationSummariesStub        func(context.Context, *imagepromotera.Options, []schema.Manifest, map[promotion.Edge]any, map[string]*provenance.Discovery, map[string]*provenance.ImageProvenance) error
 	writeVerificationSummariesMutex       sync.RWMutex
-	writeVerificationSummariesArgsForCall []struct {
-		arg1 context.Context
-		arg2 *imagepromotera.Options
-		arg3 []schema.Manifest
-		arg4 map[promotion.Edge]any
-		arg5 map[string]*provenance.Discovery
-		arg6 map[string]*provenance.ImageProvenance
-	}
-	writeVerificationSummariesReturns struct {
+	writeVerificationSummariesArgsForCall []FakePromoterImplementationWriteVerificationSummariesArgs
+	writeVerificationSummariesReturns     struct {
 		result1 error
 	}
 	writeVerificationSummariesReturnsOnCall map[int]struct {
 		result1 error
 	}
 	invocations      map[string][][]interface{}
+	callOrder        []string
 	invocationsMutex sync.RWMutex
+}
+
+// FakePromoterImplementationAppendManifestToSnapshotArgs holds the arguments of one call to AppendManifestToSnapshot.
+type FakePromoterImplementationAppendManifestToSnapshotArgs struct {
+	Arg1 *imagepromotera.Options
+	Arg2 []schema.Manifest
+}
+
+// FakePromoterImplementationCarryAttestationsArgs holds the arguments of one call to CarryAttestations.
+type FakePromoterImplementationCarryAttestationsArgs struct {
+	Arg1 context.Context
+	Arg2 *imagepromotera.Options
+	Arg3 map[promotion.Edge]any
+	Arg4 map[string]*provenance.ImageProvenance
+}
+
+// FakePromoterImplementationFixMissingAttestationsArgs holds the arguments of one call to FixMissingAttestations.
+type FakePromoterImplementationFixMissingAttestationsArgs struct {
+	Arg1 context.Context
+	Arg2 *imagepromotera.Options
+	Arg3 checkresults.Results
+	Arg4 provenance.Generator
+}
+
+// FakePromoterImplementationFixMissingSignaturesArgs holds the arguments of one call to FixMissingSignatures.
+type FakePromoterImplementationFixMissingSignaturesArgs struct {
+	Arg1 context.Context
+	Arg2 *imagepromotera.Options
+	Arg3 checkresults.Results
+}
+
+// FakePromoterImplementationGetLatestImagesArgs holds the arguments of one call to GetLatestImages.
+type FakePromoterImplementationGetLatestImagesArgs struct {
+	Arg1 context.Context
+	Arg2 *imagepromotera.Options
+}
+
+// FakePromoterImplementationGetPromotionEdgesArgs holds the arguments of one call to GetPromotionEdges.
+type FakePromoterImplementationGetPromotionEdgesArgs struct {
+	Arg1 context.Context
+	Arg2 *imagepromotera.Options
+	Arg3 []schema.Manifest
+}
+
+// FakePromoterImplementationGetRegistryImageInventoryArgs holds the arguments of one call to GetRegistryImageInventory.
+type FakePromoterImplementationGetRegistryImageInventoryArgs struct {
+	Arg1 context.Context
+	Arg2 *imagepromotera.Options
+	Arg3 []schema.Manifest
+}
+
+// FakePromoterImplementationGetSignatureStatusArgs holds the arguments of one call to GetSignatureStatus.
+type FakePromoterImplementationGetSignatureStatusArgs struct {
+	Arg1 context.Context
+	Arg2 *imagepromotera.Options
+	Arg3 []checkresults.Image
+}
+
+// FakePromoterImplementationGetSnapshotManifestsArgs holds the arguments of one call to GetSnapshotManifests.
+type FakePromoterImplementationGetSnapshotManifestsArgs struct {
+	Arg1 *imagepromotera.Options
+}
+
+// FakePromoterImplementationGetSnapshotSourceRegistryArgs holds the arguments of one call to GetSnapshotSourceRegistry.
+type FakePromoterImplementationGetSnapshotSourceRegistryArgs struct {
+	Arg1 *imagepromotera.Options
+}
+
+// FakePromoterImplementationParseManifestsArgs holds the arguments of one call to ParseManifests.
+type FakePromoterImplementationParseManifestsArgs struct {
+	Arg1 *imagepromotera.Options
+}
+
+// FakePromoterImplementationPrewarmTUFCacheArgs holds the arguments of one call to PrewarmTUFCache.
+type FakePromoterImplementationPrewarmTUFCacheArgs struct {
+	Arg1 context.Context
+}
+
+// FakePromoterImplementationPromoteImagesArgs holds the arguments of one call to PromoteImages.
+type FakePromoterImplementationPromoteImagesArgs struct {
+	Arg1 context.Context
+	Arg2 *imagepromotera.Options
+	Arg3 map[promotion.Edge]any
+}
+
+// FakePromoterImplementationScanEdgesArgs holds the arguments of one call to ScanEdges.
+type FakePromoterImplementationScanEdgesArgs struct {
+	Arg1 context.Context
+	Arg2 *imagepromotera.Options
+	Arg3 map[promotion.Edge]any
+}
+
+// FakePromoterImplementationSignImagesArgs holds the arguments of one call to SignImages.
+type FakePromoterImplementationSignImagesArgs struct {
+	Arg1 *imagepromotera.Options
+	Arg2 map[promotion.Edge]any
+}
+
+// FakePromoterImplementationSnapshotArgs holds the arguments of one call to Snapshot.
+type FakePromoterImplementationSnapshotArgs struct {
+	Arg1 *imagepromotera.Options
+	Arg2 registry.RegInvImage
+}
+
+// FakePromoterImplementationValidateOptionsArgs holds the arguments of one call to ValidateOptions.
+type FakePromoterImplementationValidateOptionsArgs struct {
+	Arg1 *imagepromotera.Options
+}
+
+// FakePromoterImplementationValidateStagingSignaturesArgs holds the arguments of one call to ValidateStagingSignatures.
+type FakePromoterImplementationValidateStagingSignaturesArgs struct {
+	Arg1 context.Context
+	Arg2 *imagepromotera.Options
+	Arg3 map[promotion.Edge]any
+	Arg4 map[string]*provenance.Discovery
+}
+
+// FakePromoterImplementationWriteProvenanceAttestationsArgs holds the arguments of one call to WriteProvenanceAttestations.
+type FakePromoterImplementationWriteProvenanceAttestationsArgs struct {
+	Arg1 context.Context
+	Arg2 *imagepromotera.Options
+	Arg3 []schema.Manifest
+	Arg4 map[promotion.Edge]any
+	Arg5 provenance.Generator
+}
+
+// FakePromoterImplementationWriteVerificationSummariesArgs holds the arguments of one call to WriteVerificationSummaries.
+type FakePromoterImplementationWriteVerificationSummariesArgs struct {
+	Arg1 context.Context
+	Arg2 *imagepromotera.Options
+	Arg3 []schema.Manifest
+	Arg4 map[promotion.Edge]any
+	Arg5 map[string]*provenance.Discovery
+	Arg6 map[string]*provenance.ImageProvenance
 }
 
 func (fake *FakePromoterImplementation) AppendManifestToSnapshot(arg1 *imagepromotera.Options, arg2 []schema.Manifest) ([]schema.Manifest, error) {
@@ -322,10 +381,7 @@ func (fake *FakePromoterImplementation) AppendManifestToSnapshot(arg1 *imageprom
 	}
 	fake.appendManifestToSnapshotMutex.Lock()
 	ret, specificReturn := fake.appendManifestToSnapshotReturnsOnCall[len(fake.appendManifestToSnapshotArgsForCall)]
-	fake.appendManifestToSnapshotArgsForCall = append(fake.appendManifestToSnapshotArgsForCall, struct {
-		arg1 *imagepromotera.Options
-		arg2 []schema.Manifest
-	}{arg1, arg2Copy})
+	fake.appendManifestToSnapshotArgsForCall = append(fake.appendManifestToSnapshotArgsForCall, FakePromoterImplementationAppendManifestToSnapshotArgs{arg1, arg2Copy})
 	stub := fake.AppendManifestToSnapshotStub
 	fakeReturns := fake.appendManifestToSnapshotReturns
 	fake.recordInvocation("AppendManifestToSnapshot", []interface{}{arg1, arg2Copy})
@@ -355,7 +411,15 @@ func (fake *FakePromoterImplementation) AppendManifestToSnapshotArgsForCall(i in
 	fake.appendManifestToSnapshotMutex.RLock()
 	defer fake.appendManifestToSnapshotMutex.RUnlock()
 	argsForCall := fake.appendManifestToSnapshotArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2
+	return argsForCall.Arg1, argsForCall.Arg2
+}
+
+func (fake *FakePromoterImplementation) AppendManifestToSnapshotArgs() []FakePromoterImplementationAppendManifestToSnapshotArgs {
+	fake.appendManifestToSnapshotMutex.RLock()
+	defer fake.appendManifestToSnapshotMutex.RUnlock()
+	args := make([]FakePromoterImplementationAppendManifestToSnapshotArgs, len(fake.appendManifestToSnapshotArgsForCall))
+	copy(args, fake.appendManifestToSnapshotArgsForCall)
+	return args
 }
 
 func (fake *FakePromoterImplementation) AppendManifestToSnapshotReturns(result1 []schema.Manifest, result2 error) {
@@ -387,12 +451,7 @@ func (fake *FakePromoterImplementation) AppendManifestToSnapshotReturnsOnCall(i 
 func (fake *FakePromoterImplementation) CarryAttestations(arg1 context.Context, arg2 *imagepromotera.Options, arg3 map[promotion.Edge]any, arg4 map[string]*provenance.ImageProvenance) error {
 	fake.carryAttestationsMutex.Lock()
 	ret, specificReturn := fake.carryAttestationsReturnsOnCall[len(fake.carryAttestationsArgsForCall)]
-	fake.carryAttestationsArgsForCall = append(fake.carryAttestationsArgsForCall, struct {
-		arg1 context.Context
-		arg2 *imagepromotera.Options
-		arg3 map[promotion.Edge]any
-		arg4 map[string]*provenance.ImageProvenance
-	}{arg1, arg2, arg3, arg4})
+	fake.carryAttestationsArgsForCall = append(fake.carryAttestationsArgsForCall, FakePromoterImplementationCarryAttestationsArgs{arg1, arg2, arg3, arg4})
 	stub := fake.CarryAttestationsStub
 	fakeReturns := fake.carryAttestationsReturns
 	fake.recordInvocation("CarryAttestations", []interface{}{arg1, arg2, arg3, arg4})
@@ -422,7 +481,15 @@ func (fake *FakePromoterImplementation) CarryAttestationsArgsForCall(i int) (con
 	fake.carryAttestationsMutex.RLock()
 	defer fake.carryAttestationsMutex.RUnlock()
 	argsForCall := fake.carryAttestationsArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4
+	return argsForCall.Arg1, argsForCall.Arg2, argsForCall.Arg3, argsForCall.Arg4
+}
+
+func (fake *FakePromoterImplementation) CarryAttestationsArgs() []FakePromoterImplementationCarryAttestationsArgs {
+	fake.carryAttestationsMutex.RLock()
+	defer fake.carryAttestationsMutex.RUnlock()
+	args := make([]FakePromoterImplementationCarryAttestationsArgs, len(fake.carryAttestationsArgsForCall))
+	copy(args, fake.carryAttestationsArgsForCall)
+	return args
 }
 
 func (fake *FakePromoterImplementation) CarryAttestationsReturns(result1 error) {
@@ -456,12 +523,7 @@ func (fake *FakePromoterImplementation) FixMissingAttestations(arg1 context.Cont
 	}
 	fake.fixMissingAttestationsMutex.Lock()
 	ret, specificReturn := fake.fixMissingAttestationsReturnsOnCall[len(fake.fixMissingAttestationsArgsForCall)]
-	fake.fixMissingAttestationsArgsForCall = append(fake.fixMissingAttestationsArgsForCall, struct {
-		arg1 context.Context
-		arg2 *imagepromotera.Options
-		arg3 checkresults.Results
-		arg4 provenance.Generator
-	}{arg1, arg2, arg3Copy, arg4})
+	fake.fixMissingAttestationsArgsForCall = append(fake.fixMissingAttestationsArgsForCall, FakePromoterImplementationFixMissingAttestationsArgs{arg1, arg2, arg3Copy, arg4})
 	stub := fake.FixMissingAttestationsStub
 	fakeReturns := fake.fixMissingAttestationsReturns
 	fake.recordInvocation("FixMissingAttestations", []interface{}{arg1, arg2, arg3Copy, arg4})
@@ -491,7 +553,15 @@ func (fake *FakePromoterImplementation) FixMissingAttestationsArgsForCall(i int)
 	fake.fixMissingAttestationsMutex.RLock()
 	defer fake.fixMissingAttestationsMutex.RUnlock()
 	argsForCall := fake.fixMissingAttestationsArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4
+	return argsForCall.Arg1, argsForCall.Arg2, argsForCall.Arg3, argsForCall.Arg4
+}
+
+func (fake *FakePromoterImplementation) FixMissingAttestationsArgs() []FakePromoterImplementationFixMissingAttestationsArgs {
+	fake.fixMissingAttestationsMutex.RLock()
+	defer fake.fixMissingAttestationsMutex.RUnlock()
+	args := make([]FakePromoterImplementationFixMissingAttestationsArgs, len(fake.fixMissingAttestationsArgsForCall))
+	copy(args, fake.fixMissingAttestationsArgsForCall)
+	return args
 }
 
 func (fake *FakePromoterImplementation) FixMissingAttestationsReturns(result1 error) {
@@ -525,11 +595,7 @@ func (fake *FakePromoterImplementation) FixMissingSignatures(arg1 context.Contex
 	}
 	fake.fixMissingSignaturesMutex.Lock()
 	ret, specificReturn := fake.fixMissingSignaturesReturnsOnCall[len(fake.fixMissingSignaturesArgsForCall)]
-	fake.fixMissingSignaturesArgsForCall = append(fake.fixMissingSignaturesArgsForCall, struct {
-		arg1 context.Context
-		arg2 *imagepromotera.Options
-		arg3 checkresults.Results
-	}{arg1, arg2, arg3Copy})
+	fake.fixMissingSignaturesArgsForCall = append(fake.fixMissingSignaturesArgsForCall, FakePromoterImplementationFixMissingSignaturesArgs{arg1, arg2, arg3Copy})
 	stub := fake.FixMissingSignaturesStub
 	fakeReturns := fake.fixMissingSignaturesReturns
 	fake.recordInvocation("FixMissingSignatures", []interface{}{arg1, arg2, arg3Copy})
@@ -559,7 +625,15 @@ func (fake *FakePromoterImplementation) FixMissingSignaturesArgsForCall(i int) (
 	fake.fixMissingSignaturesMutex.RLock()
 	defer fake.fixMissingSignaturesMutex.RUnlock()
 	argsForCall := fake.fixMissingSignaturesArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
+	return argsForCall.Arg1, argsForCall.Arg2, argsForCall.Arg3
+}
+
+func (fake *FakePromoterImplementation) FixMissingSignaturesArgs() []FakePromoterImplementationFixMissingSignaturesArgs {
+	fake.fixMissingSignaturesMutex.RLock()
+	defer fake.fixMissingSignaturesMutex.RUnlock()
+	args := make([]FakePromoterImplementationFixMissingSignaturesArgs, len(fake.fixMissingSignaturesArgsForCall))
+	copy(args, fake.fixMissingSignaturesArgsForCall)
+	return args
 }
 
 func (fake *FakePromoterImplementation) FixMissingSignaturesReturns(result1 error) {
@@ -588,10 +662,7 @@ func (fake *FakePromoterImplementation) FixMissingSignaturesReturnsOnCall(i int,
 func (fake *FakePromoterImplementation) GetLatestImages(arg1 context.Context, arg2 *imagepromotera.Options) ([]checkresults.Image, error) {
 	fake.getLatestImagesMutex.Lock()
 	ret, specificReturn := fake.getLatestImagesReturnsOnCall[len(fake.getLatestImagesArgsForCall)]
-	fake.getLatestImagesArgsForCall = append(fake.getLatestImagesArgsForCall, struct {
-		arg1 context.Context
-		arg2 *imagepromotera.Options
-	}{arg1, arg2})
+	fake.getLatestImagesArgsForCall = append(fake.getLatestImagesArgsForCall, FakePromoterImplementationGetLatestImagesArgs{arg1, arg2})
 	stub := fake.GetLatestImagesStub
 	fakeReturns := fake.getLatestImagesReturns
 	fake.recordInvocation("GetLatestImages", []interface{}{arg1, arg2})
@@ -621,7 +692,15 @@ func (fake *FakePromoterImplementation) GetLatestImagesArgsForCall(i int) (conte
 	fake.getLatestImagesMutex.RLock()
 	defer fake.getLatestImagesMutex.RUnlock()
 	argsForCall := fake.getLatestImagesArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2
+	return argsForCall.Arg1, argsForCall.Arg2
+}
+
+func (fake *FakePromoterImplementation) GetLatestImagesArgs() []FakePromoterImplementationGetLatestImagesArgs {
+	fake.getLatestImagesMutex.RLock()
+	defer fake.getLatestImagesMutex.RUnlock()
+	args := make([]FakePromoterImplementationGetLatestImagesArgs, len(fake.getLatestImagesArgsForCall))
+	copy(args, fake.getLatestImagesArgsForCall)
+	return args
 }
 
 func (fake *FakePromoterImplementation) GetLatestImagesReturns(result1 []checkresults.Image, result2 error) {
@@ -658,11 +737,7 @@ func (fake *FakePromoterImplementation) GetPromotionEdges(arg1 context.Context, 
 	}
 	fake.getPromotionEdgesMutex.Lock()
 	ret, specificReturn := fake.getPromotionEdgesReturnsOnCall[len(fake.getPromotionEdgesArgsForCall)]
-	fake.getPromotionEdgesArgsForCall = append(fake.getPromotionEdgesArgsForCall, struct {
-		arg1 context.Context
-		arg2 *imagepromotera.Options
-		arg3 []schema.Manifest
-	}{arg1, arg2, arg3Copy})
+	fake.getPromotionEdgesArgsForCall = append(fake.getPromotionEdgesArgsForCall, FakePromoterImplementationGetPromotionEdgesArgs{arg1, arg2, arg3Copy})
 	stub := fake.GetPromotionEdgesStub
 	fakeReturns := fake.getPromotionEdgesReturns
 	fake.recordInvocation("GetPromotionEdges", []interface{}{arg1, arg2, arg3Copy})
@@ -692,7 +767,15 @@ func (fake *FakePromoterImplementation) GetPromotionEdgesArgsForCall(i int) (con
 	fake.getPromotionEdgesMutex.RLock()
 	defer fake.getPromotionEdgesMutex.RUnlock()
 	argsForCall := fake.getPromotionEdgesArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
+	return argsForCall.Arg1, argsForCall.Arg2, argsForCall.Arg3
+}
+
+func (fake *FakePromoterImplementation) GetPromotionEdgesArgs() []FakePromoterImplementationGetPromotionEdgesArgs {
+	fake.getPromotionEdgesMutex.RLock()
+	defer fake.getPromotionEdgesMutex.RUnlock()
+	args := make([]FakePromoterImplementationGetPromotionEdgesArgs, len(fake.getPromotionEdgesArgsForCall))
+	copy(args, fake.getPromotionEdgesArgsForCall)
+	return args
 }
 
 func (fake *FakePromoterImplementation) GetPromotionEdgesReturns(result1 map[promotion.Edge]any, result2 error) {
@@ -729,11 +812,7 @@ func (fake *FakePromoterImplementation) GetRegistryImageInventory(arg1 context.C
 	}
 	fake.getRegistryImageInventoryMutex.Lock()
 	ret, specificReturn := fake.getRegistryImageInventoryReturnsOnCall[len(fake.getRegistryImageInventoryArgsForCall)]
-	fake.getRegistryImageInventoryArgsForCall = append(fake.getRegistryImageInventoryArgsForCall, struct {
-		arg1 context.Context
-		arg2 *imagepromotera.Options
-		arg3 []schema.Manifest
-	}{arg1, arg2, arg3Copy})
+	fake.getRegistryImageInventoryArgsForCall = append(fake.getRegistryImageInventoryArgsForCall, FakePromoterImplementationGetRegistryImageInventoryArgs{arg1, arg2, arg3Copy})
 	stub := fake.GetRegistryImageInventoryStub
 	fakeReturns := fake.getRegistryImageInventoryReturns
 	fake.recordInvocation("GetRegistryImageInventory", []interface{}{arg1, arg2, arg3Copy})
@@ -763,7 +842,15 @@ func (fake *FakePromoterImplementation) GetRegistryImageInventoryArgsForCall(i i
 	fake.getRegistryImageInventoryMutex.RLock()
 	defer fake.getRegistryImageInventoryMutex.RUnlock()
 	argsForCall := fake.getRegistryImageInventoryArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
+	return argsForCall.Arg1, argsForCall.Arg2, argsForCall.Arg3
+}
+
+func (fake *FakePromoterImplementation) GetRegistryImageInventoryArgs() []FakePromoterImplementationGetRegistryImageInventoryArgs {
+	fake.getRegistryImageInventoryMutex.RLock()
+	defer fake.getRegistryImageInventoryMutex.RUnlock()
+	args := make([]FakePromoterImplementationGetRegistryImageInventoryArgs, len(fake.getRegistryImageInventoryArgsForCall))
+	copy(args, fake.getRegistryImageInventoryArgsForCall)
+	return args
 }
 
 func (fake *FakePromoterImplementation) GetRegistryImageInventoryReturns(result1 registry.RegInvImage, result2 error) {
@@ -800,11 +887,7 @@ func (fake *FakePromoterImplementation) GetSignatureStatus(arg1 context.Context,
 	}
 	fake.getSignatureStatusMutex.Lock()
 	ret, specificReturn := fake.getSignatureStatusReturnsOnCall[len(fake.getSignatureStatusArgsForCall)]
-	fake.getSignatureStatusArgsForCall = append(fake.getSignatureStatusArgsForCall, struct {
-		arg1 context.Context
-		arg2 *imagepromotera.Options
-		arg3 []checkresults.Image
-	}{arg1, arg2, arg3Copy})
+	fake.getSignatureStatusArgsForCall = append(fake.getSignatureStatusArgsForCall, FakePromoterImplementationGetSignatureStatusArgs{arg1, arg2, arg3Copy})
 	stub := fake.GetSignatureStatusStub
 	fakeReturns := fake.getSignatureStatusReturns
 	fake.recordInvocation("GetSignatureStatus", []interface{}{arg1, arg2, arg3Copy})
@@ -834,7 +917,15 @@ func (fake *FakePromoterImplementation) GetSignatureStatusArgsForCall(i int) (co
 	fake.getSignatureStatusMutex.RLock()
 	defer fake.getSignatureStatusMutex.RUnlock()
 	argsForCall := fake.getSignatureStatusArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
+	return argsForCall.Arg1, argsForCall.Arg2, argsForCall.Arg3
+}
+
+func (fake *FakePromoterImplementation) GetSignatureStatusArgs() []FakePromoterImplementationGetSignatureStatusArgs {
+	fake.getSignatureStatusMutex.RLock()
+	defer fake.getSignatureStatusMutex.RUnlock()
+	args := make([]FakePromoterImplementationGetSignatureStatusArgs, len(fake.getSignatureStatusArgsForCall))
+	copy(args, fake.getSignatureStatusArgsForCall)
+	return args
 }
 
 func (fake *FakePromoterImplementation) GetSignatureStatusReturns(result1 checkresults.Results, result2 error) {
@@ -866,9 +957,7 @@ func (fake *FakePromoterImplementation) GetSignatureStatusReturnsOnCall(i int, r
 func (fake *FakePromoterImplementation) GetSnapshotManifests(arg1 *imagepromotera.Options) ([]schema.Manifest, error) {
 	fake.getSnapshotManifestsMutex.Lock()
 	ret, specificReturn := fake.getSnapshotManifestsReturnsOnCall[len(fake.getSnapshotManifestsArgsForCall)]
-	fake.getSnapshotManifestsArgsForCall = append(fake.getSnapshotManifestsArgsForCall, struct {
-		arg1 *imagepromotera.Options
-	}{arg1})
+	fake.getSnapshotManifestsArgsForCall = append(fake.getSnapshotManifestsArgsForCall, FakePromoterImplementationGetSnapshotManifestsArgs{arg1})
 	stub := fake.GetSnapshotManifestsStub
 	fakeReturns := fake.getSnapshotManifestsReturns
 	fake.recordInvocation("GetSnapshotManifests", []interface{}{arg1})
@@ -898,7 +987,15 @@ func (fake *FakePromoterImplementation) GetSnapshotManifestsArgsForCall(i int) *
 	fake.getSnapshotManifestsMutex.RLock()
 	defer fake.getSnapshotManifestsMutex.RUnlock()
 	argsForCall := fake.getSnapshotManifestsArgsForCall[i]
-	return argsForCall.arg1
+	return argsForCall.Arg1
+}
+
+func (fake *FakePromoterImplementation) GetSnapshotManifestsArgs() []FakePromoterImplementationGetSnapshotManifestsArgs {
+	fake.getSnapshotManifestsMutex.RLock()
+	defer fake.getSnapshotManifestsMutex.RUnlock()
+	args := make([]FakePromoterImplementationGetSnapshotManifestsArgs, len(fake.getSnapshotManifestsArgsForCall))
+	copy(args, fake.getSnapshotManifestsArgsForCall)
+	return args
 }
 
 func (fake *FakePromoterImplementation) GetSnapshotManifestsReturns(result1 []schema.Manifest, result2 error) {
@@ -930,9 +1027,7 @@ func (fake *FakePromoterImplementation) GetSnapshotManifestsReturnsOnCall(i int,
 func (fake *FakePromoterImplementation) GetSnapshotSourceRegistry(arg1 *imagepromotera.Options) (*registry.Context, error) {
 	fake.getSnapshotSourceRegistryMutex.Lock()
 	ret, specificReturn := fake.getSnapshotSourceRegistryReturnsOnCall[len(fake.getSnapshotSourceRegistryArgsForCall)]
-	fake.getSnapshotSourceRegistryArgsForCall = append(fake.getSnapshotSourceRegistryArgsForCall, struct {
-		arg1 *imagepromotera.Options
-	}{arg1})
+	fake.getSnapshotSourceRegistryArgsForCall = append(fake.getSnapshotSourceRegistryArgsForCall, FakePromoterImplementationGetSnapshotSourceRegistryArgs{arg1})
 	stub := fake.GetSnapshotSourceRegistryStub
 	fakeReturns := fake.getSnapshotSourceRegistryReturns
 	fake.recordInvocation("GetSnapshotSourceRegistry", []interface{}{arg1})
@@ -962,7 +1057,15 @@ func (fake *FakePromoterImplementation) GetSnapshotSourceRegistryArgsForCall(i i
 	fake.getSnapshotSourceRegistryMutex.RLock()
 	defer fake.getSnapshotSourceRegistryMutex.RUnlock()
 	argsForCall := fake.getSnapshotSourceRegistryArgsForCall[i]
-	return argsForCall.arg1
+	return argsForCall.Arg1
+}
+
+func (fake *FakePromoterImplementation) GetSnapshotSourceRegistryArgs() []FakePromoterImplementationGetSnapshotSourceRegistryArgs {
+	fake.getSnapshotSourceRegistryMutex.RLock()
+	defer fake.getSnapshotSourceRegistryMutex.RUnlock()
+	args := make([]FakePromoterImplementationGetSnapshotSourceRegistryArgs, len(fake.getSnapshotSourceRegistryArgsForCall))
+	copy(args, fake.getSnapshotSourceRegistryArgsForCall)
+	return args
 }
 
 func (fake *FakePromoterImplementation) GetSnapshotSourceRegistryReturns(result1 *registry.Context, result2 error) {
@@ -994,9 +1097,7 @@ func (fake *FakePromoterImplementation) GetSnapshotSourceRegistryReturnsOnCall(i
 func (fake *FakePromoterImplementation) ParseManifests(arg1 *imagepromotera.Options) ([]schema.Manifest, error) {
 	fake.parseManifestsMutex.Lock()
 	ret, specificReturn := fake.parseManifestsReturnsOnCall[len(fake.parseManifestsArgsForCall)]
-	fake.parseManifestsArgsForCall = append(fake.parseManifestsArgsForCall, struct {
-		arg1 *imagepromotera.Options
-	}{arg1})
+	fake.parseManifestsArgsForCall = append(fake.parseManifestsArgsForCall, FakePromoterImplementationParseManifestsArgs{arg1})
 	stub := fake.ParseManifestsStub
 	fakeReturns := fake.parseManifestsReturns
 	fake.recordInvocation("ParseManifests", []interface{}{arg1})
@@ -1026,7 +1127,15 @@ func (fake *FakePromoterImplementation) ParseManifestsArgsForCall(i int) *imagep
 	fake.parseManifestsMutex.RLock()
 	defer fake.parseManifestsMutex.RUnlock()
 	argsForCall := fake.parseManifestsArgsForCall[i]
-	return argsForCall.arg1
+	return argsForCall.Arg1
+}
+
+func (fake *FakePromoterImplementation) ParseManifestsArgs() []FakePromoterImplementationParseManifestsArgs {
+	fake.parseManifestsMutex.RLock()
+	defer fake.parseManifestsMutex.RUnlock()
+	args := make([]FakePromoterImplementationParseManifestsArgs, len(fake.parseManifestsArgsForCall))
+	copy(args, fake.parseManifestsArgsForCall)
+	return args
 }
 
 func (fake *FakePromoterImplementation) ParseManifestsReturns(result1 []schema.Manifest, result2 error) {
@@ -1058,9 +1167,7 @@ func (fake *FakePromoterImplementation) ParseManifestsReturnsOnCall(i int, resul
 func (fake *FakePromoterImplementation) PrewarmTUFCache(arg1 context.Context) error {
 	fake.prewarmTUFCacheMutex.Lock()
 	ret, specificReturn := fake.prewarmTUFCacheReturnsOnCall[len(fake.prewarmTUFCacheArgsForCall)]
-	fake.prewarmTUFCacheArgsForCall = append(fake.prewarmTUFCacheArgsForCall, struct {
-		arg1 context.Context
-	}{arg1})
+	fake.prewarmTUFCacheArgsForCall = append(fake.prewarmTUFCacheArgsForCall, FakePromoterImplementationPrewarmTUFCacheArgs{arg1})
 	stub := fake.PrewarmTUFCacheStub
 	fakeReturns := fake.prewarmTUFCacheReturns
 	fake.recordInvocation("PrewarmTUFCache", []interface{}{arg1})
@@ -1090,7 +1197,15 @@ func (fake *FakePromoterImplementation) PrewarmTUFCacheArgsForCall(i int) contex
 	fake.prewarmTUFCacheMutex.RLock()
 	defer fake.prewarmTUFCacheMutex.RUnlock()
 	argsForCall := fake.prewarmTUFCacheArgsForCall[i]
-	return argsForCall.arg1
+	return argsForCall.Arg1
+}
+
+func (fake *FakePromoterImplementation) PrewarmTUFCacheArgs() []FakePromoterImplementationPrewarmTUFCacheArgs {
+	fake.prewarmTUFCacheMutex.RLock()
+	defer fake.prewarmTUFCacheMutex.RUnlock()
+	args := make([]FakePromoterImplementationPrewarmTUFCacheArgs, len(fake.prewarmTUFCacheArgsForCall))
+	copy(args, fake.prewarmTUFCacheArgsForCall)
+	return args
 }
 
 func (fake *FakePromoterImplementation) PrewarmTUFCacheReturns(result1 error) {
@@ -1118,13 +1233,12 @@ func (fake *FakePromoterImplementation) PrewarmTUFCacheReturnsOnCall(i int, resu
 
 func (fake *FakePromoterImplementation) PrintSecDisclaimer() {
 	fake.printSecDisclaimerMutex.Lock()
-	fake.printSecDisclaimerArgsForCall = append(fake.printSecDisclaimerArgsForCall, struct {
-	}{})
+	fake.printSecDisclaimerArgsForCall = append(fake.printSecDisclaimerArgsForCall, struct{}{})
 	stub := fake.PrintSecDisclaimerStub
 	fake.recordInvocation("PrintSecDisclaimer", []interface{}{})
 	fake.printSecDisclaimerMutex.Unlock()
 	if stub != nil {
-		fake.PrintSecDisclaimerStub()
+		stub()
 	}
 }
 
@@ -1142,13 +1256,12 @@ func (fake *FakePromoterImplementation) PrintSecDisclaimerCalls(stub func()) {
 
 func (fake *FakePromoterImplementation) PrintVersion() {
 	fake.printVersionMutex.Lock()
-	fake.printVersionArgsForCall = append(fake.printVersionArgsForCall, struct {
-	}{})
+	fake.printVersionArgsForCall = append(fake.printVersionArgsForCall, struct{}{})
 	stub := fake.PrintVersionStub
 	fake.recordInvocation("PrintVersion", []interface{}{})
 	fake.printVersionMutex.Unlock()
 	if stub != nil {
-		fake.PrintVersionStub()
+		stub()
 	}
 }
 
@@ -1167,11 +1280,7 @@ func (fake *FakePromoterImplementation) PrintVersionCalls(stub func()) {
 func (fake *FakePromoterImplementation) PromoteImages(arg1 context.Context, arg2 *imagepromotera.Options, arg3 map[promotion.Edge]any) error {
 	fake.promoteImagesMutex.Lock()
 	ret, specificReturn := fake.promoteImagesReturnsOnCall[len(fake.promoteImagesArgsForCall)]
-	fake.promoteImagesArgsForCall = append(fake.promoteImagesArgsForCall, struct {
-		arg1 context.Context
-		arg2 *imagepromotera.Options
-		arg3 map[promotion.Edge]any
-	}{arg1, arg2, arg3})
+	fake.promoteImagesArgsForCall = append(fake.promoteImagesArgsForCall, FakePromoterImplementationPromoteImagesArgs{arg1, arg2, arg3})
 	stub := fake.PromoteImagesStub
 	fakeReturns := fake.promoteImagesReturns
 	fake.recordInvocation("PromoteImages", []interface{}{arg1, arg2, arg3})
@@ -1201,7 +1310,15 @@ func (fake *FakePromoterImplementation) PromoteImagesArgsForCall(i int) (context
 	fake.promoteImagesMutex.RLock()
 	defer fake.promoteImagesMutex.RUnlock()
 	argsForCall := fake.promoteImagesArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
+	return argsForCall.Arg1, argsForCall.Arg2, argsForCall.Arg3
+}
+
+func (fake *FakePromoterImplementation) PromoteImagesArgs() []FakePromoterImplementationPromoteImagesArgs {
+	fake.promoteImagesMutex.RLock()
+	defer fake.promoteImagesMutex.RUnlock()
+	args := make([]FakePromoterImplementationPromoteImagesArgs, len(fake.promoteImagesArgsForCall))
+	copy(args, fake.promoteImagesArgsForCall)
+	return args
 }
 
 func (fake *FakePromoterImplementation) PromoteImagesReturns(result1 error) {
@@ -1230,11 +1347,7 @@ func (fake *FakePromoterImplementation) PromoteImagesReturnsOnCall(i int, result
 func (fake *FakePromoterImplementation) ScanEdges(arg1 context.Context, arg2 *imagepromotera.Options, arg3 map[promotion.Edge]any) error {
 	fake.scanEdgesMutex.Lock()
 	ret, specificReturn := fake.scanEdgesReturnsOnCall[len(fake.scanEdgesArgsForCall)]
-	fake.scanEdgesArgsForCall = append(fake.scanEdgesArgsForCall, struct {
-		arg1 context.Context
-		arg2 *imagepromotera.Options
-		arg3 map[promotion.Edge]any
-	}{arg1, arg2, arg3})
+	fake.scanEdgesArgsForCall = append(fake.scanEdgesArgsForCall, FakePromoterImplementationScanEdgesArgs{arg1, arg2, arg3})
 	stub := fake.ScanEdgesStub
 	fakeReturns := fake.scanEdgesReturns
 	fake.recordInvocation("ScanEdges", []interface{}{arg1, arg2, arg3})
@@ -1264,7 +1377,15 @@ func (fake *FakePromoterImplementation) ScanEdgesArgsForCall(i int) (context.Con
 	fake.scanEdgesMutex.RLock()
 	defer fake.scanEdgesMutex.RUnlock()
 	argsForCall := fake.scanEdgesArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
+	return argsForCall.Arg1, argsForCall.Arg2, argsForCall.Arg3
+}
+
+func (fake *FakePromoterImplementation) ScanEdgesArgs() []FakePromoterImplementationScanEdgesArgs {
+	fake.scanEdgesMutex.RLock()
+	defer fake.scanEdgesMutex.RUnlock()
+	args := make([]FakePromoterImplementationScanEdgesArgs, len(fake.scanEdgesArgsForCall))
+	copy(args, fake.scanEdgesArgsForCall)
+	return args
 }
 
 func (fake *FakePromoterImplementation) ScanEdgesReturns(result1 error) {
@@ -1293,10 +1414,7 @@ func (fake *FakePromoterImplementation) ScanEdgesReturnsOnCall(i int, result1 er
 func (fake *FakePromoterImplementation) SignImages(arg1 *imagepromotera.Options, arg2 map[promotion.Edge]any) error {
 	fake.signImagesMutex.Lock()
 	ret, specificReturn := fake.signImagesReturnsOnCall[len(fake.signImagesArgsForCall)]
-	fake.signImagesArgsForCall = append(fake.signImagesArgsForCall, struct {
-		arg1 *imagepromotera.Options
-		arg2 map[promotion.Edge]any
-	}{arg1, arg2})
+	fake.signImagesArgsForCall = append(fake.signImagesArgsForCall, FakePromoterImplementationSignImagesArgs{arg1, arg2})
 	stub := fake.SignImagesStub
 	fakeReturns := fake.signImagesReturns
 	fake.recordInvocation("SignImages", []interface{}{arg1, arg2})
@@ -1326,7 +1444,15 @@ func (fake *FakePromoterImplementation) SignImagesArgsForCall(i int) (*imageprom
 	fake.signImagesMutex.RLock()
 	defer fake.signImagesMutex.RUnlock()
 	argsForCall := fake.signImagesArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2
+	return argsForCall.Arg1, argsForCall.Arg2
+}
+
+func (fake *FakePromoterImplementation) SignImagesArgs() []FakePromoterImplementationSignImagesArgs {
+	fake.signImagesMutex.RLock()
+	defer fake.signImagesMutex.RUnlock()
+	args := make([]FakePromoterImplementationSignImagesArgs, len(fake.signImagesArgsForCall))
+	copy(args, fake.signImagesArgsForCall)
+	return args
 }
 
 func (fake *FakePromoterImplementation) SignImagesReturns(result1 error) {
@@ -1355,10 +1481,7 @@ func (fake *FakePromoterImplementation) SignImagesReturnsOnCall(i int, result1 e
 func (fake *FakePromoterImplementation) Snapshot(arg1 *imagepromotera.Options, arg2 registry.RegInvImage) error {
 	fake.snapshotMutex.Lock()
 	ret, specificReturn := fake.snapshotReturnsOnCall[len(fake.snapshotArgsForCall)]
-	fake.snapshotArgsForCall = append(fake.snapshotArgsForCall, struct {
-		arg1 *imagepromotera.Options
-		arg2 registry.RegInvImage
-	}{arg1, arg2})
+	fake.snapshotArgsForCall = append(fake.snapshotArgsForCall, FakePromoterImplementationSnapshotArgs{arg1, arg2})
 	stub := fake.SnapshotStub
 	fakeReturns := fake.snapshotReturns
 	fake.recordInvocation("Snapshot", []interface{}{arg1, arg2})
@@ -1388,7 +1511,15 @@ func (fake *FakePromoterImplementation) SnapshotArgsForCall(i int) (*imagepromot
 	fake.snapshotMutex.RLock()
 	defer fake.snapshotMutex.RUnlock()
 	argsForCall := fake.snapshotArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2
+	return argsForCall.Arg1, argsForCall.Arg2
+}
+
+func (fake *FakePromoterImplementation) SnapshotArgs() []FakePromoterImplementationSnapshotArgs {
+	fake.snapshotMutex.RLock()
+	defer fake.snapshotMutex.RUnlock()
+	args := make([]FakePromoterImplementationSnapshotArgs, len(fake.snapshotArgsForCall))
+	copy(args, fake.snapshotArgsForCall)
+	return args
 }
 
 func (fake *FakePromoterImplementation) SnapshotReturns(result1 error) {
@@ -1417,9 +1548,7 @@ func (fake *FakePromoterImplementation) SnapshotReturnsOnCall(i int, result1 err
 func (fake *FakePromoterImplementation) ValidateOptions(arg1 *imagepromotera.Options) error {
 	fake.validateOptionsMutex.Lock()
 	ret, specificReturn := fake.validateOptionsReturnsOnCall[len(fake.validateOptionsArgsForCall)]
-	fake.validateOptionsArgsForCall = append(fake.validateOptionsArgsForCall, struct {
-		arg1 *imagepromotera.Options
-	}{arg1})
+	fake.validateOptionsArgsForCall = append(fake.validateOptionsArgsForCall, FakePromoterImplementationValidateOptionsArgs{arg1})
 	stub := fake.ValidateOptionsStub
 	fakeReturns := fake.validateOptionsReturns
 	fake.recordInvocation("ValidateOptions", []interface{}{arg1})
@@ -1449,7 +1578,15 @@ func (fake *FakePromoterImplementation) ValidateOptionsArgsForCall(i int) *image
 	fake.validateOptionsMutex.RLock()
 	defer fake.validateOptionsMutex.RUnlock()
 	argsForCall := fake.validateOptionsArgsForCall[i]
-	return argsForCall.arg1
+	return argsForCall.Arg1
+}
+
+func (fake *FakePromoterImplementation) ValidateOptionsArgs() []FakePromoterImplementationValidateOptionsArgs {
+	fake.validateOptionsMutex.RLock()
+	defer fake.validateOptionsMutex.RUnlock()
+	args := make([]FakePromoterImplementationValidateOptionsArgs, len(fake.validateOptionsArgsForCall))
+	copy(args, fake.validateOptionsArgsForCall)
+	return args
 }
 
 func (fake *FakePromoterImplementation) ValidateOptionsReturns(result1 error) {
@@ -1478,12 +1615,7 @@ func (fake *FakePromoterImplementation) ValidateOptionsReturnsOnCall(i int, resu
 func (fake *FakePromoterImplementation) ValidateStagingSignatures(arg1 context.Context, arg2 *imagepromotera.Options, arg3 map[promotion.Edge]any, arg4 map[string]*provenance.Discovery) (promotion.StagingSignatures, error) {
 	fake.validateStagingSignaturesMutex.Lock()
 	ret, specificReturn := fake.validateStagingSignaturesReturnsOnCall[len(fake.validateStagingSignaturesArgsForCall)]
-	fake.validateStagingSignaturesArgsForCall = append(fake.validateStagingSignaturesArgsForCall, struct {
-		arg1 context.Context
-		arg2 *imagepromotera.Options
-		arg3 map[promotion.Edge]any
-		arg4 map[string]*provenance.Discovery
-	}{arg1, arg2, arg3, arg4})
+	fake.validateStagingSignaturesArgsForCall = append(fake.validateStagingSignaturesArgsForCall, FakePromoterImplementationValidateStagingSignaturesArgs{arg1, arg2, arg3, arg4})
 	stub := fake.ValidateStagingSignaturesStub
 	fakeReturns := fake.validateStagingSignaturesReturns
 	fake.recordInvocation("ValidateStagingSignatures", []interface{}{arg1, arg2, arg3, arg4})
@@ -1513,7 +1645,15 @@ func (fake *FakePromoterImplementation) ValidateStagingSignaturesArgsForCall(i i
 	fake.validateStagingSignaturesMutex.RLock()
 	defer fake.validateStagingSignaturesMutex.RUnlock()
 	argsForCall := fake.validateStagingSignaturesArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4
+	return argsForCall.Arg1, argsForCall.Arg2, argsForCall.Arg3, argsForCall.Arg4
+}
+
+func (fake *FakePromoterImplementation) ValidateStagingSignaturesArgs() []FakePromoterImplementationValidateStagingSignaturesArgs {
+	fake.validateStagingSignaturesMutex.RLock()
+	defer fake.validateStagingSignaturesMutex.RUnlock()
+	args := make([]FakePromoterImplementationValidateStagingSignaturesArgs, len(fake.validateStagingSignaturesArgsForCall))
+	copy(args, fake.validateStagingSignaturesArgsForCall)
+	return args
 }
 
 func (fake *FakePromoterImplementation) ValidateStagingSignaturesReturns(result1 promotion.StagingSignatures, result2 error) {
@@ -1550,13 +1690,7 @@ func (fake *FakePromoterImplementation) WriteProvenanceAttestations(arg1 context
 	}
 	fake.writeProvenanceAttestationsMutex.Lock()
 	ret, specificReturn := fake.writeProvenanceAttestationsReturnsOnCall[len(fake.writeProvenanceAttestationsArgsForCall)]
-	fake.writeProvenanceAttestationsArgsForCall = append(fake.writeProvenanceAttestationsArgsForCall, struct {
-		arg1 context.Context
-		arg2 *imagepromotera.Options
-		arg3 []schema.Manifest
-		arg4 map[promotion.Edge]any
-		arg5 provenance.Generator
-	}{arg1, arg2, arg3Copy, arg4, arg5})
+	fake.writeProvenanceAttestationsArgsForCall = append(fake.writeProvenanceAttestationsArgsForCall, FakePromoterImplementationWriteProvenanceAttestationsArgs{arg1, arg2, arg3Copy, arg4, arg5})
 	stub := fake.WriteProvenanceAttestationsStub
 	fakeReturns := fake.writeProvenanceAttestationsReturns
 	fake.recordInvocation("WriteProvenanceAttestations", []interface{}{arg1, arg2, arg3Copy, arg4, arg5})
@@ -1586,7 +1720,15 @@ func (fake *FakePromoterImplementation) WriteProvenanceAttestationsArgsForCall(i
 	fake.writeProvenanceAttestationsMutex.RLock()
 	defer fake.writeProvenanceAttestationsMutex.RUnlock()
 	argsForCall := fake.writeProvenanceAttestationsArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4, argsForCall.arg5
+	return argsForCall.Arg1, argsForCall.Arg2, argsForCall.Arg3, argsForCall.Arg4, argsForCall.Arg5
+}
+
+func (fake *FakePromoterImplementation) WriteProvenanceAttestationsArgs() []FakePromoterImplementationWriteProvenanceAttestationsArgs {
+	fake.writeProvenanceAttestationsMutex.RLock()
+	defer fake.writeProvenanceAttestationsMutex.RUnlock()
+	args := make([]FakePromoterImplementationWriteProvenanceAttestationsArgs, len(fake.writeProvenanceAttestationsArgsForCall))
+	copy(args, fake.writeProvenanceAttestationsArgsForCall)
+	return args
 }
 
 func (fake *FakePromoterImplementation) WriteProvenanceAttestationsReturns(result1 error) {
@@ -1620,14 +1762,7 @@ func (fake *FakePromoterImplementation) WriteVerificationSummaries(arg1 context.
 	}
 	fake.writeVerificationSummariesMutex.Lock()
 	ret, specificReturn := fake.writeVerificationSummariesReturnsOnCall[len(fake.writeVerificationSummariesArgsForCall)]
-	fake.writeVerificationSummariesArgsForCall = append(fake.writeVerificationSummariesArgsForCall, struct {
-		arg1 context.Context
-		arg2 *imagepromotera.Options
-		arg3 []schema.Manifest
-		arg4 map[promotion.Edge]any
-		arg5 map[string]*provenance.Discovery
-		arg6 map[string]*provenance.ImageProvenance
-	}{arg1, arg2, arg3Copy, arg4, arg5, arg6})
+	fake.writeVerificationSummariesArgsForCall = append(fake.writeVerificationSummariesArgsForCall, FakePromoterImplementationWriteVerificationSummariesArgs{arg1, arg2, arg3Copy, arg4, arg5, arg6})
 	stub := fake.WriteVerificationSummariesStub
 	fakeReturns := fake.writeVerificationSummariesReturns
 	fake.recordInvocation("WriteVerificationSummaries", []interface{}{arg1, arg2, arg3Copy, arg4, arg5, arg6})
@@ -1657,7 +1792,15 @@ func (fake *FakePromoterImplementation) WriteVerificationSummariesArgsForCall(i 
 	fake.writeVerificationSummariesMutex.RLock()
 	defer fake.writeVerificationSummariesMutex.RUnlock()
 	argsForCall := fake.writeVerificationSummariesArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4, argsForCall.arg5, argsForCall.arg6
+	return argsForCall.Arg1, argsForCall.Arg2, argsForCall.Arg3, argsForCall.Arg4, argsForCall.Arg5, argsForCall.Arg6
+}
+
+func (fake *FakePromoterImplementation) WriteVerificationSummariesArgs() []FakePromoterImplementationWriteVerificationSummariesArgs {
+	fake.writeVerificationSummariesMutex.RLock()
+	defer fake.writeVerificationSummariesMutex.RUnlock()
+	args := make([]FakePromoterImplementationWriteVerificationSummariesArgs, len(fake.writeVerificationSummariesArgsForCall))
+	copy(args, fake.writeVerificationSummariesArgsForCall)
+	return args
 }
 
 func (fake *FakePromoterImplementation) WriteVerificationSummariesReturns(result1 error) {
@@ -1693,9 +1836,18 @@ func (fake *FakePromoterImplementation) Invocations() map[string][][]interface{}
 	return copiedInvocations
 }
 
+func (fake *FakePromoterImplementation) CallOrder() []string {
+	fake.invocationsMutex.RLock()
+	defer fake.invocationsMutex.RUnlock()
+	order := make([]string, len(fake.callOrder))
+	copy(order, fake.callOrder)
+	return order
+}
+
 func (fake *FakePromoterImplementation) recordInvocation(key string, args []interface{}) {
 	fake.invocationsMutex.Lock()
 	defer fake.invocationsMutex.Unlock()
+	fake.callOrder = append(fake.callOrder, key)
 	if fake.invocations == nil {
 		fake.invocations = map[string][][]interface{}{}
 	}

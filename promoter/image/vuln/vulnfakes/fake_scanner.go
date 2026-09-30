@@ -27,11 +27,8 @@ import (
 type FakeScanner struct {
 	ScanStub        func(context.Context, string) (*vuln.ScanResult, error)
 	scanMutex       sync.RWMutex
-	scanArgsForCall []struct {
-		arg1 context.Context
-		arg2 string
-	}
-	scanReturns struct {
+	scanArgsForCall []FakeScannerScanArgs
+	scanReturns     struct {
 		result1 *vuln.ScanResult
 		result2 error
 	}
@@ -40,16 +37,20 @@ type FakeScanner struct {
 		result2 error
 	}
 	invocations      map[string][][]interface{}
+	callOrder        []string
 	invocationsMutex sync.RWMutex
+}
+
+// FakeScannerScanArgs holds the arguments of one call to Scan.
+type FakeScannerScanArgs struct {
+	Arg1 context.Context
+	Arg2 string
 }
 
 func (fake *FakeScanner) Scan(arg1 context.Context, arg2 string) (*vuln.ScanResult, error) {
 	fake.scanMutex.Lock()
 	ret, specificReturn := fake.scanReturnsOnCall[len(fake.scanArgsForCall)]
-	fake.scanArgsForCall = append(fake.scanArgsForCall, struct {
-		arg1 context.Context
-		arg2 string
-	}{arg1, arg2})
+	fake.scanArgsForCall = append(fake.scanArgsForCall, FakeScannerScanArgs{arg1, arg2})
 	stub := fake.ScanStub
 	fakeReturns := fake.scanReturns
 	fake.recordInvocation("Scan", []interface{}{arg1, arg2})
@@ -79,7 +80,15 @@ func (fake *FakeScanner) ScanArgsForCall(i int) (context.Context, string) {
 	fake.scanMutex.RLock()
 	defer fake.scanMutex.RUnlock()
 	argsForCall := fake.scanArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2
+	return argsForCall.Arg1, argsForCall.Arg2
+}
+
+func (fake *FakeScanner) ScanArgs() []FakeScannerScanArgs {
+	fake.scanMutex.RLock()
+	defer fake.scanMutex.RUnlock()
+	args := make([]FakeScannerScanArgs, len(fake.scanArgsForCall))
+	copy(args, fake.scanArgsForCall)
+	return args
 }
 
 func (fake *FakeScanner) ScanReturns(result1 *vuln.ScanResult, result2 error) {
@@ -118,9 +127,18 @@ func (fake *FakeScanner) Invocations() map[string][][]interface{} {
 	return copiedInvocations
 }
 
+func (fake *FakeScanner) CallOrder() []string {
+	fake.invocationsMutex.RLock()
+	defer fake.invocationsMutex.RUnlock()
+	order := make([]string, len(fake.callOrder))
+	copy(order, fake.callOrder)
+	return order
+}
+
 func (fake *FakeScanner) recordInvocation(key string, args []interface{}) {
 	fake.invocationsMutex.Lock()
 	defer fake.invocationsMutex.Unlock()
+	fake.callOrder = append(fake.callOrder, key)
 	if fake.invocations == nil {
 		fake.invocations = map[string][][]interface{}{}
 	}

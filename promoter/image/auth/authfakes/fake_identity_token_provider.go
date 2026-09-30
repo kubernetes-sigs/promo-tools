@@ -27,12 +27,8 @@ import (
 type FakeIdentityTokenProvider struct {
 	GetIdentityTokenStub        func(context.Context, string, string) (string, error)
 	getIdentityTokenMutex       sync.RWMutex
-	getIdentityTokenArgsForCall []struct {
-		arg1 context.Context
-		arg2 string
-		arg3 string
-	}
-	getIdentityTokenReturns struct {
+	getIdentityTokenArgsForCall []FakeIdentityTokenProviderGetIdentityTokenArgs
+	getIdentityTokenReturns     struct {
 		result1 string
 		result2 error
 	}
@@ -41,17 +37,21 @@ type FakeIdentityTokenProvider struct {
 		result2 error
 	}
 	invocations      map[string][][]interface{}
+	callOrder        []string
 	invocationsMutex sync.RWMutex
+}
+
+// FakeIdentityTokenProviderGetIdentityTokenArgs holds the arguments of one call to GetIdentityToken.
+type FakeIdentityTokenProviderGetIdentityTokenArgs struct {
+	Arg1 context.Context
+	Arg2 string
+	Arg3 string
 }
 
 func (fake *FakeIdentityTokenProvider) GetIdentityToken(arg1 context.Context, arg2 string, arg3 string) (string, error) {
 	fake.getIdentityTokenMutex.Lock()
 	ret, specificReturn := fake.getIdentityTokenReturnsOnCall[len(fake.getIdentityTokenArgsForCall)]
-	fake.getIdentityTokenArgsForCall = append(fake.getIdentityTokenArgsForCall, struct {
-		arg1 context.Context
-		arg2 string
-		arg3 string
-	}{arg1, arg2, arg3})
+	fake.getIdentityTokenArgsForCall = append(fake.getIdentityTokenArgsForCall, FakeIdentityTokenProviderGetIdentityTokenArgs{arg1, arg2, arg3})
 	stub := fake.GetIdentityTokenStub
 	fakeReturns := fake.getIdentityTokenReturns
 	fake.recordInvocation("GetIdentityToken", []interface{}{arg1, arg2, arg3})
@@ -81,7 +81,15 @@ func (fake *FakeIdentityTokenProvider) GetIdentityTokenArgsForCall(i int) (conte
 	fake.getIdentityTokenMutex.RLock()
 	defer fake.getIdentityTokenMutex.RUnlock()
 	argsForCall := fake.getIdentityTokenArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
+	return argsForCall.Arg1, argsForCall.Arg2, argsForCall.Arg3
+}
+
+func (fake *FakeIdentityTokenProvider) GetIdentityTokenArgs() []FakeIdentityTokenProviderGetIdentityTokenArgs {
+	fake.getIdentityTokenMutex.RLock()
+	defer fake.getIdentityTokenMutex.RUnlock()
+	args := make([]FakeIdentityTokenProviderGetIdentityTokenArgs, len(fake.getIdentityTokenArgsForCall))
+	copy(args, fake.getIdentityTokenArgsForCall)
+	return args
 }
 
 func (fake *FakeIdentityTokenProvider) GetIdentityTokenReturns(result1 string, result2 error) {
@@ -120,9 +128,18 @@ func (fake *FakeIdentityTokenProvider) Invocations() map[string][][]interface{} 
 	return copiedInvocations
 }
 
+func (fake *FakeIdentityTokenProvider) CallOrder() []string {
+	fake.invocationsMutex.RLock()
+	defer fake.invocationsMutex.RUnlock()
+	order := make([]string, len(fake.callOrder))
+	copy(order, fake.callOrder)
+	return order
+}
+
 func (fake *FakeIdentityTokenProvider) recordInvocation(key string, args []interface{}) {
 	fake.invocationsMutex.Lock()
 	defer fake.invocationsMutex.Unlock()
+	fake.callOrder = append(fake.callOrder, key)
 	if fake.invocations == nil {
 		fake.invocations = map[string][][]interface{}{}
 	}

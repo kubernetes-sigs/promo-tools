@@ -27,25 +27,27 @@ import (
 type FakeSyncFileOp struct {
 	RunStub        func(context.Context) error
 	runMutex       sync.RWMutex
-	runArgsForCall []struct {
-		arg1 context.Context
-	}
-	runReturns struct {
+	runArgsForCall []FakeSyncFileOpRunArgs
+	runReturns     struct {
 		result1 error
 	}
 	runReturnsOnCall map[int]struct {
 		result1 error
 	}
 	invocations      map[string][][]interface{}
+	callOrder        []string
 	invocationsMutex sync.RWMutex
+}
+
+// FakeSyncFileOpRunArgs holds the arguments of one call to Run.
+type FakeSyncFileOpRunArgs struct {
+	Arg1 context.Context
 }
 
 func (fake *FakeSyncFileOp) Run(arg1 context.Context) error {
 	fake.runMutex.Lock()
 	ret, specificReturn := fake.runReturnsOnCall[len(fake.runArgsForCall)]
-	fake.runArgsForCall = append(fake.runArgsForCall, struct {
-		arg1 context.Context
-	}{arg1})
+	fake.runArgsForCall = append(fake.runArgsForCall, FakeSyncFileOpRunArgs{arg1})
 	stub := fake.RunStub
 	fakeReturns := fake.runReturns
 	fake.recordInvocation("Run", []interface{}{arg1})
@@ -75,7 +77,15 @@ func (fake *FakeSyncFileOp) RunArgsForCall(i int) context.Context {
 	fake.runMutex.RLock()
 	defer fake.runMutex.RUnlock()
 	argsForCall := fake.runArgsForCall[i]
-	return argsForCall.arg1
+	return argsForCall.Arg1
+}
+
+func (fake *FakeSyncFileOp) RunArgs() []FakeSyncFileOpRunArgs {
+	fake.runMutex.RLock()
+	defer fake.runMutex.RUnlock()
+	args := make([]FakeSyncFileOpRunArgs, len(fake.runArgsForCall))
+	copy(args, fake.runArgsForCall)
+	return args
 }
 
 func (fake *FakeSyncFileOp) RunReturns(result1 error) {
@@ -111,9 +121,18 @@ func (fake *FakeSyncFileOp) Invocations() map[string][][]interface{} {
 	return copiedInvocations
 }
 
+func (fake *FakeSyncFileOp) CallOrder() []string {
+	fake.invocationsMutex.RLock()
+	defer fake.invocationsMutex.RUnlock()
+	order := make([]string, len(fake.callOrder))
+	copy(order, fake.callOrder)
+	return order
+}
+
 func (fake *FakeSyncFileOp) recordInvocation(key string, args []interface{}) {
 	fake.invocationsMutex.Lock()
 	defer fake.invocationsMutex.Unlock()
+	fake.callOrder = append(fake.callOrder, key)
 	if fake.invocations == nil {
 		fake.invocations = map[string][][]interface{}{}
 	}

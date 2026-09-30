@@ -27,11 +27,8 @@ import (
 type FakeGenerator struct {
 	GenerateStub        func(context.Context, *provenance.PromotionRecord) ([]byte, error)
 	generateMutex       sync.RWMutex
-	generateArgsForCall []struct {
-		arg1 context.Context
-		arg2 *provenance.PromotionRecord
-	}
-	generateReturns struct {
+	generateArgsForCall []FakeGeneratorGenerateArgs
+	generateReturns     struct {
 		result1 []byte
 		result2 error
 	}
@@ -40,16 +37,20 @@ type FakeGenerator struct {
 		result2 error
 	}
 	invocations      map[string][][]interface{}
+	callOrder        []string
 	invocationsMutex sync.RWMutex
+}
+
+// FakeGeneratorGenerateArgs holds the arguments of one call to Generate.
+type FakeGeneratorGenerateArgs struct {
+	Arg1 context.Context
+	Arg2 *provenance.PromotionRecord
 }
 
 func (fake *FakeGenerator) Generate(arg1 context.Context, arg2 *provenance.PromotionRecord) ([]byte, error) {
 	fake.generateMutex.Lock()
 	ret, specificReturn := fake.generateReturnsOnCall[len(fake.generateArgsForCall)]
-	fake.generateArgsForCall = append(fake.generateArgsForCall, struct {
-		arg1 context.Context
-		arg2 *provenance.PromotionRecord
-	}{arg1, arg2})
+	fake.generateArgsForCall = append(fake.generateArgsForCall, FakeGeneratorGenerateArgs{arg1, arg2})
 	stub := fake.GenerateStub
 	fakeReturns := fake.generateReturns
 	fake.recordInvocation("Generate", []interface{}{arg1, arg2})
@@ -79,7 +80,15 @@ func (fake *FakeGenerator) GenerateArgsForCall(i int) (context.Context, *provena
 	fake.generateMutex.RLock()
 	defer fake.generateMutex.RUnlock()
 	argsForCall := fake.generateArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2
+	return argsForCall.Arg1, argsForCall.Arg2
+}
+
+func (fake *FakeGenerator) GenerateArgs() []FakeGeneratorGenerateArgs {
+	fake.generateMutex.RLock()
+	defer fake.generateMutex.RUnlock()
+	args := make([]FakeGeneratorGenerateArgs, len(fake.generateArgsForCall))
+	copy(args, fake.generateArgsForCall)
+	return args
 }
 
 func (fake *FakeGenerator) GenerateReturns(result1 []byte, result2 error) {
@@ -118,9 +127,18 @@ func (fake *FakeGenerator) Invocations() map[string][][]interface{} {
 	return copiedInvocations
 }
 
+func (fake *FakeGenerator) CallOrder() []string {
+	fake.invocationsMutex.RLock()
+	defer fake.invocationsMutex.RUnlock()
+	order := make([]string, len(fake.callOrder))
+	copy(order, fake.callOrder)
+	return order
+}
+
 func (fake *FakeGenerator) recordInvocation(key string, args []interface{}) {
 	fake.invocationsMutex.Lock()
 	defer fake.invocationsMutex.Unlock()
+	fake.callOrder = append(fake.callOrder, key)
 	if fake.invocations == nil {
 		fake.invocations = map[string][][]interface{}{}
 	}
