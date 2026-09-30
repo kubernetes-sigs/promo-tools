@@ -34,6 +34,10 @@ const (
 	summaryName   = "registry.k8s.io/security-profiles-operator/security-profiles-operator"
 	summarySource = "us-central1-docker.pkg.dev/k8s-staging-images/sp-operator/security-profiles-operator"
 
+	// Verified build levels.
+	levelBuild2 = "SLSA_BUILD_LEVEL_2"
+	levelBuild3 = "SLSA_BUILD_LEVEL_3"
+
 	// Digest algorithms of in-toto digest sets.
 	algorithmSHA256    = "sha256"
 	algorithmGitCommit = "gitCommit"
@@ -143,13 +147,13 @@ func TestVerificationSummaryLevels(t *testing.T) {
 			name:    "one policy",
 			results: []*PolicyResult{satisfied(3)},
 			result:  resultPassed,
-			levels:  []string{"SLSA_BUILD_LEVEL_3", LevelManifestReviewed},
+			levels:  []string{levelBuild3, LevelManifestReviewed},
 		},
 		{
 			name:    "the lowest level of all policies",
 			results: []*PolicyResult{satisfied(3), satisfied(2)},
 			result:  resultPassed,
-			levels:  []string{"SLSA_BUILD_LEVEL_2", LevelManifestReviewed},
+			levels:  []string{levelBuild2, LevelManifestReviewed},
 		},
 		{
 			name:    "a level that was not verified is never claimed",
@@ -210,7 +214,7 @@ func TestVerificationSummarySources(t *testing.T) {
 			name:     "all sources satisfied",
 			outcomes: []*ImageProvenance{satisfied, satisfied},
 			result:   resultPassed,
-			levels:   []string{"SLSA_BUILD_LEVEL_3", LevelManifestReviewed},
+			levels:   []string{levelBuild3, LevelManifestReviewed},
 		},
 		{
 			name:     "a source without a policy",
@@ -277,6 +281,111 @@ func TestChildSummaryInput(t *testing.T) {
 	require.Equal(t, summaryManifest().GetUri(), stmt.Predicate.Policy.URI)
 
 	require.Nil(t, ChildSummaryInput(child, nil))
+}
+
+func TestChildSummaryInputPlatformResults(t *testing.T) {
+	t.Parallel()
+
+	child := "sha256:" + strings.Repeat("9", 64)
+	discovery := &Discovery{Reference: summarySource + "@" + testDigest}
+	platformProvenance := &Attestation{
+		Source: SourceReferrer, Location: "sha256:" + strings.Repeat("a", 64), Layer: "sha256:" + strings.Repeat("e", 64),
+	}
+
+	index := func(indexSatisfied bool, platform *PolicyResult) *SummaryInput {
+		return summaryInput(&ImageProvenance{
+			Policies: []*Policy{{}},
+			Results: []*PolicyResult{{
+				Satisfied:        indexSatisfied || platform.Satisfied,
+				SLSALevel:        2,
+				ThroughPlatforms: !indexSatisfied && platform.Satisfied,
+				Platforms:        map[string]*PolicyResult{child: platform},
+			}},
+		}, discovery)
+	}
+
+	satisfied := &PolicyResult{Satisfied: true, SLSALevel: 2, Accepted: []*Attestation{platformProvenance}}
+	violated := &PolicyResult{Violations: []string{testViolation}}
+
+	// The platform manifest claims the level of its own provenance.
+	stmt := summaryOf(t, ChildSummaryInput(child, []*SummaryInput{index(false, satisfied)}))
+	require.Equal(t, resultPassed, stmt.Predicate.VerificationResult)
+	require.Equal(t, []string{levelBuild2, LevelManifestReviewed}, stmt.Predicate.VerifiedLevels)
+	require.Len(t, stmt.Predicate.InputAttestations, 1)
+	require.Equal(t, summarySource+"@"+platformProvenance.Location, stmt.Predicate.InputAttestations[0].URI)
+
+	// An index with provenance of its own passes its platform manifests
+	// without claiming a level for them.
+	stmt = summaryOf(t, ChildSummaryInput(child, []*SummaryInput{index(true, violated)}))
+	require.Equal(t, resultPassed, stmt.Predicate.VerificationResult)
+	require.Equal(t, []string{LevelBuildUnevaluated, LevelManifestReviewed}, stmt.Predicate.VerifiedLevels)
+	require.Empty(t, stmt.Predicate.InputAttestations)
+
+	// A platform manifest with passing attestations of its own claims its
+	// level, whether or not the index passed on its own.
+	stmt = summaryOf(t, ChildSummaryInput(child, []*SummaryInput{index(true, satisfied)}))
+	require.Equal(t, []string{levelBuild2, LevelManifestReviewed}, stmt.Predicate.VerifiedLevels)
+
+	// Neither the index nor the platform manifest satisfy the policy.
+	stmt = summaryOf(t, ChildSummaryInput(child, []*SummaryInput{index(false, violated)}))
+	require.Equal(t, resultFailed, stmt.Predicate.VerificationResult)
+}
+
+func TestVerificationSummaryThroughPlatforms(t *testing.T) {
+	t.Parallel()
+
+	child := "sha256:" + strings.Repeat("9", 64)
+	indexSBOM := &Attestation{
+		Source: SourceReferrer, Location: "sha256:" + strings.Repeat("a", 64), Layer: "sha256:" + strings.Repeat("e", 64),
+	}
+	platformProvenance := &Attestation{
+		Source: SourceReferrer, Location: "sha256:" + strings.Repeat("b", 64), Layer: "sha256:" + strings.Repeat("f", 64),
+	}
+
+	// The index was verified with the provenance of its platform
+	// manifests, so the summary lists it.
+	stmt := summaryOf(t, summaryInput(&ImageProvenance{
+		Policies: []*Policy{{}},
+		Results: []*PolicyResult{{
+			Satisfied:        true,
+			SLSALevel:        3,
+			ThroughPlatforms: true,
+			Accepted:         []*Attestation{indexSBOM},
+			Platforms: map[string]*PolicyResult{
+				child: {Satisfied: true, SLSALevel: 3, Accepted: []*Attestation{platformProvenance}},
+			},
+		}},
+	}, &Discovery{Reference: summarySource + "@" + testDigest}))
+
+	require.Equal(t, []string{levelBuild3, LevelManifestReviewed}, stmt.Predicate.VerifiedLevels)
+	require.Len(t, stmt.Predicate.InputAttestations, 2)
+	require.Equal(t, summarySource+"@"+indexSBOM.Location, stmt.Predicate.InputAttestations[0].URI)
+	require.Equal(t, summarySource+"@"+platformProvenance.Location, stmt.Predicate.InputAttestations[1].URI)
+}
+
+func TestImageProvenancePlatform(t *testing.T) {
+	t.Parallel()
+
+	child := "sha256:" + strings.Repeat("9", 64)
+	platform := &PolicyResult{Satisfied: true}
+	policies := []*Policy{{Mode: PolicyModeWarn}, {Mode: PolicyModeRequire}}
+
+	outcome := &ImageProvenance{
+		Policies: policies,
+		Results: []*PolicyResult{
+			{Platforms: map[string]*PolicyResult{child: platform}},
+			{Platforms: map[string]*PolicyResult{child: platform}},
+		},
+	}
+	require.Equal(t, &ImageProvenance{Policies: policies, Results: []*PolicyResult{platform, platform}}, outcome.Platform(child))
+
+	// Every policy needs a result for the platform manifest.
+	outcome.Results[1].Platforms = nil
+	require.Nil(t, outcome.Platform(child))
+	require.Nil(t, (&ImageProvenance{}).Platform(child))
+
+	var none *ImageProvenance
+	require.Nil(t, none.Platform(child))
 }
 
 func TestVerificationSummaryRepositoryPolicy(t *testing.T) {

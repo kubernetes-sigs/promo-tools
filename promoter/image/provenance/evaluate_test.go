@@ -32,16 +32,17 @@ import (
 )
 
 const (
-	testDigest      = "sha256:1111111111111111111111111111111111111111111111111111111111111111"
-	otherDigest     = "sha256:2222222222222222222222222222222222222222222222222222222222222222"
-	testRef         = "us-central1-docker.pkg.dev/k8s-staging-images/sp-operator/security-profiles-operator@" + testDigest
-	foreignSigner   = "sigstore::https://accounts.google.com::someone-else@example.iam.gserviceaccount.com"
-	spdxType        = "https://spdx.dev/Document"
-	slsaV1Type      = "https://slsa.dev/provenance/v1"
-	testBuildType   = "https://cloudbuild.googleapis.com/CloudBuildYaml@v1"
-	testInvocation  = "https://prow.k8s.io/view/gs/kubernetes-ci-logs/logs/post-security-profiles-operator-push-image/1"
-	testSourceURI   = "git+https://" + testSource + "@refs/heads/main"
-	otherSourceRepo = "github.com/kubernetes-sigs/other"
+	testDigest       = "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+	otherDigest      = "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+	testRef          = "us-central1-docker.pkg.dev/k8s-staging-images/sp-operator/security-profiles-operator@" + testDigest
+	foreignSigner    = "sigstore::https://accounts.google.com::someone-else@example.iam.gserviceaccount.com"
+	spdxType         = "https://spdx.dev/Document"
+	slsaV1Type       = "https://slsa.dev/provenance/v1"
+	testBuildType    = "https://cloudbuild.googleapis.com/CloudBuildYaml@v1"
+	testInvocation   = "https://prow.k8s.io/view/gs/kubernetes-ci-logs/logs/post-security-profiles-operator-push-image/1"
+	testSourceURI    = "git+https://" + testSource + "@refs/heads/main"
+	otherSourceRepo  = "github.com/kubernetes-sigs/other"
+	untrustedBuilder = "https://prow.k8s.io/untrusted"
 )
 
 // subjectsFor returns the in-toto subjects naming the digest.
@@ -413,7 +414,7 @@ func predicateTypeTestCases() []evaluateTestCase {
 		{
 			name: "attestation without envelope",
 			discovery: func(*testing.T) *Discovery {
-				return newDiscovery(Attestation{PredicateType: slsaV1Type, Location: "sha256-abc.att"})
+				return newDiscovery(Attestation{Digest: testDigest, PredicateType: slsaV1Type, Location: "sha256-abc.att"})
 			},
 			violations: []string{"not a parseable in-toto statement"},
 		},
@@ -519,7 +520,7 @@ func TestPolicyEvaluatorAccepted(t *testing.T) {
 		// policy, from another source or an untrusted builder.
 		newAttestation(t, provenanceStatement(t, provenanceOptions{source: "git+https://" + otherSourceRepo + "@refs/heads/main"}),
 			signed(t, testSigner)),
-		newAttestation(t, provenanceStatement(t, provenanceOptions{builder: "https://prow.k8s.io/untrusted"}),
+		newAttestation(t, provenanceStatement(t, provenanceOptions{builder: untrustedBuilder}),
 			signed(t, testSigner)),
 	)
 
@@ -530,6 +531,162 @@ func TestPolicyEvaluatorAccepted(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, result.Satisfied, result.Violations)
 	require.Equal(t, []*Attestation{&discovery.Attestations[0], &discovery.Attestations[1]}, result.Accepted)
+}
+
+// platformAttestation returns an attestation attached to and about a
+// platform manifest of the test index.
+func platformAttestation(t *testing.T, data []byte, digest string) Attestation {
+	t.Helper()
+
+	att := newAttestation(t, data, signed(t, testSigner))
+	att.Digest = digest
+
+	return att
+}
+
+func TestPolicyEvaluatorPlatforms(t *testing.T) {
+	t.Parallel()
+
+	const thirdDigest = "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+
+	evaluator, err := NewPolicyEvaluator()
+	require.NoError(t, err)
+
+	provenanceOf := func(t *testing.T, digest string, opts provenanceOptions) Attestation {
+		t.Helper()
+
+		opts.digest = digest
+
+		return platformAttestation(t, provenanceStatement(t, opts), digest)
+	}
+
+	for _, tc := range []struct {
+		name             string
+		discovery        func(t *testing.T) *Discovery
+		satisfied        bool
+		throughPlatforms bool
+		level            int
+		violations       []string
+	}{
+		{
+			name: "all platform manifests satisfy the policy",
+			discovery: func(t *testing.T) *Discovery {
+				t.Helper()
+
+				return newDiscovery(
+					provenanceOf(t, otherDigest, provenanceOptions{}),
+					provenanceOf(t, thirdDigest, provenanceOptions{noInvocation: true}),
+				)
+			},
+			satisfied:        true,
+			throughPlatforms: true,
+			// The lowest level of the platform manifests.
+			level: 2,
+		},
+		{
+			name: "one platform manifest without provenance",
+			discovery: func(t *testing.T) *Discovery {
+				t.Helper()
+
+				return newDiscovery(provenanceOf(t, otherDigest, provenanceOptions{}))
+			},
+			violations: []string{
+				"no SLSA build provenance found",
+				"platform manifest " + thirdDigest + ": no SLSA build provenance found",
+			},
+		},
+		{
+			name: "one platform manifest from an untrusted builder",
+			discovery: func(t *testing.T) *Discovery {
+				t.Helper()
+
+				return newDiscovery(
+					provenanceOf(t, otherDigest, provenanceOptions{}),
+					provenanceOf(t, thirdDigest, provenanceOptions{builder: untrustedBuilder}),
+				)
+			},
+			violations: []string{"platform manifest " + thirdDigest + ": "},
+		},
+		{
+			name: "rejected provenance about the index is not outweighed by its platform manifests",
+			discovery: func(t *testing.T) *Discovery {
+				t.Helper()
+
+				return newDiscovery(
+					newAttestation(t, provenanceStatement(t, provenanceOptions{builder: untrustedBuilder}),
+						signed(t, testSigner)),
+					provenanceOf(t, otherDigest, provenanceOptions{}),
+					provenanceOf(t, thirdDigest, provenanceOptions{}),
+				)
+			},
+			violations: []string{"builder-id-trusted"},
+		},
+		{
+			name: "the index satisfies the policy on its own",
+			discovery: func(t *testing.T) *Discovery {
+				t.Helper()
+
+				return newDiscovery(goodProvenance(t))
+			},
+			satisfied: true,
+			level:     3,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			discovery := tc.discovery(t)
+			discovery.Children = []string{otherDigest, thirdDigest}
+
+			// Level 2 lets provenance without an invocation pass.
+			policy := testPolicy(PolicyModeRequire)
+			policy.Level = 2
+
+			res, err := evaluator.Evaluate(context.Background(), discovery, policy)
+			require.NoError(t, err)
+			require.Equal(t, tc.satisfied, res.Satisfied, "violations: %v", res.Violations)
+			require.Equal(t, tc.throughPlatforms, res.ThroughPlatforms)
+			require.Len(t, res.Platforms, 2)
+
+			if tc.satisfied {
+				require.Empty(t, res.Violations)
+				require.Equal(t, tc.level, res.SLSALevel)
+
+				return
+			}
+
+			joined := strings.Join(res.Violations, "\n")
+			for _, want := range tc.violations {
+				require.Contains(t, joined, want)
+			}
+
+			// Provenance of a platform manifest is not about the index.
+			require.NotContains(t, joined, "not about")
+		})
+	}
+}
+
+func TestPolicyEvaluatorPlatformAccepted(t *testing.T) {
+	t.Parallel()
+
+	provenance := platformAttestation(t, provenanceStatement(t, provenanceOptions{digest: otherDigest}), otherDigest)
+	sbom := platformAttestation(t, sbomStatement(t, otherDigest), otherDigest)
+	indexSBOM := newAttestation(t, sbomStatement(t, testDigest), signed(t, testSigner))
+
+	discovery := newDiscovery(provenance, sbom, indexSBOM)
+	discovery.Children = []string{otherDigest}
+
+	evaluator, err := NewPolicyEvaluator()
+	require.NoError(t, err)
+
+	result, err := evaluator.Evaluate(context.Background(), discovery, testPolicy(PolicyModeRequire))
+	require.NoError(t, err)
+	require.True(t, result.ThroughPlatforms, result.Violations)
+
+	// Each digest accepts the attestations about it.
+	require.Equal(t, []*Attestation{&discovery.Attestations[2]}, result.Accepted)
+	require.Equal(t, []*Attestation{&discovery.Attestations[0], &discovery.Attestations[1]},
+		result.Platforms[otherDigest].Accepted)
 }
 
 func TestPolicyEvaluatorEvaluateErrors(t *testing.T) {

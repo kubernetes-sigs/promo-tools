@@ -19,6 +19,8 @@ package provenance
 import (
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
 	"strings"
 	"time"
 
@@ -177,11 +179,13 @@ func VerificationSummary(in *SummaryInput) ([]byte, error) {
 }
 
 // ChildSummaryInput returns the input of the verification summary of a
-// child of the indexes with the given inputs, whose digest the promoter
-// manifests don't list. The provenance of an index is not about its
-// children, so the summary of a child never claims a build level and has no
-// input attestations. It fails when the summary of one of the indexes
-// fails. Its policy is that of the first index, or the repository when the
+// platform manifest of the indexes with the given inputs, whose digest the
+// promoter manifests don't list. Each source image of an index contributes
+// the policy results of the platform manifest, evaluated against its own
+// attestations, when they satisfy the policies, whether or not the index
+// satisfied them on its own. Otherwise, because no policy applies or the
+// platform manifest has no passing attestations of its own, it claims no
+// build level and fails when the summary of its index fails. The policy is that of the first index, or the repository when the
 // indexes come from different promoter manifests.
 func ChildSummaryInput(digest string, indexes []*SummaryInput) *SummaryInput {
 	if len(indexes) == 0 {
@@ -189,12 +193,29 @@ func ChildSummaryInput(digest string, indexes []*SummaryInput) *SummaryInput {
 	}
 
 	first := indexes[0]
-	outcome := &ImageProvenance{}
 	policy := first.Policy
 
+	var sources []SummarySource
+
 	for _, index := range indexes {
-		if result, _ := summaryResult(index.Sources); result == resultFailed && len(outcome.Results) == 0 {
-			outcome.Results = []*PolicyResult{{Violations: []string{"the verification of the index failed"}}}
+		for i := range index.Sources {
+			source := &index.Sources[i]
+
+			platform := SummarySource{Discovery: source.Discovery, Provenance: source.Provenance.Platform(digest)}
+			if platform.Provenance != nil {
+				if result, _ := summaryResult([]SummarySource{platform}); result == resultPassed {
+					sources = append(sources, platform)
+
+					continue
+				}
+			}
+
+			outcome := &ImageProvenance{}
+			if result, _ := summaryResult([]SummarySource{*source}); result == resultFailed {
+				outcome.Results = []*PolicyResult{{Violations: []string{"the verification of the index failed"}}}
+			}
+
+			sources = append(sources, SummarySource{Provenance: outcome})
 		}
 
 		if policyURI(index.Policy) != policyURI(first.Policy) {
@@ -208,8 +229,29 @@ func ChildSummaryInput(digest string, indexes []*SummaryInput) *SummaryInput {
 		Version: first.Version,
 		Time:    first.Time,
 		Policy:  policy,
-		Sources: []SummarySource{{Provenance: outcome}},
+		Sources: sources,
 	}
+}
+
+// Platform returns the policy results of a platform manifest of the index
+// this is the outcome for, or nil if the policies were not evaluated for
+// it.
+func (p *ImageProvenance) Platform(digest string) *ImageProvenance {
+	if p == nil || len(p.Results) == 0 {
+		return nil
+	}
+
+	platform := &ImageProvenance{Policies: p.Policies}
+
+	for _, res := range p.Results {
+		if res == nil || res.Platforms[digest] == nil {
+			return nil
+		}
+
+		platform.Results = append(platform.Results, res.Platforms[digest])
+	}
+
+	return platform
 }
 
 // summaryResult returns the verification result and the verified levels
@@ -280,7 +322,21 @@ func inputAttestations(sources []SummarySource) []*vsav1.VerificationSummary_Inp
 				continue
 			}
 
-			for _, att := range res.Accepted {
+			// An index that satisfied the policy through its platform
+			// manifests was verified with their attestations. The results
+			// are shared between summaries written in parallel, so the
+			// lists are copied, never appended to.
+			accepted := res.Accepted
+			if res.ThroughPlatforms {
+				lists := [][]*Attestation{res.Accepted}
+				for _, digest := range slices.Sorted(maps.Keys(res.Platforms)) {
+					lists = append(lists, res.Platforms[digest].Accepted)
+				}
+
+				accepted = slices.Concat(lists...)
+			}
+
+			for _, att := range accepted {
 				if seen[att] {
 					continue
 				}

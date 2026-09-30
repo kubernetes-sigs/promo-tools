@@ -393,8 +393,19 @@ func TestWriteVerificationSummariesIndex(t *testing.T) {
 
 	indexEdge, listedEdge := edge(indexDigest.String(), testTagV1), edge(listed, "")
 	edges := map[promotion.Edge]any{indexEdge: nil, listedEdge: nil}
+	// The index satisfies its policy through its platform manifests, which
+	// were evaluated against their own attestations.
 	outcomes := map[string]*provenance.ImageProvenance{
-		indexEdge.SrcReference(): {},
+		indexEdge.SrcReference(): {
+			Policies: []*provenance.Policy{{Mode: provenance.PolicyModeWarn}},
+			Results: []*provenance.PolicyResult{{
+				Satisfied: true, SLSALevel: 2, ThroughPlatforms: true,
+				Platforms: map[string]*provenance.PolicyResult{
+					listed:   {Satisfied: true, SLSALevel: 3},
+					unlisted: {Satisfied: true, SLSALevel: 2},
+				},
+			}},
+		},
 		listedEdge.SrcReference(): {
 			Policies: []*provenance.Policy{{Mode: provenance.PolicyModeWarn}},
 			Results:  []*provenance.PolicyResult{{Satisfied: true, SLSALevel: 3}},
@@ -426,11 +437,12 @@ func TestWriteVerificationSummariesIndex(t *testing.T) {
 
 	resource := targetIdentity(&indexEdge)
 	require.Equal(t, map[string][]string{
-		resource + "@" + indexDigest.String(): {provenance.LevelBuildUnevaluated, provenance.LevelManifestReviewed},
-		// The listed child has a summary of its own.
+		// The lowest level of the platform manifests.
+		resource + "@" + indexDigest.String(): {"SLSA_BUILD_LEVEL_2", provenance.LevelManifestReviewed},
+		// The listed child has a summary from its own results.
 		resource + "@" + listed: {"SLSA_BUILD_LEVEL_3", provenance.LevelManifestReviewed},
-		// The unlisted child gets one that claims no level.
-		resource + "@" + unlisted: {provenance.LevelBuildUnevaluated, provenance.LevelManifestReviewed},
+		// The unlisted child gets one from its platform results.
+		resource + "@" + unlisted: {"SLSA_BUILD_LEVEL_2", provenance.LevelManifestReviewed},
 	}, levels)
 	require.Len(t, signer.statements, 3)
 }
@@ -461,9 +473,11 @@ func TestWriteVerificationSummariesSharedChild(t *testing.T) {
 		mutate.IndexAddendum{Add: images[0]}, mutate.IndexAddendum{Add: images[1]})
 	failed := mutate.AppendManifests(empty.Index,
 		mutate.IndexAddendum{Add: images[0]}, mutate.IndexAddendum{Add: images[2]},
-		mutate.IndexAddendum{Add: images[3], Annotations: map[string]string{
-			dockerReferenceTypeAnnotation: dockerAttestationManifest,
-		}})
+		mutate.IndexAddendum{
+			Add:         images[3],
+			Annotations: map[string]string{"vnd.docker.reference.type": "attestation-manifest"},
+			Platform:    &v1.Platform{OS: "unknown", Architecture: "unknown"},
+		})
 
 	dst := host + "/production/" + testImageApp
 	src := reg.Context{Name: image.Registry(host + "/staging"), Src: true}

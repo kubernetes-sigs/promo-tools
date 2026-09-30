@@ -344,9 +344,21 @@ include the image digest, and it names one of the builders and one of the
 sources. Unsigned attestations, attestations whose signature does not
 verify, attestations by other signers and attestations about other digests
 never count. If discovering the attestations fails, the policy is not
-satisfied either. For an index, the provenance must be about the index
-digest itself: provenance attached to the platform images satisfies the
-policy of those images, when they are promoted on their own.
+satisfied either.
+
+For an index, each of its platform manifests in the same repository is
+evaluated the same way, against its own digest and attestations, because
+builders usually attest the platform images rather than the index. The
+index satisfies the policy with provenance about its own digest or, when it
+has no build provenance of its own, when all its platform manifests satisfy
+it; the verified level is then the lowest of theirs. Provenance about the
+index that fails the policy fails the index, whatever its platform
+manifests carry. A nested index is evaluated against its own attestations
+only. Attestation manifests BuildKit adds to an index (annotated and with
+the platform `unknown/unknown`) are no platform manifests. Platform images
+a build attested in their own
+repositories (for example `…-amd64`) satisfy the policy of those
+repositories when they are promoted on their own.
 
 Every run logs the effective policy per source image, so dry runs show
 which images are checked against which policy. Manifests that share a
@@ -375,7 +387,9 @@ unverified content reaches production. Carrying is idempotent and, like the
 promotion records, needs signing. Images without an enabled policy carry
 nothing, attestations in legacy `.att` tags are not carried, and neither are
 promotion records or verification summaries, which the promoter writes
-itself. A failure to carry is reported without stopping the others, but
+itself. The attestations of platform manifests that the promoter manifest
+doesn't list are not carried either, even when their index satisfied the
+policy through them. A failure to carry is reported without stopping the others, but
 promoted images are not promotion candidates in later runs, so it is not
 retried automatically.
 
@@ -389,7 +403,8 @@ image and logs it, dry runs included:
 - DSSE envelopes and unsigned in-toto statements in legacy cosign `.att` tags
 
 For an index, the referrers and `.att` tags of its direct children in the same
-repository are listed too. Referrers are per repository, so attestations that
+repository are listed too, except for the attestation manifests BuildKit
+adds. Referrers are per repository, so attestations that
 a build attached to the platform images in their own repositories (for
 example `…-amd64`) are found when those repositories are promoted.
 
@@ -472,14 +487,17 @@ images the digest was promoted from, usually one:
 - `slsaVersion` is `1.0`, the SLSA version whose build track the policies
   are evaluated against.
 
-The summary of an index covers the index itself. Its platform manifests get
-summaries of their own: from their own provenance results when the promoter
-manifest lists them, and otherwise one that claims no build level
-(`SLSA_BUILD_LEVEL_UNEVALUATED`) and no input attestations, because the
-provenance of the index is not about them, and that fails when the summary
-of one of the indexes holding them fails. Attestation manifests BuildKit
-adds to an index get none. Evaluating the provenance of the platform
-manifests in that case is tracked in [#1998][issue-1998].
+The summary of an index covers the index itself; when the index satisfied
+the policies through its platform manifests, its input attestations are
+theirs. The platform manifests get summaries of their own: from their own
+policy results when the promoter manifest lists them, and otherwise from
+the policy results of their own attestations when these satisfy the
+policies, whether or not the index satisfied them on its own. Any other
+platform manifest, because no policy applies or its own attestations don't
+satisfy the policies, gets a summary that claims no build level
+(`SLSA_BUILD_LEVEL_UNEVALUATED`) and no input attestations, and that fails
+when the summary of one of the indexes holding it fails.
+Attestation manifests BuildKit adds to an index get none.
 
 The summaries are signed by the same identity as the promotion records,
 `--signer-account`. Which identity should sign them for consumers is not
@@ -608,5 +626,4 @@ kpromo cip \
 [signer-principals]: https://github.com/carabiner-dev/signer/blob/main/docs/principals.md
 [slsa-verifier]: https://github.com/slsa-framework/verifier
 [issue-1955]: https://github.com/kubernetes-sigs/promo-tools/issues/1955
-[issue-1998]: https://github.com/kubernetes-sigs/promo-tools/issues/1998
 [slsa-vsa]: https://slsa.dev/spec/v1.0/verification_summary

@@ -44,16 +44,9 @@ import (
 	"sigs.k8s.io/promo-tools/v4/types/image"
 )
 
-const (
-	// maxSummarySize limits how much of an existing verification summary
-	// is read.
-	maxSummarySize = 1 << 20
-
-	// dockerReferenceTypeAnnotation and dockerAttestationManifest mark the
-	// attestation manifests BuildKit adds to an index.
-	dockerReferenceTypeAnnotation = "vnd.docker.reference.type"
-	dockerAttestationManifest     = "attestation-manifest"
-)
+// maxSummarySize limits how much of an existing verification summary is
+// read.
+const maxSummarySize = 1 << 20
 
 // WriteVerificationSummaries writes a signed SLSA verification summary for
 // each promoted digest, index and platform manifests alike, to the
@@ -238,8 +231,7 @@ func (di *DefaultPromoterImplementation) unlistedChildren(
 
 	for i := range im.Manifests {
 		child := &im.Manifests[i]
-		if !child.MediaType.IsImage() && !child.MediaType.IsIndex() ||
-			child.Annotations[dockerReferenceTypeAnnotation] == dockerAttestationManifest {
+		if !provenance.IsPlatformManifest(child) {
 			continue
 		}
 
