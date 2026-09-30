@@ -27,11 +27,8 @@ import (
 type FakeDiscoverer struct {
 	DiscoverStub        func(context.Context, string) (*provenance.Discovery, error)
 	discoverMutex       sync.RWMutex
-	discoverArgsForCall []struct {
-		arg1 context.Context
-		arg2 string
-	}
-	discoverReturns struct {
+	discoverArgsForCall []FakeDiscovererDiscoverArgs
+	discoverReturns     struct {
 		result1 *provenance.Discovery
 		result2 error
 	}
@@ -40,16 +37,20 @@ type FakeDiscoverer struct {
 		result2 error
 	}
 	invocations      map[string][][]interface{}
+	callOrder        []string
 	invocationsMutex sync.RWMutex
+}
+
+// FakeDiscovererDiscoverArgs holds the arguments of one call to Discover.
+type FakeDiscovererDiscoverArgs struct {
+	Arg1 context.Context
+	Arg2 string
 }
 
 func (fake *FakeDiscoverer) Discover(arg1 context.Context, arg2 string) (*provenance.Discovery, error) {
 	fake.discoverMutex.Lock()
 	ret, specificReturn := fake.discoverReturnsOnCall[len(fake.discoverArgsForCall)]
-	fake.discoverArgsForCall = append(fake.discoverArgsForCall, struct {
-		arg1 context.Context
-		arg2 string
-	}{arg1, arg2})
+	fake.discoverArgsForCall = append(fake.discoverArgsForCall, FakeDiscovererDiscoverArgs{arg1, arg2})
 	stub := fake.DiscoverStub
 	fakeReturns := fake.discoverReturns
 	fake.recordInvocation("Discover", []interface{}{arg1, arg2})
@@ -79,7 +80,15 @@ func (fake *FakeDiscoverer) DiscoverArgsForCall(i int) (context.Context, string)
 	fake.discoverMutex.RLock()
 	defer fake.discoverMutex.RUnlock()
 	argsForCall := fake.discoverArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2
+	return argsForCall.Arg1, argsForCall.Arg2
+}
+
+func (fake *FakeDiscoverer) DiscoverArgs() []FakeDiscovererDiscoverArgs {
+	fake.discoverMutex.RLock()
+	defer fake.discoverMutex.RUnlock()
+	args := make([]FakeDiscovererDiscoverArgs, len(fake.discoverArgsForCall))
+	copy(args, fake.discoverArgsForCall)
+	return args
 }
 
 func (fake *FakeDiscoverer) DiscoverReturns(result1 *provenance.Discovery, result2 error) {
@@ -118,9 +127,18 @@ func (fake *FakeDiscoverer) Invocations() map[string][][]interface{} {
 	return copiedInvocations
 }
 
+func (fake *FakeDiscoverer) CallOrder() []string {
+	fake.invocationsMutex.RLock()
+	defer fake.invocationsMutex.RUnlock()
+	order := make([]string, len(fake.callOrder))
+	copy(order, fake.callOrder)
+	return order
+}
+
 func (fake *FakeDiscoverer) recordInvocation(key string, args []interface{}) {
 	fake.invocationsMutex.Lock()
 	defer fake.invocationsMutex.Unlock()
+	fake.callOrder = append(fake.callOrder, key)
 	if fake.invocations == nil {
 		fake.invocations = map[string][][]interface{}{}
 	}

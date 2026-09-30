@@ -28,10 +28,8 @@ import (
 type FakeSyncFilestore struct {
 	ListFilesStub        func(context.Context) (map[string]*file.SyncFileInfo, error)
 	listFilesMutex       sync.RWMutex
-	listFilesArgsForCall []struct {
-		arg1 context.Context
-	}
-	listFilesReturns struct {
+	listFilesArgsForCall []FakeSyncFilestoreListFilesArgs
+	listFilesReturns     struct {
 		result1 map[string]*file.SyncFileInfo
 		result2 error
 	}
@@ -41,11 +39,8 @@ type FakeSyncFilestore struct {
 	}
 	OpenReaderStub        func(context.Context, string) (io.ReadCloser, error)
 	openReaderMutex       sync.RWMutex
-	openReaderArgsForCall []struct {
-		arg1 context.Context
-		arg2 string
-	}
-	openReaderReturns struct {
+	openReaderArgsForCall []FakeSyncFilestoreOpenReaderArgs
+	openReaderReturns     struct {
 		result1 io.ReadCloser
 		result2 error
 	}
@@ -55,27 +50,40 @@ type FakeSyncFilestore struct {
 	}
 	UploadFileStub        func(context.Context, string, string) error
 	uploadFileMutex       sync.RWMutex
-	uploadFileArgsForCall []struct {
-		arg1 context.Context
-		arg2 string
-		arg3 string
-	}
-	uploadFileReturns struct {
+	uploadFileArgsForCall []FakeSyncFilestoreUploadFileArgs
+	uploadFileReturns     struct {
 		result1 error
 	}
 	uploadFileReturnsOnCall map[int]struct {
 		result1 error
 	}
 	invocations      map[string][][]interface{}
+	callOrder        []string
 	invocationsMutex sync.RWMutex
+}
+
+// FakeSyncFilestoreListFilesArgs holds the arguments of one call to ListFiles.
+type FakeSyncFilestoreListFilesArgs struct {
+	Arg1 context.Context
+}
+
+// FakeSyncFilestoreOpenReaderArgs holds the arguments of one call to OpenReader.
+type FakeSyncFilestoreOpenReaderArgs struct {
+	Arg1 context.Context
+	Arg2 string
+}
+
+// FakeSyncFilestoreUploadFileArgs holds the arguments of one call to UploadFile.
+type FakeSyncFilestoreUploadFileArgs struct {
+	Arg1 context.Context
+	Arg2 string
+	Arg3 string
 }
 
 func (fake *FakeSyncFilestore) ListFiles(arg1 context.Context) (map[string]*file.SyncFileInfo, error) {
 	fake.listFilesMutex.Lock()
 	ret, specificReturn := fake.listFilesReturnsOnCall[len(fake.listFilesArgsForCall)]
-	fake.listFilesArgsForCall = append(fake.listFilesArgsForCall, struct {
-		arg1 context.Context
-	}{arg1})
+	fake.listFilesArgsForCall = append(fake.listFilesArgsForCall, FakeSyncFilestoreListFilesArgs{arg1})
 	stub := fake.ListFilesStub
 	fakeReturns := fake.listFilesReturns
 	fake.recordInvocation("ListFiles", []interface{}{arg1})
@@ -105,7 +113,15 @@ func (fake *FakeSyncFilestore) ListFilesArgsForCall(i int) context.Context {
 	fake.listFilesMutex.RLock()
 	defer fake.listFilesMutex.RUnlock()
 	argsForCall := fake.listFilesArgsForCall[i]
-	return argsForCall.arg1
+	return argsForCall.Arg1
+}
+
+func (fake *FakeSyncFilestore) ListFilesArgs() []FakeSyncFilestoreListFilesArgs {
+	fake.listFilesMutex.RLock()
+	defer fake.listFilesMutex.RUnlock()
+	args := make([]FakeSyncFilestoreListFilesArgs, len(fake.listFilesArgsForCall))
+	copy(args, fake.listFilesArgsForCall)
+	return args
 }
 
 func (fake *FakeSyncFilestore) ListFilesReturns(result1 map[string]*file.SyncFileInfo, result2 error) {
@@ -137,10 +153,7 @@ func (fake *FakeSyncFilestore) ListFilesReturnsOnCall(i int, result1 map[string]
 func (fake *FakeSyncFilestore) OpenReader(arg1 context.Context, arg2 string) (io.ReadCloser, error) {
 	fake.openReaderMutex.Lock()
 	ret, specificReturn := fake.openReaderReturnsOnCall[len(fake.openReaderArgsForCall)]
-	fake.openReaderArgsForCall = append(fake.openReaderArgsForCall, struct {
-		arg1 context.Context
-		arg2 string
-	}{arg1, arg2})
+	fake.openReaderArgsForCall = append(fake.openReaderArgsForCall, FakeSyncFilestoreOpenReaderArgs{arg1, arg2})
 	stub := fake.OpenReaderStub
 	fakeReturns := fake.openReaderReturns
 	fake.recordInvocation("OpenReader", []interface{}{arg1, arg2})
@@ -170,7 +183,15 @@ func (fake *FakeSyncFilestore) OpenReaderArgsForCall(i int) (context.Context, st
 	fake.openReaderMutex.RLock()
 	defer fake.openReaderMutex.RUnlock()
 	argsForCall := fake.openReaderArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2
+	return argsForCall.Arg1, argsForCall.Arg2
+}
+
+func (fake *FakeSyncFilestore) OpenReaderArgs() []FakeSyncFilestoreOpenReaderArgs {
+	fake.openReaderMutex.RLock()
+	defer fake.openReaderMutex.RUnlock()
+	args := make([]FakeSyncFilestoreOpenReaderArgs, len(fake.openReaderArgsForCall))
+	copy(args, fake.openReaderArgsForCall)
+	return args
 }
 
 func (fake *FakeSyncFilestore) OpenReaderReturns(result1 io.ReadCloser, result2 error) {
@@ -202,11 +223,7 @@ func (fake *FakeSyncFilestore) OpenReaderReturnsOnCall(i int, result1 io.ReadClo
 func (fake *FakeSyncFilestore) UploadFile(arg1 context.Context, arg2 string, arg3 string) error {
 	fake.uploadFileMutex.Lock()
 	ret, specificReturn := fake.uploadFileReturnsOnCall[len(fake.uploadFileArgsForCall)]
-	fake.uploadFileArgsForCall = append(fake.uploadFileArgsForCall, struct {
-		arg1 context.Context
-		arg2 string
-		arg3 string
-	}{arg1, arg2, arg3})
+	fake.uploadFileArgsForCall = append(fake.uploadFileArgsForCall, FakeSyncFilestoreUploadFileArgs{arg1, arg2, arg3})
 	stub := fake.UploadFileStub
 	fakeReturns := fake.uploadFileReturns
 	fake.recordInvocation("UploadFile", []interface{}{arg1, arg2, arg3})
@@ -236,7 +253,15 @@ func (fake *FakeSyncFilestore) UploadFileArgsForCall(i int) (context.Context, st
 	fake.uploadFileMutex.RLock()
 	defer fake.uploadFileMutex.RUnlock()
 	argsForCall := fake.uploadFileArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
+	return argsForCall.Arg1, argsForCall.Arg2, argsForCall.Arg3
+}
+
+func (fake *FakeSyncFilestore) UploadFileArgs() []FakeSyncFilestoreUploadFileArgs {
+	fake.uploadFileMutex.RLock()
+	defer fake.uploadFileMutex.RUnlock()
+	args := make([]FakeSyncFilestoreUploadFileArgs, len(fake.uploadFileArgsForCall))
+	copy(args, fake.uploadFileArgsForCall)
+	return args
 }
 
 func (fake *FakeSyncFilestore) UploadFileReturns(result1 error) {
@@ -272,9 +297,18 @@ func (fake *FakeSyncFilestore) Invocations() map[string][][]interface{} {
 	return copiedInvocations
 }
 
+func (fake *FakeSyncFilestore) CallOrder() []string {
+	fake.invocationsMutex.RLock()
+	defer fake.invocationsMutex.RUnlock()
+	order := make([]string, len(fake.callOrder))
+	copy(order, fake.callOrder)
+	return order
+}
+
 func (fake *FakeSyncFilestore) recordInvocation(key string, args []interface{}) {
 	fake.invocationsMutex.Lock()
 	defer fake.invocationsMutex.Unlock()
+	fake.callOrder = append(fake.callOrder, key)
 	if fake.invocations == nil {
 		fake.invocations = map[string][][]interface{}{}
 	}
