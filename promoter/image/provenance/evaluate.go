@@ -291,12 +291,14 @@ func (e *PolicyEvaluator) verifyProvenance(
 
 	var errs []error
 
+	builders := policy.builderIDs()
+
 	for _, source := range policy.Sources {
 		res, err := e.verifier.Verify(ctx, statement,
 			slsa.WithRequireSignatures(true),
 			slsa.WithExpectedSigners(signers),
 			slsa.WithSubjects([]*subject.Expected{expected}),
-			slsa.WithParam("trusted_builders", policy.Builders),
+			slsa.WithParam("trusted_builders", builders),
 			slsa.WithParam("expected_source", source),
 			slsa.WithMinLevel(policy.Level),
 			slsa.WithSkipBuildTypeChecks(true),
@@ -310,7 +312,10 @@ func (e *PolicyEvaluator) verifyProvenance(
 		}
 
 		if res.Pass() {
-			return res.SLSALevel, res.Message, nil
+			// The provenance can't show the build level of its builder,
+			// and any trusted signer can claim any trusted builder, so it
+			// verifies at no more than the lowest level of the builders.
+			return min(res.SLSALevel, policy.builderLevel()), res.Message, nil
 		}
 
 		errs = append(errs, fmt.Errorf("source %s: %s", source, failureReason(res)))

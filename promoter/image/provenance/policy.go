@@ -43,14 +43,49 @@ const (
 	PolicyModeRequire PolicyMode = "require"
 )
 
-// minPolicyLevel and maxPolicyLevel bound the SLSA build level a policy
-// can require. The verifier treats controls above the required level as
-// informative, and the trusted builder check is a level 2 control, so a
-// lower level would stop enforcing the builders.
+// minBuilderLevel, minPolicyLevel and maxLevel bound the SLSA build levels
+// of builders and policies. The verifier treats controls above the
+// required level as informative, and the trusted builder check is a level
+// 2 control, so a lower policy level would stop enforcing the builders.
 const (
-	minPolicyLevel = 2
-	maxPolicyLevel = 3
+	minBuilderLevel = 1
+	minPolicyLevel  = 2
+	maxLevel        = 3
 )
+
+// Builder is a trusted builder of SLSA build provenance and the SLSA build
+// level it reaches. The level depends on how the builder isolates builds
+// and who generates and signs the provenance, which the provenance can't
+// show, so the policy states it. The builder ID is what the provenance
+// claims, and any trusted signer can claim any trusted builder, so
+// provenance verifies at no more than the lowest level of the builders of
+// its policy.
+type Builder struct {
+	// ID is the builder ID of the provenance. An ID without an @ also
+	// matches the builder at any ref.
+	ID string `yaml:"id"`
+
+	// Level is the SLSA build level the builder reaches, 1 to 3.
+	// Provenance of the builder never verifies at a higher level.
+	Level int `yaml:"level"`
+}
+
+// String describes the builder for the logs.
+func (b *Builder) String() string {
+	return fmt.Sprintf("%s (level %d)", b.ID, b.Level)
+}
+
+// UnmarshalYAML rejects builders given as plain IDs, without a level.
+func (b *Builder) UnmarshalYAML(unmarshal func(any) error) error {
+	var id string
+	if err := unmarshal(&id); err == nil {
+		return fmt.Errorf("provenance: builder %q needs a level, as {id: %q, level: <1-3>}", id, id)
+	}
+
+	type plain Builder
+
+	return unmarshal((*plain)(b))
+}
 
 // Policy is the provenance policy of a project, declared in the
 // `provenance` section of its promoter manifest. Images of the project
@@ -68,9 +103,8 @@ type Policy struct {
 	// They are separate from the identity the promoter signs with.
 	Signers []string `yaml:"signers,omitempty"`
 
-	// Builders are the trusted builder IDs of the SLSA build provenance.
-	// An ID without an @ also matches the builder at any ref.
-	Builders []string `yaml:"builders,omitempty"`
+	// Builders are the trusted builders of the SLSA build provenance.
+	Builders []Builder `yaml:"builders,omitempty"`
 
 	// Sources are the repositories the images may be built from, for
 	// example "github.com/kubernetes-sigs/security-profiles-operator".
@@ -80,9 +114,9 @@ type Policy struct {
 	// image, in addition to the build provenance.
 	PredicateTypes []string `yaml:"predicateTypes,omitempty"`
 
-	// Level is the SLSA build level the provenance must reach, 2 or 3.
-	// Zero (the default) requires every applicable SLSA build control to
-	// pass.
+	// Level is the SLSA build level the provenance must reach, 2 or 3, at
+	// most the lowest level of the builders. Zero (the default) requires
+	// every applicable SLSA build control to pass.
 	Level int `yaml:"level,omitempty"`
 }
 
@@ -113,8 +147,15 @@ func (p *Policy) Validate() error {
 	}
 
 	for _, builder := range p.Builders {
-		if strings.TrimSpace(builder) == "" {
-			errs = append(errs, errors.New("provenance: builders must not be empty"))
+		if strings.TrimSpace(builder.ID) == "" {
+			errs = append(errs, errors.New("provenance: builder IDs must not be empty"))
+		}
+
+		if builder.Level < minBuilderLevel || builder.Level > maxLevel {
+			errs = append(errs, fmt.Errorf(
+				"provenance: builder %q needs a level between %d and %d, got %d",
+				builder.ID, minBuilderLevel, maxLevel, builder.Level,
+			))
 		}
 	}
 
@@ -134,9 +175,15 @@ func (p *Policy) Validate() error {
 		}
 	}
 
-	if p.Level != 0 && (p.Level < minPolicyLevel || p.Level > maxPolicyLevel) {
+	if p.Level != 0 && (p.Level < minPolicyLevel || p.Level > maxLevel) {
 		errs = append(errs, fmt.Errorf(
-			"provenance: level must be between %d and %d, got %d", minPolicyLevel, maxPolicyLevel, p.Level,
+			"provenance: level must be between %d and %d, got %d", minPolicyLevel, maxLevel, p.Level,
+		))
+	}
+
+	if lowest := p.builderLevel(); p.Level > 0 && lowest > 0 && p.Level > lowest {
+		errs = append(errs, fmt.Errorf(
+			"provenance: level %d is above %d, the lowest level of the builders", p.Level, lowest,
 		))
 	}
 
@@ -170,10 +217,20 @@ func (p *Policy) Equal(other *Policy) bool {
 
 	return p.Mode == other.Mode &&
 		sameElements(p.Signers, other.Signers) &&
-		sameElements(p.Builders, other.Builders) &&
+		sameElements(builderStrings(p.Builders), builderStrings(other.Builders)) &&
 		sameElements(p.Sources, other.Sources) &&
 		sameElements(p.PredicateTypes, other.PredicateTypes) &&
 		p.Level == other.Level
+}
+
+// builderStrings describes the builders, one per entry.
+func builderStrings(builders []Builder) []string {
+	strs := make([]string, 0, len(builders))
+	for i := range builders {
+		strs = append(strs, builders[i].String())
+	}
+
+	return strs
 }
 
 // sameElements reports whether two lists hold the same elements, in any
@@ -191,7 +248,7 @@ func (p *Policy) String() string {
 	parts := []string{
 		"mode=" + string(p.Mode),
 		"signers=[" + strings.Join(p.Signers, ", ") + "]",
-		"builders=[" + strings.Join(p.Builders, ", ") + "]",
+		"builders=[" + strings.Join(builderStrings(p.Builders), ", ") + "]",
 		"sources=[" + strings.Join(p.Sources, ", ") + "]",
 	}
 
@@ -204,6 +261,30 @@ func (p *Policy) String() string {
 	}
 
 	return strings.Join(parts, " ")
+}
+
+// builderIDs returns the IDs of the builders.
+func (p *Policy) builderIDs() []string {
+	ids := make([]string, 0, len(p.Builders))
+	for i := range p.Builders {
+		ids = append(ids, p.Builders[i].ID)
+	}
+
+	return ids
+}
+
+// builderLevel returns the lowest SLSA build level of the builders, or
+// zero without builders.
+func (p *Policy) builderLevel() int {
+	level := 0
+
+	for i := range p.Builders {
+		if level == 0 || p.Builders[i].Level < level {
+			level = p.Builders[i].Level
+		}
+	}
+
+	return level
 }
 
 // identities parses the signer identity specs.

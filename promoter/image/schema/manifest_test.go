@@ -191,13 +191,27 @@ provenance:
   signers:
   - sigstore::https://accounts.google.com::sp-operator-sa@k8s-staging-images.iam.gserviceaccount.com
   builders:
-  - https://prow.k8s.io/post-security-profiles-operator-push-image
+  - id: https://prow.k8s.io/post-security-profiles-operator-push-image
+    level: 3
   sources:
   - github.com/kubernetes-sigs/security-profiles-operator
   predicateTypes:
   - https://spdx.dev/Document
   level: 2
 `
+
+func TestParseThinManifestYAMLProvenanceBuilderWithoutLevel(t *testing.T) {
+	t.Parallel()
+
+	// Builders were plain IDs before they had a level.
+	yaml := strings.Replace(testPolicyYAML,
+		"  - id: https://prow.k8s.io/post-security-profiles-operator-push-image\n    level: 3\n",
+		"  - https://prow.k8s.io/post-security-profiles-operator-push-image\n", 1)
+	require.NotEqual(t, testPolicyYAML, yaml)
+
+	_, err := ParseThinManifestYAML([]byte(yaml))
+	require.ErrorContains(t, err, `builder "https://prow.k8s.io/post-security-profiles-operator-push-image" needs a level`)
+}
 
 func TestParseThinManifestYAMLProvenance(t *testing.T) {
 	t.Parallel()
@@ -207,7 +221,7 @@ func TestParseThinManifestYAMLProvenance(t *testing.T) {
 	require.Equal(t, &provenance.Policy{
 		Mode:           provenance.PolicyModeRequire,
 		Signers:        []string{"sigstore::https://accounts.google.com::sp-operator-sa@k8s-staging-images.iam.gserviceaccount.com"},
-		Builders:       []string{"https://prow.k8s.io/post-security-profiles-operator-push-image"},
+		Builders:       []provenance.Builder{{ID: "https://prow.k8s.io/post-security-profiles-operator-push-image", Level: 3}},
 		Sources:        []string{"github.com/kubernetes-sigs/security-profiles-operator"},
 		PredicateTypes: []string{"https://spdx.dev/Document"},
 		Level:          2,
@@ -290,13 +304,13 @@ func TestProvenancePolicies(t *testing.T) {
 	requirePolicy := &provenance.Policy{
 		Mode:     provenance.PolicyModeRequire,
 		Signers:  []string{"sigstore::https://accounts.google.com::a@example.com"},
-		Builders: []string{"https://builder.example.com"},
+		Builders: []provenance.Builder{{ID: "https://builder.example.com", Level: 3}},
 		Sources:  []string{"github.com/example/a"},
 	}
 	warn := &provenance.Policy{
 		Mode:     provenance.PolicyModeWarn,
 		Signers:  []string{"sigstore::https://accounts.google.com::a@example.com"},
-		Builders: []string{"https://builder.example.com"},
+		Builders: []provenance.Builder{{ID: "https://builder.example.com", Level: 3}},
 		Sources:  []string{"github.com/example/a"},
 	}
 

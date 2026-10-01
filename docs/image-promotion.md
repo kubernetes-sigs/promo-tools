@@ -310,12 +310,12 @@ provenance:
   signers:
   - sigstore::https://accounts.google.com::sp-operator-sa@k8s-staging-images.iam.gserviceaccount.com
   builders:
-  - https://prow.k8s.io/job-history/gs/kubernetes-ci-logs/logs/post-security-profiles-operator-push-image
+  - id: https://cloudbuild.googleapis.com/projects/k8s-staging-images/serviceAccounts/sp-operator-sa@k8s-staging-images.iam.gserviceaccount.com/cloudbuild.yaml
+    level: 1
   sources:
   - github.com/kubernetes-sigs/security-profiles-operator
   predicateTypes:
   - https://spdx.dev/Document
-  level: 3
 ```
 
 - `mode`: `off` (the default) keeps the verify-if-present check, `warn` logs
@@ -328,14 +328,24 @@ provenance:
   `sigstore(identityMatch=regex)::<issuer>::<identity regexp>` to match
   several. Only sigstore identities with both an issuer and an identity are
   accepted. They are separate from the identity the promoter signs with.
-- `builders`: the trusted builder IDs of the SLSA build provenance. An ID
-  without `@` also matches the builder at any ref.
+- `builders`: the trusted builders of the SLSA build provenance, each with
+  its `id` and the SLSA build `level` it reaches, 1 to 3. An ID without `@`
+  also matches the builder at any ref. The level depends on how the builder
+  isolates builds and who generates and signs the provenance, which the
+  provenance itself can't show: a build that generates and signs its own
+  provenance, like the example, reaches level 1 only, because its build
+  steps could forge it. The builder ID is what the provenance claims, and
+  any of the signers can claim any of the builders, so provenance verifies
+  at no more than the lowest level of the builders.
 - `sources`: the repositories the images may be built from, without a ref.
 - `predicateTypes` (optional): predicate types that must also be attested
   for every image by one of the signers, for example an SBOM.
-- `level` (optional): the SLSA build level the provenance must reach, 2 or
-  3. By default every applicable SLSA build control has to pass. Lower
-  levels are not accepted, because they would not enforce the builders.
+- `level` (optional): the SLSA build level the provenance must reach in the
+  [SLSA verifier][slsa-verifier]'s controls, 2 or 3, and at most the lowest
+  level of the builders. By default every applicable SLSA build control has
+  to pass. Lower levels are not accepted, because they would not enforce
+  the builders. The verified level is the lower of the level the provenance
+  reaches and the lowest level of the builders.
 
 `signers`, `builders` and `sources` are required unless the mode is `off`.
 
