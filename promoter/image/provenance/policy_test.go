@@ -33,7 +33,7 @@ func testPolicy(mode PolicyMode) *Policy {
 	return &Policy{
 		Mode:     mode,
 		Signers:  []string{testSigner},
-		Builders: []string{testBuilder},
+		Builders: []Builder{{ID: testBuilder, Level: 3}},
 		Sources:  []string{testSource},
 	}
 }
@@ -70,7 +70,7 @@ func TestPolicyValidate(t *testing.T) {
 			policy: &Policy{
 				Mode:           PolicyModeRequire,
 				Signers:        []string{"sigstore(identityMatch=regex)::https://accounts.google.com::.*@k8s-staging-images\\.iam\\.gserviceaccount\\.com"},
-				Builders:       []string{testBuilder},
+				Builders:       []Builder{{ID: testBuilder, Level: 3}},
 				Sources:        []string{testSource},
 				PredicateTypes: []string{"https://spdx.dev/Document"},
 				Level:          2,
@@ -86,7 +86,7 @@ func TestPolicyValidate(t *testing.T) {
 			policy: &Policy{
 				Mode:     PolicyModeWarn,
 				Signers:  []string{"not-a-spec"},
-				Builders: []string{testBuilder},
+				Builders: []Builder{{ID: testBuilder, Level: 3}},
 				Sources:  []string{testSource},
 			},
 			wantErr: `invalid signer "not-a-spec"`,
@@ -96,7 +96,7 @@ func TestPolicyValidate(t *testing.T) {
 			policy: &Policy{
 				Mode:     PolicyModeWarn,
 				Signers:  []string{"sigstore(issuerMatch=exact)::https://accounts.google.com::"},
-				Builders: []string{testBuilder},
+				Builders: []Builder{{ID: testBuilder, Level: 3}},
 				Sources:  []string{testSource},
 			},
 			wantErr: "the identity must not be empty",
@@ -106,7 +106,7 @@ func TestPolicyValidate(t *testing.T) {
 			policy: &Policy{
 				Mode:     PolicyModeWarn,
 				Signers:  []string{"key::ecdsa::abc"},
-				Builders: []string{testBuilder},
+				Builders: []Builder{{ID: testBuilder, Level: 3}},
 				Sources:  []string{testSource},
 			},
 			wantErr: "only sigstore signers are supported",
@@ -130,7 +130,7 @@ func TestPolicyValidate(t *testing.T) {
 			policy: &Policy{
 				Mode:     PolicyModeRequire,
 				Signers:  []string{testSigner},
-				Builders: []string{testBuilder},
+				Builders: []Builder{{ID: testBuilder, Level: 3}},
 			},
 			wantErr: "at least one source is required",
 		},
@@ -139,7 +139,7 @@ func TestPolicyValidate(t *testing.T) {
 			policy: &Policy{
 				Mode:     PolicyModeRequire,
 				Signers:  []string{testSigner},
-				Builders: []string{testBuilder},
+				Builders: []Builder{{ID: testBuilder, Level: 3}},
 				Sources:  []string{testSource + "@refs/heads/main"},
 			},
 			wantErr: "must not carry a ref",
@@ -149,17 +149,17 @@ func TestPolicyValidate(t *testing.T) {
 			policy: &Policy{
 				Mode:     PolicyModeRequire,
 				Signers:  []string{testSigner},
-				Builders: []string{" "},
+				Builders: []Builder{{ID: " ", Level: 3}},
 				Sources:  []string{testSource},
 			},
-			wantErr: "builders must not be empty",
+			wantErr: "builder IDs must not be empty",
 		},
 		{
 			name: "empty predicate type",
 			policy: &Policy{
 				Mode:           PolicyModeRequire,
 				Signers:        []string{testSigner},
-				Builders:       []string{testBuilder},
+				Builders:       []Builder{{ID: testBuilder, Level: 3}},
 				Sources:        []string{testSource},
 				PredicateTypes: []string{""},
 			},
@@ -170,7 +170,7 @@ func TestPolicyValidate(t *testing.T) {
 			policy: &Policy{
 				Mode:     PolicyModeRequire,
 				Signers:  []string{testSigner},
-				Builders: []string{testBuilder},
+				Builders: []Builder{{ID: testBuilder, Level: 3}},
 				Sources:  []string{testSource},
 				Level:    4,
 			},
@@ -181,11 +181,42 @@ func TestPolicyValidate(t *testing.T) {
 			policy: &Policy{
 				Mode:     PolicyModeRequire,
 				Signers:  []string{testSigner},
-				Builders: []string{testBuilder},
+				Builders: []Builder{{ID: testBuilder, Level: 3}},
 				Sources:  []string{testSource},
 				Level:    1,
 			},
 			wantErr: "level must be between 2 and 3, got 1",
+		},
+		{
+			name: "level above the lowest builder",
+			policy: &Policy{
+				Mode:     PolicyModeRequire,
+				Signers:  []string{testSigner},
+				Builders: []Builder{{ID: testBuilder, Level: 3}, {ID: "https://example.com/self-signed", Level: 1}},
+				Sources:  []string{testSource},
+				Level:    2,
+			},
+			wantErr: "level 2 is above 1, the lowest level of the builders",
+		},
+		{
+			name: "builder without a level",
+			policy: &Policy{
+				Mode:     PolicyModeRequire,
+				Signers:  []string{testSigner},
+				Builders: []Builder{{ID: testBuilder}},
+				Sources:  []string{testSource},
+			},
+			wantErr: "needs a level between 1 and 3, got 0",
+		},
+		{
+			name: "builder level too high",
+			policy: &Policy{
+				Mode:     PolicyModeRequire,
+				Signers:  []string{testSigner},
+				Builders: []Builder{{ID: testBuilder, Level: 4}},
+				Sources:  []string{testSource},
+			},
+			wantErr: "needs a level between 1 and 3, got 4",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -228,7 +259,7 @@ func TestPolicyString(t *testing.T) {
 	policy.Level = 2
 
 	require.Equal(t,
-		"mode=require signers=["+testSigner+"] builders=["+testBuilder+"] sources=["+testSource+"] "+
+		"mode=require signers=["+testSigner+"] builders=["+testBuilder+" (level 3)] sources=["+testSource+"] "+
 			"predicateTypes=[https://spdx.dev/Document] level=2",
 		policy.String(),
 	)

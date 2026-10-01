@@ -334,6 +334,40 @@ func provenanceTestCases() []evaluateTestCase {
 			violations: []string{"provenance-has-invocation-id"},
 		},
 		{
+			// The provenance can't show how isolated its builder is.
+			name: "the builder level caps the verified level",
+			policy: func() *Policy {
+				p := testPolicy(PolicyModeRequire)
+				p.Builders[0].Level = 1
+
+				return p
+			},
+			discovery: func(t *testing.T) *Discovery {
+				t.Helper()
+
+				return newDiscovery(newAttestation(t, provenanceStatement(t, provenanceOptions{}), signed(t, testSigner)))
+			},
+			satisfied: true,
+			level:     1,
+		},
+		{
+			// Any trusted signer can claim the level 3 builder.
+			name: "the lowest builder level caps the verified level",
+			policy: func() *Policy {
+				p := testPolicy(PolicyModeRequire)
+				p.Builders = append(p.Builders, Builder{ID: "https://example.com/self-signed", Level: 1})
+
+				return p
+			},
+			discovery: func(t *testing.T) *Discovery {
+				t.Helper()
+
+				return newDiscovery(newAttestation(t, provenanceStatement(t, provenanceOptions{}), signed(t, testSigner)))
+			},
+			satisfied: true,
+			level:     1,
+		},
+		{
 			name: "missing invocation passes at level 2",
 			policy: func() *Policy {
 				p := testPolicy(PolicyModeRequire)
@@ -490,13 +524,18 @@ func TestPolicyEvaluatorRealProvenance(t *testing.T) {
 	evaluator, err := NewPolicyEvaluator()
 	require.NoError(t, err)
 
-	result, err := evaluator.Evaluate(context.Background(), discovery, testPolicy(PolicyModeRequire))
+	// The build signs its own provenance, which reaches every level 3
+	// control but SLSA build level 1 only.
+	policy := testPolicy(PolicyModeRequire)
+	policy.Builders[0].Level = 1
+
+	result, err := evaluator.Evaluate(context.Background(), discovery, policy)
 	require.NoError(t, err)
 	require.True(t, result.Satisfied, result.Violations)
-	require.Equal(t, 3, result.SLSALevel)
+	require.Equal(t, 1, result.SLSALevel)
 
-	policy := testPolicy(PolicyModeRequire)
-	policy.Builders = []string{"https://prow.k8s.io/post-security-profiles-operator-push-image"}
+	policy = testPolicy(PolicyModeRequire)
+	policy.Builders = []Builder{{ID: "https://prow.k8s.io/post-security-profiles-operator-push-image", Level: 3}}
 
 	result, err = evaluator.Evaluate(context.Background(), discovery, policy)
 	require.NoError(t, err)

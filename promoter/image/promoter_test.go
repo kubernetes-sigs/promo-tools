@@ -357,7 +357,7 @@ func testProvenancePolicy(mode provenance.PolicyMode) *provenance.Policy {
 	return &provenance.Policy{
 		Mode:     mode,
 		Signers:  []string{"sigstore::https://accounts.google.com::builder@k8s-staging-test.iam.gserviceaccount.com"},
-		Builders: []string{"https://prow.k8s.io/test"},
+		Builders: []provenance.Builder{{ID: "https://prow.k8s.io/test", Level: 3}},
 		Sources:  []string{"github.com/kubernetes/test"},
 	}
 }
