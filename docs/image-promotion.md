@@ -26,6 +26,7 @@ registries.
   - [Attestation discovery](#attestation-discovery)
 - [Provenance generation](#provenance-generation)
   - [Verification summaries](#verification-summaries)
+  - [Repairing carried attestations and summaries](#repairing-carried-attestations-and-summaries)
 - [Checking signatures and attestations](#checking-signatures-and-attestations)
 - [Vulnerability scanning](#vulnerability-scanning)
 - [Grabbing snapshots](#grabbing-snapshots)
@@ -182,7 +183,8 @@ The promotion flow is organized into sequential pipeline phases:
 | 4 | **validate** | Validate staging image signatures |
 | 5 | **promote** | Copy images from staging to production |
 | 6 | **sign** | Sign promoted images with cosign (primary registry only) |
-| 7 | **attest** | Generate promotion provenance attestations and, with `--verification-summaries`, [verification summaries](#verification-summaries) |
+| 7 | **attest** | Generate promotion provenance attestations, [carry staging attestations](#carrying-staging-attestations) and, with `--verification-summaries`, write [verification summaries](#verification-summaries) |
+| 8 | **repair** | [Carry the attestations and write the summaries](#repairing-carried-attestations-and-summaries) that promoted images with a provenance policy miss |
 
 Without `--confirm`, the pipeline stops after the validate phase (dry-run
 precheck). With `--parse-only`, it stops after parsing manifests.
@@ -389,9 +391,9 @@ nothing, attestations in legacy `.att` tags are not carried, and neither are
 promotion records or verification summaries, which the promoter writes
 itself. The attestations of platform manifests that the promoter manifest
 doesn't list are not carried either, even when their index satisfied the
-policy through them. A failure to carry is reported without stopping the others, but
-promoted images are not promotion candidates in later runs, so it is not
-retried automatically.
+policy through them. A failure to carry is reported without stopping the others,
+and the [repair phase](#repairing-carried-attestations-and-summaries) of a
+later run that parses the digest retries it.
 
 ### Attestation discovery
 
@@ -473,9 +475,10 @@ images the digest was promoted from, usually one:
   manifest that is not at a commit of a repository.
 - `verificationResult` is `PASSED` when every
   [provenance policy](#provenance-policies) that applies to the staging
-  images is satisfied, and `FAILED` otherwise, which only happens in `warn`
-  mode, because `require` blocks the promotion. A failed summary has the
-  verified level `FAILED`.
+  images is satisfied, and `FAILED` otherwise. That happens in `warn` mode,
+  because `require` blocks the promotion, and for images that the
+  [repair phase](#repairing-carried-attestations-and-summaries) summarizes
+  after their promotion. A failed summary has the verified level `FAILED`.
 - `verifiedLevels` of a passed summary are the lowest SLSA build level the
   policies verified (`SLSA_BUILD_LEVEL_<n>`), or
   `SLSA_BUILD_LEVEL_UNEVALUATED` when a staging image had no policy or a
@@ -514,6 +517,40 @@ slsa-verifier vsa \
 or with `cosign verify-attestation --new-bundle-format --type
 https://slsa.dev/verification_summary/v1` and the signer's identity and
 issuer.
+
+### Repairing carried attestations and summaries
+
+Promoted images are no promotion candidates in later runs, so a failed attest
+phase would leave them without their carried attestations or verification
+summaries for good, and `kpromo sigcheck` has no promoter manifests to repair
+them. The repair phase checks the images of the parsed manifests with an
+enabled [provenance policy](#provenance-policies) that the run doesn't
+promote. It compares the attestation referrers of the staging image with
+those in the canonical registry, and, with `--verification-summaries`, looks
+for the promoter's summary of the digest and of the platform manifests of an
+index that the promoter manifest doesn't list. That takes about six requests
+per digest and three more per platform manifest of an index, and nothing for
+manifests without a policy.
+
+Images that miss something are discovered and evaluated against their
+policies again, then carried and summarized as in the attest phase. They are
+promoted already, so a policy they no longer satisfy blocks nothing and their
+summary records it as failed. Images whose attestations can't be discovered,
+for example because they are gone from staging, get nothing written. Images
+that don't satisfy their policies, or have a staging attestation the policies
+don't accept, never get it carried. All of them are discovered and evaluated
+again in every run that parses them. Promotion records are repaired by
+`kpromo sigcheck`. Repair failures are logged as warnings and don't fail the
+run, which promoted its images already, and later runs retry them.
+
+A run only sees the digests its manifests are parsed with. With
+`--use-prow-manifest-diff` that is the digests the change added, and with
+`--manifest-diff-since` the digests added in that time. The production jobs,
+a postsubmit with the former and a daily periodic with
+`--manifest-diff-since=14 days`, therefore repair a failed attest phase for 14
+days. Older images, for example when a project adds a policy or the summaries
+are turned on, are only filled in by a run without these flags. The repair
+phase needs signing and, like promotion, `--confirm`.
 
 ## Checking signatures and attestations
 

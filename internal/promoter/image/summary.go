@@ -213,18 +213,27 @@ func (di *DefaultPromoterImplementation) unlistedChildren(
 		return nil, fmt.Errorf("fetching manifest of %s: %w", canonical, err)
 	}
 
+	return unlistedPlatformManifests(desc, edge, promoted)
+}
+
+// unlistedPlatformManifests returns the digests of the platform manifests of
+// the fetched manifest of an edge that are not promoted digests of their own,
+// none if it is no index.
+func unlistedPlatformManifests(
+	desc *remote.Descriptor, edge *promotion.Edge, promoted map[string]bool,
+) ([]string, error) {
 	if !desc.MediaType.IsIndex() {
 		return nil, nil
 	}
 
 	idx, err := desc.ImageIndex()
 	if err != nil {
-		return nil, fmt.Errorf("reading index %s: %w", canonical, err)
+		return nil, fmt.Errorf("reading index %s: %w", desc.Digest, err)
 	}
 
 	im, err := idx.IndexManifest()
 	if err != nil {
-		return nil, fmt.Errorf("reading index manifest %s: %w", canonical, err)
+		return nil, fmt.Errorf("reading index manifest %s: %w", desc.Digest, err)
 	}
 
 	var digests []string
@@ -393,8 +402,9 @@ func (pc *policyContext) summaryInput(
 
 		seen[ref] = true
 
-		// Every promoted image went through the provenance phase, but a
-		// summary must never be made of anything else.
+		// Every promoted image went through the provenance phase or was
+		// evaluated again for a repair, but a summary must never be made
+		// of anything else.
 		outcome, ok := outcomes[ref]
 		if !ok || outcome == nil {
 			return nil, fmt.Errorf("no provenance result for %s", ref)

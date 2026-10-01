@@ -39,17 +39,20 @@ func (p *Promoter) SetDiscoverer(d provenance.Discoverer) {
 }
 
 // Discoveries returns the attestations discovered for the staging images of
-// the last promotion run, by source digest reference. Images whose
-// discovery failed are left out. It is nil if that run stopped before the
-// provenance phase, or without a discoverer.
+// the last promotion run, by source digest reference, including the
+// promoted images the repair phase evaluated again. Images whose discovery
+// failed are left out. It is nil if that run stopped before the provenance
+// phase, or without a discoverer.
 func (p *Promoter) Discoveries() map[string]*provenance.Discovery {
 	return p.discoveries
 }
 
 // Provenance returns what the provenance phase of the last promotion run
 // concluded for each staging image, by source digest reference: the
-// provenance policies that apply and their results. It is nil if that run
-// stopped before the provenance phase.
+// provenance policies that apply and their results. It also holds the
+// results of the promoted images the repair phase evaluated again, which
+// blocked nothing. It is nil if that run stopped before the provenance
+// phase.
 func (p *Promoter) Provenance() map[string]*provenance.ImageProvenance {
 	return p.provenance
 }
