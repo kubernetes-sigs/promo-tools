@@ -18,20 +18,19 @@ package imagepromoter
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"maps"
 	"slices"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/carabiner-dev/collector/envelope/bundle"
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	ociremote "github.com/sigstore/cosign/v3/pkg/oci/remote"
+	sgbundle "github.com/sigstore/sigstore-go/pkg/bundle"
+	"github.com/sigstore/sigstore-go/pkg/verify"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 	"sigs.k8s.io/release-utils/version"
@@ -43,10 +42,6 @@ import (
 	"sigs.k8s.io/promo-tools/v4/promoter/image/schema"
 	"sigs.k8s.io/promo-tools/v4/types/image"
 )
-
-// maxSummarySize limits how much of an existing verification summary is
-// read.
-const maxSummarySize = 1 << 20
 
 // WriteVerificationSummaries writes a signed SLSA verification summary for
 // each promoted digest, index and platform manifests alike, to the
@@ -77,8 +72,13 @@ func (di *DefaultPromoterImplementation) WriteVerificationSummaries(
 	}
 
 	//nolint:contextcheck
-	if err := di.ensureAttestationSigner(opts); err != nil {
-		return fmt.Errorf("initializing attestation signer: %w", err)
+	if err := di.ensureSummarySigner(opts); err != nil {
+		return fmt.Errorf("initializing verification summary signer: %w", err)
+	}
+
+	identity, err := summaryIdentity(opts)
+	if err != nil {
+		return err
 	}
 
 	policies := newPolicyContext(mfests)
@@ -128,7 +128,7 @@ func (di *DefaultPromoterImplementation) WriteVerificationSummaries(
 		in.Time = now
 
 		g.Go(func() error {
-			if err := di.pushVerificationSummary(ctx, &edge, in); err != nil {
+			if err := di.pushVerificationSummary(ctx, &edge, in, identity); err != nil {
 				addErr(fmt.Errorf("writing verification summary for %s: %w", in.Name, err))
 
 				return nil
@@ -172,7 +172,7 @@ func (di *DefaultPromoterImplementation) WriteVerificationSummaries(
 
 		g.Go(func() error {
 			in := provenance.ChildSummaryInput(string(child.edge.Digest), child.indexes)
-			if err := di.pushVerificationSummary(ctx, &child.edge, in); err != nil {
+			if err := di.pushVerificationSummary(ctx, &child.edge, in, identity); err != nil {
 				addErr(fmt.Errorf("writing verification summary for %s: %w", key, err))
 			}
 
@@ -254,9 +254,9 @@ func unlistedPlatformManifests(
 
 // pushVerificationSummary signs the verification summary of an edge and
 // attaches it to the digest on the canonical registry, unless the digest
-// already has one.
+// already has one of the identity.
 func (di *DefaultPromoterImplementation) pushVerificationSummary(
-	_ context.Context, edge *promotion.Edge, in *provenance.SummaryInput,
+	_ context.Context, edge *promotion.Edge, in *provenance.SummaryInput, identity *verify.CertificateIdentity,
 ) error {
 	dstDigestRef := canonicalDigestRef(edge)
 
@@ -265,7 +265,7 @@ func (di *DefaultPromoterImplementation) pushVerificationSummary(
 		return fmt.Errorf("parsing digest reference %s: %w", dstDigestRef, err)
 	}
 
-	exists, err := di.hasVerificationSummary(digest)
+	exists, err := di.hasVerificationSummary(digest, identity)
 	if err != nil {
 		return fmt.Errorf("checking the verification summaries of %s: %w", digest, err)
 	}
@@ -281,7 +281,7 @@ func (di *DefaultPromoterImplementation) pushVerificationSummary(
 		return fmt.Errorf("creating verification summary: %w", err)
 	}
 
-	bundleJSON, err := di.attSigner.SignStatement(statement)
+	bundleJSON, err := di.summarySigner.SignStatement(statement)
 	if err != nil {
 		return fmt.Errorf("signing verification summary for %s: %w", digest, err)
 	}
@@ -445,23 +445,25 @@ func (pc *policyContext) summaryInput(
 }
 
 // hasVerificationSummary reports whether the promoter wrote a verification
-// summary for the digest. Other summaries, for example one a build wrote,
-// don't count.
-func (di *DefaultPromoterImplementation) hasVerificationSummary(digest name.Digest) (bool, error) {
+// summary for the digest, signed by the identity of the summaries. Other
+// summaries, for example one a build or an earlier signer wrote, don't count.
+func (di *DefaultPromoterImplementation) hasVerificationSummary(
+	digest name.Digest, identity *verify.CertificateIdentity,
+) (bool, error) {
 	refs, err := di.bundleReferrers(digest, provenance.SummaryPredicateType)
 	if err != nil {
 		return false, err
 	}
 
 	for _, ref := range refs {
-		verifier, err := di.summaryVerifier(ref)
+		bundle, err := ociremote.Bundle(ref, ociremote.WithRemoteOptions(di.remoteOptions()...))
 		if err != nil {
 			logrus.Debugf("Unable to read verification summary %s: %v", ref, err)
 
 			continue
 		}
 
-		if verifier == provenance.SummaryVerifierID {
+		if summaryMatches(bundle, identity) {
 			return true, nil
 		}
 	}
@@ -469,52 +471,37 @@ func (di *DefaultPromoterImplementation) hasVerificationSummary(digest name.Dige
 	return false, nil
 }
 
-// summaryVerifier returns the verifier ID of the verification summary in a
-// referrer.
-func (di *DefaultPromoterImplementation) summaryVerifier(ref name.Digest) (string, error) {
-	img, err := remote.Image(ref, di.remoteOptions()...)
+// summaryMatches reports whether a bundle holds a verification summary of
+// the promoter, signed by the expected identity.
+func summaryMatches(bundle *sgbundle.Bundle, identity *verify.CertificateIdentity) bool {
+	content, err := bundle.VerificationContent()
+	if err != nil || content.Certificate() == nil || !matchesIdentity(identity, content.Certificate()) {
+		return false
+	}
+
+	envelope, err := bundle.Envelope()
 	if err != nil {
-		return "", fmt.Errorf("fetching referrer: %w", err)
+		return false
 	}
 
-	layers, err := img.Layers()
+	statement, err := envelope.Statement()
+	if err != nil || statement.GetPredicateType() != provenance.SummaryPredicateType {
+		return false
+	}
+
+	verifier := statement.GetPredicate().GetFields()["verifier"].GetStructValue()
+
+	return verifier.GetFields()["id"].GetStringValue() == provenance.SummaryVerifierID
+}
+
+// summaryIdentity returns the certificate identity the verification
+// summaries are signed with, the one of --summary-signer-account or
+// --signer-account.
+func summaryIdentity(opts *options.Options) (*verify.CertificateIdentity, error) {
+	identity, err := verify.NewShortCertificateIdentity(signerIssuer, "", summarySignerAccount(opts), "")
 	if err != nil {
-		return "", fmt.Errorf("reading the layers of the referrer: %w", err)
+		return nil, fmt.Errorf("creating summary signer identity: %w", err)
 	}
 
-	if len(layers) != 1 {
-		return "", fmt.Errorf("referrer has %d layers, want 1", len(layers))
-	}
-
-	rc, err := layers[0].Uncompressed()
-	if err != nil {
-		return "", fmt.Errorf("reading the bundle: %w", err)
-	}
-	defer rc.Close()
-
-	data, err := io.ReadAll(io.LimitReader(rc, maxSummarySize))
-	if err != nil {
-		return "", fmt.Errorf("reading the bundle: %w", err)
-	}
-
-	envs, err := (&bundle.Parser{}).Parse(data)
-	if err != nil {
-		return "", fmt.Errorf("parsing the bundle: %w", err)
-	}
-
-	if len(envs) != 1 || envs[0].GetPredicate() == nil {
-		return "", errors.New("bundle without a single predicate")
-	}
-
-	var predicate struct {
-		Verifier struct {
-			ID string `json:"id"`
-		} `json:"verifier"`
-	}
-
-	if err := json.Unmarshal(envs[0].GetPredicate().GetData(), &predicate); err != nil {
-		return "", fmt.Errorf("parsing the predicate: %w", err)
-	}
-
-	return predicate.Verifier.ID, nil
+	return &identity, nil
 }

@@ -178,6 +178,13 @@ network from a registry, it reads from the local manifests only`,
 	)
 
 	CipCmd.PersistentFlags().StringVar(
+		&runOpts.SummarySignerAccount,
+		"summary-signer-account",
+		options.DefaultOptions.SummarySignerAccount,
+		"service account to use as signing identity of the verification summaries (default: --signer-account)",
+	)
+
+	CipCmd.PersistentFlags().StringVar(
 		&runOpts.SignCheckIdentity,
 		"certificate-identity",
 		options.DefaultOptions.SignCheckIdentity,

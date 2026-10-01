@@ -48,6 +48,10 @@ type DefaultPromoterImplementation struct {
 	// during the attest phase.
 	attSigner statementSigner
 
+	// summarySigner signs the verification summaries, attSigner unless
+	// they have their own signer account.
+	summarySigner statementSigner
+
 	// transport is the rate-limited HTTP transport shared by all phases.
 	transport *ratelimit.RoundTripper
 
@@ -129,6 +133,21 @@ func defaultSignerOptions(opts *options.Options) *sign.Options {
 func (di *DefaultPromoterImplementation) ValidateOptions(opts *options.Options) error {
 	if err := opts.Validate(); err != nil {
 		return fmt.Errorf("validating options: %w", err)
+	}
+
+	if opts.SummarySignerAccount != "" && (!opts.SignImages || !opts.VerificationSummaries) {
+		logrus.Warn("--summary-signer-account has no effect without --sign and --verification-summaries")
+	}
+
+	// The summaries are only signed after the images are promoted, so a
+	// missing permission for their own identity fails the run before
+	// anything is promoted, instead of leaving the summaries of this batch
+	// to a later run.
+	if account := summarySignerAccount(opts); opts.Confirm && opts.SignImages && opts.VerificationSummaries &&
+		account != opts.SignerAccount {
+		if _, err := di.GetIdentityToken(opts, account); err != nil {
+			return fmt.Errorf("checking --summary-signer-account: %w", err)
+		}
 	}
 
 	return nil
