@@ -50,6 +50,17 @@ type FakePromoterImplementation struct {
 	carryAttestationsReturnsOnCall map[int]struct {
 		result1 error
 	}
+	FindAttestationRepairsStub        func(context.Context, *imagepromotera.Options, map[promotion.Edge]any) (map[promotion.Edge]any, error)
+	findAttestationRepairsMutex       sync.RWMutex
+	findAttestationRepairsArgsForCall []FakePromoterImplementationFindAttestationRepairsArgs
+	findAttestationRepairsReturns     struct {
+		result1 map[promotion.Edge]any
+		result2 error
+	}
+	findAttestationRepairsReturnsOnCall map[int]struct {
+		result1 map[promotion.Edge]any
+		result2 error
+	}
 	FixMissingAttestationsStub        func(context.Context, *imagepromotera.Options, checkresults.Results, provenance.Generator) error
 	fixMissingAttestationsMutex       sync.RWMutex
 	fixMissingAttestationsArgsForCall []FakePromoterImplementationFixMissingAttestationsArgs
@@ -251,6 +262,13 @@ type FakePromoterImplementationCarryAttestationsArgs struct {
 	Arg2 *imagepromotera.Options
 	Arg3 map[promotion.Edge]any
 	Arg4 map[string]*provenance.ImageProvenance
+}
+
+// FakePromoterImplementationFindAttestationRepairsArgs holds the arguments of one call to FindAttestationRepairs.
+type FakePromoterImplementationFindAttestationRepairsArgs struct {
+	Arg1 context.Context
+	Arg2 *imagepromotera.Options
+	Arg3 map[promotion.Edge]any
 }
 
 // FakePromoterImplementationFixMissingAttestationsArgs holds the arguments of one call to FixMissingAttestations.
@@ -513,6 +531,76 @@ func (fake *FakePromoterImplementation) CarryAttestationsReturnsOnCall(i int, re
 	fake.carryAttestationsReturnsOnCall[i] = struct {
 		result1 error
 	}{result1}
+}
+
+func (fake *FakePromoterImplementation) FindAttestationRepairs(arg1 context.Context, arg2 *imagepromotera.Options, arg3 map[promotion.Edge]any) (map[promotion.Edge]any, error) {
+	fake.findAttestationRepairsMutex.Lock()
+	ret, specificReturn := fake.findAttestationRepairsReturnsOnCall[len(fake.findAttestationRepairsArgsForCall)]
+	fake.findAttestationRepairsArgsForCall = append(fake.findAttestationRepairsArgsForCall, FakePromoterImplementationFindAttestationRepairsArgs{arg1, arg2, arg3})
+	stub := fake.FindAttestationRepairsStub
+	fakeReturns := fake.findAttestationRepairsReturns
+	fake.recordInvocation("FindAttestationRepairs", []interface{}{arg1, arg2, arg3})
+	fake.findAttestationRepairsMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2, arg3)
+	}
+	if specificReturn {
+		return ret.result1, ret.result2
+	}
+	return fakeReturns.result1, fakeReturns.result2
+}
+
+func (fake *FakePromoterImplementation) FindAttestationRepairsCallCount() int {
+	fake.findAttestationRepairsMutex.RLock()
+	defer fake.findAttestationRepairsMutex.RUnlock()
+	return len(fake.findAttestationRepairsArgsForCall)
+}
+
+func (fake *FakePromoterImplementation) FindAttestationRepairsCalls(stub func(context.Context, *imagepromotera.Options, map[promotion.Edge]any) (map[promotion.Edge]any, error)) {
+	fake.findAttestationRepairsMutex.Lock()
+	defer fake.findAttestationRepairsMutex.Unlock()
+	fake.FindAttestationRepairsStub = stub
+}
+
+func (fake *FakePromoterImplementation) FindAttestationRepairsArgsForCall(i int) (context.Context, *imagepromotera.Options, map[promotion.Edge]any) {
+	fake.findAttestationRepairsMutex.RLock()
+	defer fake.findAttestationRepairsMutex.RUnlock()
+	argsForCall := fake.findAttestationRepairsArgsForCall[i]
+	return argsForCall.Arg1, argsForCall.Arg2, argsForCall.Arg3
+}
+
+func (fake *FakePromoterImplementation) FindAttestationRepairsArgs() []FakePromoterImplementationFindAttestationRepairsArgs {
+	fake.findAttestationRepairsMutex.RLock()
+	defer fake.findAttestationRepairsMutex.RUnlock()
+	args := make([]FakePromoterImplementationFindAttestationRepairsArgs, len(fake.findAttestationRepairsArgsForCall))
+	copy(args, fake.findAttestationRepairsArgsForCall)
+	return args
+}
+
+func (fake *FakePromoterImplementation) FindAttestationRepairsReturns(result1 map[promotion.Edge]any, result2 error) {
+	fake.findAttestationRepairsMutex.Lock()
+	defer fake.findAttestationRepairsMutex.Unlock()
+	fake.FindAttestationRepairsStub = nil
+	fake.findAttestationRepairsReturns = struct {
+		result1 map[promotion.Edge]any
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakePromoterImplementation) FindAttestationRepairsReturnsOnCall(i int, result1 map[promotion.Edge]any, result2 error) {
+	fake.findAttestationRepairsMutex.Lock()
+	defer fake.findAttestationRepairsMutex.Unlock()
+	fake.FindAttestationRepairsStub = nil
+	if fake.findAttestationRepairsReturnsOnCall == nil {
+		fake.findAttestationRepairsReturnsOnCall = make(map[int]struct {
+			result1 map[promotion.Edge]any
+			result2 error
+		})
+	}
+	fake.findAttestationRepairsReturnsOnCall[i] = struct {
+		result1 map[promotion.Edge]any
+		result2 error
+	}{result1, result2}
 }
 
 func (fake *FakePromoterImplementation) FixMissingAttestations(arg1 context.Context, arg2 *imagepromotera.Options, arg3 checkresults.Results, arg4 provenance.Generator) error {

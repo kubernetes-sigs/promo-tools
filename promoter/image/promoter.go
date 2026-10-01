@@ -53,11 +53,13 @@ type Promoter struct {
 	discoverer          provenance.Discoverer
 
 	// discoveries are the attestations discovered in the last promotion
-	// run, by source reference.
+	// run, by source reference, including those of the images the repair
+	// phase evaluated again.
 	discoveries map[string]*provenance.Discovery
 
 	// provenance is what the provenance phase of the last promotion run
-	// concluded, by source reference.
+	// concluded, by source reference, and what the repair phase concluded
+	// for the images it evaluated again.
 	provenance map[string]*provenance.ImageProvenance
 
 	// stagingSignatures are the staging signature results of the last
@@ -141,6 +143,7 @@ type promoterImplementation interface {
 	WriteProvenanceAttestations(context.Context, *options.Options, []schema.Manifest, map[promotion.Edge]any, provenance.Generator) error
 	CarryAttestations(context.Context, *options.Options, map[promotion.Edge]any, map[string]*provenance.ImageProvenance) error
 	WriteVerificationSummaries(context.Context, *options.Options, []schema.Manifest, map[promotion.Edge]any, map[string]*provenance.Discovery, map[string]*provenance.ImageProvenance) error
+	FindAttestationRepairs(context.Context, *options.Options, map[promotion.Edge]any) (map[promotion.Edge]any, error)
 
 	// Methods for checking signatures and attestations
 	GetLatestImages(context.Context, *options.Options) ([]checkresults.Image, error)
@@ -281,6 +284,18 @@ func (p *Promoter) PromoteImages(ctx context.Context, opts *options.Options) err
 		}
 
 		return errors.Join(errs...)
+	}))
+
+	// Repair phase: carry the attestations and write the verification
+	// summaries that an earlier run failed to, for promoted images with a
+	// provenance policy. The promotion succeeded and later runs retry, so
+	// a failed repair only warns.
+	pipe.AddPhase(pipeline.NewPhase("repair", func(ctx context.Context) error {
+		if err := p.repairAttestations(ctx, opts, mfests, promotionEdges); err != nil {
+			logrus.Warnf("Repairing attestations: %v", err)
+		}
+
+		return nil
 	}))
 
 	if err := pipe.Run(ctx); err != nil {
@@ -439,18 +454,39 @@ func (p *Promoter) checkProvenance(
 		return errors.New("provenance verifier not configured")
 	}
 
-	policies, err := schema.ProvenancePolicies(mfests)
+	refPolicies, err := sourcePolicies(mfests, edges)
 	if err != nil {
-		return fmt.Errorf("reading provenance policies: %w", err)
+		return err
 	}
 
 	checker := &provenance.PolicyChecker{}
+	p.provenance = make(map[string]*provenance.ImageProvenance, len(refPolicies))
 
-	// Edges repeat the same source digest once per destination region
-	// and tag, and manifests can share images, so collect the distinct
-	// policies of every source reference.
+	// Every image is checked, so that all violations are reported at once.
+	var errs []error
+
+	for _, ref := range slices.Sorted(maps.Keys(refPolicies)) {
+		if err := p.checkImageProvenance(ctx, checker, verifier, ref, refPolicies[ref]); err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	return errors.Join(errs...)
+}
+
+// sourcePolicies returns the distinct enabled provenance policies that
+// apply to the source reference of every edge. Edges repeat the same
+// source digest once per destination region and tag, and manifests can
+// share images.
+func sourcePolicies(
+	mfests []schema.Manifest, edges map[promotion.Edge]any,
+) (map[string][]*provenance.Policy, error) {
+	policies, err := schema.ProvenancePolicies(mfests)
+	if err != nil {
+		return nil, fmt.Errorf("reading provenance policies: %w", err)
+	}
+
 	refPolicies := make(map[string][]*provenance.Policy, len(edges))
-	p.provenance = make(map[string]*provenance.ImageProvenance, len(edges))
 
 	for edge := range edges {
 		ref := edge.SrcReference()
@@ -469,16 +505,7 @@ func (p *Promoter) checkProvenance(
 		}
 	}
 
-	// Every image is checked, so that all violations are reported at once.
-	var errs []error
-
-	for _, ref := range slices.Sorted(maps.Keys(refPolicies)) {
-		if err := p.checkImageProvenance(ctx, checker, verifier, ref, refPolicies[ref]); err != nil {
-			errs = append(errs, err)
-		}
-	}
-
-	return errors.Join(errs...)
+	return refPolicies, nil
 }
 
 // checkImageProvenance checks one source image against every policy that
