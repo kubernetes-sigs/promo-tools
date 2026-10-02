@@ -82,6 +82,9 @@ For background on the image promotion process, see
 To create an image promotion PR via `kpromo pr`, see
 [here](docs/promotion-pull-requests.md).
 
+To get signed SLSA verification summaries for your promoted images, and to
+verify them, see [here](docs/verification-summaries.md).
+
 ### File promotion
 
 See [here](/docs/file-promotion.md).
