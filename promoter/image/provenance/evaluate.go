@@ -49,15 +49,15 @@ type PolicyResult struct {
 	Satisfied bool
 
 	// Provenance is the location of the build provenance that satisfied
-	// the policy.
+	// the policy at the highest SLSA build level, the first of them on a
+	// tie.
 	Provenance string
 
-	// SLSALevel is the SLSA build level the accepted provenance reached.
+	// SLSALevel is the SLSA build level that provenance reached.
 	SLSALevel int
 
-	// Notice is what the SLSA verifier noted about the accepted
-	// provenance, for example that nothing binds its builder to its
-	// signer.
+	// Notice is what the SLSA verifier noted about that provenance, for
+	// example that nothing binds its builder to its signer.
 	Notice string
 
 	// Violations explain why the policy is not satisfied. It is empty
@@ -234,7 +234,11 @@ func (e *PolicyEvaluator) evaluateDigest(
 
 		passed[att] = true
 
-		if !satisfied {
+		// An image can carry provenance of several builders, for example
+		// of a self-signed build and of an isolated generator for the
+		// same digest. Each one is verified on its own, so the highest
+		// level counts.
+		if !satisfied || level > result.SLSALevel {
 			result.Provenance = att.Location
 			result.SLSALevel = level
 			result.Notice = notice
