@@ -201,6 +201,7 @@ type evaluateTestCase struct {
 	discovery  func(t *testing.T) *Discovery
 	satisfied  bool
 	level      int
+	provenance string
 	violations []string
 }
 
@@ -219,6 +220,35 @@ func claimedBy(builder, signer string) func(t *testing.T) *Discovery {
 
 		return newDiscovery(newAttestation(t,
 			provenanceStatement(t, provenanceOptions{builder: builder}), signed(t, signer)))
+	}
+}
+
+// bothLocations are the locations of the provenances of claimedByBoth, in
+// order.
+var bothLocations = [2]string{"sha256:" + strings.Repeat("1", 64), "sha256:" + strings.Repeat("2", 64)}
+
+// claimedByBoth returns a discovery with provenance of both builders at
+// distinct locations, each signed by testGeneratorSigner when the builder
+// is the generator and by testSigner otherwise.
+func claimedByBoth(first, second string) func(t *testing.T) *Discovery {
+	return func(t *testing.T) *Discovery {
+		t.Helper()
+
+		builders := []string{first, second}
+		atts := make([]Attestation, 0, len(builders))
+
+		for i, builder := range builders {
+			signer := testSigner
+			if strings.HasPrefix(builder, testGeneratorBuilder) {
+				signer = testGeneratorSigner
+			}
+
+			att := newAttestation(t, provenanceStatement(t, provenanceOptions{builder: builder}), signed(t, signer))
+			att.Location = bothLocations[i]
+			atts = append(atts, att)
+		}
+
+		return newDiscovery(atts...)
 	}
 }
 
@@ -267,6 +297,31 @@ func builderSignerTestCases() []evaluateTestCase {
 	generatorRelease := testGeneratorBuilder + "@refs/tags/v1.2.0"
 
 	return []evaluateTestCase{
+		{
+			// The level 3 provenance counts whichever comes first.
+			name:       "the highest level of several passing provenances counts",
+			policy:     func() *Policy { return boundBuilderPolicy(0) },
+			discovery:  claimedByBoth(testSelfSignedBuilder, generatorRelease),
+			satisfied:  true,
+			level:      3,
+			provenance: bothLocations[1],
+		},
+		{
+			name:       "the highest level counts in any order",
+			policy:     func() *Policy { return boundBuilderPolicy(0) },
+			discovery:  claimedByBoth(generatorRelease, testSelfSignedBuilder),
+			satisfied:  true,
+			level:      3,
+			provenance: bothLocations[0],
+		},
+		{
+			name:       "the first provenance counts on a tie",
+			policy:     func() *Policy { return boundBuilderPolicy(0) },
+			discovery:  claimedByBoth(testSelfSignedBuilder, testSelfSignedBuilder),
+			satisfied:  true,
+			level:      1,
+			provenance: bothLocations[0],
+		},
 		{
 			// Only the provenance generator can claim the level 3 builder.
 			name:      "a builder bound to the signer verifies at its level",
@@ -617,6 +672,11 @@ func TestPolicyEvaluatorEvaluate(t *testing.T) {
 				require.Empty(t, res.Violations)
 				require.NotEmpty(t, res.Provenance)
 				require.Equal(t, tc.level, res.SLSALevel)
+
+				if tc.provenance != "" {
+					require.Equal(t, tc.provenance, res.Provenance,
+						"the result names the provenance that sets the level")
+				}
 
 				return
 			}

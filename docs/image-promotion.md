@@ -381,9 +381,11 @@ provenance:
   are not accepted, because they would not enforce the builders. The
   verified level is the lower of the level the provenance reaches and the
   lowest level of the builders its signer may claim, and provenance below
-  `level` doesn't count. The validation can't tell which `signers` an
-  identity matches, so provenance of an identity that matches several may
-  stay below `level`.
+  `level` doesn't count. When several build provenances of an image pass,
+  for example of a self-signed build and of an isolated provenance
+  generator, the image gets the highest of their levels. The validation
+  can't tell which `signers` an identity matches, so provenance of an
+  identity that matches several may stay below `level`.
 
 `signers`, `builders` and `sources` are required unless the mode is `off`.
 
