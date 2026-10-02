@@ -275,7 +275,8 @@ func (e *PolicyEvaluator) evaluateDigest(
 
 // verifyProvenance verifies one build provenance against the policy and
 // returns the SLSA build level it reached and the verifier's notice. It
-// passes when it verifies for any of the policy sources.
+// passes when it verifies for a builder its signer may claim and any of
+// the policy sources.
 func (e *PolicyEvaluator) verifyProvenance(
 	ctx context.Context,
 	att *Attestation,
@@ -289,16 +290,24 @@ func (e *PolicyEvaluator) verifyProvenance(
 
 	statement := att.Envelope.GetStatement()
 
-	var errs []error
+	builders := policy.claimableBuilders(policy.matchingSigners(statement.GetVerification()))
+	if len(builders) == 0 {
+		return 0, "", errors.New("not signed by a signer the builders name")
+	}
 
-	builders := policy.builderIDs()
+	// The provenance can't show the level of its builder, and its signer
+	// could claim any of the builders, so it verifies at no more than
+	// their lowest level.
+	ceiling := lowestLevel(builders)
+
+	var errs []error
 
 	for _, source := range policy.Sources {
 		res, err := e.verifier.Verify(ctx, statement,
 			slsa.WithRequireSignatures(true),
 			slsa.WithExpectedSigners(signers),
 			slsa.WithSubjects([]*subject.Expected{expected}),
-			slsa.WithParam("trusted_builders", builders),
+			slsa.WithParam("trusted_builders", builderIDs(builders)),
 			slsa.WithParam("expected_source", source),
 			slsa.WithMinLevel(policy.Level),
 			slsa.WithSkipBuildTypeChecks(true),
@@ -312,10 +321,16 @@ func (e *PolicyEvaluator) verifyProvenance(
 		}
 
 		if res.Pass() {
-			// The provenance can't show the build level of its builder,
-			// and any trusted signer can claim any trusted builder, so it
-			// verifies at no more than the lowest level of the builders.
-			return min(res.SLSALevel, policy.builderLevel()), res.Message, nil
+			// The builder level is checked last, so that provenance that
+			// doesn't verify says why.
+			if ceiling < policy.Level {
+				return 0, "", fmt.Errorf(
+					"its signer may claim builders %s, which reach SLSA build level %d, the policy requires %d",
+					strings.Join(builderIDs(builders), ", "), ceiling, policy.Level,
+				)
+			}
+
+			return min(res.SLSALevel, ceiling), res.Message, nil
 		}
 
 		errs = append(errs, fmt.Errorf("source %s: %s", source, failureReason(res)))

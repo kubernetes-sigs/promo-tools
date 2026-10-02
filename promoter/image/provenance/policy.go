@@ -22,6 +22,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/carabiner-dev/attestation"
 	sapi "github.com/carabiner-dev/signer/api/v1"
 	"github.com/sirupsen/logrus"
 )
@@ -57,9 +58,10 @@ const (
 // level it reaches. The level depends on how the builder isolates builds
 // and who generates and signs the provenance, which the provenance can't
 // show, so the policy states it. The builder ID is what the provenance
-// claims, and any trusted signer can claim any trusted builder, so
-// provenance verifies at no more than the lowest level of the builders of
-// its policy.
+// claims. A signer that builders name may claim only the builders that
+// name it, and the other signers only the builders that name no signers,
+// so provenance verifies at no more than the lowest level of the builders
+// its signer may claim.
 type Builder struct {
 	// ID is the builder ID of the provenance. An ID without an @ also
 	// matches the builder at any ref.
@@ -68,11 +70,22 @@ type Builder struct {
 	// Level is the SLSA build level the builder reaches, 1 to 3.
 	// Provenance of the builder never verifies at a higher level.
 	Level int `yaml:"level"`
+
+	// Signers are the policy signers, as written there, that may claim
+	// the builder, for example the identity of an isolated provenance
+	// generator. Without them, the policy signers no builder names may.
+	Signers []string `yaml:"signers,omitempty"`
 }
 
 // String describes the builder for the logs.
 func (b *Builder) String() string {
-	return fmt.Sprintf("%s (level %d)", b.ID, b.Level)
+	if len(b.Signers) == 0 {
+		return fmt.Sprintf("%s (level %d)", b.ID, b.Level)
+	}
+
+	signers := slices.Sorted(slices.Values(b.Signers))
+
+	return fmt.Sprintf("%s (level %d, signers %s)", b.ID, b.Level, strings.Join(signers, ", "))
 }
 
 // UnmarshalYAML rejects builders given as plain IDs, without a level.
@@ -115,8 +128,9 @@ type Policy struct {
 	PredicateTypes []string `yaml:"predicateTypes,omitempty"`
 
 	// Level is the SLSA build level the provenance must reach, 2 or 3, at
-	// most the lowest level of the builders. Zero (the default) requires
-	// every applicable SLSA build control to pass.
+	// most the highest level provenance can verify at with the builders.
+	// Zero (the default) requires every applicable SLSA build control to
+	// pass.
 	Level int `yaml:"level,omitempty"`
 }
 
@@ -146,18 +160,7 @@ func (p *Policy) Validate() error {
 		errs = append(errs, err)
 	}
 
-	for _, builder := range p.Builders {
-		if strings.TrimSpace(builder.ID) == "" {
-			errs = append(errs, errors.New("provenance: builder IDs must not be empty"))
-		}
-
-		if builder.Level < minBuilderLevel || builder.Level > maxLevel {
-			errs = append(errs, fmt.Errorf(
-				"provenance: builder %q needs a level between %d and %d, got %d",
-				builder.ID, minBuilderLevel, maxLevel, builder.Level,
-			))
-		}
-	}
+	errs = append(errs, p.validateBuilders()...)
 
 	for _, source := range p.Sources {
 		if strings.TrimSpace(source) == "" {
@@ -181,9 +184,10 @@ func (p *Policy) Validate() error {
 		))
 	}
 
-	if lowest := p.builderLevel(); p.Level > 0 && lowest > 0 && p.Level > lowest {
+	if highest := p.highestLevel(); p.Level > 0 && highest > 0 && p.Level > highest {
 		errs = append(errs, fmt.Errorf(
-			"provenance: level %d is above %d, the lowest level of the builders", p.Level, lowest,
+			"provenance: level %d is above %d, the highest level provenance can verify at with these builders",
+			p.Level, highest,
 		))
 	}
 
@@ -263,24 +267,134 @@ func (p *Policy) String() string {
 	return strings.Join(parts, " ")
 }
 
-// builderIDs returns the IDs of the builders.
-func (p *Policy) builderIDs() []string {
-	ids := make([]string, 0, len(p.Builders))
+// validateBuilders checks the builders of the policy.
+func (p *Policy) validateBuilders() []error {
+	var errs []error
+
+	for i, builder := range p.Builders {
+		if strings.TrimSpace(builder.ID) == "" {
+			errs = append(errs, errors.New("provenance: builder IDs must not be empty"))
+		}
+
+		if builder.Level < minBuilderLevel || builder.Level > maxLevel {
+			errs = append(errs, fmt.Errorf(
+				"provenance: builder %q needs a level between %d and %d, got %d",
+				builder.ID, minBuilderLevel, maxLevel, builder.Level,
+			))
+		}
+
+		for _, signer := range builder.Signers {
+			if !slices.Contains(p.Signers, signer) {
+				errs = append(errs, fmt.Errorf(
+					"provenance: signer %q of builder %q must be one of the policy signers", signer, builder.ID,
+				))
+			}
+		}
+
+		// A builder without signers that matches the ID of one with
+		// signers would let other signers claim it.
+		for _, other := range p.Builders[i+1:] {
+			switch {
+			case other.ID == builder.ID:
+				errs = append(errs, fmt.Errorf("provenance: builder %q is listed more than once", builder.ID))
+			case (len(builder.Signers) == 0) != (len(other.Signers) == 0) &&
+				(coversBuilder(builder.ID, other.ID) || coversBuilder(other.ID, builder.ID)):
+				errs = append(errs, fmt.Errorf(
+					"provenance: builders %q and %q overlap, but only one of them names signers", builder.ID, other.ID,
+				))
+			}
+		}
+	}
+
+	return errs
+}
+
+// coversBuilder reports whether the builder ID, without an @, also
+// matches the other at a ref.
+func coversBuilder(id, other string) bool {
+	return !strings.Contains(id, "@") && strings.HasPrefix(other, id+"@")
+}
+
+// claimableBuilders returns the builders provenance signed by the given
+// policy signers may claim: those that name one of them or, if none does,
+// those that name no signers.
+func (p *Policy) claimableBuilders(signers []string) []Builder {
+	var bound, unbound []Builder
+
 	for i := range p.Builders {
-		ids = append(ids, p.Builders[i].ID)
+		builder := p.Builders[i]
+
+		switch {
+		case len(builder.Signers) == 0:
+			unbound = append(unbound, builder)
+		case slices.ContainsFunc(builder.Signers, func(s string) bool {
+			return slices.Contains(signers, s)
+		}):
+			bound = append(bound, builder)
+		}
+	}
+
+	if len(bound) > 0 {
+		return bound
+	}
+
+	return unbound
+}
+
+// highestLevel returns the highest SLSA build level provenance can
+// verify at under the policy, or zero without signers. Provenance whose
+// signer matches several signers may verify at a lower level only.
+func (p *Policy) highestLevel() int {
+	highest := 0
+
+	for _, signer := range p.Signers {
+		highest = max(highest, lowestLevel(p.claimableBuilders([]string{signer})))
+	}
+
+	return highest
+}
+
+// matchingSigners returns the policy signers, as written there, that
+// match one of the verified identities of a signature.
+func (p *Policy) matchingSigners(verification attestation.Verification) []string {
+	if verification == nil || !verification.GetVerified() {
+		return nil
+	}
+
+	var signers []string
+
+	for _, spec := range p.Signers {
+		id, err := sapi.NewIdentityFromSpec(spec)
+		if err != nil {
+			continue
+		}
+
+		if verification.MatchesIdentity(id) {
+			signers = append(signers, spec)
+		}
+	}
+
+	return signers
+}
+
+// builderIDs returns the IDs of the builders.
+func builderIDs(builders []Builder) []string {
+	ids := make([]string, 0, len(builders))
+	for i := range builders {
+		ids = append(ids, builders[i].ID)
 	}
 
 	return ids
 }
 
-// builderLevel returns the lowest SLSA build level of the builders, or
+// lowestLevel returns the lowest SLSA build level of the builders, or
 // zero without builders.
-func (p *Policy) builderLevel() int {
+func lowestLevel(builders []Builder) int {
 	level := 0
 
-	for i := range p.Builders {
-		if level == 0 || p.Builders[i].Level < level {
-			level = p.Builders[i].Level
+	for i := range builders {
+		if level == 0 || builders[i].Level < level {
+			level = builders[i].Level
 		}
 	}
 

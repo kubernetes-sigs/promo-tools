@@ -23,6 +23,14 @@ import (
 )
 
 const (
+	// testGeneratorSigner is the identity of an isolated provenance
+	// generator, and testGeneratorBuilder the builder only it can claim.
+	// GitHub names the signing workflow in both.
+	testGeneratorBuilder = "https://github.com/kubernetes-sigs/security-profiles-operator/.github/workflows/provenance.yml"
+	testGeneratorSigner  = "sigstore::https://token.actions.githubusercontent.com::" +
+		testGeneratorBuilder + "@refs/tags/v1.2.0"
+	testSelfSignedBuilder = "https://example.com/self-signed"
+
 	testSigner  = "sigstore::https://accounts.google.com::sp-operator-sa@k8s-staging-images.iam.gserviceaccount.com"
 	testBuilder = "https://prow.k8s.io/job-history/gs/kubernetes-ci-logs/logs/post-security-profiles-operator-push-image"
 	testSource  = "github.com/kubernetes-sigs/security-profiles-operator"
@@ -196,7 +204,7 @@ func TestPolicyValidate(t *testing.T) {
 				Sources:  []string{testSource},
 				Level:    2,
 			},
-			wantErr: "level 2 is above 1, the lowest level of the builders",
+			wantErr: "level 2 is above 1, the highest level provenance can verify at with these builders",
 		},
 		{
 			name: "builder without a level",
@@ -223,6 +231,138 @@ func TestPolicyValidate(t *testing.T) {
 			t.Parallel()
 
 			err := tc.policy.Validate()
+			if tc.wantErr == "" {
+				require.NoError(t, err)
+
+				return
+			}
+
+			require.ErrorContains(t, err, tc.wantErr)
+		})
+	}
+}
+
+// boundBuilderPolicy returns a policy with a self-signed level 1 builder
+// the signers no builder names can claim, and a level 3 builder only the
+// provenance generator can claim.
+func boundBuilderPolicy(level int) *Policy {
+	return &Policy{
+		Mode:    PolicyModeRequire,
+		Signers: []string{testSigner, testGeneratorSigner},
+		Builders: []Builder{
+			{ID: testSelfSignedBuilder, Level: 1},
+			{ID: testGeneratorBuilder, Level: 3, Signers: []string{testGeneratorSigner}},
+		},
+		Sources: []string{testSource},
+		Level:   level,
+	}
+}
+
+func TestPolicyBuilderSigners(t *testing.T) {
+	t.Parallel()
+
+	require.NoError(t, boundBuilderPolicy(3).Validate(), "a builder bound to its signer reaches level 3")
+
+	policy := boundBuilderPolicy(0)
+
+	require.Equal(t, 3, policy.highestLevel())
+	require.Equal(t, []Builder{policy.Builders[0]}, policy.claimableBuilders(nil))
+	require.Equal(t, []Builder{policy.Builders[0]}, policy.claimableBuilders([]string{testSigner}))
+	require.Equal(t, []Builder{policy.Builders[1]}, policy.claimableBuilders([]string{testGeneratorSigner}))
+	require.Equal(t, []Builder{policy.Builders[1]}, policy.claimableBuilders([]string{testSigner, testGeneratorSigner}),
+		"a signer that builders name can't claim the builders without signers")
+
+	require.Contains(t, policy.String(), testGeneratorBuilder+" (level 3, signers "+testGeneratorSigner+")")
+
+	other := boundBuilderPolicy(0)
+	other.Builders[1].Signers = nil
+	require.False(t, policy.Equal(other), "the builder signers are part of the policy")
+	require.Equal(t, 1, other.highestLevel())
+
+	policy.Builders[1].Signers = []string{testGeneratorSigner, testSigner}
+	other.Builders[1].Signers = []string{testSigner, testGeneratorSigner}
+	require.True(t, policy.Equal(other), "the order of the builder signers doesn't matter")
+	require.Equal(t, policy.String(), other.String())
+
+	require.Zero(t, (&Policy{Builders: policy.Builders}).highestLevel(), "no signers")
+}
+
+func TestPolicyValidateBuilderSigners(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name     string
+		builders []Builder
+		wantErr  string
+	}{
+		{
+			name: "signer that isn't a policy signer",
+			builders: []Builder{
+				{ID: testGeneratorBuilder, Level: 3, Signers: []string{foreignSigner}},
+			},
+			wantErr: "must be one of the policy signers",
+		},
+		{
+			name: "empty signer",
+			builders: []Builder{
+				{ID: testGeneratorBuilder, Level: 3, Signers: []string{""}},
+			},
+			wantErr: "must be one of the policy signers",
+		},
+		{
+			name: "same builder twice",
+			builders: []Builder{
+				{ID: testSelfSignedBuilder, Level: 1},
+				{ID: testSelfSignedBuilder, Level: 1},
+			},
+			wantErr: "is listed more than once",
+		},
+		{
+			name: "same builder with and without signers",
+			builders: []Builder{
+				{ID: testGeneratorBuilder, Level: 1},
+				{ID: testGeneratorBuilder, Level: 3, Signers: []string{testGeneratorSigner}},
+			},
+			wantErr: "is listed more than once",
+		},
+		{
+			name: "builder without signers at any ref",
+			builders: []Builder{
+				{ID: testGeneratorBuilder, Level: 1},
+				{ID: testGeneratorBuilder + "@refs/tags/v1.2.0", Level: 3, Signers: []string{testGeneratorSigner}},
+			},
+			wantErr: "overlap, but only one of them names signers",
+		},
+		{
+			name: "builder with signers at any ref",
+			builders: []Builder{
+				{ID: testGeneratorBuilder + "@refs/heads/main", Level: 1},
+				{ID: testGeneratorBuilder, Level: 3, Signers: []string{testGeneratorSigner}},
+			},
+			wantErr: "overlap, but only one of them names signers",
+		},
+		{
+			name: "overlapping builders without signers",
+			builders: []Builder{
+				{ID: testGeneratorBuilder, Level: 1},
+				{ID: testGeneratorBuilder + "@refs/heads/main", Level: 1},
+			},
+		},
+		{
+			name: "builders that only share a prefix",
+			builders: []Builder{
+				{ID: testGeneratorBuilder, Level: 1},
+				{ID: testGeneratorBuilder + "2", Level: 3, Signers: []string{testGeneratorSigner}},
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			policy := boundBuilderPolicy(0)
+			policy.Builders = tc.builders
+
+			err := policy.Validate()
 			if tc.wantErr == "" {
 				require.NoError(t, err)
 
