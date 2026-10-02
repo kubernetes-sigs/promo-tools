@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -184,6 +185,15 @@ func newDiscovery(atts ...Attestation) *Discovery {
 	return &Discovery{Reference: testRef, Attestations: atts}
 }
 
+const (
+	// controlBuilderTrusted is the SLSA verifier control that checks the
+	// builder.
+	controlBuilderTrusted = "builder-id-trusted"
+
+	// testIsolatedBuilder is a builder the SLSA verifier doesn't know.
+	testIsolatedBuilder = "https://example.com/isolated"
+)
+
 // evaluateTestCase is a policy evaluation test case.
 type evaluateTestCase struct {
 	name       string
@@ -199,6 +209,132 @@ func goodProvenance(t *testing.T) Attestation {
 	t.Helper()
 
 	return newAttestation(t, provenanceStatement(t, provenanceOptions{}), signed(t, testSigner))
+}
+
+// claimedBy returns a discovery with provenance of the builder, signed by
+// the signer.
+func claimedBy(builder, signer string) func(t *testing.T) *Discovery {
+	return func(t *testing.T) *Discovery {
+		t.Helper()
+
+		return newDiscovery(newAttestation(t,
+			provenanceStatement(t, provenanceOptions{builder: builder}), signed(t, signer)))
+	}
+}
+
+// isolatedBuilderPolicy returns a policy with a level 3 builder that only
+// foreignSigner can claim, and that the SLSA verifier doesn't know, so
+// that it would bind the builder to any expected signer. With
+// selfSigned, testSigner can claim a self-signed level 1 builder.
+func isolatedBuilderPolicy(selfSigned bool) *Policy {
+	p := &Policy{
+		Mode:     PolicyModeRequire,
+		Signers:  []string{testSigner, foreignSigner},
+		Builders: []Builder{{ID: testIsolatedBuilder, Level: 3, Signers: []string{foreignSigner}}},
+		Sources:  []string{testSource},
+	}
+
+	if selfSigned {
+		p.Builders = append(p.Builders, Builder{ID: testSelfSignedBuilder, Level: 1})
+	}
+
+	return p
+}
+
+// overlappingSignersPolicy returns a policy whose generator signer also
+// matches a regexp signer of the level 2 build workflow.
+func overlappingSignersPolicy(level int) *Policy {
+	const (
+		buildBuilder = "https://github.com/kubernetes-sigs/security-profiles-operator/.github/workflows/build.yml"
+		workflows    = "sigstore(identityMatch=regex)::https://token.actions.githubusercontent.com::" +
+			`https://github\.com/kubernetes-sigs/security-profiles-operator/\.github/workflows/.*`
+	)
+
+	return &Policy{
+		Mode:    PolicyModeRequire,
+		Signers: []string{testGeneratorSigner, workflows},
+		Builders: []Builder{
+			{ID: testGeneratorBuilder, Level: 3, Signers: []string{testGeneratorSigner}},
+			{ID: buildBuilder, Level: 2, Signers: []string{workflows}},
+		},
+		Sources: []string{testSource},
+		Level:   level,
+	}
+}
+
+// builderSignerTestCases cover builders that name their signers.
+func builderSignerTestCases() []evaluateTestCase {
+	generatorRelease := testGeneratorBuilder + "@refs/tags/v1.2.0"
+
+	return []evaluateTestCase{
+		{
+			// Only the provenance generator can claim the level 3 builder.
+			name:      "a builder bound to the signer verifies at its level",
+			policy:    func() *Policy { return boundBuilderPolicy(0) },
+			discovery: claimedBy(generatorRelease, testGeneratorSigner),
+			satisfied: true,
+			level:     3,
+		},
+		{
+			name:      "a builder bound to the signer satisfies the policy level",
+			policy:    func() *Policy { return boundBuilderPolicy(3) },
+			discovery: claimedBy(generatorRelease, testGeneratorSigner),
+			satisfied: true,
+			level:     3,
+		},
+		{
+			name:       "other signers can't claim a bound builder",
+			policy:     func() *Policy { return boundBuilderPolicy(0) },
+			discovery:  claimedBy(generatorRelease, testSigner),
+			violations: []string{controlBuilderTrusted},
+		},
+		{
+			name:       "other signers stay below the policy level",
+			policy:     func() *Policy { return boundBuilderPolicy(3) },
+			discovery:  claimedBy(testSelfSignedBuilder, testSigner),
+			violations: []string{"reach SLSA build level 1, the policy requires 3"},
+		},
+		{
+			name:      "a builder unknown to the verifier bound to the signer verifies at its level",
+			policy:    func() *Policy { return isolatedBuilderPolicy(true) },
+			discovery: claimedBy(testIsolatedBuilder, foreignSigner),
+			satisfied: true,
+			level:     3,
+		},
+		{
+			// The verifier binds an unknown builder to any expected signer.
+			name:       "other signers can't claim a bound builder unknown to the verifier",
+			policy:     func() *Policy { return isolatedBuilderPolicy(true) },
+			discovery:  claimedBy(testIsolatedBuilder, testSigner),
+			violations: []string{controlBuilderTrusted},
+		},
+		{
+			name:       "a signer that builders name can't claim the builders without signers",
+			policy:     func() *Policy { return isolatedBuilderPolicy(true) },
+			discovery:  claimedBy(testSelfSignedBuilder, foreignSigner),
+			violations: []string{controlBuilderTrusted},
+		},
+		{
+			name:       "a signer no builder names can't claim builders that name signers",
+			policy:     func() *Policy { return isolatedBuilderPolicy(false) },
+			discovery:  claimedBy(testIsolatedBuilder, testSigner),
+			violations: []string{"not signed by a signer the builders name"},
+		},
+		{
+			// The signer could claim the build workflow, too.
+			name:      "a signer that matches several signers verifies at the lowest level of their builders",
+			policy:    func() *Policy { return overlappingSignersPolicy(0) },
+			discovery: claimedBy(generatorRelease, testGeneratorSigner),
+			satisfied: true,
+			level:     2,
+		},
+		{
+			name:       "a signer that matches several signers stays below the policy level",
+			policy:     func() *Policy { return overlappingSignersPolicy(3) },
+			discovery:  claimedBy(generatorRelease, testGeneratorSigner),
+			violations: []string{"reach SLSA build level 2, the policy requires 3"},
+		},
+	}
 }
 
 // provenanceTestCases cover the build provenance checks.
@@ -266,7 +402,7 @@ func provenanceTestCases() []evaluateTestCase {
 				return newDiscovery(newAttestation(t,
 					provenanceStatement(t, provenanceOptions{builder: "https://example.com/builder"}), signed(t, testSigner)))
 			},
-			violations: []string{"builder-id-trusted"},
+			violations: []string{controlBuilderTrusted},
 		},
 		{
 			name: "other source",
@@ -355,7 +491,7 @@ func provenanceTestCases() []evaluateTestCase {
 			name: "the lowest builder level caps the verified level",
 			policy: func() *Policy {
 				p := testPolicy(PolicyModeRequire)
-				p.Builders = append(p.Builders, Builder{ID: "https://example.com/self-signed", Level: 1})
+				p.Builders = append(p.Builders, Builder{ID: testSelfSignedBuilder, Level: 1})
 
 				return p
 			},
@@ -461,7 +597,7 @@ func TestPolicyEvaluatorEvaluate(t *testing.T) {
 	evaluator, err := NewPolicyEvaluator()
 	require.NoError(t, err)
 
-	for _, tc := range append(provenanceTestCases(), predicateTypeTestCases()...) {
+	for _, tc := range slices.Concat(provenanceTestCases(), builderSignerTestCases(), predicateTypeTestCases()) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -658,7 +794,7 @@ func TestPolicyEvaluatorPlatforms(t *testing.T) {
 					provenanceOf(t, thirdDigest, provenanceOptions{}),
 				)
 			},
-			violations: []string{"builder-id-trusted"},
+			violations: []string{controlBuilderTrusted},
 		},
 		{
 			name: "the index satisfies the policy on its own",

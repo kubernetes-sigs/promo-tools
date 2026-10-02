@@ -326,26 +326,55 @@ provenance:
   [signer identity specs][signer-principals], for example
   `sigstore::<issuer>::<identity>`, or
   `sigstore(identityMatch=regex)::<issuer>::<identity regexp>` to match
-  several. Only sigstore identities with both an issuer and an identity are
-  accepted. They are separate from the identity the promoter signs with.
+  several. A regexp has to match the whole identity. Only sigstore
+  identities with both an issuer and an identity are accepted. They are
+  separate from the identity the promoter signs with.
 - `builders`: the trusted builders of the SLSA build provenance, each with
   its `id` and the SLSA build `level` it reaches, 1 to 3. An ID without `@`
   also matches the builder at any ref. The level depends on how the builder
   isolates builds and who generates and signs the provenance, which the
   provenance itself can't show: a build that generates and signs its own
   provenance, like the example, reaches level 1 only, because its build
-  steps could forge it. The builder ID is what the provenance claims, and
-  any of the signers can claim any of the builders, so provenance verifies
-  at no more than the lowest level of the builders.
+  steps could forge it. The builder ID is what the provenance claims, so
+  provenance verifies at no more than the lowest level of the builders its
+  signer may claim. A builder can name the policy `signers` that may claim
+  it, as written there. A signer that builders name may claim only the
+  builders that name it, and the other signers only the builders that name
+  no signers, so an isolated provenance generator can reach level 3 next
+  to a self-signed build at level 1:
+
+  ```yaml
+  signers:
+  - sigstore::https://accounts.google.com::sp-operator-sa@k8s-staging-images.iam.gserviceaccount.com
+  - sigstore(identityMatch=regex)::https://token.actions.githubusercontent.com::https://github\.com/kubernetes-sigs/security-profiles-operator/\.github/workflows/provenance\.yml@refs/tags/v[0-9.]+
+  builders:
+  - id: https://cloudbuild.googleapis.com/projects/k8s-staging-images/serviceAccounts/sp-operator-sa@k8s-staging-images.iam.gserviceaccount.com/cloudbuild.yaml
+    level: 1
+  - id: https://github.com/kubernetes-sigs/security-profiles-operator/.github/workflows/provenance.yml
+    level: 3
+    signers:
+    - sigstore(identityMatch=regex)::https://token.actions.githubusercontent.com::https://github\.com/kubernetes-sigs/security-profiles-operator/\.github/workflows/provenance\.yml@refs/tags/v[0-9.]+
+  ```
+
+  GitHub Actions provenance names the signing workflow as its builder,
+  and the [SLSA verifier][slsa-verifier] checks that it does. A signer
+  identity that matches several `signers` may claim the builders that name
+  any of them, at no more than their lowest level. Every builder ID may be
+  listed once, and a builder that names signers and one that doesn't must
+  not match each other through an ID without `@`.
 - `sources`: the repositories the images may be built from, without a ref.
 - `predicateTypes` (optional): predicate types that must also be attested
   for every image by one of the signers, for example an SBOM.
 - `level` (optional): the SLSA build level the provenance must reach in the
-  [SLSA verifier][slsa-verifier]'s controls, 2 or 3, and at most the lowest
-  level of the builders. By default every applicable SLSA build control has
-  to pass. Lower levels are not accepted, because they would not enforce
-  the builders. The verified level is the lower of the level the provenance
-  reaches and the lowest level of the builders.
+  [SLSA verifier][slsa-verifier]'s controls, 2 or 3, and at most the
+  highest level provenance can verify at with the builders of one signer.
+  By default every applicable SLSA build control has to pass. Lower levels
+  are not accepted, because they would not enforce the builders. The
+  verified level is the lower of the level the provenance reaches and the
+  lowest level of the builders its signer may claim, and provenance below
+  `level` doesn't count. The validation can't tell which `signers` an
+  identity matches, so provenance of an identity that matches several may
+  stay below `level`.
 
 `signers`, `builders` and `sources` are required unless the mode is `off`.
 
