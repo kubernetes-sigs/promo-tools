@@ -95,6 +95,45 @@ type ImageProvenance struct {
 	Results  []*PolicyResult
 }
 
+// Satisfied reports whether the image has an enabled policy and satisfies
+// all of them.
+func (ip *ImageProvenance) Satisfied() bool {
+	if ip == nil || len(ip.Results) == 0 {
+		return false
+	}
+
+	for _, result := range ip.Results {
+		if result == nil || !result.Satisfied {
+			return false
+		}
+	}
+
+	return true
+}
+
+// AcceptedByAll reports whether the image satisfies all its policies and
+// each of them accepted the attestation. Only such attestations are
+// carried with the image.
+func (ip *ImageProvenance) AcceptedByAll(att *Attestation) bool {
+	if !ip.Satisfied() {
+		return false
+	}
+
+	for _, result := range ip.Results {
+		if !slices.ContainsFunc(result.Accepted, func(a *Attestation) bool { return SameReferrer(a, att) }) {
+			return false
+		}
+	}
+
+	return true
+}
+
+// SameReferrer reports whether two attestations are the same referrer
+// layer.
+func SameReferrer(a, b *Attestation) bool {
+	return a.Location == b.Location && a.Layer == b.Layer
+}
+
 // PolicyEvaluator evaluates provenance policies against the attestations
 // found for an image, using the SLSA verifier.
 type PolicyEvaluator struct {

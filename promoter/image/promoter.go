@@ -137,7 +137,8 @@ type promoterImplementation interface {
 	// Methods for image signing
 	PrewarmTUFCache(context.Context) error
 	ValidateStagingSignatures(
-		context.Context, *options.Options, map[promotion.Edge]any, map[string]*provenance.Discovery,
+		context.Context, *options.Options, map[promotion.Edge]any,
+		map[string]*provenance.Discovery, map[string]*provenance.ImageProvenance,
 	) (promotion.StagingSignatures, error)
 	SignImages(*options.Options, map[promotion.Edge]any) error
 	WriteProvenanceAttestations(context.Context, *options.Options, []schema.Manifest, map[promotion.Edge]any, provenance.Generator) error
@@ -227,7 +228,7 @@ func (p *Promoter) PromoteImages(ctx context.Context, opts *options.Options) err
 	pipe.AddPhase(pipeline.NewPhase("validate", func(ctx context.Context) error {
 		// The results are kept when a signature is invalid, too.
 		signatures, err := p.impl.ValidateStagingSignatures(
-			ctx, opts, promotionEdges, p.discoveries,
+			ctx, opts, promotionEdges, p.discoveries, p.provenance,
 		)
 		p.stagingSignatures = signatures
 

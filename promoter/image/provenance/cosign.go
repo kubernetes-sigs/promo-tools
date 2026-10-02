@@ -143,7 +143,7 @@ func (v *CosignVerifier) Verify(ctx context.Context, ref string) (*Result, error
 	if _, err := crane.Manifest(attRef, craneOpts...); err != nil {
 		var terr *transport.Error
 		if errors.As(err, &terr) && terr.StatusCode == http.StatusNotFound {
-			logrus.Warnf("No attestation found for %s, skipping verification", ref)
+			logrus.Warnf("No legacy attestation tag %s found for %s, skipping its verification", attTag, ref)
 
 			result.Verified = true
 
