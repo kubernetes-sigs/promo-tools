@@ -501,6 +501,10 @@ Attestations can be verified with
 
 ### Verification summaries
 
+[verification-summaries.md](verification-summaries.md) explains how a project
+gets summaries for its images and how to verify them. This section is the
+reference.
+
 With `--verification-summaries` (off by default), the promoter also writes a
 signed [SLSA verification summary][slsa-vsa] (VSA) for each promoted digest,
 index and platform manifests alike, next to the promotion record: an in-toto
@@ -554,19 +558,19 @@ Attestation manifests BuildKit adds to an index get none.
 
 The summaries are signed by the identity of `--summary-signer-account`, or of
 `--signer-account`, which signs the images and promotion records, when it is
-not set. A dedicated identity that only the production promotion jobs can use
-is meant to sign them ([#1955][issue-1955]); until it is set up, they are off
-by default. A summary counts as written only when it is signed by that
-identity, so after the identity changes, every digest whose summary is
-written again, for example because it is promoted under a new tag, gets one
-of the new identity. The identity is meant to be set before the summaries
-are turned on. Consumers pin both the verifier and its signer, with `$SIGNER` the
-identity of `--summary-signer-account` in the production promotion jobs, for
-example with the [SLSA verifier][slsa-verifier]:
+not set. The production promotion jobs sign them as
+`promoter-summaries@k8s-releng-prod.iam.gserviceaccount.com`, an identity
+only they and the signature check that shares their account can use, see
+[signing identity](verification-summaries.md#signing-identity). A summary
+counts as written only when it is signed by that identity, so after the
+identity changes, every digest whose summary is written again, for example
+because it is promoted under a new tag, gets one of the new identity.
+Consumers pin both the verifier and its signer, for example with the
+[SLSA verifier][slsa-verifier]:
 
 ```console
 slsa-verifier vsa \
-  --verifier "https://k8s.io/promo-tools/verifier/v1=sigstore::https://accounts.google.com::$SIGNER" \
+  --verifier 'https://k8s.io/promo-tools/verifier/v1=sigstore::https://accounts.google.com::promoter-summaries@k8s-releng-prod.iam.gserviceaccount.com' \
   --level SLSA_BUILD_LEVEL_3 vsa.sigstore.json
 ```
 
@@ -718,5 +722,4 @@ kpromo cip \
 [k8sio-manifests-dir]: https://git.k8s.io/k8s.io/registry.k8s.io
 [signer-principals]: https://github.com/carabiner-dev/signer/blob/main/docs/principals.md
 [slsa-verifier]: https://github.com/slsa-framework/verifier
-[issue-1955]: https://github.com/kubernetes-sigs/promo-tools/issues/1955
 [slsa-vsa]: https://slsa.dev/spec/v1.0/verification_summary
