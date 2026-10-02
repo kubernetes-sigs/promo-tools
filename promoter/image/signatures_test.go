@@ -82,10 +82,12 @@ func TestPromoteImagesStagingSignatures(t *testing.T) {
 	require.Equal(t, 2, discoverer.DiscoverCallCount())
 
 	require.Equal(t, 1, mock.ValidateStagingSignaturesCallCount())
-	_, _, gotEdges, discoveries := mock.ValidateStagingSignaturesArgsForCall(0)
+	_, _, gotEdges, discoveries, outcomes := mock.ValidateStagingSignaturesArgsForCall(0)
 	require.Equal(t, edges, gotEdges)
 	require.Len(t, discoveries, 1, "a failed discovery is left out")
 	require.Contains(t, discoveries, "gcr.io/staging/found@sha256:abc")
+	require.Contains(t, outcomes, "gcr.io/staging/found@sha256:abc",
+		"the provenance outcomes are passed on")
 
 	require.Equal(t, results, sut.StagingSignatures())
 }
@@ -103,9 +105,10 @@ func TestPromoteImagesWithoutDiscoverer(t *testing.T) {
 
 	require.NoError(t, sut.PromoteImages(context.Background(), &options.Options{}))
 
-	_, gotOpts, _, discoveries := mock.ValidateStagingSignaturesArgsForCall(0)
+	_, gotOpts, _, discoveries, outcomes := mock.ValidateStagingSignaturesArgsForCall(0)
 	require.NotNil(t, gotOpts)
 	require.Nil(t, discoveries, "bundles are not checked without a discoverer")
+	require.Len(t, outcomes, 1, "the provenance outcomes are passed on anyway")
 }
 
 func TestPromoteImagesInvalidStagingSignatures(t *testing.T) {

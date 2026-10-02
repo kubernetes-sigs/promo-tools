@@ -216,7 +216,7 @@ type FakePromoterImplementation struct {
 	validateOptionsReturnsOnCall map[int]struct {
 		result1 error
 	}
-	ValidateStagingSignaturesStub        func(context.Context, *imagepromotera.Options, map[promotion.Edge]any, map[string]*provenance.Discovery) (promotion.StagingSignatures, error)
+	ValidateStagingSignaturesStub        func(context.Context, *imagepromotera.Options, map[promotion.Edge]any, map[string]*provenance.Discovery, map[string]*provenance.ImageProvenance) (promotion.StagingSignatures, error)
 	validateStagingSignaturesMutex       sync.RWMutex
 	validateStagingSignaturesArgsForCall []FakePromoterImplementationValidateStagingSignaturesArgs
 	validateStagingSignaturesReturns     struct {
@@ -370,6 +370,7 @@ type FakePromoterImplementationValidateStagingSignaturesArgs struct {
 	Arg2 *imagepromotera.Options
 	Arg3 map[promotion.Edge]any
 	Arg4 map[string]*provenance.Discovery
+	Arg5 map[string]*provenance.ImageProvenance
 }
 
 // FakePromoterImplementationWriteProvenanceAttestationsArgs holds the arguments of one call to WriteProvenanceAttestations.
@@ -1700,16 +1701,16 @@ func (fake *FakePromoterImplementation) ValidateOptionsReturnsOnCall(i int, resu
 	}{result1}
 }
 
-func (fake *FakePromoterImplementation) ValidateStagingSignatures(arg1 context.Context, arg2 *imagepromotera.Options, arg3 map[promotion.Edge]any, arg4 map[string]*provenance.Discovery) (promotion.StagingSignatures, error) {
+func (fake *FakePromoterImplementation) ValidateStagingSignatures(arg1 context.Context, arg2 *imagepromotera.Options, arg3 map[promotion.Edge]any, arg4 map[string]*provenance.Discovery, arg5 map[string]*provenance.ImageProvenance) (promotion.StagingSignatures, error) {
 	fake.validateStagingSignaturesMutex.Lock()
 	ret, specificReturn := fake.validateStagingSignaturesReturnsOnCall[len(fake.validateStagingSignaturesArgsForCall)]
-	fake.validateStagingSignaturesArgsForCall = append(fake.validateStagingSignaturesArgsForCall, FakePromoterImplementationValidateStagingSignaturesArgs{arg1, arg2, arg3, arg4})
+	fake.validateStagingSignaturesArgsForCall = append(fake.validateStagingSignaturesArgsForCall, FakePromoterImplementationValidateStagingSignaturesArgs{arg1, arg2, arg3, arg4, arg5})
 	stub := fake.ValidateStagingSignaturesStub
 	fakeReturns := fake.validateStagingSignaturesReturns
-	fake.recordInvocation("ValidateStagingSignatures", []interface{}{arg1, arg2, arg3, arg4})
+	fake.recordInvocation("ValidateStagingSignatures", []interface{}{arg1, arg2, arg3, arg4, arg5})
 	fake.validateStagingSignaturesMutex.Unlock()
 	if stub != nil {
-		return stub(arg1, arg2, arg3, arg4)
+		return stub(arg1, arg2, arg3, arg4, arg5)
 	}
 	if specificReturn {
 		return ret.result1, ret.result2
@@ -1723,17 +1724,17 @@ func (fake *FakePromoterImplementation) ValidateStagingSignaturesCallCount() int
 	return len(fake.validateStagingSignaturesArgsForCall)
 }
 
-func (fake *FakePromoterImplementation) ValidateStagingSignaturesCalls(stub func(context.Context, *imagepromotera.Options, map[promotion.Edge]any, map[string]*provenance.Discovery) (promotion.StagingSignatures, error)) {
+func (fake *FakePromoterImplementation) ValidateStagingSignaturesCalls(stub func(context.Context, *imagepromotera.Options, map[promotion.Edge]any, map[string]*provenance.Discovery, map[string]*provenance.ImageProvenance) (promotion.StagingSignatures, error)) {
 	fake.validateStagingSignaturesMutex.Lock()
 	defer fake.validateStagingSignaturesMutex.Unlock()
 	fake.ValidateStagingSignaturesStub = stub
 }
 
-func (fake *FakePromoterImplementation) ValidateStagingSignaturesArgsForCall(i int) (context.Context, *imagepromotera.Options, map[promotion.Edge]any, map[string]*provenance.Discovery) {
+func (fake *FakePromoterImplementation) ValidateStagingSignaturesArgsForCall(i int) (context.Context, *imagepromotera.Options, map[promotion.Edge]any, map[string]*provenance.Discovery, map[string]*provenance.ImageProvenance) {
 	fake.validateStagingSignaturesMutex.RLock()
 	defer fake.validateStagingSignaturesMutex.RUnlock()
 	argsForCall := fake.validateStagingSignaturesArgsForCall[i]
-	return argsForCall.Arg1, argsForCall.Arg2, argsForCall.Arg3, argsForCall.Arg4
+	return argsForCall.Arg1, argsForCall.Arg2, argsForCall.Arg3, argsForCall.Arg4, argsForCall.Arg5
 }
 
 func (fake *FakePromoterImplementation) ValidateStagingSignaturesArgs() []FakePromoterImplementationValidateStagingSignaturesArgs {

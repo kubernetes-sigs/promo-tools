@@ -71,6 +71,10 @@ type signatureCheck struct {
 	status  provenance.SignatureStatus
 	signers []string
 	err     string
+
+	// accepted are the signers of an untrusted bundle that all
+	// provenance policies of the image accepted.
+	accepted []string
 }
 
 // ValidateStagingSignatures checks the signatures of the staging images of
@@ -80,6 +84,9 @@ type signatureCheck struct {
 // bundles are not checked; a reference missing from them failed discovery.
 //
 // Unsigned images and sigstore bundles signed only by other identities pass.
+// Bundles of other identities that all provenance policies of the image
+// accepted, from the outcomes keyed by source reference, are reported as
+// accepted by the policies; they don't change the status.
 // Legacy signature tags of other identities fail, because release-sdk can't
 // tell them apart from invalid ones. It returns an error, along with the
 // results, if a signature is invalid.
@@ -88,6 +95,7 @@ func (di *DefaultPromoterImplementation) ValidateStagingSignatures(
 	opts *options.Options,
 	edges map[promotion.Edge]any,
 	discoveries map[string]*provenance.Discovery,
+	outcomes map[string]*provenance.ImageProvenance,
 ) (promotion.StagingSignatures, error) {
 	identity, err := signCheckIdentity(opts)
 	if err != nil {
@@ -111,7 +119,7 @@ func (di *DefaultPromoterImplementation) ValidateStagingSignatures(
 			checks = append(checks, di.checkSignatureTag(ctx, identity, results[ref], di.verifySignatureTag(ref)))
 
 			if discoveries != nil {
-				checks = append(checks, checkSignatureBundles(identity, results[ref], discoveries)...)
+				checks = append(checks, checkSignatureBundles(identity, outcomes[ref], results[ref], discoveries)...)
 			}
 
 			applySignatureChecks(results[ref], checks)
@@ -286,6 +294,7 @@ func (di *DefaultPromoterImplementation) signatureTagSigners(
 // the image, so only those of the image digest count.
 func checkSignatureBundles(
 	identity *verify.CertificateIdentity,
+	outcome *provenance.ImageProvenance,
 	res *promotion.StagingSignature,
 	discoveries map[string]*provenance.Discovery,
 ) []signatureCheck {
@@ -307,7 +316,12 @@ func checkSignatureBundles(
 			continue
 		}
 
-		checks = append(checks, checkSignatureBundle(identity, att, digest))
+		check := checkSignatureBundle(identity, att, digest)
+		if check.status == provenance.SignatureUntrusted && outcome.AcceptedByAll(att) {
+			check.accepted = check.signers
+		}
+
+		checks = append(checks, check)
 	}
 
 	return checks
@@ -433,6 +447,7 @@ func sigstorePrincipal(issuer, identity string) string {
 func applySignatureChecks(res *promotion.StagingSignature, checks []signatureCheck) {
 	res.Status = provenance.SignatureUnsigned
 	res.Signers = nil
+	res.PolicySigners = nil
 	res.Errors = nil
 
 	for _, check := range checks {
@@ -443,6 +458,8 @@ func applySignatureChecks(res *promotion.StagingSignature, checks []signatureChe
 		if check.err != "" {
 			res.Errors = append(res.Errors, check.err)
 		}
+
+		res.PolicySigners = append(res.PolicySigners, check.accepted...)
 	}
 
 	for _, check := range checks {
@@ -453,6 +470,8 @@ func applySignatureChecks(res *promotion.StagingSignature, checks []signatureChe
 
 	slices.Sort(res.Signers)
 	res.Signers = slices.Compact(res.Signers)
+	slices.Sort(res.PolicySigners)
+	res.PolicySigners = slices.Compact(res.PolicySigners)
 }
 
 // logStagingSignature logs the signature status of a staging image.
@@ -463,6 +482,15 @@ func logStagingSignature(res *promotion.StagingSignature) {
 	case provenance.SignatureUnsigned:
 		logrus.Infof("Staging image %s is not signed", res.Reference)
 	case provenance.SignatureUntrusted:
+		if len(res.PolicySigners) > 0 {
+			logrus.Infof(
+				"Staging image %s is signed by %s, accepted by its provenance policies",
+				res.Reference, strings.Join(res.PolicySigners, ", "),
+			)
+
+			return
+		}
+
 		logrus.Warnf(
 			"Staging image %s is only signed by identities that are not configured: %s",
 			res.Reference, joinOrUnknown(res.Signers),

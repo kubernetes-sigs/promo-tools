@@ -983,3 +983,33 @@ func TestPolicyCheckerWithoutPolicy(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, result)
 }
+
+func TestImageProvenanceAcceptedByAll(t *testing.T) {
+	t.Parallel()
+
+	att := &Attestation{Location: "staging/image@sha256:aaa", Layer: "sha256:bbb"}
+	same := &Attestation{Location: att.Location, Layer: att.Layer}
+	other := &Attestation{Location: att.Location, Layer: "sha256:ccc"}
+
+	accepting := &PolicyResult{Satisfied: true, Accepted: []*Attestation{same}}
+
+	var none *ImageProvenance
+
+	require.False(t, none.Satisfied())
+	require.False(t, (&ImageProvenance{}).Satisfied(), "an image without a policy satisfies none")
+	require.False(t, none.AcceptedByAll(att))
+
+	all := &ImageProvenance{Results: []*PolicyResult{accepting, accepting}}
+	require.True(t, all.Satisfied())
+	require.True(t, all.AcceptedByAll(att), "the same referrer layer counts")
+	require.False(t, all.AcceptedByAll(other))
+
+	partial := &ImageProvenance{Results: []*PolicyResult{accepting, {Satisfied: true}}}
+	require.True(t, partial.Satisfied())
+	require.False(t, partial.AcceptedByAll(att), "every policy must accept it")
+
+	unsatisfied := &ImageProvenance{Results: []*PolicyResult{accepting, {Satisfied: false, Accepted: []*Attestation{same}}}}
+	require.False(t, unsatisfied.Satisfied())
+	require.False(t, unsatisfied.AcceptedByAll(att))
+	require.False(t, (&ImageProvenance{Results: []*PolicyResult{nil}}).Satisfied())
+}

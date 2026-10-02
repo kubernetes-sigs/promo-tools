@@ -152,6 +152,15 @@ func signatureBundle(
 	}
 }
 
+// locatedBundle returns a verified signature bundle of the foreign signer
+// about the digest, at its own location.
+func locatedBundle(digest, location string) provenance.Attestation {
+	att := signatureBundle(digest, provenance.SignatureVerified, digest, testForeignPrincipal)
+	att.Location = location
+
+	return att
+}
+
 // fakeStagingSigner returns a release-sdk signer that reports the given
 // references as signed, and fails to verify the invalid ones.
 func fakeStagingSigner(signed map[string]bool, invalid map[string]bool) *sign.Signer {
@@ -205,6 +214,8 @@ func TestValidateStagingSignatures(t *testing.T) {
 	unsignedDigest := numberedDigest(3)
 	undiscoveredDigest := numberedDigest(4)
 	indexDigest := numberedDigest(5)
+	policyDigest := numberedDigest(7)
+	partialDigest := numberedDigest(8)
 
 	edges := map[promotion.Edge]any{
 		testStagingEdge(host, "legacy", legacyDigest, "v1.0"):           nil,
@@ -214,6 +225,8 @@ func TestValidateStagingSignatures(t *testing.T) {
 		testStagingEdge(host, "unsigned", unsignedDigest, "v1.0"):       nil,
 		testStagingEdge(host, "undiscovered", undiscoveredDigest, "v1"): nil,
 		testStagingEdge(host, "index", indexDigest, "v1.0"):             nil,
+		testStagingEdge(host, "policy", policyDigest, "v1.0"):           nil,
+		testStagingEdge(host, "partial", partialDigest, "v1.0"):         nil,
 	}
 
 	ref := func(imageName, digest string) string {
@@ -242,11 +255,37 @@ func TestValidateStagingSignatures(t *testing.T) {
 			// A failing signature of a child is not one of the index.
 			signatureBundle(numberedDigest(6), provenance.SignatureFailed, numberedDigest(6)),
 		}},
+		ref("policy", policyDigest): {Attestations: []provenance.Attestation{
+			locatedBundle(policyDigest, numberedDigest(11)),
+		}},
+		ref("partial", partialDigest): {Attestations: []provenance.Attestation{
+			locatedBundle(partialDigest, numberedDigest(12)),
+		}},
 	}
 
-	results, err := di.ValidateStagingSignatures(context.Background(), testSignCheckOptions(), edges, discoveries)
+	// Only bundles that all policies of the image accepted count. The
+	// foreign image satisfies its policy without accepting its bundle,
+	// the partial one fails one of its two policies.
+	accepted := func(imageName, digest string) *provenance.PolicyResult {
+		return &provenance.PolicyResult{
+			Satisfied: true,
+			Accepted:  []*provenance.Attestation{&discoveries[ref(imageName, digest)].Attestations[0]},
+		}
+	}
+	outcomes := map[string]*provenance.ImageProvenance{
+		ref("policy", policyDigest): {Results: []*provenance.PolicyResult{accepted("policy", policyDigest)}},
+		ref("foreign", foreignDigest): {Results: []*provenance.PolicyResult{{
+			Satisfied: true,
+			Accepted:  []*provenance.Attestation{new(locatedBundle(foreignDigest, numberedDigest(13)))},
+		}}},
+		ref("partial", partialDigest): {Results: []*provenance.PolicyResult{
+			accepted("partial", partialDigest), {Satisfied: false},
+		}},
+	}
+
+	results, err := di.ValidateStagingSignatures(context.Background(), testSignCheckOptions(), edges, discoveries, outcomes)
 	require.NoError(t, err)
-	require.Len(t, results, 6)
+	require.Len(t, results, 8)
 
 	legacy := results[ref("legacy", legacyDigest)]
 	require.Equal(t, provenance.SignatureVerified, legacy.Status)
@@ -261,6 +300,14 @@ func TestValidateStagingSignatures(t *testing.T) {
 	foreign := results[ref("foreign", foreignDigest)]
 	require.Equal(t, provenance.SignatureUntrusted, foreign.Status)
 	require.Equal(t, []string{testForeignPrincipal}, foreign.Signers)
+	require.Empty(t, foreign.PolicySigners)
+
+	policy := results[ref("policy", policyDigest)]
+	require.Equal(t, provenance.SignatureUntrusted, policy.Status, "policy signers don't change the status")
+	require.Equal(t, []string{testForeignPrincipal}, policy.Signers)
+	require.Equal(t, []string{testForeignPrincipal}, policy.PolicySigners)
+
+	require.Empty(t, results[ref("partial", partialDigest)].PolicySigners)
 
 	require.Equal(t, provenance.SignatureUnsigned, results[ref("unsigned", unsignedDigest)].Status)
 	require.Equal(t, provenance.SignatureUnsigned, results[ref("index", indexDigest)].Status)
@@ -305,7 +352,7 @@ func TestValidateStagingSignaturesInvalid(t *testing.T) {
 		}},
 	}
 
-	results, err := di.ValidateStagingSignatures(context.Background(), testSignCheckOptions(), edges, discoveries)
+	results, err := di.ValidateStagingSignatures(context.Background(), testSignCheckOptions(), edges, discoveries, nil)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), invalidRef)
 	require.Contains(t, err.Error(), bundleRef)
@@ -332,7 +379,7 @@ func TestValidateStagingSignaturesUnknownSigner(t *testing.T) {
 	di.signer = fakeStagingSigner(map[string]bool{ref: true}, nil)
 
 	results, err := di.ValidateStagingSignatures(context.Background(), testSignCheckOptions(),
-		map[promotion.Edge]any{testStagingEdge(host, "other", digest, "v1.0"): nil}, nil)
+		map[promotion.Edge]any{testStagingEdge(host, "other", digest, "v1.0"): nil}, nil, nil)
 	require.NoError(t, err)
 	require.Equal(t, provenance.SignatureUnverifiable, results[ref].Status)
 	require.Empty(t, results[ref].Signers)
@@ -351,7 +398,7 @@ func TestValidateStagingSignaturesWithoutDiscovery(t *testing.T) {
 
 	di := &DefaultPromoterImplementation{signer: fakeStagingSigner(nil, nil)}
 
-	results, err := di.ValidateStagingSignatures(context.Background(), testSignCheckOptions(), edges, nil)
+	results, err := di.ValidateStagingSignatures(context.Background(), testSignCheckOptions(), edges, nil, nil)
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 	require.Equal(t, provenance.SignatureUnsigned, results[host+"/staging/image@"+digest].Status)

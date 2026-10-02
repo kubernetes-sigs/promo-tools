@@ -143,14 +143,8 @@ type sourceAttestations struct {
 // index, so they are never accepted for it, and attestations of the kinds
 // the promoter writes itself are not carried.
 func carriedAttestations(outcome *provenance.ImageProvenance, digest string) []*provenance.Attestation {
-	if outcome == nil || len(outcome.Results) == 0 {
+	if !outcome.Satisfied() {
 		return nil
-	}
-
-	for _, result := range outcome.Results {
-		if result == nil || !result.Satisfied {
-			return nil
-		}
 	}
 
 	var carried []*provenance.Attestation
@@ -161,32 +155,16 @@ func carriedAttestations(outcome *provenance.ImageProvenance, digest string) []*
 			continue
 		}
 
-		if slices.ContainsFunc(carried, func(c *provenance.Attestation) bool { return sameReferrer(c, att) }) {
+		if slices.ContainsFunc(carried, func(c *provenance.Attestation) bool { return provenance.SameReferrer(c, att) }) {
 			continue
 		}
 
-		acceptedByAll := true
-
-		for _, result := range outcome.Results[1:] {
-			if !slices.ContainsFunc(result.Accepted, func(a *provenance.Attestation) bool { return sameReferrer(a, att) }) {
-				acceptedByAll = false
-
-				break
-			}
-		}
-
-		if acceptedByAll {
+		if outcome.AcceptedByAll(att) {
 			carried = append(carried, att)
 		}
 	}
 
 	return carried
-}
-
-// sameReferrer reports whether two attestations are the same referrer
-// layer.
-func sameReferrer(a, b *provenance.Attestation) bool {
-	return a.Location == b.Location && a.Layer == b.Layer
 }
 
 // carryDigestAttestations copies the attestation referrers of one digest

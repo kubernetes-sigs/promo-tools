@@ -41,6 +41,13 @@ type StagingSignature struct {
 	// identities for verified, the other identities for untrusted.
 	Signers []string
 
+	// PolicySigners are the signers of verified sigstore bundles of the
+	// image that all its provenance policies accepted, so that the bundles
+	// are carried with the image. They don't change Status: they are not
+	// configured identities, and the policies may only be tried in warn
+	// mode.
+	PolicySigners []string
+
 	// Errors explain why signatures failed or could not be checked.
 	Errors []string
 }

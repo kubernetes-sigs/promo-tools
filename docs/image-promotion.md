@@ -283,8 +283,10 @@ against the SLSA provenance v1 predicate type and the configured signing
 identity (`--certificate-identity` or `--certificate-identity-regexp`) and
 OIDC issuer (`--certificate-oidc-issuer` or
 `--certificate-oidc-issuer-regexp`). The regular expression flags take
-precedence over the exact ones. If no attestation is found, a warning is
-logged and the image is still promoted. This allows progressive adoption
+precedence over the exact ones. If no attestation tag is found, a warning
+is logged and the image is still promoted. Attestations attached as OCI
+referrers are not part of this check; [provenance policies](#provenance-policies)
+evaluate them. This allows progressive adoption
 without blocking images that do not yet have attestations.
 
 Attestations signed by another identity, or with another predicate type,
@@ -328,7 +330,11 @@ provenance:
   `sigstore(identityMatch=regex)::<issuer>::<identity regexp>` to match
   several. A regexp has to match the whole identity. Only sigstore
   identities with both an issuer and an identity are accepted. They are
-  separate from the identity the promoter signs with.
+  separate from the identity the promoter signs with. A sigstore bundle
+  signature of the staging image that all policies of the image accepted is
+  carried with it, and the validate phase logs it as accepted instead of
+  warning that its signer is not configured. It doesn't count as a signature
+  of the configured identity, and doesn't block the promotion either way.
 - `builders`: the trusted builders of the SLSA build provenance, each with
   its `id` and the SLSA build `level` it reaches, 1 to 3. An ID without `@`
   also matches the builder at any ref. The level depends on how the builder
