@@ -162,7 +162,12 @@ func (di *DefaultPromoterImplementation) missingAttestation(
 		return "", nil
 	}
 
-	exists, err := di.hasVerificationSummary(canonical)
+	identity, err := summaryIdentity(opts)
+	if err != nil {
+		return "", err
+	}
+
+	exists, err := di.hasVerificationSummary(canonical, identity)
 	if err != nil {
 		return "", fmt.Errorf("checking the verification summaries of %s: %w", canonical, err)
 	}
@@ -177,7 +182,7 @@ func (di *DefaultPromoterImplementation) missingAttestation(
 	}
 
 	for _, child := range children {
-		exists, err := di.hasVerificationSummary(canonical.Context().Digest(child))
+		exists, err := di.hasVerificationSummary(canonical.Context().Digest(child), identity)
 		if err != nil {
 			return "", fmt.Errorf("checking the verification summaries of %s@%s: %w", canonical.Context(), child, err)
 		}

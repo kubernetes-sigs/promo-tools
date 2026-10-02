@@ -50,20 +50,21 @@ const (
 	summaryFailed = "FAILED"
 )
 
-// recordingSigner records the statements it signs and returns a fixed
-// bundle.
+// recordingSigner records the statements it signs and returns them as
+// bundles with a test certificate of its identity.
 type recordingSigner struct {
+	t          *testing.T
+	identity   string
 	mu         sync.Mutex
 	statements [][]byte
 }
 
 func (r *recordingSigner) SignStatement(statement []byte) ([]byte, error) {
 	r.mu.Lock()
-	defer r.mu.Unlock()
-
 	r.statements = append(r.statements, statement)
+	r.mu.Unlock()
 
-	return testBundle(statement)
+	return (&certBundleSigner{identity: r.identity, t: r.t}).SignStatement(statement)
 }
 
 // testBundle returns a sigstore bundle holding the statement. It is not
@@ -178,7 +179,7 @@ func newSummaryTest(t *testing.T) *summaryTest {
 	}
 
 	edge := mkEdge(testTagV1)
-	signer := &recordingSigner{}
+	signer := &recordingSigner{t: t, identity: testSignerIdentity}
 	di.attSigner = signer
 
 	return &summaryTest{
@@ -196,6 +197,7 @@ func newSummaryTest(t *testing.T) *summaryTest {
 			edge.SrcReference(): {},
 		},
 		opts: &options.Options{
+			SignerAccount:         testSignerIdentity,
 			SignImages:            true,
 			VerificationSummaries: true,
 			MaxSignatureOps:       10,
@@ -253,28 +255,84 @@ func TestWriteVerificationSummaries(t *testing.T) {
 func TestWriteVerificationSummariesOtherSummary(t *testing.T) {
 	t.Parallel()
 
+	for desc, tc := range map[string]struct {
+		verifier string
+		sign     func([]byte) ([]byte, error)
+	}{
+		// For example one carried from staging.
+		"another verifier": {
+			verifier: "https://example.com/verifier",
+			sign:     (&certBundleSigner{identity: testSignerIdentity, t: t}).SignStatement,
+		},
+		// For example from before --summary-signer-account changed.
+		"another signer": {
+			verifier: provenance.SummaryVerifierID,
+			sign:     (&certBundleSigner{identity: "other@example.iam.gserviceaccount.com", t: t}).SignStatement,
+		},
+		"no certificate": {verifier: provenance.SummaryVerifierID, sign: testBundle},
+	} {
+		t.Run(desc, func(t *testing.T) {
+			t.Parallel()
+
+			st := newSummaryTest(t)
+
+			// A summary that is not the promoter's does not count.
+			other := fmt.Appendf(nil,
+				`{"_type": "https://in-toto.io/Statement/v1", "subject": [{"name": %q, "digest": {"sha256": %q}}], `+
+					`"predicateType": %q, "predicate": {"verifier": {"id": %q}}}`,
+				testImageApp, st.digest[7:], provenance.SummaryPredicateType, tc.verifier,
+			)
+
+			bundleJSON, err := tc.sign(other)
+			require.NoError(t, err)
+
+			digestRef, err := name.NewDigest(fmt.Sprintf("%s/%s@%s", st.edge.DstRegistry.Name, testImageApp, st.digest))
+			require.NoError(t, err)
+			require.NoError(t, ociremote.WriteAttestationNewBundleFormat(digestRef, bundleJSON, provenance.SummaryPredicateType,
+				ociremote.WithRemoteOptions(st.di.remoteOptions()...)))
+
+			require.NoError(t, st.di.WriteVerificationSummaries(
+				context.Background(), st.opts, st.summaryManifests(t, nil), st.edges, nil, st.outcomes,
+			))
+			require.Equal(t, provenance.SummaryVerifierID, st.statement(t).Predicate.Verifier.ID)
+			require.Equal(t, 2, st.referrers(t))
+		})
+	}
+}
+
+func TestWriteVerificationSummariesSummarySigner(t *testing.T) {
+	t.Parallel()
+
+	const summaryAccount = "summaries@example.iam.gserviceaccount.com"
+
 	st := newSummaryTest(t)
+	st.opts.SummarySignerAccount = summaryAccount
 
-	// A summary of another verifier, for example one carried from staging,
-	// does not count as the promoter's.
-	other := fmt.Appendf(nil,
-		`{"_type": "https://in-toto.io/Statement/v1", "subject": [{"name": %q, "digest": {"sha256": %q}}], `+
-			`"predicateType": %q, "predicate": {"verifier": {"id": "https://example.com/verifier"}}}`,
-		testImageApp, st.digest[7:], provenance.SummaryPredicateType,
-	)
+	// The summaries have their own signer, the attestation signer of the
+	// images and promotion records signs none.
+	summarySigner := &recordingSigner{t: t, identity: summaryAccount}
+	st.di.summarySigner = summarySigner
 
-	bundleJSON, err := testBundle(other)
-	require.NoError(t, err)
+	mfests := st.summaryManifests(t, nil)
 
-	digestRef, err := name.NewDigest(fmt.Sprintf("%s/%s@%s", st.edge.DstRegistry.Name, testImageApp, st.digest))
-	require.NoError(t, err)
-	require.NoError(t, ociremote.WriteAttestationNewBundleFormat(digestRef, bundleJSON, provenance.SummaryPredicateType,
-		ociremote.WithRemoteOptions(st.di.remoteOptions()...)))
+	// Written once, its own identity is recognized.
+	for range 2 {
+		require.NoError(t, st.di.WriteVerificationSummaries(
+			context.Background(), st.opts, mfests, st.edges, nil, st.outcomes,
+		))
+	}
+
+	require.Empty(t, st.signer.statements)
+	require.Len(t, summarySigner.statements, 1)
+	require.Equal(t, 1, st.referrers(t))
+
+	// A summary of the previous signer doesn't count for the new one.
+	st.opts.SummarySignerAccount = "next@example.iam.gserviceaccount.com"
+	st.di.summarySigner = &recordingSigner{t: t, identity: st.opts.SummarySignerAccount}
 
 	require.NoError(t, st.di.WriteVerificationSummaries(
-		context.Background(), st.opts, st.summaryManifests(t, nil), st.edges, nil, st.outcomes,
+		context.Background(), st.opts, mfests, st.edges, nil, st.outcomes,
 	))
-	require.Equal(t, provenance.SummaryVerifierID, st.statement(t).Predicate.Verifier.ID)
 	require.Equal(t, 2, st.referrers(t))
 }
 
@@ -359,7 +417,7 @@ func TestWriteVerificationSummariesIndex(t *testing.T) {
 	t.Parallel()
 
 	host, di := newTLSTestRegistry(t)
-	signer := &recordingSigner{}
+	signer := &recordingSigner{t: t, identity: testSignerIdentity}
 	di.attSigner = signer
 
 	// An index with two platform manifests, of which the promoter manifest
@@ -420,7 +478,9 @@ func TestWriteVerificationSummariesIndex(t *testing.T) {
 			Dmap: reg.DigestTags{image.Digest(indexDigest.String()): {testTagV1}, image.Digest(listed): {}},
 		}},
 	}}
-	opts := &options.Options{SignImages: true, VerificationSummaries: true, MaxSignatureOps: 10}
+	opts := &options.Options{
+		SignerAccount: testSignerIdentity, SignImages: true, VerificationSummaries: true, MaxSignatureOps: 10,
+	}
 
 	// Written once, whatever the number of runs.
 	for range 2 {
@@ -451,7 +511,7 @@ func TestWriteVerificationSummariesSharedChild(t *testing.T) {
 	t.Parallel()
 
 	host, di := newTLSTestRegistry(t)
-	signer := &recordingSigner{}
+	signer := &recordingSigner{t: t, identity: testSignerIdentity}
 	di.attSigner = signer
 
 	images := make([]v1.Image, 4)
@@ -521,7 +581,9 @@ func TestWriteVerificationSummariesSharedChild(t *testing.T) {
 		Filepath:    gitManifest(t),
 		Images:      []reg.Image{{Name: testImageApp, Dmap: dmap}},
 	}}
-	opts := &options.Options{SignImages: true, VerificationSummaries: true, MaxSignatureOps: 10}
+	opts := &options.Options{
+		SignerAccount: testSignerIdentity, SignImages: true, VerificationSummaries: true, MaxSignatureOps: 10,
+	}
 
 	require.NoError(t, di.WriteVerificationSummaries(context.Background(), opts, mfests, edges, nil, outcomes))
 

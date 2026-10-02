@@ -36,7 +36,9 @@ import (
 
 // repairTestOptions are the options the repair checks run with.
 func repairTestOptions() *options.Options {
-	return &options.Options{SignImages: true, VerificationSummaries: true, MaxSignatureOps: 10}
+	return &options.Options{
+		SignerAccount: testSignerIdentity, SignImages: true, VerificationSummaries: true, MaxSignatureOps: 10,
+	}
 }
 
 // pushSummary attaches a verification summary of the verifier to the
@@ -53,7 +55,7 @@ func pushSummary(t *testing.T, di *DefaultPromoterImplementation, ref, verifierI
 		digest.Context().String(), digest.DigestStr()[len("sha256:"):], provenance.SummaryPredicateType, verifierID,
 	)
 
-	bundleJSON, err := testBundle(statement)
+	bundleJSON, err := (&certBundleSigner{identity: testSignerIdentity, t: t}).SignStatement(statement)
 	require.NoError(t, err)
 	require.NoError(t, ociremote.WriteAttestationNewBundleFormat(digest, bundleJSON, provenance.SummaryPredicateType,
 		ociremote.WithRemoteOptions(di.remoteOptions()...)))

@@ -265,6 +265,9 @@ Related flags:
 
 - `--sign` — enable/disable signing (default: `true`)
 - `--signer-account` — service account identity for signing
+- `--summary-signer-account` — service account identity for signing the
+  [verification summaries](#verification-summaries) (default:
+  `--signer-account`)
 - `--certificate-identity` — identity to verify when checking signatures
 - `--certificate-identity-regexp` — Go regex alternative to
   `--certificate-identity`
@@ -541,15 +544,21 @@ satisfy the policies, gets a summary that claims no build level
 when the summary of one of the indexes holding it fails.
 Attestation manifests BuildKit adds to an index get none.
 
-The summaries are signed by the same identity as the promotion records,
-`--signer-account`. Which identity should sign them for consumers is not
-decided yet ([#1955][issue-1955]), which is why they are off by default.
-Consumers pin both the verifier and its signer, for example with the
-[SLSA verifier][slsa-verifier]:
+The summaries are signed by the identity of `--summary-signer-account`, or of
+`--signer-account`, which signs the images and promotion records, when it is
+not set. A dedicated identity that only the production promotion jobs can use
+is meant to sign them ([#1955][issue-1955]); until it is set up, they are off
+by default. A summary counts as written only when it is signed by that
+identity, so after the identity changes, every digest whose summary is
+written again, for example because it is promoted under a new tag, gets one
+of the new identity. The identity is meant to be set before the summaries
+are turned on. Consumers pin both the verifier and its signer, with `$SIGNER` the
+identity of `--summary-signer-account` in the production promotion jobs, for
+example with the [SLSA verifier][slsa-verifier]:
 
 ```console
 slsa-verifier vsa \
-  --verifier 'https://k8s.io/promo-tools/verifier/v1=sigstore::https://accounts.google.com::krel-trust@k8s-releng-prod.iam.gserviceaccount.com' \
+  --verifier "https://k8s.io/promo-tools/verifier/v1=sigstore::https://accounts.google.com::$SIGNER" \
   --level SLSA_BUILD_LEVEL_3 vsa.sigstore.json
 ```
 

@@ -76,6 +76,11 @@ type Options struct {
 	// when signing promoted images
 	SignerAccount string
 
+	// SummarySignerAccount is the service account whose identity signs the
+	// verification summaries, which consumers pin as the verifier of
+	// promoted images. SignerAccount signs them when it is empty.
+	SummarySignerAccount string
+
 	// SignCheckReferences list of image references to check for signatures
 	SignCheckReferences []string
 
@@ -112,8 +117,8 @@ type Options struct {
 	MaxSignatureOps int
 
 	// VerificationSummaries when true, write a signed SLSA verification
-	// summary for each promoted digest. Off by default until the identity
-	// signing them is decided.
+	// summary for each promoted digest. Off by default until the production
+	// promotion jobs sign them with a dedicated SummarySignerAccount.
 	VerificationSummaries bool
 }
 

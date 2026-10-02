@@ -65,20 +65,73 @@ func (di *DefaultPromoterImplementation) ensureAttestationSigner(opts *options.O
 		return nil
 	}
 
-	token, err := di.GetIdentityToken(opts, opts.SignerAccount)
+	s, err := di.newStatementSigner(opts, opts.SignerAccount)
 	if err != nil {
-		return fmt.Errorf("getting attestation signing token: %w", err)
+		return err
+	}
+
+	di.attSigner = s
+
+	return nil
+}
+
+// ensureSummarySigner initializes the signer of the verification summaries
+// if it is not already set. It is the attestation signer, unless
+// --summary-signer-account names another identity, which then is the only
+// one that signs them.
+func (di *DefaultPromoterImplementation) ensureSummarySigner(opts *options.Options) error {
+	if di.summarySigner != nil {
+		return nil
+	}
+
+	account := summarySignerAccount(opts)
+	if account == opts.SignerAccount {
+		if err := di.ensureAttestationSigner(opts); err != nil {
+			return err
+		}
+
+		di.summarySigner = di.attSigner
+
+		return nil
+	}
+
+	s, err := di.newStatementSigner(opts, account)
+	if err != nil {
+		return err
+	}
+
+	di.summarySigner = s
+
+	return nil
+}
+
+// summarySignerAccount returns the service account whose identity signs the
+// verification summaries, --summary-signer-account or else --signer-account.
+func summarySignerAccount(opts *options.Options) string {
+	if opts.SummarySignerAccount != "" {
+		return opts.SummarySignerAccount
+	}
+
+	return opts.SignerAccount
+}
+
+// newStatementSigner returns a keyless signer for the identity of the
+// service account.
+func (di *DefaultPromoterImplementation) newStatementSigner(
+	opts *options.Options, account string,
+) (*carabinerSigner, error) {
+	token, err := di.GetIdentityToken(opts, account)
+	if err != nil {
+		return nil, fmt.Errorf("getting signing token for %s: %w", account, err)
 	}
 
 	s := signer.NewSigner()
 
 	// Inject the token and disable the signer's ambient STS discovery
 	// so no other identity source (CI tokens, interactive flows) can ever
-	// sign a promotion attestation.
+	// sign an attestation or summary of the promoter.
 	s.Options.Token = &oauthflow.OIDCIDToken{RawString: token}
 	s.Options.DisableSTS = true
 
-	di.attSigner = &carabinerSigner{signer: s}
-
-	return nil
+	return &carabinerSigner{signer: s}, nil
 }
