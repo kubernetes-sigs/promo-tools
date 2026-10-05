@@ -75,6 +75,8 @@ buildImage() {
     for tag in $tags; do
         cmd+="-t $tag "
     done
+    # The release version, without the image build suffix of IMG_VERSION.
+    cmd+="--build-arg GIT_VERSION=${IMG_VERSION%-*} "
     # Specify Dockerfile location.
     cmd+="$repo_root"
     # Build the container.

@@ -19,7 +19,8 @@ REPO_ROOT:=$(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
 
 all: test
 
-GIT_VERSION=$(shell git describe --tags --always --dirty)
+# Image builds pass the release version, see hack/cip-image.sh.
+GIT_VERSION ?= $(shell git describe --tags --always --dirty)
 GIT_HASH ?= $(shell git rev-parse HEAD)
 DATE_FMT = +%Y-%m-%dT%H:%M:%SZ
 SOURCE_DATE_EPOCH ?= $(shell git log -1 --pretty=%ct)
@@ -42,6 +43,7 @@ export CGO_ENABLED=0
 kpromo:
 	go build \
 		-trimpath \
+		-buildvcs=false \
 		-ldflags '-s -w -buildid= $(LDFLAGS)' \
 		-o ./bin/kpromo \
 		./cmd/kpromo

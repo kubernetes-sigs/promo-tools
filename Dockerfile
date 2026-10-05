@@ -29,7 +29,9 @@ ENV CGO_ENABLED=0
 ENV GOOS=linux
 ENV GOARCH=${ARCH}
 
-RUN make kpromo
+# The version kpromo reports, from the git tags when empty.
+ARG GIT_VERSION
+RUN make kpromo ${GIT_VERSION:+GIT_VERSION=${GIT_VERSION}}
 
 FROM gcr.io/google.com/cloudsdktool/cloud-sdk:slim AS base
 
