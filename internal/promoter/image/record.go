@@ -17,8 +17,10 @@ limitations under the License.
 package imagepromoter
 
 import (
+	"encoding/json"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -39,6 +41,10 @@ const (
 	prowJobTypeEnv   = "JOB_TYPE"
 	prowBuildIDEnv   = "BUILD_ID"
 	prowProwJobIDEnv = "PROW_JOB_ID"
+
+	// prowJobSpecEnv is the specification of the Prow job, which names the
+	// repositories Prow checked out.
+	prowJobSpecEnv = "JOB_SPEC"
 )
 
 // manifestKey identifies the manifest entry an edge was created from.
@@ -241,9 +247,91 @@ func manifestDescriptor(path string) *provenance.ResourceDescriptor {
 		descriptor.Digest = map[string]string{"gitCommit": commit}
 	}
 
-	descriptor.Uri = repositoryURI(git("remote", "get-url", "origin"))
+	remote := git("remote", "get-url", "origin")
+	if remote == "" {
+		// Prow checks out repositories without a remote.
+		remote = prowRepositoryLink(root)
+	}
+
+	descriptor.Uri = repositoryURI(remote)
 
 	return descriptor
+}
+
+// prowRef is the part of a repository reference in a Prow job
+// specification that identifies the repository, where Prow cloned it and
+// whether Prow merged pull requests into the checkout.
+type prowRef struct {
+	Org       string            `json:"org"`
+	Repo      string            `json:"repo"`
+	RepoLink  string            `json:"repo_link"`  //nolint:tagliatelle // Prow field name
+	PathAlias string            `json:"path_alias"` //nolint:tagliatelle // Prow field name
+	Pulls     []json.RawMessage `json:"pulls"`
+}
+
+// prowRepositoryLink returns the link of the repository that Prow checked
+// out at root, according to the job specification, or nothing outside of
+// Prow.
+func prowRepositoryLink(root string) string {
+	spec := os.Getenv(prowJobSpecEnv)
+	if spec == "" {
+		return ""
+	}
+
+	var job struct {
+		Refs      *prowRef  `json:"refs"`
+		ExtraRefs []prowRef `json:"extra_refs"` //nolint:tagliatelle // Prow field name
+	}
+	if err := json.Unmarshal([]byte(spec), &job); err != nil {
+		logrus.Debugf("Unable to parse %s: %v", prowJobSpecEnv, err)
+
+		return ""
+	}
+
+	refs := job.ExtraRefs
+	if job.Refs != nil {
+		refs = append([]prowRef{*job.Refs}, refs...)
+	}
+
+	root = filepath.ToSlash(root)
+
+	for _, ref := range refs {
+		// A checkout with pull requests merged is at a commit that is not
+		// in the repository.
+		if ref.Org == "" || ref.Repo == "" || len(ref.Pulls) > 0 {
+			continue
+		}
+
+		if !strings.HasSuffix(root, path.Clean("/src/"+prowClonePath(&ref))) {
+			continue
+		}
+
+		if ref.RepoLink != "" {
+			return ref.RepoLink
+		}
+
+		return "https://github.com/" + ref.Org + "/" + ref.Repo
+	}
+
+	return ""
+}
+
+// prowClonePath returns where Prow clones a repository below the src
+// directory of its GOPATH, like PathForRefs of Prow's clonerefs: the path
+// alias, the repository link without its scheme, or
+// github.com/<org>/<repo>.
+func prowClonePath(ref *prowRef) string {
+	if ref.PathAlias != "" {
+		return ref.PathAlias
+	}
+
+	if ref.RepoLink != "" {
+		parts := strings.Split(ref.RepoLink, "://")
+
+		return parts[len(parts)-1]
+	}
+
+	return "github.com/" + ref.Org + "/" + ref.Repo
 }
 
 // repositoryURI returns a git+https URI for an https remote without
