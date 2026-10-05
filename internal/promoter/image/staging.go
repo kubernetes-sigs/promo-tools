@@ -27,11 +27,11 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/carabiner-dev/collector/envelope/bundle"
-	sapi "github.com/carabiner-dev/signer/api/v1"
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/google/go-containerregistry/pkg/v1/remote/transport"
+	"github.com/policylabs/collector/envelope/bundle"
+	sapi "github.com/policylabs/signer/api/v1"
 	"github.com/sigstore/sigstore-go/pkg/fulcio/certificate"
 	"github.com/sigstore/sigstore-go/pkg/verify"
 	"github.com/sigstore/sigstore/pkg/cryptoutils"

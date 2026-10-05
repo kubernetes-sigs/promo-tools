@@ -20,7 +20,7 @@ import (
 	"bytes"
 	"fmt"
 
-	signer "github.com/carabiner-dev/signer"
+	signer "github.com/policylabs/signer"
 	"github.com/sigstore/sigstore/pkg/oauthflow"
 
 	options "sigs.k8s.io/promo-tools/v4/promoter/image/options"
@@ -32,16 +32,16 @@ type statementSigner interface {
 	SignStatement(statement []byte) ([]byte, error)
 }
 
-// carabinerSigner implements statementSigner using the carabiner-dev
+// policylabsSigner implements statementSigner using the policylabs
 // signer with sigstore keyless signing. The underlying signer is safe
 // for concurrent use, so signing parallelizes up to MaxSignatureOps.
 // The Fulcio cert is fetched once and reused by every signature  until
 // it expires.
-type carabinerSigner struct {
+type policylabsSigner struct {
 	signer *signer.Signer
 }
 
-func (cs *carabinerSigner) SignStatement(statement []byte) ([]byte, error) {
+func (cs *policylabsSigner) SignStatement(statement []byte) ([]byte, error) {
 	bndl, err := cs.signer.SignStatementBundle(statement)
 	if err != nil {
 		return nil, fmt.Errorf("signing statement: %w", err)
@@ -119,7 +119,7 @@ func summarySignerAccount(opts *options.Options) string {
 // service account.
 func (di *DefaultPromoterImplementation) newStatementSigner(
 	opts *options.Options, account string,
-) (*carabinerSigner, error) {
+) (*policylabsSigner, error) {
 	token, err := di.GetIdentityToken(opts, account)
 	if err != nil {
 		return nil, fmt.Errorf("getting signing token for %s: %w", account, err)
@@ -133,5 +133,5 @@ func (di *DefaultPromoterImplementation) newStatementSigner(
 	s.Options.Token = &oauthflow.OIDCIDToken{RawString: token}
 	s.Options.DisableSTS = true
 
-	return &carabinerSigner{signer: s}, nil
+	return &policylabsSigner{signer: s}, nil
 }

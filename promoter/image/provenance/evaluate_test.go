@@ -26,9 +26,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/carabiner-dev/collector/envelope/bare"
-	"github.com/carabiner-dev/collector/envelope/bundle"
-	sapi "github.com/carabiner-dev/signer/api/v1"
+	"github.com/policylabs/collector/envelope/bare"
+	"github.com/policylabs/collector/envelope/bundle"
+	sapi "github.com/policylabs/signer/api/v1"
 	"github.com/stretchr/testify/require"
 )
 

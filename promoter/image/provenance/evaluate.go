@@ -25,8 +25,8 @@ import (
 	"strings"
 	"sync"
 
-	sapi "github.com/carabiner-dev/signer/api/v1"
 	"github.com/google/go-containerregistry/pkg/name"
+	sapi "github.com/policylabs/signer/api/v1"
 	"github.com/sirupsen/logrus"
 	"github.com/slsa-framework/verifier/pkg/slsa"
 	"github.com/slsa-framework/verifier/pkg/subject"
