@@ -37,6 +37,9 @@ const (
 	recordTestStaging = "gcr.io/k8s-staging-foo"
 	recordTestImage   = "foo"
 	recordTestDigest  = "sha256"
+
+	// recordTestRepoLink is the repository Prow names in the job specification.
+	recordTestRepoLink = "https://github.com/kubernetes/k8s.io"
 )
 
 func recordTestEdges(tags ...image.Tag) []promotion.Edge {
@@ -150,6 +153,102 @@ func TestRecordWithoutProwOrManifest(t *testing.T) {
 	require.Nil(t, record.GetManifest())
 	require.Empty(t, record.GetTags())
 	require.Equal(t, "registry.k8s.io/foo", record.GetDestination().GetName())
+}
+
+func TestRecordInProwCheckout(t *testing.T) {
+	// Prow clones the repositories of a job without a remote.
+	repo := filepath.Join(t.TempDir(), "src", "github.com", "kubernetes", "k8s.io")
+	imagesPath := filepath.Join(repo, "registry.k8s.io", "images", "k8s-staging-foo", "images.yaml")
+	require.NoError(t, os.MkdirAll(filepath.Dir(imagesPath), 0o755))
+	require.NoError(t, os.WriteFile(imagesPath, []byte("- name: foo\n"), 0o600))
+
+	git := func(args ...string) string {
+		res, err := command.NewWithWorkDir(repo, "git", args...).RunSilentSuccessOutput()
+		require.NoError(t, err)
+
+		return res.OutputTrimNL()
+	}
+	git("init", "-q")
+	git("add", ".")
+	git("-c", "user.name=test", "-c", "user.email=test@example.com", "commit", "-q", "-m", "images")
+	commit := git("rev-parse", "HEAD")
+
+	t.Setenv(prowJobSpecEnv, `{"type":"periodic","extra_refs":[{"org":"kubernetes","repo":"k8s.io","repo_link":"https://github.com/kubernetes/k8s.io","base_ref":"main"}]}`)
+
+	rc := newRecordContext([]schema.Manifest{recordTestManifest(t, imagesPath)})
+	record := rc.record(recordTestEdges("v1.0.0"), "registry.k8s.io/foo")
+
+	require.Equal(t, "registry.k8s.io/images/k8s-staging-foo/images.yaml", record.GetManifest().GetName())
+	require.Equal(t, map[string]string{"gitCommit": commit}, record.GetManifest().GetDigest())
+	require.Equal(t, "git+https://github.com/kubernetes/k8s.io", record.GetManifest().GetUri())
+}
+
+func TestProwRepositoryLink(t *testing.T) {
+	const root = "/home/prow/go/src/github.com/kubernetes/k8s.io"
+
+	for _, tc := range []struct {
+		name, spec, root, want string
+	}{
+		{
+			name: "outside of Prow",
+			root: root,
+		},
+		{
+			name: "invalid job specification",
+			spec: "{",
+			root: root,
+		},
+		{
+			name: "postsubmit",
+			spec: `{"type":"postsubmit","refs":{"org":"kubernetes","repo":"k8s.io","repo_link":"https://github.com/kubernetes/k8s.io"}}`,
+			root: root,
+			want: recordTestRepoLink,
+		},
+		{
+			name: "extra refs without a link",
+			spec: `{"type":"periodic","extra_refs":[{"org":"kubernetes","repo":"test-infra"},{"org":"kubernetes","repo":"k8s.io"}]}`,
+			root: root,
+			want: recordTestRepoLink,
+		},
+		{
+			name: "path alias",
+			spec: `{"type":"periodic","extra_refs":[{"org":"kubernetes","repo":"k8s.io","repo_link":"https://github.com/kubernetes/k8s.io","path_alias":"k8s.io/k8s.io"}]}`,
+			root: "/home/prow/go/src/k8s.io/k8s.io",
+			want: recordTestRepoLink,
+		},
+		{
+			name: "repository link outside of GitHub",
+			spec: `{"type":"periodic","extra_refs":[{"org":"https://gerrit.example.com","repo":"project","repo_link":"https://gerrit.example.com/project"}]}`,
+			root: "/home/prow/go/src/gerrit.example.com/project",
+			want: "https://gerrit.example.com/project",
+		},
+		{
+			name: "path alias with a trailing slash",
+			spec: `{"type":"periodic","extra_refs":[{"org":"kubernetes","repo":"k8s.io","path_alias":"k8s.io/k8s.io/"}]}`,
+			root: "/home/prow/go/src/k8s.io/k8s.io",
+			want: recordTestRepoLink,
+		},
+		{
+			name: "presubmit with a merged pull request",
+			spec: `{"type":"presubmit","refs":{"org":"kubernetes","repo":"k8s.io","repo_link":"https://github.com/kubernetes/k8s.io","pulls":[{"number":1}]}}`,
+			root: root,
+		},
+		{
+			name: "other repository",
+			spec: `{"type":"postsubmit","refs":{"org":"kubernetes","repo":"test-infra","repo_link":"https://github.com/kubernetes/test-infra"}}`,
+			root: root,
+		},
+		{
+			name: "same repository name in another org",
+			spec: `{"type":"postsubmit","refs":{"org":"other","repo":"k8s.io"}}`,
+			root: root,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv(prowJobSpecEnv, tc.spec)
+			require.Equal(t, tc.want, prowRepositoryLink(tc.root))
+		})
+	}
 }
 
 func TestRepositoryURI(t *testing.T) {

@@ -521,8 +521,10 @@ images the digest was promoted from, usually one:
   `git+https://github.com/kubernetes/k8s.io#registry.k8s.io/manifests/<project>/promoter-manifest.yaml`),
   and the commit it was read from as `digest.gitCommit`. When the policies
   that applied come from other manifests too, for example of a parent source
-  registry, the `uri` is the repository only. No summary is written for a
-  manifest that is not at a commit of a repository.
+  registry, the `uri` is the repository only. The repository is the `origin`
+  remote of the checkout or, in a Prow job, the one the job specification
+  names for it. No summary is written for a manifest that is not at a commit
+  of a known repository.
 - `verificationResult` is `PASSED` when every
   [provenance policy](#provenance-policies) that applies to the staging
   images is satisfied, and `FAILED` otherwise. That happens in `warn` mode,
