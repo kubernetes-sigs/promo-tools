@@ -108,7 +108,6 @@ main() {
 
     handleVariant \
         "${tag_prefix}:latest" \
-        "${tag_prefix}:latest-canary" \
         "${tag_prefix}:${IMG_TAG}" \
         "${tag_prefix}:${IMG_VERSION}"
 
