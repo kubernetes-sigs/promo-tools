@@ -29,19 +29,19 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/carabiner-dev/attestation"
-	"github.com/carabiner-dev/collector/envelope/bare"
-	"github.com/carabiner-dev/collector/envelope/bundle"
-	"github.com/carabiner-dev/collector/repository/coci"
-	"github.com/carabiner-dev/signer"
-	sapi "github.com/carabiner-dev/signer/api/v1"
-	signeroptions "github.com/carabiner-dev/signer/options"
 	"github.com/google/go-containerregistry/pkg/crane"
 	"github.com/google/go-containerregistry/pkg/gcrane"
 	"github.com/google/go-containerregistry/pkg/name"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/google/go-containerregistry/pkg/v1/remote/transport"
+	"github.com/policylabs/attestation"
+	"github.com/policylabs/collector/envelope/bare"
+	"github.com/policylabs/collector/envelope/bundle"
+	"github.com/policylabs/collector/repository/coci"
+	"github.com/policylabs/signer"
+	sapi "github.com/policylabs/signer/api/v1"
+	signeroptions "github.com/policylabs/signer/options"
 	sgbundle "github.com/sigstore/sigstore-go/pkg/bundle"
 
 	"sigs.k8s.io/promo-tools/v4/types/image"
@@ -84,7 +84,7 @@ const (
 // attestations to the platform images.
 //
 // Attestations are verified cryptographically against the sigstore trust
-// roots of carabiner-dev/signer, without checking who signed them. Which
+// roots of policylabs/signer, without checking who signed them. Which
 // signers are trusted, and whether an attestation must be about the image
 // (Attestation.SubjectMatches), is up to the caller.
 type OCIDiscoverer struct {

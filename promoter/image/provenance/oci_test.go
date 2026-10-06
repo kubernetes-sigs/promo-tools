@@ -29,8 +29,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/carabiner-dev/attestation"
-	sapi "github.com/carabiner-dev/signer/api/v1"
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/registry"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
@@ -39,6 +37,8 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/google/go-containerregistry/pkg/v1/static"
 	"github.com/google/go-containerregistry/pkg/v1/types"
+	"github.com/policylabs/attestation"
+	sapi "github.com/policylabs/signer/api/v1"
 	"github.com/stretchr/testify/require"
 
 	"sigs.k8s.io/promo-tools/v4/types/image"

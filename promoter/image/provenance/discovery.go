@@ -19,7 +19,7 @@ package provenance
 import (
 	"context"
 
-	"github.com/carabiner-dev/attestation"
+	"github.com/policylabs/attestation"
 )
 
 // Discoverer finds the attestations attached to a staging image.

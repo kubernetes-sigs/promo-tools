@@ -58,7 +58,7 @@ func TestEnsureAttestationSigner(t *testing.T) {
 		require.NoError(t, di.ensureAttestationSigner(opts))
 		require.NotNil(t, di.attSigner)
 
-		cs, ok := di.attSigner.(*carabinerSigner)
+		cs, ok := di.attSigner.(*policylabsSigner)
 		require.True(t, ok)
 		require.Equal(t, "test-token", cs.signer.Options.Token.RawString)
 		require.True(t, cs.signer.Options.DisableSTS,
@@ -88,7 +88,7 @@ func (accountTokenProvider) GetIdentityToken(_ context.Context, serviceAccount, 
 func signerToken(t *testing.T, s statementSigner) string {
 	t.Helper()
 
-	cs, ok := s.(*carabinerSigner)
+	cs, ok := s.(*policylabsSigner)
 	require.True(t, ok)
 	require.True(t, cs.signer.Options.DisableSTS)
 

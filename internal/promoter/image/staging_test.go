@@ -27,10 +27,10 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/carabiner-dev/attestation"
-	"github.com/carabiner-dev/collector/envelope/bundle"
 	"github.com/google/go-containerregistry/pkg/crane"
 	"github.com/google/go-containerregistry/pkg/name"
+	"github.com/policylabs/attestation"
+	"github.com/policylabs/collector/envelope/bundle"
 	sdkoptions "github.com/sigstore/cosign/v2/cmd/cosign/cli/options"
 	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
 	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"

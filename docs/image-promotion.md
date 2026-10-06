@@ -461,7 +461,7 @@ a build attached to the platform images in their own repositories (for
 example `…-amd64`) are found when those repositories are promoted.
 
 Each attestation is verified cryptographically against the sigstore trust
-roots of [carabiner-dev/signer][signer] (the public good instance and
+roots of [policylabs/signer][signer] (the public good instance and
 GitHub's), without checking who signed it, and logged with its predicate
 type, location, signature status (`verified`, `unsigned`, `unverifiable` or
 `failed`) and the verified signers as
@@ -720,8 +720,8 @@ kpromo cip \
 ```
 
 [ggcr-google]: https://pkg.go.dev/github.com/google/go-containerregistry/pkg/v1/google
-[signer]: https://github.com/carabiner-dev/signer
+[signer]: https://github.com/policylabs/signer
 [k8sio-manifests-dir]: https://git.k8s.io/k8s.io/registry.k8s.io
-[signer-principals]: https://github.com/carabiner-dev/signer/blob/main/docs/principals.md
+[signer-principals]: https://github.com/policylabs/signer/blob/main/docs/principals.md
 [slsa-verifier]: https://github.com/slsa-framework/verifier
 [slsa-vsa]: https://slsa.dev/spec/v1.0/verification_summary

@@ -22,8 +22,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/carabiner-dev/collector/envelope/bare"
 	intoto "github.com/in-toto/attestation/go/v1"
+	"github.com/policylabs/collector/envelope/bare"
 	"github.com/stretchr/testify/require"
 )
 
