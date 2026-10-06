@@ -604,7 +604,7 @@ The summaries are signed by the identity of `--summary-signer-account`, or of
 not set. The production promotion jobs sign them as
 `promoter-summaries@k8s-releng-prod.iam.gserviceaccount.com`, an identity
 only they and the signature check that shares their account can use, see
-[signing identity](verification-summaries.md#signing-identity). A summary
+[signing identities](verification-summaries.md#signing-identities). A summary
 counts as written only when it is signed by that identity, so after the
 identity changes, every digest whose summary is written again, for example
 because it is promoted under a new tag, gets one of the new identity.
