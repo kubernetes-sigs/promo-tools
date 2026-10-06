@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -663,7 +664,7 @@ func TestPolicyEvaluatorEvaluate(t *testing.T) {
 
 			require.NoError(t, policy.Validate())
 
-			res, err := evaluator.Evaluate(context.Background(), tc.discovery(t), policy)
+			res, err := evaluator.Evaluate(context.Background(), tc.discovery(t), policy, "")
 			require.NoError(t, err)
 
 			require.Equal(t, tc.satisfied, res.Satisfied, "violations: %v", res.Violations)
@@ -725,7 +726,7 @@ func TestPolicyEvaluatorRealProvenance(t *testing.T) {
 	policy := testPolicy(PolicyModeRequire)
 	policy.Builders[0].Level = 1
 
-	result, err := evaluator.Evaluate(context.Background(), discovery, policy)
+	result, err := evaluator.Evaluate(context.Background(), discovery, policy, "")
 	require.NoError(t, err)
 	require.True(t, result.Satisfied, result.Violations)
 	require.Equal(t, 1, result.SLSALevel)
@@ -733,7 +734,7 @@ func TestPolicyEvaluatorRealProvenance(t *testing.T) {
 	policy = testPolicy(PolicyModeRequire)
 	policy.Builders = []Builder{{ID: "https://prow.k8s.io/post-security-profiles-operator-push-image", Level: 3}}
 
-	result, err = evaluator.Evaluate(context.Background(), discovery, policy)
+	result, err = evaluator.Evaluate(context.Background(), discovery, policy, "")
 	require.NoError(t, err)
 	require.False(t, result.Satisfied)
 }
@@ -762,7 +763,7 @@ func TestPolicyEvaluatorAccepted(t *testing.T) {
 	evaluator, err := NewPolicyEvaluator()
 	require.NoError(t, err)
 
-	result, err := evaluator.Evaluate(context.Background(), discovery, testPolicy(PolicyModeRequire))
+	result, err := evaluator.Evaluate(context.Background(), discovery, testPolicy(PolicyModeRequire), "")
 	require.NoError(t, err)
 	require.True(t, result.Satisfied, result.Violations)
 	require.Equal(t, []*Attestation{&discovery.Attestations[0], &discovery.Attestations[1]}, result.Accepted)
@@ -877,7 +878,7 @@ func TestPolicyEvaluatorPlatforms(t *testing.T) {
 			policy := testPolicy(PolicyModeRequire)
 			policy.Level = 2
 
-			res, err := evaluator.Evaluate(context.Background(), discovery, policy)
+			res, err := evaluator.Evaluate(context.Background(), discovery, policy, "")
 			require.NoError(t, err)
 			require.Equal(t, tc.satisfied, res.Satisfied, "violations: %v", res.Violations)
 			require.Equal(t, tc.throughPlatforms, res.ThroughPlatforms)
@@ -901,6 +902,145 @@ func TestPolicyEvaluatorPlatforms(t *testing.T) {
 	}
 }
 
+func TestPolicyEvaluatorImageLevels(t *testing.T) {
+	t.Parallel()
+
+	const levelViolation = "its provenance verified at SLSA build level %d at most, the policy requires 3 for this image"
+
+	generatorRelease := testGeneratorBuilder + "@refs/tags/v1.2.0"
+
+	evaluator, err := NewPolicyEvaluator()
+	require.NoError(t, err)
+
+	for _, tc := range []struct {
+		name       string
+		image      string
+		discovery  func(t *testing.T) *Discovery
+		satisfied  bool
+		level      int
+		accepted   int
+		violations []string
+	}{
+		{
+			// The self-signed provenance passes as well and is carried.
+			name:      "an image at its required level",
+			image:     testLevelImage,
+			discovery: claimedByBoth(testSelfSignedBuilder, generatorRelease),
+			satisfied: true,
+			level:     3,
+			accepted:  2,
+		},
+		{
+			name:       "an image below its required level",
+			image:      testLevelImage,
+			discovery:  claimedBy(testSelfSignedBuilder, testSigner),
+			level:      1,
+			accepted:   1,
+			violations: []string{fmt.Sprintf(levelViolation, 1)},
+		},
+		{
+			// The reason the level 3 provenance failed tells how to fix it.
+			name:  "an image below its required level with rejected provenance",
+			image: testLevelImage,
+			discovery: func(t *testing.T) *Discovery {
+				t.Helper()
+
+				selfSigned := newAttestation(t,
+					provenanceStatement(t, provenanceOptions{builder: testSelfSignedBuilder}), signed(t, testSigner))
+				selfSigned.Location = bothLocations[0]
+
+				// Only the generator signer may claim the generator.
+				generator := newAttestation(t,
+					provenanceStatement(t, provenanceOptions{builder: generatorRelease}), signed(t, testSigner))
+				generator.Location = bothLocations[1]
+
+				return newDiscovery(selfSigned, generator)
+			},
+			level:      1,
+			accepted:   1,
+			violations: []string{fmt.Sprintf(levelViolation, 1), bothLocations[1], controlBuilderTrusted},
+		},
+		{
+			name:      "an image without a required level",
+			image:     "security-profiles-operator-bundle",
+			discovery: claimedBy(testSelfSignedBuilder, testSigner),
+			satisfied: true,
+			level:     1,
+			accepted:  1,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			policy := boundBuilderPolicy(0)
+			policy.Levels = []ImageLevel{{Images: []string{testLevelImage, testLevelPattern}, Level: 3}}
+			require.NoError(t, policy.Validate())
+
+			res, err := evaluator.Evaluate(context.Background(), tc.discovery(t), policy, tc.image)
+			require.NoError(t, err)
+			require.Equal(t, tc.satisfied, res.Satisfied, "violations: %v", res.Violations)
+			require.Equal(t, tc.level, res.SLSALevel)
+			require.Len(t, res.Accepted, tc.accepted)
+
+			joined := strings.Join(res.Violations, "\n")
+			for _, want := range tc.violations {
+				require.Contains(t, joined, want)
+			}
+		})
+	}
+
+	// The platform manifests of an index are held to the level of the
+	// index image.
+	const thirdDigest = "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+
+	discovery := newDiscovery(
+		platformAttestation(t, provenanceStatement(t, provenanceOptions{digest: otherDigest}), otherDigest),
+		platformAttestation(t, provenanceStatement(t, provenanceOptions{digest: thirdDigest, noInvocation: true}),
+			thirdDigest),
+	)
+	discovery.Children = []string{otherDigest, thirdDigest}
+
+	// Level 2 lets provenance without an invocation pass.
+	policy := testPolicy(PolicyModeRequire)
+	policy.Level = 2
+	policy.Levels = []ImageLevel{{Images: []string{"img"}, Level: 3}}
+	require.NoError(t, policy.Validate())
+
+	res, err := evaluator.Evaluate(context.Background(), discovery, policy, "img")
+	require.NoError(t, err)
+	require.False(t, res.Satisfied)
+	require.Contains(t, strings.Join(res.Violations, "\n"),
+		"platform manifest "+thirdDigest+": "+fmt.Sprintf(levelViolation, 2))
+
+	res, err = evaluator.Evaluate(context.Background(), discovery, policy, "other")
+	require.NoError(t, err)
+	require.True(t, res.Satisfied, res.Violations)
+	require.True(t, res.ThroughPlatforms)
+	require.Equal(t, 2, res.SLSALevel)
+
+	// An index with provenance of its own passes on that alone, so its
+	// platform manifests keep their own level.
+	ownDiscovery := newDiscovery(
+		newAttestation(t, provenanceStatement(t, provenanceOptions{builder: generatorRelease}),
+			signed(t, testGeneratorSigner)),
+		platformAttestation(t,
+			provenanceStatement(t, provenanceOptions{digest: otherDigest, builder: testSelfSignedBuilder}), otherDigest),
+	)
+	ownDiscovery.Children = []string{otherDigest}
+
+	ownPolicy := boundBuilderPolicy(0)
+	ownPolicy.Levels = []ImageLevel{{Images: []string{testLevelImage}, Level: 3}}
+	require.NoError(t, ownPolicy.Validate())
+
+	res, err = evaluator.Evaluate(context.Background(), ownDiscovery, ownPolicy, testLevelImage)
+	require.NoError(t, err)
+	require.True(t, res.Satisfied, res.Violations)
+	require.False(t, res.ThroughPlatforms)
+	require.Equal(t, 3, res.SLSALevel)
+	require.True(t, res.Platforms[otherDigest].Satisfied, res.Platforms[otherDigest].Violations)
+	require.Equal(t, 1, res.Platforms[otherDigest].SLSALevel)
+}
+
 func TestPolicyEvaluatorPlatformAccepted(t *testing.T) {
 	t.Parallel()
 
@@ -914,7 +1054,7 @@ func TestPolicyEvaluatorPlatformAccepted(t *testing.T) {
 	evaluator, err := NewPolicyEvaluator()
 	require.NoError(t, err)
 
-	result, err := evaluator.Evaluate(context.Background(), discovery, testPolicy(PolicyModeRequire))
+	result, err := evaluator.Evaluate(context.Background(), discovery, testPolicy(PolicyModeRequire), "")
 	require.NoError(t, err)
 	require.True(t, result.ThroughPlatforms, result.Violations)
 
@@ -932,19 +1072,19 @@ func TestPolicyEvaluatorEvaluateErrors(t *testing.T) {
 
 	ctx := context.Background()
 
-	_, err = evaluator.Evaluate(ctx, nil, testPolicy(PolicyModeRequire))
+	_, err = evaluator.Evaluate(ctx, nil, testPolicy(PolicyModeRequire), "")
 	require.Error(t, err)
 
-	_, err = evaluator.Evaluate(ctx, newDiscovery(), nil)
+	_, err = evaluator.Evaluate(ctx, newDiscovery(), nil, "")
 	require.Error(t, err)
 
-	_, err = evaluator.Evaluate(ctx, &Discovery{Reference: "example.com/image:latest"}, testPolicy(PolicyModeRequire))
+	_, err = evaluator.Evaluate(ctx, &Discovery{Reference: "example.com/image:latest"}, testPolicy(PolicyModeRequire), "")
 	require.ErrorContains(t, err, "parsing reference")
 
-	_, err = evaluator.Evaluate(ctx, newDiscovery(), &Policy{Mode: PolicyModeRequire, Signers: []string{"bad"}})
+	_, err = evaluator.Evaluate(ctx, newDiscovery(), &Policy{Mode: PolicyModeRequire, Signers: []string{"bad"}}, "")
 	require.ErrorContains(t, err, "invalid signer")
 
-	_, err = evaluator.Evaluate(ctx, newDiscovery(), &Policy{Mode: PolicyModeRequire})
+	_, err = evaluator.Evaluate(ctx, newDiscovery(), &Policy{Mode: PolicyModeRequire}, "")
 	require.ErrorContains(t, err, "at least one signer")
 }
 
@@ -997,7 +1137,7 @@ func TestPolicyCheckerCheck(t *testing.T) {
 
 			checker := &PolicyChecker{}
 
-			result, err := checker.Check(context.Background(), testRef, testPolicy(tc.mode), tc.discovery(t))
+			result, err := checker.Check(context.Background(), testRef, testPolicy(tc.mode), "", tc.discovery(t))
 			if tc.wantErr == "" {
 				require.NoError(t, err)
 			} else {
@@ -1018,6 +1158,33 @@ func TestPolicyCheckerCheck(t *testing.T) {
 	}
 }
 
+func TestPolicyCheckerImageLevels(t *testing.T) {
+	t.Parallel()
+
+	discovery := claimedBy(testSelfSignedBuilder, testSigner)(t)
+	checker := &PolicyChecker{}
+
+	for _, mode := range []PolicyMode{PolicyModeWarn, PolicyModeRequire} {
+		policy := boundBuilderPolicy(0)
+		policy.Mode = mode
+		policy.Levels = []ImageLevel{{Images: []string{testLevelImage}, Level: 3}}
+
+		result, err := checker.Check(context.Background(), testRef, policy, testLevelImage, discovery)
+		require.NotNil(t, result)
+		require.False(t, result.Satisfied)
+
+		if mode == PolicyModeRequire {
+			require.ErrorContains(t, err, "the policy requires 3 for this image")
+		} else {
+			require.NoError(t, err, "warn mode only logs the violation")
+		}
+
+		result, err = checker.Check(context.Background(), testRef, policy, "bundle", discovery)
+		require.NoError(t, err)
+		require.True(t, result.Satisfied)
+	}
+}
+
 func TestPolicyCheckerOtherImage(t *testing.T) {
 	t.Parallel()
 
@@ -1028,7 +1195,7 @@ func TestPolicyCheckerOtherImage(t *testing.T) {
 		checker := &PolicyChecker{}
 
 		for _, mode := range []PolicyMode{PolicyModeWarn, PolicyModeRequire} {
-			_, err := checker.Check(context.Background(), testRef, testPolicy(mode), discovery)
+			_, err := checker.Check(context.Background(), testRef, testPolicy(mode), "", discovery)
 			require.ErrorContains(t, err, "returned another image")
 		}
 	}
@@ -1039,7 +1206,7 @@ func TestPolicyCheckerWithoutPolicy(t *testing.T) {
 
 	checker := &PolicyChecker{}
 
-	result, err := checker.Check(context.Background(), testRef, nil, nil)
+	result, err := checker.Check(context.Background(), testRef, nil, "", nil)
 	require.NoError(t, err)
 	require.Nil(t, result)
 }

@@ -161,6 +161,16 @@ field, for example how to bind a builder to its own signer and level. The
 [policy of the Security Profiles Operator][spo-policy] is a complete example
 with a Cloud Build builder at level 1 and a GitHub Actions builder at level 3.
 
+If some of your images reach a higher level than others, require it for them
+with `levels`, so that they can't pass with the provenance of the lower level
+builder alone:
+
+```yaml
+  levels:
+  - images: ["<image>", "charts/*"]
+    level: 3
+```
+
 Before you open the PR, run a dry run against a directory with only your
 project's thin manifests (`manifests/<project>/` and `images/<project>/`),
 with the policy added and the digests you are about to promote in

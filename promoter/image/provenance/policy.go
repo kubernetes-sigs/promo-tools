@@ -19,6 +19,8 @@ package provenance
 import (
 	"errors"
 	"fmt"
+	"maps"
+	"path"
 	"slices"
 	"strings"
 
@@ -100,6 +102,25 @@ func (b *Builder) UnmarshalYAML(unmarshal func(any) error) error {
 	return unmarshal((*plain)(b))
 }
 
+// ImageLevel requires a SLSA build level for some images of a policy.
+type ImageLevel struct {
+	// Images are patterns of the image names, as written in the image
+	// list of the manifest, relative to the source registry of the
+	// policy, for example "spoc" or "charts/*". They use path.Match
+	// syntax, so * doesn't match a /.
+	Images []string `yaml:"images"`
+
+	// Level is the SLSA build level the images must verify at, 2 or 3.
+	Level int `yaml:"level"`
+}
+
+// String describes the image level for the logs.
+func (l *ImageLevel) String() string {
+	images := slices.Sorted(slices.Values(l.Images))
+
+	return fmt.Sprintf("%s (level %d)", strings.Join(images, ", "), l.Level)
+}
+
 // Policy is the provenance policy of a project, declared in the
 // `provenance` section of its promoter manifest. Images of the project
 // satisfy it when they carry SLSA build provenance that is about the
@@ -132,6 +153,12 @@ type Policy struct {
 	// Zero (the default) requires every applicable SLSA build control to
 	// pass.
 	Level int `yaml:"level,omitempty"`
+
+	// Levels require a SLSA build level for some images. An image whose
+	// highest verified level is below the highest level of the entries
+	// that match it doesn't satisfy the policy. Its provenance at lower
+	// levels still counts, so it is carried all the same.
+	Levels []ImageLevel `yaml:"levels,omitempty"`
 }
 
 // Enabled reports whether the policy is set and not off.
@@ -191,8 +218,10 @@ func (p *Policy) Validate() error {
 		))
 	}
 
+	errs = append(errs, p.validateLevels()...)
+
 	if !p.Enabled() && (len(p.Signers) > 0 || len(p.Builders) > 0 || len(p.Sources) > 0 ||
-		len(p.PredicateTypes) > 0 || p.Level > 0) {
+		len(p.PredicateTypes) > 0 || p.Level > 0 || len(p.Levels) > 0) {
 		logrus.Warnf("provenance: the policy is %s, set a mode to check it", PolicyModeOff)
 	}
 
@@ -224,7 +253,33 @@ func (p *Policy) Equal(other *Policy) bool {
 		sameElements(builderStrings(p.Builders), builderStrings(other.Builders)) &&
 		sameElements(p.Sources, other.Sources) &&
 		sameElements(p.PredicateTypes, other.PredicateTypes) &&
-		p.Level == other.Level
+		p.Level == other.Level &&
+		maps.Equal(levelsByPattern(p.Levels), levelsByPattern(other.Levels))
+}
+
+// levelsByPattern returns the highest level the image levels require per
+// pattern, so that equal requirements compare equal however the entries
+// group the patterns.
+func levelsByPattern(levels []ImageLevel) map[string]int {
+	byPattern := make(map[string]int)
+
+	for i := range levels {
+		for _, pattern := range levels[i].Images {
+			byPattern[pattern] = max(byPattern[pattern], levels[i].Level)
+		}
+	}
+
+	return byPattern
+}
+
+// levelStrings describes the image levels, one per entry.
+func levelStrings(levels []ImageLevel) []string {
+	strs := make([]string, 0, len(levels))
+	for i := range levels {
+		strs = append(strs, levels[i].String())
+	}
+
+	return strs
 }
 
 // builderStrings describes the builders, one per entry.
@@ -264,7 +319,125 @@ func (p *Policy) String() string {
 		parts = append(parts, fmt.Sprintf("level=%d", p.Level))
 	}
 
+	if len(p.Levels) > 0 {
+		parts = append(parts, "levels=["+strings.Join(levelStrings(p.Levels), "; ")+"]")
+	}
+
 	return strings.Join(parts, " ")
+}
+
+// RequiredLevel returns the SLSA build level the policy requires for the
+// image, named relative to the source registry of the policy: the highest
+// level of the levels that match it, or zero if none does. An image at the
+// source registry itself has no name, which no pattern is meant to match.
+func (p *Policy) RequiredLevel(image string) int {
+	if p == nil {
+		return 0
+	}
+
+	required := 0
+
+	for i := range p.Levels {
+		if slices.ContainsFunc(p.Levels[i].Images, func(pattern string) bool {
+			return matchesImage(pattern, image)
+		}) {
+			required = max(required, p.Levels[i].Level)
+		}
+	}
+
+	return required
+}
+
+// UnmatchedLevelPatterns returns the patterns of the levels that match none
+// of the images, named relative to the source registry of the policy. Such
+// a pattern most likely has a typo, and requires nothing.
+func (p *Policy) UnmatchedLevelPatterns(images []string) []string {
+	if p == nil {
+		return nil
+	}
+
+	var unmatched []string
+
+	for i := range p.Levels {
+		for _, pattern := range p.Levels[i].Images {
+			if !slices.Contains(unmatched, pattern) && !slices.ContainsFunc(images, func(image string) bool {
+				return matchesImage(pattern, image)
+			}) {
+				unmatched = append(unmatched, pattern)
+			}
+		}
+	}
+
+	return unmatched
+}
+
+// matchesImage reports whether the levels pattern matches the image name.
+func matchesImage(pattern, image string) bool {
+	image = strings.Trim(image, "/")
+	if image == "" {
+		return false
+	}
+
+	matched, err := path.Match(pattern, image)
+
+	return err == nil && matched
+}
+
+// validateLevels checks the image levels of the policy.
+func (p *Policy) validateLevels() []error {
+	var errs []error
+
+	highest := p.highestLevel()
+
+	for i := range p.Levels {
+		level := &p.Levels[i]
+
+		if len(level.Images) == 0 {
+			errs = append(errs, errors.New("provenance: every entry of levels needs at least one image"))
+		}
+
+		for _, pattern := range level.Images {
+			if strings.TrimSpace(pattern) == "" {
+				errs = append(errs, errors.New("provenance: image patterns of levels must not be empty"))
+
+				continue
+			}
+
+			if _, err := path.Match(pattern, ""); err != nil {
+				errs = append(errs, fmt.Errorf("provenance: invalid image pattern %q in levels: %w", pattern, err))
+			}
+
+			// Image names are relative to the source registry, so a
+			// pattern with a leading or trailing / never matches.
+			if strings.HasPrefix(pattern, "/") || strings.HasSuffix(pattern, "/") {
+				errs = append(errs, fmt.Errorf(
+					"provenance: image pattern %q in levels must not start or end with a /", pattern,
+				))
+			}
+		}
+
+		// Every satisfied image reaches level 1, so a lower entry would
+		// require nothing.
+		switch {
+		case level.Level < minPolicyLevel || level.Level > maxLevel:
+			errs = append(errs, fmt.Errorf(
+				"provenance: levels of %s must be between %d and %d, got %d",
+				strings.Join(level.Images, ", "), minPolicyLevel, maxLevel, level.Level,
+			))
+		case highest > 0 && level.Level > highest:
+			errs = append(errs, fmt.Errorf(
+				"provenance: level %d of %s is above %d, the highest level provenance can verify at with these builders",
+				level.Level, strings.Join(level.Images, ", "), highest,
+			))
+		case p.Level > 0 && level.Level <= p.Level:
+			logrus.Warnf(
+				"provenance: level %d of %s requires nothing beyond the policy level %d",
+				level.Level, strings.Join(level.Images, ", "), p.Level,
+			)
+		}
+	}
+
+	return errs
 }
 
 // validateBuilders checks the builders of the policy.

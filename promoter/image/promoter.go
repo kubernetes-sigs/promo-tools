@@ -478,16 +478,17 @@ func (p *Promoter) checkProvenance(
 // sourcePolicies returns the distinct enabled provenance policies that
 // apply to the source reference of every edge. Edges repeat the same
 // source digest once per destination region and tag, and manifests can
-// share images.
+// share images. Equal policies count once unless they require different
+// levels for the image.
 func sourcePolicies(
 	mfests []schema.Manifest, edges map[promotion.Edge]any,
-) (map[string][]*provenance.Policy, error) {
+) (map[string][]schema.AppliedProvenancePolicy, error) {
 	policies, err := schema.ProvenancePolicies(mfests)
 	if err != nil {
 		return nil, fmt.Errorf("reading provenance policies: %w", err)
 	}
 
-	refPolicies := make(map[string][]*provenance.Policy, len(edges))
+	refPolicies := make(map[string][]schema.AppliedProvenancePolicy, len(edges))
 
 	for edge := range edges {
 		ref := edge.SrcReference()
@@ -499,9 +500,12 @@ func sourcePolicies(
 			refPolicies[ref] = nil
 		}
 
-		for _, policy := range schema.ApplicableProvenancePolicies(policies, edge.SrcRegistry.Name, edge.SrcImageTag.Name) {
-			if !slices.ContainsFunc(refPolicies[ref], policy.Equal) {
-				refPolicies[ref] = append(refPolicies[ref], policy)
+		for _, applied := range schema.ApplicableProvenancePolicies(policies, edge.SrcRegistry.Name, edge.SrcImageTag.Name) {
+			if !slices.ContainsFunc(refPolicies[ref], func(other schema.AppliedProvenancePolicy) bool {
+				return other.Policy.Equal(applied.Policy) &&
+					other.Policy.RequiredLevel(other.Image) == applied.Policy.RequiredLevel(applied.Image)
+			}) {
+				refPolicies[ref] = append(refPolicies[ref], applied)
 			}
 		}
 	}
@@ -517,11 +521,11 @@ func (p *Promoter) checkImageProvenance(
 	checker *provenance.PolicyChecker,
 	verifier provenance.Verifier,
 	ref string,
-	policies []*provenance.Policy,
+	policies []schema.AppliedProvenancePolicy,
 ) error {
 	if len(policies) == 0 {
 		// Logs that no policy applies.
-		if _, err := checker.Check(ctx, ref, nil, p.discoveries[ref]); err != nil {
+		if _, err := checker.Check(ctx, ref, nil, "", p.discoveries[ref]); err != nil {
 			return fmt.Errorf("checking provenance policy: %w", err)
 		}
 	}
@@ -530,10 +534,10 @@ func (p *Promoter) checkImageProvenance(
 	outcome := &provenance.ImageProvenance{}
 	p.provenance[ref] = outcome
 
-	for _, policy := range policies {
-		result, err := checker.Check(ctx, ref, policy, p.discoveries[ref])
+	for _, applied := range policies {
+		result, err := checker.Check(ctx, ref, applied.Policy, applied.Image, p.discoveries[ref])
 		if result != nil {
-			outcome.Policies = append(outcome.Policies, policy)
+			outcome.Policies = append(outcome.Policies, applied.Policy)
 			outcome.Results = append(outcome.Results, result)
 		}
 
@@ -541,7 +545,7 @@ func (p *Promoter) checkImageProvenance(
 			return fmt.Errorf("checking provenance policy: %w", err)
 		}
 
-		if policy.Mode != provenance.PolicyModeRequire {
+		if applied.Policy.Mode != provenance.PolicyModeRequire {
 			verify = true
 		}
 	}

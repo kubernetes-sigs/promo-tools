@@ -386,6 +386,47 @@ provenance:
   generator, the image gets the highest of their levels. The validation
   can't tell which `signers` an identity matches, so provenance of an
   identity that matches several may stay below `level`.
+- `levels` (optional): the SLSA build level some images must verify at, 2
+  or 3, for projects whose images come from builders at different levels.
+  Level 1 would require nothing, since every image that satisfies the
+  policy reaches it. Each entry lists `images`, patterns of the image names
+  relative to the source registry of the policy, as `images.yaml` names
+  them, without a leading or trailing `/`, in
+  [`path.Match`](https://pkg.go.dev/path#Match) syntax, where `*` doesn't
+  match a `/`. An image matched by several entries needs the highest of
+  their levels, and an image no entry matches has no required level. The
+  level must not be above the highest level provenance can verify at with
+  the builders of one signer. Loading the manifests warns about a pattern
+  that matches no image of the source registry of the policy, which most
+  likely has a typo, and about an entry at or below the policy `level`,
+  which requires nothing more. Unlike `level`, it doesn't filter the
+  provenance: an image whose highest verified level is below its required
+  level violates the policy, with the reasons any of its provenance was
+  rejected for, and its provenance at lower levels still counts, so it is
+  carried all the same when the image satisfies the policy. For example, to require level 3 for the images an isolated
+  provenance generator attests, next to a self-signed build at level 1:
+
+  ```yaml
+  levels:
+  - images:
+    - spoc
+    - charts/*
+    - security-profiles-operator
+    - security-profiles-operator-amd64
+    - security-profiles-operator-arm64
+    - security-profiles-operator-ppc64le
+    level: 3
+  ```
+
+  The per-arch images are listed one by one: `security-profiles-operator-*`
+  would also match the bundle and catalog images, which only reach level 1.
+
+  An index without build provenance of its own passes through its
+  platform manifests, so they are held to the level of the index image. An
+  index with provenance of its own passes on that alone, and its platform
+  manifests keep their own level in their summaries. A nested repository
+  without a manifest of its own is matched with its path, for example
+  `charts/security-profiles-operator`.
 
 `signers`, `builders` and `sources` are required unless the mode is `off`.
 
