@@ -16,7 +16,7 @@ require (
 	github.com/maxbrunsfeld/counterfeiter/v6 v6.14.0
 	github.com/policylabs/attestation v0.3.0
 	github.com/policylabs/collector v0.4.0
-	github.com/policylabs/signer v0.6.4
+	github.com/policylabs/signer v0.6.5-0.20261015200636-00dacc16df2a
 	github.com/sigstore/cosign/v3 v3.1.3
 	github.com/sigstore/protobuf-specs v0.5.2
 	github.com/sigstore/sigstore v1.11.0
@@ -155,14 +155,14 @@ require (
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-openapi/analysis v0.26.0 // indirect
-	github.com/go-openapi/errors v0.22.8 // indirect
+	github.com/go-openapi/errors v0.22.9 // indirect
 	github.com/go-openapi/jsonpointer v1.0.0 // indirect
 	github.com/go-openapi/jsonreference v1.0.0 // indirect
 	github.com/go-openapi/loads v0.25.1 // indirect
 	github.com/go-openapi/runtime v0.33.0 // indirect
 	github.com/go-openapi/runtime/server-middleware v0.33.0 // indirect
 	github.com/go-openapi/spec v0.22.9 // indirect
-	github.com/go-openapi/strfmt v0.27.2 // indirect
+	github.com/go-openapi/strfmt v0.27.3 // indirect
 	github.com/go-openapi/swag v0.28.0 // indirect
 	github.com/go-openapi/swag/cmdutils v0.28.0 // indirect
 	github.com/go-openapi/swag/conv v0.29.2 // indirect

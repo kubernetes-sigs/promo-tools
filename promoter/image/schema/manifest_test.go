@@ -233,6 +233,46 @@ func TestParseThinManifestYAMLProvenance(t *testing.T) {
 	require.Nil(t, m.Provenance)
 }
 
+// testCallersYAML adds two alternative callers to the builder of
+// testPolicyYAML.
+const testCallersYAML = "    callers:\n" +
+	"    - workflows:\n      - .github/workflows/build.yml\n      - .github/workflows/image-reproducible.yml\n" +
+	"      refs:\n      - refs/tags/v*\n      events:\n      - release\n" +
+	"    - workflows:\n      - .github/workflows/build.yml\n" +
+	"      refs:\n      - refs/heads/main\n      events:\n      - push\n"
+
+// withCallers returns testPolicyYAML with the callers YAML on its builder.
+// withCallers gives the builder of the test policy callers, which needs a
+// builder on github.com.
+func withCallers(callers string) string {
+	return strings.Replace(testPolicyYAML,
+		"  - id: https://prow.k8s.io/post-security-profiles-operator-push-image\n    level: 3\n",
+		"  - id: https://github.com/kubernetes-sigs/security-profiles-operator/.github/workflows/provenance.yml\n"+
+			"    level: 3\n"+callers, 1)
+}
+
+func TestParseThinManifestYAMLProvenanceCallers(t *testing.T) {
+	t.Parallel()
+
+	yaml := withCallers(testCallersYAML)
+	require.NotEqual(t, testPolicyYAML, yaml)
+
+	m, err := ParseThinManifestYAML([]byte(yaml))
+	require.NoError(t, err)
+	require.Equal(t, []provenance.Caller{
+		{
+			Workflows: []string{".github/workflows/build.yml", ".github/workflows/image-reproducible.yml"},
+			Refs:      []string{"refs/tags/v*"},
+			Events:    []string{"release"},
+		},
+		{
+			Workflows: []string{".github/workflows/build.yml"},
+			Refs:      []string{"refs/heads/main"},
+			Events:    []string{"push"},
+		},
+	}, m.Provenance.Builders[0].Callers)
+}
+
 func TestParseThinManifestYAMLProvenanceInvalid(t *testing.T) {
 	t.Parallel()
 
@@ -255,6 +295,21 @@ func TestParseThinManifestYAMLProvenanceInvalid(t *testing.T) {
 			name:    "invalid signer",
 			yaml:    strings.Replace(testPolicyYAML, "sigstore::https", "unknown::https", 1),
 			wantErr: "invalid signer",
+		},
+		{
+			name:    "invalid caller event",
+			yaml:    withCallers(testCallersYAML + "    - refs:\n      - refs/tags/v*\n      events:\n      - Release\n"),
+			wantErr: `callers[2]: event "Release" must be a GitHub Actions event name`,
+		},
+		{
+			name:    "unknown caller field",
+			yaml:    withCallers(testCallersYAML + "      repositories: []\n"),
+			wantErr: "field repositories not found",
+		},
+		{
+			name:    "single caller",
+			yaml:    withCallers("    callers:\n      refs:\n      - refs/tags/v*\n"),
+			wantErr: "cannot unmarshal",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
