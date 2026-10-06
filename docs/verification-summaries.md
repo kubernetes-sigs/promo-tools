@@ -15,7 +15,7 @@ level for its images and how to verify them. The reference for every option is
 - [What a promoted image carries](#what-a-promoted-image-carries)
 - [Getting summaries with a build level](#getting-summaries-with-a-build-level)
 - [Verifying a summary](#verifying-a-summary)
-- [Signing identity](#signing-identity)
+- [Signing identities](#signing-identities)
 
 ## How it works
 
@@ -238,12 +238,14 @@ slsa-verifier vsa \
   --level "$LEVEL" vsa.sigstore.json
 ```
 
-## Signing identity
+## Signing identities
 
 Users trust a summary because of the identity that signed it,
-`promoter-summaries@k8s-releng-prod.iam.gserviceaccount.com`. Only the
-production image promotion jobs, and the signature check that shares their
-account, can sign as it:
+`promoter-summaries@k8s-releng-prod.iam.gserviceaccount.com`, and the image
+signatures and promotion records because of
+`krel-trust@k8s-releng-prod.iam.gserviceaccount.com`. Only the production
+image promotion jobs, and the signature check that shares their account, can
+sign as either:
 
 ```mermaid
 flowchart LR
@@ -255,17 +257,23 @@ flowchart LR
     end
     gsa["k8s-infra-image-promotion@<br/>k8s-artifacts-prod"]
     summaries["promoter-summaries@k8s-releng-prod"]
+    krel["krel-trust@k8s-releng-prod"]
 
     post --> ksa
     ci --> ksa
     check --> ksa
     ksa -- "Workload Identity" --> gsa
     gsa -- "token creator" --> summaries
+    gsa -- "token creator" --> krel
 ```
 
 - Only `k8s-infra-image-promotion@k8s-artifacts-prod.iam.gserviceaccount.com`
-  can get tokens for `promoter-summaries`
-  (`infra/gcp/bash/ensure-releng.sh` in [kubernetes/k8s.io][k8sio]).
+  can get tokens for `promoter-summaries` and `krel-trust`
+  (`infra/gcp/bash/ensure-releng.sh` in [kubernetes/k8s.io][k8sio]). The
+  file promoter (`k8s-infra-promoter@k8s-artifacts-prod`) and the former
+  image promoter account (`k8s-infra-gcr-promoter@k8s-artifacts-prod`) lost
+  their access to `krel-trust` in [kubernetes/k8s.io#10016][k8sio-10016] and
+  [kubernetes/k8s.io#10025][k8sio-10025].
 - Only the Kubernetes service account `test-pods/k8s-infra-image-promotion` in
   the `k8s-infra-prow-build-trusted` cluster can use that account through
   Workload Identity (`kubernetes/gke-prow-build-trusted/prow/serviceaccounts.yaml`
@@ -288,12 +296,14 @@ Google-managed service agents and of default service accounts that run no
 workloads. Changing any of the bindings above
 takes a reviewed PR in kubernetes/k8s.io or kubernetes/test-infra.
 
-The image signatures and promotion records are signed as
-`krel-trust@k8s-releng-prod.iam.gserviceaccount.com`, which other jobs use as
-well, see [signing and attestation](image-promotion.md#signing-and-attestation).
+The flags that select these identities are described in [signing and
+attestation](image-promotion.md#signing-and-attestation) and [verification
+summaries](image-promotion.md#verification-summaries).
 
 [k8sio]: https://github.com/kubernetes/k8s.io
 [k8sio-8817]: https://github.com/kubernetes/k8s.io/pull/8817
+[k8sio-10016]: https://github.com/kubernetes/k8s.io/pull/10016
+[k8sio-10025]: https://github.com/kubernetes/k8s.io/pull/10025
 [k8sio-manifests]: https://github.com/kubernetes/k8s.io/tree/main/registry.k8s.io/manifests
 [slsa-github-generator]: https://github.com/slsa-framework/slsa-github-generator
 [slsa-verifier]: https://github.com/slsa-framework/verifier
