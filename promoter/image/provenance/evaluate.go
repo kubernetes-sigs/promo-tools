@@ -159,9 +159,14 @@ func NewPolicyEvaluator() (*PolicyEvaluator, error) {
 // has no build provenance of its own, when all its platform manifests do.
 // Rejected provenance about the index is never outweighed by its platform
 // manifests. A nested index is evaluated against its own attestations
-// only, not through its platform manifests.
+// only, not through its platform manifests. The image is the name of the
+// image relative to the source registry of the policy, which selects the
+// level the policy requires for it. The platform manifests of an index
+// without build provenance of its own are held to that level too, since
+// the index passes through them. An index with provenance of its own
+// passes on that alone, so its platform manifests keep their own level.
 func (e *PolicyEvaluator) Evaluate(
-	ctx context.Context, discovery *Discovery, policy *Policy,
+	ctx context.Context, discovery *Discovery, policy *Policy, image string,
 ) (*PolicyResult, error) {
 	if discovery == nil {
 		return nil, errors.New("no discovery to evaluate")
@@ -185,7 +190,9 @@ func (e *PolicyEvaluator) Evaluate(
 		return nil, fmt.Errorf("parsing reference %q: %w", discovery.Reference, err)
 	}
 
-	result, err := e.evaluateDigest(ctx, discovery, policy, signers, digestRef.DigestStr())
+	required := policy.RequiredLevel(image)
+
+	result, err := e.evaluateDigest(ctx, discovery, policy, signers, digestRef.DigestStr(), required)
 	if err != nil {
 		return nil, err
 	}
@@ -196,13 +203,18 @@ func (e *PolicyEvaluator) Evaluate(
 
 	result.Platforms = make(map[string]*PolicyResult, len(discovery.Children))
 
+	platformRequired := required
+	if result.ownProvenance {
+		platformRequired = 0
+	}
+
 	var (
 		lowest     = -1
 		violations []string
 	)
 
 	for _, child := range discovery.Children {
-		platform, err := e.evaluateDigest(ctx, discovery, policy, signers, child)
+		platform, err := e.evaluateDigest(ctx, discovery, policy, signers, child, platformRequired)
 		if err != nil {
 			return nil, err
 		}
@@ -237,9 +249,10 @@ func (e *PolicyEvaluator) Evaluate(
 }
 
 // evaluateDigest checks the attestations in the discovery that are about
-// the digest against the policy.
+// the digest against the policy, and that the highest level of the
+// provenance that passed reaches the required level.
 func (e *PolicyEvaluator) evaluateDigest(
-	ctx context.Context, discovery *Discovery, policy *Policy, signers []*sapi.Identity, digest string,
+	ctx context.Context, discovery *Discovery, policy *Policy, signers []*sapi.Identity, digest string, required int,
 ) (*PolicyResult, error) {
 	expected, err := subject.Parse(digest)
 	if err != nil {
@@ -285,11 +298,21 @@ func (e *PolicyEvaluator) evaluateDigest(
 		}
 	}
 
-	if !satisfied {
+	switch {
+	case !satisfied:
 		if len(rejected) == 0 {
 			result.Violations = append(result.Violations, "no SLSA build provenance found")
 		}
 
+		result.Violations = append(result.Violations, rejected...)
+	case result.SLSALevel < required:
+		result.Violations = append(result.Violations, fmt.Sprintf(
+			"its provenance verified at SLSA build level %d at most, the policy requires %d for this image",
+			result.SLSALevel, required,
+		))
+
+		// The rejected provenance is what could have reached the level,
+		// so its reasons tell how to fix it.
 		result.Violations = append(result.Violations, rejected...)
 	}
 
@@ -501,14 +524,19 @@ type PolicyChecker struct {
 
 // Check evaluates the policy for the image at the digest reference against
 // the attestations discovered for it and returns the result, which is nil
-// for a policy that is off. A nil discovery means the discovery failed. A
+// for a policy that is off. The image is its name relative to the source
+// registry of the policy. A nil discovery means the discovery failed. A
 // violation fails the check in require mode, along with the result, and is
 // logged in warn mode. Errors that prevent the evaluation, like an invalid
 // policy, fail the check in both modes.
 func (c *PolicyChecker) Check(
-	ctx context.Context, ref string, policy *Policy, discovery *Discovery,
+	ctx context.Context, ref string, policy *Policy, image string, discovery *Discovery,
 ) (*PolicyResult, error) {
 	logrus.Infof("Provenance policy for %s: %s", ref, policy)
+
+	if required := policy.RequiredLevel(image); required > 0 && policy.Enabled() {
+		logrus.Infof("Provenance policy requires SLSA build level %d for %s (image %s)", required, ref, image)
+	}
 
 	if !policy.Enabled() {
 		return nil, nil //nolint:nilnil // a policy that is off has no result
@@ -533,7 +561,7 @@ func (c *PolicyChecker) Check(
 	case !sameImage(discovery, ref):
 		return nil, fmt.Errorf("discovering attestations of %s returned another image", ref)
 	default:
-		result, err = c.evaluator.Evaluate(ctx, discovery, policy)
+		result, err = c.evaluator.Evaluate(ctx, discovery, policy, image)
 		if err != nil {
 			return nil, fmt.Errorf("evaluating provenance policy for %s: %w", ref, err)
 		}

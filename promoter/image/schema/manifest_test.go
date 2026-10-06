@@ -369,23 +369,70 @@ func TestApplicableProvenancePolicies(t *testing.T) {
 	})
 	require.NoError(t, err)
 
+	// The image names are relative to the source registry of each policy.
+	inParent := func(img string) AppliedProvenancePolicy { return AppliedProvenancePolicy{Policy: parent, Image: img} }
+	inNested := AppliedProvenancePolicy{Policy: nested, Image: testPolicyImage}
+
 	for _, tc := range []struct {
 		registry image.Registry
 		name     image.Name
-		want     []*provenance.Policy
+		want     []AppliedProvenancePolicy
 	}{
-		{registry: testPolicySrc, name: testPolicyImage, want: []*provenance.Policy{parent}},
-		{registry: "gcr.io/a/", name: testPolicyImage, want: []*provenance.Policy{parent}},
-		{registry: "Gcr.io/a", name: testPolicyImage, want: []*provenance.Policy{parent}},
-		{registry: "gcr.io/a/nested", name: testPolicyImage, want: []*provenance.Policy{parent, nested}},
-		{registry: testPolicySrc, name: "nested/img", want: []*provenance.Policy{parent, nested}},
-		{registry: "gcr.io/a/open", name: testPolicyImage, want: []*provenance.Policy{parent}},
-		{registry: testPolicySrc, name: "nested-img", want: []*provenance.Policy{parent}},
+		{registry: testPolicySrc, name: testPolicyImage, want: []AppliedProvenancePolicy{inParent(testPolicyImage)}},
+		{registry: "gcr.io/a/", name: testPolicyImage, want: []AppliedProvenancePolicy{inParent(testPolicyImage)}},
+		{registry: "Gcr.io/a", name: testPolicyImage, want: []AppliedProvenancePolicy{inParent(testPolicyImage)}},
+		{registry: "gcr.io/a/nested", name: testPolicyImage, want: []AppliedProvenancePolicy{inParent("nested/img"), inNested}},
+		{registry: testPolicySrc, name: "nested/img", want: []AppliedProvenancePolicy{inParent("nested/img"), inNested}},
+		{registry: "gcr.io/a/open", name: testPolicyImage, want: []AppliedProvenancePolicy{inParent("open/img")}},
+		{registry: testPolicySrc, name: "nested-img", want: []AppliedProvenancePolicy{inParent("nested-img")}},
 		{registry: "gcr.io/ab", name: testPolicyImage},
-		{registry: "gcr.io", name: "a/img", want: []*provenance.Policy{parent}},
+		{registry: "gcr.io", name: "a/img", want: []AppliedProvenancePolicy{inParent(testPolicyImage)}},
 		{registry: "gcr.io/other", name: testPolicyImage},
 	} {
 		require.Equal(t, tc.want, ApplicableProvenancePolicies(policies, tc.registry, tc.name),
 			"%s %s", tc.registry, tc.name)
 	}
+}
+
+func TestUnmatchedLevelPatterns(t *testing.T) {
+	t.Parallel()
+
+	withLevels := func(mode provenance.PolicyMode) *provenance.Policy {
+		return &provenance.Policy{
+			Mode:   mode,
+			Levels: []provenance.ImageLevel{{Images: []string{testPolicyImage, "nested/*", "typo"}, Level: 3}},
+		}
+	}
+
+	manifest := func(src string, policy *provenance.Policy, images ...image.Name) Manifest {
+		mfest := Manifest{
+			Registries: []registry.Context{{Name: image.Registry(src), Src: true}},
+			Provenance: policy,
+			Filepath:   src + "/promoter-manifest.yaml",
+		}
+
+		for _, name := range images {
+			mfest.Images = append(mfest.Images, registry.Image{Name: name})
+		}
+
+		return mfest
+	}
+
+	// The images of a nested manifest count for the parent policy, those
+	// of a sibling registry don't.
+	require.Equal(t, map[string][]string{testPolicySrc + "/promoter-manifest.yaml": {"typo"}},
+		unmatchedLevelPatterns([]Manifest{
+			manifest(testPolicySrc, withLevels(provenance.PolicyModeWarn), testPolicyImage),
+			manifest("gcr.io/a/nested", nil, "chart"),
+			manifest("gcr.io/ab", nil, "typo"),
+		}))
+
+	require.Empty(t, unmatchedLevelPatterns([]Manifest{
+		manifest(testPolicySrc, withLevels(provenance.PolicyModeWarn), testPolicyImage, "nested/chart", "typo"),
+	}), "every pattern matches")
+
+	require.Empty(t, unmatchedLevelPatterns([]Manifest{
+		manifest(testPolicySrc, withLevels(provenance.PolicyModeOff)),
+		manifest("gcr.io/b", nil, testPolicyImage),
+	}), "a policy that is off requires nothing")
 }

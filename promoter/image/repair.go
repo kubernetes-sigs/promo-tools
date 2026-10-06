@@ -195,8 +195,8 @@ func evaluateRepairs(
 		outcome := &provenance.ImageProvenance{}
 		evaluated := true
 
-		for _, policy := range refPolicies[ref] {
-			result, err := checker.Check(ctx, ref, policy, discoveries[ref])
+		for _, applied := range refPolicies[ref] {
+			result, err := checker.Check(ctx, ref, applied.Policy, applied.Image, discoveries[ref])
 			if result == nil {
 				if err != nil {
 					logrus.Warnf("Not repairing the attestations of %s: %v", ref, err)
@@ -213,7 +213,7 @@ func evaluateRepairs(
 				logrus.Warnf("Promoted image %s: %v", ref, err)
 			}
 
-			outcome.Policies = append(outcome.Policies, policy)
+			outcome.Policies = append(outcome.Policies, applied.Policy)
 			outcome.Results = append(outcome.Results, result)
 		}
 

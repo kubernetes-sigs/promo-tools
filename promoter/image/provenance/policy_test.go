@@ -34,6 +34,11 @@ const (
 	testSigner  = "sigstore::https://accounts.google.com::sp-operator-sa@k8s-staging-images.iam.gserviceaccount.com"
 	testBuilder = "https://prow.k8s.io/job-history/gs/kubernetes-ci-logs/logs/post-security-profiles-operator-push-image"
 	testSource  = "github.com/kubernetes-sigs/security-profiles-operator"
+
+	// testLevelImage and testLevelPattern are an image name and a pattern
+	// of levels.
+	testLevelImage   = "spoc"
+	testLevelPattern = "charts/*"
 )
 
 // testPolicy returns a valid policy in the given mode.
@@ -431,4 +436,173 @@ func TestPolicyEqualOrder(t *testing.T) {
 	require.False(t, a.Equal(testPolicy(PolicyModeWarn)))
 	require.True(t, (*Policy)(nil).Equal(&Policy{Mode: PolicyModeOff}))
 	require.False(t, (*Policy)(nil).Equal(a))
+}
+
+func TestPolicyValidateLevels(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name    string
+		levels  []ImageLevel
+		wantErr string
+	}{
+		{
+			name:   "images at the levels of the builders",
+			levels: []ImageLevel{{Images: []string{testLevelImage, testLevelPattern}, Level: 3}, {Images: []string{"*-bundle"}, Level: 2}},
+		},
+		{
+			// Every satisfied image reaches level 1 anyway.
+			name:    "level 1 requires nothing",
+			levels:  []ImageLevel{{Images: []string{"*-bundle"}, Level: 1}},
+			wantErr: "levels of *-bundle must be between 2 and 3, got 1",
+		},
+		{
+			name:    "image pattern with a leading slash",
+			levels:  []ImageLevel{{Images: []string{"/spoc"}, Level: 3}},
+			wantErr: `image pattern "/spoc" in levels must not start or end with a /`,
+		},
+		{
+			name:    "image pattern with a trailing slash",
+			levels:  []ImageLevel{{Images: []string{"charts/"}, Level: 3}},
+			wantErr: `image pattern "charts/" in levels must not start or end with a /`,
+		},
+		{
+			name:    "entry without images",
+			levels:  []ImageLevel{{Level: 3}},
+			wantErr: "every entry of levels needs at least one image",
+		},
+		{
+			name:    "empty image pattern",
+			levels:  []ImageLevel{{Images: []string{" "}, Level: 3}},
+			wantErr: "image patterns of levels must not be empty",
+		},
+		{
+			name:    "invalid image pattern",
+			levels:  []ImageLevel{{Images: []string{"spoc["}, Level: 3}},
+			wantErr: `invalid image pattern "spoc[" in levels`,
+		},
+		{
+			name:    "level without a value",
+			levels:  []ImageLevel{{Images: []string{testLevelImage}}},
+			wantErr: "levels of spoc must be between 2 and 3, got 0",
+		},
+		{
+			name:    "level too high",
+			levels:  []ImageLevel{{Images: []string{testLevelImage}, Level: 4}},
+			wantErr: "levels of spoc must be between 2 and 3, got 4",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			policy := boundBuilderPolicy(0)
+			policy.Levels = tc.levels
+
+			err := policy.Validate()
+			if tc.wantErr == "" {
+				require.NoError(t, err)
+
+				return
+			}
+
+			require.ErrorContains(t, err, tc.wantErr)
+		})
+	}
+
+	// No signer can claim more than the level 1 builder.
+	policy := testPolicy(PolicyModeRequire)
+	policy.Builders[0].Level = 1
+	policy.Levels = []ImageLevel{{Images: []string{testLevelImage}, Level: 2}}
+	require.ErrorContains(t, policy.Validate(),
+		"level 2 of spoc is above 1, the highest level provenance can verify at with these builders")
+}
+
+func TestPolicyRequiredLevel(t *testing.T) {
+	t.Parallel()
+
+	var nilPolicy *Policy
+
+	require.Zero(t, nilPolicy.RequiredLevel(testLevelImage))
+
+	policy := boundBuilderPolicy(0)
+	require.Zero(t, policy.RequiredLevel(testLevelImage), "without levels nothing is required")
+
+	policy.Levels = []ImageLevel{
+		{Images: []string{testLevelImage, testLevelPattern}, Level: 3},
+		{Images: []string{"security-profiles-operator*"}, Level: 2},
+		// Overlapping entries: the highest level wins.
+		{Images: []string{"security-profiles-operator-amd64"}, Level: 3},
+	}
+
+	for image, want := range map[string]int{
+		testLevelImage:                      3,
+		"/spoc/":                            3,
+		"charts/security-profiles-operator": 3,
+		"charts/nested/chart":               0,
+		"security-profiles-operator":        2,
+		"security-profiles-operator-amd64":  3,
+		"security-profiles-operator-arm64":  2,
+		"spoc-amd64":                        0,
+		"":                                  0,
+	} {
+		require.Equal(t, want, policy.RequiredLevel(image), image)
+	}
+
+	// An image at the source registry itself has no name, which even *
+	// doesn't match.
+	policy.Levels = []ImageLevel{{Images: []string{"*"}, Level: 3}}
+	require.Zero(t, policy.RequiredLevel(""))
+	require.Zero(t, policy.RequiredLevel("/"))
+	require.Equal(t, 3, policy.RequiredLevel(testLevelImage))
+}
+
+func TestPolicyLevelsStringAndEqual(t *testing.T) {
+	t.Parallel()
+
+	const bundle = "bundle"
+
+	a := testPolicy(PolicyModeRequire)
+	a.Levels = []ImageLevel{{Images: []string{testLevelImage, testLevelPattern}, Level: 3}, {Images: []string{bundle}, Level: 2}}
+
+	require.Contains(t, a.String(), "levels=[charts/*, spoc (level 3); bundle (level 2)]")
+
+	b := testPolicy(PolicyModeRequire)
+	b.Levels = []ImageLevel{{Images: []string{bundle}, Level: 2}, {Images: []string{testLevelPattern, testLevelImage}, Level: 3}}
+
+	require.True(t, a.Equal(b), "the order of the levels and their images does not matter")
+	require.False(t, a.Equal(testPolicy(PolicyModeRequire)))
+
+	// The same requirements, grouped differently.
+	c := testPolicy(PolicyModeRequire)
+	c.Levels = []ImageLevel{
+		{Images: []string{testLevelImage}, Level: 3},
+		{Images: []string{testLevelPattern}, Level: 3},
+		{Images: []string{bundle, testLevelImage}, Level: 2},
+	}
+	require.True(t, a.Equal(c), "only the highest level per pattern counts")
+
+	b.Levels[0].Level = 3
+	require.False(t, a.Equal(b))
+}
+
+func TestPolicyUnmatchedLevelPatterns(t *testing.T) {
+	t.Parallel()
+
+	// An absolute image name never matches.
+	const absolute = "registry.k8s.io/spoc"
+
+	var nilPolicy *Policy
+
+	require.Empty(t, nilPolicy.UnmatchedLevelPatterns([]string{testLevelImage}))
+
+	policy := boundBuilderPolicy(0)
+	policy.Levels = []ImageLevel{
+		{Images: []string{testLevelImage, testLevelPattern}, Level: 3},
+		{Images: []string{absolute, testLevelImage}, Level: 2},
+	}
+
+	require.Equal(t, []string{absolute},
+		policy.UnmatchedLevelPatterns([]string{testLevelImage, "charts/security-profiles-operator"}))
+	require.Equal(t, []string{testLevelImage, testLevelPattern, absolute},
+		policy.UnmatchedLevelPatterns(nil))
 }

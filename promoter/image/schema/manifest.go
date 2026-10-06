@@ -293,6 +293,15 @@ func (m *Manifest) srcRegistryName() image.Registry {
 	return image.Registry("")
 }
 
+// AppliedProvenancePolicy is a provenance policy that applies to an image.
+type AppliedProvenancePolicy struct {
+	Policy *provenance.Policy
+
+	// Image is the name of the image relative to the source registry of
+	// the policy, which selects the level the policy requires for it.
+	Image string
+}
+
 // ApplicableProvenancePolicies returns the enabled provenance policies of
 // every manifest whose source registry contains the image repository,
 // ordered by source registry. Source registries can be nested, and every
@@ -301,15 +310,21 @@ func (m *Manifest) srcRegistryName() image.Registry {
 // of the other.
 func ApplicableProvenancePolicies(
 	policies map[image.Registry]*provenance.Policy, registry image.Registry, name image.Name,
-) []*provenance.Policy {
+) []AppliedProvenancePolicy {
 	repo := string(normalizeRegistry(registry)) + "/" + strings.Trim(string(name), "/")
 
-	var applicable []*provenance.Policy
+	var applicable []AppliedProvenancePolicy
 
 	for _, src := range slices.Sorted(maps.Keys(policies)) {
 		policy := policies[src]
-		if policy.Enabled() && (repo == string(src) || strings.HasPrefix(repo, string(src)+"/")) {
-			applicable = append(applicable, policy)
+		if !policy.Enabled() {
+			continue
+		}
+
+		if repo == string(src) {
+			applicable = append(applicable, AppliedProvenancePolicy{Policy: policy})
+		} else if rel, ok := strings.CutPrefix(repo, string(src)+"/"); ok {
+			applicable = append(applicable, AppliedProvenancePolicy{Policy: policy, Image: rel})
 		}
 	}
 
@@ -439,7 +454,60 @@ func ParseThinManifestsFromDir(
 		return nil, fmt.Errorf("no manifests found in dir: %s", dir)
 	}
 
+	warnUnmatchedLevels(mfests)
+
 	return mfests, nil
+}
+
+// warnUnmatchedLevels warns about the levels patterns of the provenance
+// policies that match no image, since such a pattern requires nothing.
+func warnUnmatchedLevels(mfests []Manifest) {
+	unmatched := unmatchedLevelPatterns(mfests)
+	for _, file := range slices.Sorted(maps.Keys(unmatched)) {
+		logrus.Warnf(
+			"Provenance policy of %s: the levels patterns %s match no image of its source registry",
+			file, strings.Join(unmatched[file], ", "),
+		)
+	}
+}
+
+// unmatchedLevelPatterns returns, per manifest file, the levels patterns of
+// its enabled provenance policy that match no image of the manifests whose
+// source registry is at or under the source registry of the policy. A
+// manifest parsed for a diff keeps all its images, only with fewer digests.
+func unmatchedLevelPatterns(mfests []Manifest) map[string][]string {
+	unmatched := make(map[string][]string)
+
+	for i := range mfests {
+		policy := mfests[i].Provenance
+		src := normalizeRegistry(mfests[i].srcRegistryName())
+
+		if !policy.Enabled() || len(policy.Levels) == 0 || src == "" {
+			continue
+		}
+
+		var images []string
+
+		for j := range mfests {
+			other := normalizeRegistry(mfests[j].srcRegistryName())
+			if other == "" {
+				continue
+			}
+
+			for _, img := range mfests[j].Images {
+				repo := string(other) + "/" + strings.Trim(string(img.Name), "/")
+				if rel, ok := strings.CutPrefix(repo, string(src)+"/"); ok {
+					images = append(images, rel)
+				}
+			}
+		}
+
+		if patterns := policy.UnmatchedLevelPatterns(images); len(patterns) > 0 {
+			unmatched[mfests[i].Filepath] = patterns
+		}
+	}
+
+	return unmatched
 }
 
 var digestRe = regexp.MustCompile(`"(sha256:[0-9a-f]{64})"`)
