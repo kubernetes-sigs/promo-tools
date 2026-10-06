@@ -233,6 +233,29 @@ func TestParseThinManifestYAMLProvenance(t *testing.T) {
 	require.Nil(t, m.Provenance)
 }
 
+// testCallerYAML adds caller constraints to the builder of testPolicyYAML.
+const testCallerYAML = "    caller:\n      workflows:\n      - .github/workflows/build.yml\n" +
+	"      refs:\n      - refs/tags/v*\n"
+
+// withCaller returns testPolicyYAML with the caller YAML on its builder.
+func withCaller(caller string) string {
+	return strings.Replace(testPolicyYAML, "    level: 3\n", "    level: 3\n"+caller, 1)
+}
+
+func TestParseThinManifestYAMLProvenanceCaller(t *testing.T) {
+	t.Parallel()
+
+	yaml := withCaller(testCallerYAML)
+	require.NotEqual(t, testPolicyYAML, yaml)
+
+	m, err := ParseThinManifestYAML([]byte(yaml))
+	require.NoError(t, err)
+	require.Equal(t, &provenance.Caller{
+		Workflows: []string{".github/workflows/build.yml"},
+		Refs:      []string{"refs/tags/v*"},
+	}, m.Provenance.Builders[0].Caller)
+}
+
 func TestParseThinManifestYAMLProvenanceInvalid(t *testing.T) {
 	t.Parallel()
 
@@ -255,6 +278,16 @@ func TestParseThinManifestYAMLProvenanceInvalid(t *testing.T) {
 			name:    "invalid signer",
 			yaml:    strings.Replace(testPolicyYAML, "sigstore::https", "unknown::https", 1),
 			wantErr: "invalid signer",
+		},
+		{
+			name:    "caller events",
+			yaml:    withCaller(testCallerYAML + "      events:\n      - release\n"),
+			wantErr: "caller events are not supported yet",
+		},
+		{
+			name:    "unknown caller field",
+			yaml:    withCaller(testCallerYAML + "      repositories: []\n"),
+			wantErr: "field repositories not found",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
