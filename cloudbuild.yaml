@@ -43,4 +43,3 @@ images:
 - 'gcr.io/$PROJECT_ID/kpromo:$_GIT_TAG'
 - 'gcr.io/$PROJECT_ID/kpromo:$_IMG_VERSION'
 - 'gcr.io/$PROJECT_ID/kpromo:latest'
-- 'gcr.io/$PROJECT_ID/kpromo:latest-canary'
