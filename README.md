@@ -13,6 +13,7 @@ in the Kubernetes project.
     - [Developer](#developer)
   - [Usage](#usage)
   - [Image promotion](#image-promotion)
+  - [Artifact promotion](#artifact-promotion)
   - [File promotion](#file-promotion)
   - [GitHub promotion](#github-promotion)
 
@@ -84,6 +85,11 @@ To create an image promotion PR via `kpromo pr`, see
 
 To get signed SLSA verification summaries for your promoted images, and to
 verify them, see [here](docs/verification-summaries.md).
+
+### Artifact promotion
+
+To promote files, like binaries, as OCI artifacts with signatures and
+verification summaries, see [here](docs/artifact-promotion.md).
 
 ### File promotion
 
