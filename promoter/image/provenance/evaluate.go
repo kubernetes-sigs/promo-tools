@@ -387,6 +387,12 @@ func (e *PolicyEvaluator) verifyProvenance(
 		}
 
 		if res.Pass() {
+			// The verifier doesn't look at who called a reusable workflow,
+			// so the caller constraints of its builder are checked here.
+			if err := checkCallers(statement, builders, policy.Sources); err != nil {
+				return 0, "", err
+			}
+
 			// The builder level is checked last, so that provenance that
 			// doesn't verify says why.
 			if ceiling < policy.Level {

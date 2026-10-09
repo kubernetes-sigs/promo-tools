@@ -62,6 +62,10 @@ type provenanceOptions struct {
 	builder      string
 	source       string
 	noInvocation bool
+
+	// workflow is the calling workflow GitHub records in the external
+	// parameters.
+	workflow *workflowRun
 }
 
 // provenanceStatement returns a SLSA v1 build provenance statement.
@@ -85,6 +89,11 @@ func provenanceStatement(t *testing.T, opts provenanceOptions) []byte {
 		metadata["invocationId"] = testInvocation
 	}
 
+	externalParameters := map[string]any{}
+	if opts.workflow != nil {
+		externalParameters["workflow"] = opts.workflow
+	}
+
 	data, err := json.Marshal(inTotoStatement{
 		Type:          inTotoStatementType,
 		PredicateType: slsaV1Type,
@@ -92,9 +101,9 @@ func provenanceStatement(t *testing.T, opts provenanceOptions) []byte {
 		Predicate: map[string]any{
 			"buildDefinition": map[string]any{
 				"buildType":          testBuildType,
-				"externalParameters": map[string]any{},
+				"externalParameters": externalParameters,
 				"resolvedDependencies": []map[string]any{
-					{"uri": opts.source, "digest": map[string]string{"gitCommit": strings.Repeat("a", 40)}},
+					{uriField: opts.source, digestField: map[string]string{"gitCommit": strings.Repeat("a", 40)}},
 				},
 			},
 			"runDetails": map[string]any{
@@ -653,7 +662,9 @@ func TestPolicyEvaluatorEvaluate(t *testing.T) {
 	evaluator, err := NewPolicyEvaluator()
 	require.NoError(t, err)
 
-	for _, tc := range slices.Concat(provenanceTestCases(), builderSignerTestCases(), predicateTypeTestCases()) {
+	for _, tc := range slices.Concat(
+		provenanceTestCases(), builderSignerTestCases(), callerTestCases(), predicateTypeTestCases(),
+	) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 

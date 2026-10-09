@@ -77,17 +77,26 @@ type Builder struct {
 	// the builder, for example the identity of an isolated provenance
 	// generator. Without them, the policy signers no builder names may.
 	Signers []string `yaml:"signers,omitempty"`
+
+	// Caller constrains the GitHub Actions run that produced the
+	// provenance, for a builder that is a reusable workflow any workflow
+	// could call.
+	Caller *Caller `yaml:"caller,omitempty"`
 }
 
 // String describes the builder for the logs.
 func (b *Builder) String() string {
-	if len(b.Signers) == 0 {
-		return fmt.Sprintf("%s (level %d)", b.ID, b.Level)
+	details := []string{fmt.Sprintf("level %d", b.Level)}
+
+	if len(b.Signers) > 0 {
+		details = append(details, "signers "+strings.Join(slices.Sorted(slices.Values(b.Signers)), ", "))
 	}
 
-	signers := slices.Sorted(slices.Values(b.Signers))
+	if caller := b.Caller.String(); caller != "" {
+		details = append(details, "caller "+caller)
+	}
 
-	return fmt.Sprintf("%s (level %d, signers %s)", b.ID, b.Level, strings.Join(signers, ", "))
+	return fmt.Sprintf("%s (%s)", b.ID, strings.Join(details, ", "))
 }
 
 // UnmarshalYAML rejects builders given as plain IDs, without a level.
@@ -462,6 +471,10 @@ func (p *Policy) validateBuilders() []error {
 					"provenance: signer %q of builder %q must be one of the policy signers", signer, builder.ID,
 				))
 			}
+		}
+
+		if err := builder.Caller.validate(); err != nil {
+			errs = append(errs, fmt.Errorf("provenance: builder %q: %w", builder.ID, err))
 		}
 
 		// A builder without signers that matches the ID of one with

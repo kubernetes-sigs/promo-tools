@@ -371,6 +371,56 @@ provenance:
   any of them, at no more than their lowest level. Every builder ID may be
   listed once, and a builder that names signers and one that doesn't must
   not match each other through an ID without `@`.
+
+  A builder that is a reusable GitHub Actions workflow can restrict the run
+  that called it with `caller`. Its signer identity is the workflow at the
+  ref its caller referenced it with, which any workflow can get by calling
+  it at that ref, also from a branch or a pull request, with subjects of its
+  choice. `caller` checks the calling workflow that Fulcio records in the
+  signing certificate (its Build Config URI) and that the provenance names,
+  in `buildDefinition.externalParameters.workflow` for SLSA v1 or in
+  `invocation.configSource` for SLSA v0.2 as the SLSA GitHub generator
+  writes it:
+
+  ```yaml
+  - id: https://github.com/kubernetes-sigs/security-profiles-operator/.github/workflows/provenance.yml
+    level: 3
+    signers: [...]
+    caller:
+      workflows:
+      - .github/workflows/build.yml
+      - .github/workflows/helm-chart-package.yaml
+      - .github/workflows/image-reproducible.yml
+      refs:
+      - refs/tags/v*
+  ```
+
+  - `refs` (required): patterns of the git ref the calling run ran for,
+    where `*` matches within one path segment.
+  - `workflows` (optional): the paths of the workflows in
+    `.github/workflows/` of the source repository that may call the
+    builder. Empty allows any workflow. A workflow path alone is no
+    constraint, since whoever can push a ref decides what the workflow
+    contains at that ref, so `caller` always needs `refs`.
+
+  Provenance of a builder with `caller` passes only when its certificate
+  names the calling workflow, the workflow is in one of the `sources`
+  (which the [SLSA verifier][slsa-verifier] also checks when the
+  certificate names its source repository), the provenance names the same
+  workflow at the same ref, and the workflow and ref are allowed. Provenance
+  that fails doesn't count, like provenance of an untrusted builder. When
+  several builders with `caller` match the builder ID of the provenance, for
+  example one with and one without a ref, the provenance has to satisfy all
+  of them.
+
+  Prefer tag refs, like `refs/tags/v*`, over branch refs: runs triggered by
+  `pull_request_target` or `workflow_run` run for the base or default
+  branch, possibly with code of a pull request, until the event of a run
+  can be checked too. Either way, a `refs` constraint is only as strong as
+  the protection of those tags or branches in the repository.
+  `caller.events`, to restrict the event that triggered the run, is
+  rejected for now: the signer library doesn't record that part of the
+  certificate yet.
 - `sources`: the repositories the images may be built from, without a ref.
 - `predicateTypes` (optional): predicate types that must also be attested
   for every image by one of the signers, for example an SPDX 3 SBOM

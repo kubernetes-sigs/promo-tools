@@ -292,6 +292,25 @@ func TestPolicyBuilderSigners(t *testing.T) {
 	require.Zero(t, (&Policy{Builders: policy.Builders}).highestLevel(), "no signers")
 }
 
+// cleanWorkflowErr is the error of a caller workflow that is not a clean
+// path in the workflows directory.
+const cleanWorkflowErr = "must be a clean path in .github/workflows/"
+
+func TestPolicyBuilderCaller(t *testing.T) {
+	t.Parallel()
+
+	policy := callerPolicy()
+	require.Contains(t, policy.String(), testGeneratorBuilder+" (level 3, signers "+testGeneratorSigner+
+		", caller workflows ["+testCallerWorkflow+"] refs [refs/tags/v*])")
+
+	other := callerPolicy()
+	other.Builders[1].Caller.Refs = []string{"refs/heads/*"}
+	require.False(t, policy.Equal(other), "the caller is part of the policy")
+
+	other.Builders[1].Caller = nil
+	require.False(t, policy.Equal(other), "a builder without a caller differs from one with")
+}
+
 func TestPolicyValidateBuilderSigners(t *testing.T) {
 	t.Parallel()
 
@@ -359,6 +378,92 @@ func TestPolicyValidateBuilderSigners(t *testing.T) {
 				{ID: testGeneratorBuilder, Level: 1},
 				{ID: testGeneratorBuilder + "2", Level: 3, Signers: []string{testGeneratorSigner}},
 			},
+		},
+		{
+			name: "builder with a caller",
+			builders: []Builder{
+				{ID: testSelfSignedBuilder, Level: 1},
+				{ID: testGeneratorBuilder, Level: 3, Signers: []string{testGeneratorSigner}, Caller: testCaller()},
+			},
+		},
+		{
+			name: "caller events need the build trigger of the certificate",
+			builders: []Builder{{
+				ID: testGeneratorBuilder, Level: 3, Signers: []string{testGeneratorSigner},
+				Caller: &Caller{Refs: []string{testReleaseRefs}, Events: []string{"release"}},
+			}},
+			wantErr: "caller events are not supported yet",
+		},
+		{
+			name: "caller without constraints",
+			builders: []Builder{{
+				ID: testGeneratorBuilder, Level: 3, Signers: []string{testGeneratorSigner}, Caller: &Caller{},
+			}},
+			wantErr: "caller needs refs",
+		},
+		{
+			name: "caller workflows without refs",
+			builders: []Builder{{
+				ID: testGeneratorBuilder, Level: 3, Signers: []string{testGeneratorSigner},
+				Caller: &Caller{Workflows: []string{testCallerWorkflow}},
+			}},
+			wantErr: "caller needs refs: workflows alone only name a file",
+		},
+		{
+			name: "caller workflow with a ref",
+			builders: []Builder{{
+				ID: testGeneratorBuilder, Level: 3, Signers: []string{testGeneratorSigner},
+				Caller: &Caller{Workflows: []string{testCallerWorkflow + "@refs/heads/main"}, Refs: []string{testReleaseRefs}},
+			}},
+			wantErr: cleanWorkflowErr,
+		},
+		{
+			name: "absolute caller workflow",
+			builders: []Builder{{
+				ID: testGeneratorBuilder, Level: 3, Signers: []string{testGeneratorSigner},
+				Caller: &Caller{Workflows: []string{"/" + testCallerWorkflow}, Refs: []string{testReleaseRefs}},
+			}},
+			wantErr: cleanWorkflowErr,
+		},
+		{
+			name: "caller workflow with a dot segment",
+			builders: []Builder{{
+				ID: testGeneratorBuilder, Level: 3, Signers: []string{testGeneratorSigner},
+				Caller: &Caller{Workflows: []string{"./" + testCallerWorkflow}, Refs: []string{testReleaseRefs}},
+			}},
+			wantErr: cleanWorkflowErr,
+		},
+		{
+			name: "caller workflow leaving the workflows directory",
+			builders: []Builder{{
+				ID: testGeneratorBuilder, Level: 3, Signers: []string{testGeneratorSigner},
+				Caller: &Caller{Workflows: []string{".github/workflows/../build.yml"}, Refs: []string{testReleaseRefs}},
+			}},
+			wantErr: cleanWorkflowErr,
+		},
+		{
+			name: "caller workflow outside the workflows directory",
+			builders: []Builder{{
+				ID: testGeneratorBuilder, Level: 3, Signers: []string{testGeneratorSigner},
+				Caller: &Caller{Workflows: []string{"ci/build.yml"}, Refs: []string{testReleaseRefs}},
+			}},
+			wantErr: cleanWorkflowErr,
+		},
+		{
+			name: "caller ref that isn't a full ref",
+			builders: []Builder{{
+				ID: testGeneratorBuilder, Level: 3, Signers: []string{testGeneratorSigner},
+				Caller: &Caller{Refs: []string{"v*"}},
+			}},
+			wantErr: "must be a pattern of a full git ref",
+		},
+		{
+			name: "malformed caller ref pattern",
+			builders: []Builder{{
+				ID: testGeneratorBuilder, Level: 3, Signers: []string{testGeneratorSigner},
+				Caller: &Caller{Refs: []string{"refs/tags/["}},
+			}},
+			wantErr: "must be a pattern of a full git ref",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
