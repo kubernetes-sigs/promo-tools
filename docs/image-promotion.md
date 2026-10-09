@@ -320,7 +320,7 @@ provenance:
   sources:
   - github.com/kubernetes-sigs/security-profiles-operator
   predicateTypes:
-  - https://spdx.dev/Document
+  - https://spdx.dev/Document/v3
 ```
 
 - `mode`: `off` (the default) keeps the verify-if-present check, `warn` logs
@@ -373,7 +373,8 @@ provenance:
   not match each other through an ID without `@`.
 - `sources`: the repositories the images may be built from, without a ref.
 - `predicateTypes` (optional): predicate types that must also be attested
-  for every image by one of the signers, for example an SBOM.
+  for every image by one of the signers, for example an SPDX 3 SBOM
+  (`https://spdx.dev/Document/v3`; `https://spdx.dev/Document` is SPDX 2).
 - `level` (optional): the SLSA build level the provenance must reach in the
   [SLSA verifier][slsa-verifier]'s controls, 2 or 3, and at most the
   highest level provenance can verify at with the builders of one signer.
