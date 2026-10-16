@@ -77,17 +77,27 @@ type Builder struct {
 	// the builder, for example the identity of an isolated provenance
 	// generator. Without them, the policy signers no builder names may.
 	Signers []string `yaml:"signers,omitempty"`
+
+	// Callers are the GitHub Actions runs that may produce the provenance,
+	// for a builder that is a reusable workflow any workflow could call.
+	// They are alternatives, of which the calling run has to match one.
+	// Empty allows any run.
+	Callers []Caller `yaml:"callers,omitempty"`
 }
 
 // String describes the builder for the logs.
 func (b *Builder) String() string {
-	if len(b.Signers) == 0 {
-		return fmt.Sprintf("%s (level %d)", b.ID, b.Level)
+	details := []string{fmt.Sprintf("level %d", b.Level)}
+
+	if len(b.Signers) > 0 {
+		details = append(details, "signers "+strings.Join(slices.Sorted(slices.Values(b.Signers)), ", "))
 	}
 
-	signers := slices.Sorted(slices.Values(b.Signers))
+	if len(b.Callers) > 0 {
+		details = append(details, "callers "+callersString(b.Callers))
+	}
 
-	return fmt.Sprintf("%s (level %d, signers %s)", b.ID, b.Level, strings.Join(signers, ", "))
+	return fmt.Sprintf("%s (%s)", b.ID, strings.Join(details, ", "))
 }
 
 // UnmarshalYAML rejects builders given as plain IDs, without a level.
@@ -462,6 +472,19 @@ func (p *Policy) validateBuilders() []error {
 					"provenance: signer %q of builder %q must be one of the policy signers", signer, builder.ID,
 				))
 			}
+		}
+
+		for _, err := range validateCallers(builder.Callers) {
+			errs = append(errs, fmt.Errorf("provenance: builder %q: %w", builder.ID, err))
+		}
+
+		// Only GitHub Actions certificates name a calling workflow, so
+		// callers of any other builder could never pass.
+		if len(builder.Callers) > 0 && !strings.HasPrefix(builder.ID, githubURL) {
+			errs = append(errs, fmt.Errorf(
+				"provenance: builder %q: callers need a builder on github.com, the only one whose certificates name a calling workflow",
+				builder.ID,
+			))
 		}
 
 		// A builder without signers that matches the ID of one with
