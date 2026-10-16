@@ -540,16 +540,23 @@ func signCheckSAN(opts *options.Options) (string, string) {
 	return opts.SignCheckIdentity, ""
 }
 
+// signCheckIssuer returns the expected certificate issuer and its regular
+// expression, of which only one is set like for the subject alternative
+// name.
+func signCheckIssuer(opts *options.Options) (string, string) {
+	if opts.SignCheckIssuerRegexp != "" {
+		return "", opts.SignCheckIssuerRegexp
+	}
+
+	return opts.SignCheckIssuer, ""
+}
+
 // signCheckIdentity returns the certificate identity signatures and
 // attestations must have. As in promotion, the regular expressions take
 // precedence over the exact values.
 func signCheckIdentity(opts *options.Options) (*verify.CertificateIdentity, error) {
 	san, sanRegexp := signCheckSAN(opts)
-
-	issuer, issuerRegexp := opts.SignCheckIssuer, ""
-	if opts.SignCheckIssuerRegexp != "" {
-		issuer, issuerRegexp = "", opts.SignCheckIssuerRegexp
-	}
+	issuer, issuerRegexp := signCheckIssuer(opts)
 
 	identity, err := verify.NewShortCertificateIdentity(issuer, issuerRegexp, san, sanRegexp)
 	if err != nil {

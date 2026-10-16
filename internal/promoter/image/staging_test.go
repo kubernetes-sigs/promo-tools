@@ -27,11 +27,9 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/google/go-containerregistry/pkg/crane"
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/policylabs/attestation"
 	"github.com/policylabs/collector/envelope/bundle"
-	sdkoptions "github.com/sigstore/cosign/v2/cmd/cosign/cli/options"
 	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
 	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 	"github.com/stretchr/testify/require"
@@ -165,9 +163,6 @@ func locatedBundle(digest, location string) provenance.Attestation {
 // references as signed, and fails to verify the invalid ones.
 func fakeStagingSigner(signed map[string]bool, invalid map[string]bool) *sign.Signer {
 	opts := sign.Default()
-	// release-sdk verifies images in parallel goroutines sharing an error
-	// variable, one worker keeps the race detector quiet.
-	opts.MaxWorkers = 1
 
 	impl := &signfakes.FakeImpl{}
 	impl.ImagesSignedStub = func(_ context.Context, _ *sign.Signer, refs ...string) (*sync.Map, error) {
@@ -178,21 +173,16 @@ func fakeStagingSigner(signed map[string]bool, invalid map[string]bool) *sign.Si
 
 		return res, nil
 	}
-	impl.VerifyImageInternalStub = func(
-		_ context.Context, _ sdkoptions.CertVerifyOptions, _ string, refs []string, _ bool,
-	) (*sign.SignedObject, error) {
-		if invalid[refs[0]] {
-			return nil, errors.New("no matching signatures")
+	impl.VerifyImageInternalStub = func(_ context.Context, _ *sign.Options, ref string) (string, error) {
+		if invalid[ref] {
+			return "", errors.New("no matching signatures")
 		}
 
-		return &sign.SignedObject{}, nil
-	}
-	impl.ParseReferenceStub = name.ParseReference
-	impl.DigestStub = func(ref string, _ ...crane.Option) (string, error) {
 		_, digest, _ := strings.Cut(ref, "@")
 
 		return digest, nil
 	}
+	impl.ParseReferenceStub = name.ParseReference
 
 	signer := sign.New(opts)
 	signer.SetImpl(impl)
