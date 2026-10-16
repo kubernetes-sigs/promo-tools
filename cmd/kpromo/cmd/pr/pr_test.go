@@ -260,3 +260,48 @@ func indexChecksumSkipped(t *testing.T, dir string) bool {
 
 	return bytes.Equal(data[len(data)-checksumSize:], make([]byte, checksumSize))
 }
+
+func TestResolveStagingRepo(t *testing.T) {
+	baseDir := t.TempDir()
+	manifestDir := filepath.Join(baseDir, "manifests", "k8s-staging-foo")
+	require.NoError(t, os.MkdirAll(manifestDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(manifestDir, "promoter-manifest.yaml"), []byte(`registries:
+- name: us-central1-docker.pkg.dev/k8s-staging-images/foo
+  src: true
+`), 0o600))
+
+	for _, tc := range []struct {
+		name        string
+		opts        promoteOptions
+		expected    string
+		expectedErr string
+	}{
+		{
+			name:     "from promoter manifest",
+			opts:     promoteOptions{project: "foo"},
+			expected: "us-central1-docker.pkg.dev/k8s-staging-images/foo",
+		},
+		{
+			name:     "explicit staging repo",
+			opts:     promoteOptions{project: "foo", stagingRepo: "gcr.io/k8s-staging-foo"},
+			expected: "gcr.io/k8s-staging-foo",
+		},
+		{
+			name:        "unknown project",
+			opts:        promoteOptions{project: "bar"},
+			expectedErr: "determining staging repo for project bar",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := resolveStagingRepo(&tc.opts, baseDir)
+			if tc.expectedErr != "" {
+				require.ErrorContains(t, err, tc.expectedErr)
+
+				return
+			}
+
+			require.NoError(t, err)
+			require.Equal(t, tc.expected, got)
+		})
+	}
+}
