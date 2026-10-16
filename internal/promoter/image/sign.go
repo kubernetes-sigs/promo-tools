@@ -30,9 +30,8 @@ import (
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/google/go-containerregistry/pkg/v1/remote/transport"
-	"github.com/sigstore/cosign/v3/pkg/cosign/env"
+	"github.com/sigstore/cosign/v3/pkg/cosign"
 	ociremote "github.com/sigstore/cosign/v3/pkg/oci/remote"
-	"github.com/sigstore/sigstore-go/pkg/tuf"
 	"github.com/sigstore/sigstore-go/pkg/verify"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -58,10 +57,6 @@ const (
 	signerIssuer = "https://accounts.google.com"
 
 	TestSigningAccount = "k8s-infra-promoter-test-signer@k8s-cip-test-prod.iam.gserviceaccount.com"
-
-	// trustedRootTarget is the TUF target holding the sigstore trusted root,
-	// the same one sigstore-go's root.NewLiveTrustedRoot fetches by default.
-	trustedRootTarget = "trusted_root.json"
 
 	// bundlePredicateTypeAnnotation is the referrer manifest annotation where
 	// cosign records the predicate type of an attached attestation bundle.
@@ -600,27 +595,17 @@ func craneCopyWithTimeout(ctx context.Context, src, dst string, opts []crane.Opt
 	return crane.Copy(src, dst, withCtx...)
 }
 
-// PrewarmTUFCache initializes the TUF cache so that threads do not have to compete
-// against each other creating the TUF database.
-func (di *DefaultPromoterImplementation) PrewarmTUFCache(ctx context.Context) error {
-	// Get the cache path to prewarm the cache at that location
-	opts := tuf.DefaultOptions().WithContext(ctx)
-	if cacheDir := env.Getenv(env.VariableTUFRootDir); cacheDir != "" {
-		opts.CachePath = cacheDir
-	}
-
-	// Sigstore go's client prewarms the cache, so just creating it should
-	// replace the custom logic we had here to account for weak tuf root
-	// handling in the very early cosign releases.
-	client, err := tuf.New(opts)
-	if err != nil {
-		return fmt.Errorf("initializing TUF client: %w", err)
-	}
-
-	// Pull the trusted root target as well. That is the file cosign reads from
-	// the cache to assemble the trusted material when verifying signatures.
-	if _, err := client.GetTarget(trustedRootTarget); err != nil {
+// PrewarmTUFCache fills the TUF cache with the trusted root and the signing
+// config, so that threads do not have to compete against each other creating
+// it. cosign selects the cache, mirror and root from TUF_ROOT, TUF_MIRROR,
+// TUF_ROOT_JSON and the remote.json of `cosign initialize` like release-sdk.
+func (di *DefaultPromoterImplementation) PrewarmTUFCache(context.Context) error {
+	if _, err := cosign.TrustedRoot(); err != nil {
 		return fmt.Errorf("fetching trusted root: %w", err)
+	}
+
+	if _, err := cosign.SigningConfig(); err != nil {
+		return fmt.Errorf("fetching signing config: %w", err)
 	}
 
 	return nil

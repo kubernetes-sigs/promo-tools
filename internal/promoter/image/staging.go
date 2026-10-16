@@ -179,9 +179,8 @@ func stagingSignatureResults(edges map[promotion.Edge]any) promotion.StagingSign
 }
 
 // verifySignatureTag verifies the legacy signature tag of one image with
-// release-sdk. Verifying one image per call reports every invalid signature,
-// and keeps release-sdk from verifying images in goroutines that share an
-// error variable.
+// release-sdk. Verifying one image per call reports every invalid
+// signature, while a call for several images stops at the first error.
 func (di *DefaultPromoterImplementation) verifySignatureTag(ref string) signatureTag {
 	res, err := di.signer.VerifyImages(ref)
 	if err != nil {

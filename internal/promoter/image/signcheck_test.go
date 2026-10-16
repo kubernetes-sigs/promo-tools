@@ -43,6 +43,7 @@ import (
 	ociremote "github.com/sigstore/cosign/v3/pkg/oci/remote"
 	"github.com/sigstore/sigstore-go/pkg/fulcio/certificate"
 	sgsign "github.com/sigstore/sigstore-go/pkg/sign"
+	"github.com/sigstore/sigstore-go/pkg/verify"
 	"github.com/sigstore/sigstore/pkg/cryptoutils"
 	"github.com/sigstore/sigstore/pkg/signature/payload"
 	"github.com/stretchr/testify/require"
@@ -58,6 +59,7 @@ const (
 	testSignerIdentity = "krel-trust@k8s-releng-prod.iam.gserviceaccount.com"
 	testOtherIdentity  = "someone@example.com"
 	testIssuer         = "https://accounts.google.com"
+	testGitHubIssuer   = "https://token.actions.githubusercontent.com"
 	testTagStable      = "stable"
 
 	testOtherIdentityRegexp = `^someone@example\.com$`
@@ -340,13 +342,13 @@ func TestSignCheckIdentity(t *testing.T) {
 		{
 			name: "other issuer",
 			modify: func(o *options.Options) {
-				o.SignCheckIssuer = "https://token.actions.githubusercontent.com"
+				o.SignCheckIssuer = testGitHubIssuer
 			},
 		},
 		{
 			name: "issuer regexp takes precedence",
 			modify: func(o *options.Options) {
-				o.SignCheckIssuer = "https://token.actions.githubusercontent.com"
+				o.SignCheckIssuer = testGitHubIssuer
 				o.SignCheckIssuerRegexp = `^https://accounts\.google\.com$`
 			},
 			signerMatch: true,
@@ -367,6 +369,67 @@ func TestSignCheckIdentity(t *testing.T) {
 
 	_, err = signCheckIdentity(&options.Options{SignCheckIssuer: testIssuer})
 	require.Error(t, err, "an identity is required")
+}
+
+func TestDefaultSignerOptions(t *testing.T) {
+	t.Parallel()
+
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+
+	signer := testCertificate(t, key.Public(), testSignerIdentity)
+	other := testCertificate(t, key.Public(), testOtherIdentity)
+
+	for _, tc := range []struct {
+		name        string
+		modify      func(*options.Options)
+		signerMatch bool
+		otherMatch  bool
+	}{
+		{
+			name:        "exact identity",
+			modify:      func(*options.Options) {},
+			signerMatch: true,
+		},
+		{
+			name: "identity regexp takes precedence",
+			modify: func(o *options.Options) {
+				o.SignCheckIdentityRegexp = testOtherIdentityRegexp
+			},
+			otherMatch: true,
+		},
+		{
+			name: "issuer regexp takes precedence",
+			modify: func(o *options.Options) {
+				o.SignCheckIssuer = testGitHubIssuer
+				o.SignCheckIssuerRegexp = `^https://accounts\.google\.com$`
+			},
+			signerMatch: true,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			opts := testSignCheckOptions()
+			tc.modify(opts)
+
+			signOpts := defaultSignerOptions(opts)
+			require.False(t, signOpts.CertIdentity != "" && signOpts.CertIdentityRegexp != "",
+				"only one of the identity and its regexp may be set")
+			require.False(t, signOpts.CertOidcIssuer != "" && signOpts.CertOidcIssuerRegexp != "",
+				"only one of the issuer and its regexp may be set")
+
+			// release-sdk verifies with this identity, which requires both
+			// the exact value and the regexp to match when both are set.
+			identity, err := verify.NewShortCertificateIdentity(
+				signOpts.CertOidcIssuer, signOpts.CertOidcIssuerRegexp,
+				signOpts.CertIdentity, signOpts.CertIdentityRegexp,
+			)
+			require.NoError(t, err)
+			require.Equal(t, tc.signerMatch, matchesIdentity(&identity, signer))
+			require.Equal(t, tc.otherMatch, matchesIdentity(&identity, other))
+		})
+	}
 }
 
 func TestSignerIdentity(t *testing.T) {
