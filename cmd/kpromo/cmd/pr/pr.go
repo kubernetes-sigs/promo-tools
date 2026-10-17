@@ -24,11 +24,13 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/release-sdk/git"
 	"sigs.k8s.io/release-sdk/github"
 	"sigs.k8s.io/release-utils/command"
@@ -46,6 +48,10 @@ const (
 	defaultProject        = consts.StagingRepoSuffix
 	defaultReviewers      = "@kubernetes/release-engineering"
 	githubHost            = "github.com"
+
+	// maxBodyImages is the maximum number of promoted images named in the
+	// PR body.
+	maxBodyImages = 3
 )
 
 // PRCmd is the kpromo subcommand to promote container images.
@@ -125,7 +131,8 @@ func init() {
 		&promoteOpts.stagingRepo,
 		"staging-repo",
 		"",
-		"the full staging repo URL, overrides the default gcr.io/k8s-staging-<project> format "+
+		"the full staging repo URL, overrides the source registry read from "+
+			"the project's promoter manifest in kubernetes/k8s.io "+
 			"(e.g. us-central1-docker.pkg.dev/k8s-staging-images/my-project)",
 	)
 
@@ -256,9 +263,9 @@ func runPromote(opts *promoteOptions) error {
 		}
 	}()
 
-	stagingRepo := consts.StagingRepoPrefix + opts.project
-	if opts.stagingRepo != "" {
-		stagingRepo = opts.stagingRepo
+	stagingRepo, err := resolveStagingRepo(opts, filepath.Join(repo.Dir(), consts.ProdRegistry))
+	if err != nil {
+		return err
 	}
 
 	opt := manifest.GrowOptions{}
@@ -288,24 +295,9 @@ func runPromote(opts *promoteOptions) error {
 	)
 
 	// Read the current manifest to check later if new images come up
-	oldlist := make([]byte, 0)
-
-	// Run the promoter manifest grower
-	if mustRun(opts, "Grow the manifests to add the new tags?") {
-		if helpers.Exists(filepath.Join(repo.Dir(), imagesListPath)) {
-			logrus.Debug("Reading the current image promoter manifest (image list)")
-
-			oldlist, err = os.ReadFile(filepath.Join(repo.Dir(), imagesListPath))
-			if err != nil {
-				return fmt.Errorf("while reading the current promoter image list: %w", err)
-			}
-		}
-
-		logrus.Infof("Growing manifests for images matching filter %s and matching tag %s", opts.images, opts.tags)
-
-		if err := manifest.Grow(ctx, &opt); err != nil {
-			return fmt.Errorf("growing manifest with image filter %s and tag %s: %w", opts.images, opts.tags, err)
-		}
+	oldlist, grown, err := growManifest(ctx, opts, &opt, filepath.Join(repo.Dir(), imagesListPath))
+	if err != nil {
+		return err
 	}
 
 	// Re-write the image list without the mock images
@@ -357,10 +349,13 @@ func runPromote(opts *promoteOptions) error {
 		return fmt.Errorf("adding image manifest to staging area: %w", err)
 	}
 
-	commitMessage := "Image promotion for " + opts.project + " " + strings.Join(opts.tags, " / ")
-	if opts.project == consts.StagingRepoSuffix {
-		commitMessage = "releng: " + commitMessage
+	// Without growing, oldlist is empty and every image would count as promoted.
+	var promoted []string
+	if grown {
+		promoted = promotedImages(oldlist, newImageList)
 	}
+
+	commitMessage := prTitle(opts, promoted)
 
 	// Commit files
 	logrus.Debug("Creating commit")
@@ -388,7 +383,7 @@ func runPromote(opts *promoteOptions) error {
 		pr, err := gh.CreatePullRequest(
 			git.DefaultGithubOrg, k8sioRepo, k8sioDefaultBranch,
 			fmt.Sprintf("%s:%s", userForkOrg, branchname),
-			commitMessage, generatePRBody(opts), false,
+			commitMessage, generatePRBody(opts, promoted), false,
 		)
 		if err != nil {
 			return fmt.Errorf("creating the pull request in k/k8s.io: %w", err)
@@ -402,6 +397,134 @@ func runPromote(opts *promoteOptions) error {
 
 	// Success!
 	return nil
+}
+
+// growManifest runs the promoter manifest grower unless the user declines it.
+// It returns the image list at imagesListPath from before growing, and whether
+// the manifest was grown.
+func growManifest(
+	ctx context.Context, opts *promoteOptions, opt *manifest.GrowOptions, imagesListPath string,
+) ([]byte, bool, error) {
+	oldlist := make([]byte, 0)
+
+	if !mustRun(opts, "Grow the manifests to add the new tags?") {
+		return oldlist, false, nil
+	}
+
+	if helpers.Exists(imagesListPath) {
+		logrus.Debug("Reading the current image promoter manifest (image list)")
+
+		var err error
+
+		oldlist, err = os.ReadFile(imagesListPath)
+		if err != nil {
+			return nil, false, fmt.Errorf("while reading the current promoter image list: %w", err)
+		}
+	}
+
+	logrus.Infof("Growing manifests for images matching filter %s and matching tag %s", opts.images, opts.tags)
+
+	if err := manifest.Grow(ctx, opt); err != nil {
+		return nil, false, fmt.Errorf("growing manifest with image filter %s and tag %s: %w", opts.images, opts.tags, err)
+	}
+
+	return oldlist, true, nil
+}
+
+// resolveStagingRepo returns the staging repo to promote images from.
+// It returns the --staging-repo value if set. Otherwise, it reads the source
+// registry from the project's promoter manifest in baseDir.
+func resolveStagingRepo(opts *promoteOptions, baseDir string) (string, error) {
+	if opts.stagingRepo != "" {
+		return opts.stagingRepo, nil
+	}
+
+	srcRegistry, err := manifest.FindStagingRepo(baseDir, opts.project)
+	if err != nil {
+		return "", fmt.Errorf(
+			"determining staging repo for project %s: %w",
+			opts.project, err,
+		)
+	}
+
+	logrus.Infof("Using staging repo %s from the promoter manifest of project %s", srcRegistry, opts.project)
+
+	return string(srcRegistry), nil
+}
+
+// promotedImages returns the sorted names of the images in newList that have
+// digests or tags not present in the oldList YAML.
+func promotedImages(oldList []byte, newList *image.ManifestList) []string {
+	old := &image.ManifestList{}
+	if err := old.Parse(oldList); err != nil {
+		logrus.Warnf("Parsing the previous promoter image list: %v", err)
+
+		return nil
+	}
+
+	oldDMaps := make(map[string]map[string][]string, len(*old))
+	for _, img := range *old {
+		oldDMaps[img.Name] = img.DMap
+	}
+
+	images := []string{}
+
+	for _, img := range *newList {
+		oldDMap := oldDMaps[img.Name]
+
+		for digest, tags := range img.DMap {
+			oldTags, found := oldDMap[digest]
+			if !found || slices.ContainsFunc(tags, func(tag string) bool {
+				return !slices.Contains(oldTags, tag)
+			}) {
+				images = append(images, img.Name)
+
+				break
+			}
+		}
+	}
+
+	slices.Sort(images)
+
+	return withoutArchVariants(images)
+}
+
+// archSuffixes are the suffixes of architecture specific image names, e.g.
+// foo-amd64 for the foo manifest list.
+var archSuffixes = []string{
+	"-386", "-amd64", "-arm", "-arm32v7", "-arm64", "-arm64v8", "-ppc64le", "-riscv64", "-s390x",
+}
+
+// withoutArchVariants drops the architecture specific images whose base image
+// is also in images, so a multi-arch image is named only once.
+func withoutArchVariants(images []string) []string {
+	promoted := sets.New(images...)
+
+	return slices.DeleteFunc(slices.Clone(images), func(img string) bool {
+		for _, suffix := range archSuffixes {
+			if base, found := strings.CutSuffix(img, suffix); found && promoted.Has(base) {
+				return true
+			}
+		}
+
+		return false
+	})
+}
+
+// prTitle returns the title of the promotion PR, also used as the commit
+// message. It names the promoted image if there is only one.
+func prTitle(opts *promoteOptions, images []string) string {
+	subject := opts.project
+	if len(images) == 1 {
+		subject += "/" + images[0]
+	}
+
+	title := "Image promotion for " + subject + " " + strings.Join(opts.tags, " / ")
+	if opts.project == consts.StagingRepoSuffix {
+		title = "releng: " + title
+	}
+
+	return title
 }
 
 // disableIndexSkipHash makes git write the index checksum in the repository
@@ -444,7 +567,7 @@ func mustRun(opts *promoteOptions, question string) bool {
 }
 
 // generatePRBody creates the body of the Image Promotion Pull Request.
-func generatePRBody(opts *promoteOptions) string {
+func generatePRBody(opts *promoteOptions, images []string) string {
 	args := "--fork " + opts.userFork
 	if opts.interactiveMode {
 		args += " --interactive"
@@ -483,7 +606,12 @@ func generatePRBody(opts *promoteOptions) string {
 
 	args += imageString.String()
 
-	prBody := fmt.Sprintf("Image promotion for %s %s\n", opts.project, strings.Join(opts.tags, " / "))
+	subject := opts.project
+	if len(images) > 0 && len(images) <= maxBodyImages {
+		subject += " (" + strings.Join(images, ", ") + ")"
+	}
+
+	prBody := fmt.Sprintf("Image promotion for %s %s\n", subject, strings.Join(opts.tags, " / "))
 
 	if opts.issue != "" {
 		prBody += "\nxref: " + opts.issue + "\n\n"

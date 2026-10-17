@@ -27,6 +27,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"sigs.k8s.io/promo-tools/v4/image/consts"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/registry"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/schema"
 	"sigs.k8s.io/promo-tools/v4/types/image"
@@ -211,6 +212,34 @@ func Find(o *GrowOptions) (schema.Manifest, error) {
 
 	return schema.Manifest{},
 		fmt.Errorf("could not find Manifest for %q", o.StagingRepo)
+}
+
+// FindStagingRepo returns the source registry declared in the thin promoter
+// manifest of the given project, located at
+// <baseDir>/manifests/k8s-staging-<project>/promoter-manifest.yaml.
+func FindStagingRepo(baseDir, project string) (image.Registry, error) {
+	manifestPath := filepath.Join(
+		baseDir, "manifests",
+		consts.StagingManifestDirPrefix+project,
+		consts.PromoterManifestFile,
+	)
+
+	b, err := os.ReadFile(manifestPath)
+	if err != nil {
+		return "", fmt.Errorf("reading promoter manifest of project %q: %w", project, err)
+	}
+
+	thinManifest, err := schema.ParseThinManifestYAML(b)
+	if err != nil {
+		return "", fmt.Errorf("parsing promoter manifest %s: %w", manifestPath, err)
+	}
+
+	srcRegistry, err := registry.GetSrcRegistry(thinManifest.Registries)
+	if err != nil {
+		return "", fmt.Errorf("getting source registry from %s: %w", manifestPath, err)
+	}
+
+	return srcRegistry.Name, nil
 }
 
 // ReadStagingRepo reads the StagingRepo, and applies whatever filters are

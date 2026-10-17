@@ -23,6 +23,13 @@ const (
 	// StagingRepoPrefix is the staging repository root URL prefix.
 	StagingRepoPrefix = "gcr.io/k8s-staging-"
 
+	// StagingManifestDirPrefix is the prefix of the per-project directory
+	// holding the thin promoter manifest, e.g. manifests/k8s-staging-foo.
+	StagingManifestDirPrefix = "k8s-staging-"
+
+	// PromoterManifestFile is the file name of a thin promoter manifest.
+	PromoterManifestFile = "promoter-manifest.yaml"
+
 	// StagingRepoSuffix is the suffix of the default image repository to promote images from
 	// i.e., gcr.io/<staging-prefix>-<staging-suffix>
 	// e.g., gcr.io/k8s-staging-foo.

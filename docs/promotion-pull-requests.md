@@ -55,7 +55,7 @@ Flags:
       --issue string          link to a GitHub issue to cross-reference in the PR body (e.g. https://github.com/kubernetes/k8s.io/issues/1234)
       --project string        the name of the project to promote images for (default "kubernetes")
       --reviewers string      the list of GitHub users or teams to assign to the PR (default "@kubernetes/release-engineering")
-      --staging-repo string   the full staging repo URL, overrides the default gcr.io/k8s-staging-<project> format
+      --staging-repo string   the full staging repo URL, overrides the source registry read from the project's promoter manifest in kubernetes/k8s.io
   -t, --tag strings           version tag of the images we will promote
 ```
 
@@ -65,7 +65,16 @@ Example:
 kpromo pr -i --fork=<your-github-username> --tag=v1.20.0-rc.0 --tag=v1.21.0-alpha.0
 ```
 
-For projects using Artifact Registry instead of GCR, use the `--staging-repo` flag:
+The staging repository is read from the `src` registry of the project's
+promoter manifest (`registry.k8s.io/manifests/k8s-staging-<project>/promoter-manifest.yaml`)
+in `kubernetes/k8s.io`, so both GCR and Artifact Registry projects work with
+just the `--project` flag:
+
+```shell
+kpromo pr -i --fork=<your-github-username> --project=my-project --tag=v1.0.0
+```
+
+To override the detected staging repository, use the `--staging-repo` flag:
 
 ```shell
 kpromo pr -i --fork=<your-github-username> --project=my-project --tag=v1.0.0 \
