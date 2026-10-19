@@ -125,7 +125,8 @@ func init() {
 		&promoteOpts.stagingRepo,
 		"staging-repo",
 		"",
-		"the full staging repo URL, overrides the default gcr.io/k8s-staging-<project> format "+
+		"the full staging repo URL, overrides the source registry read from "+
+			"the project's promoter manifest in kubernetes/k8s.io "+
 			"(e.g. us-central1-docker.pkg.dev/k8s-staging-images/my-project)",
 	)
 
@@ -256,9 +257,9 @@ func runPromote(opts *promoteOptions) error {
 		}
 	}()
 
-	stagingRepo := consts.StagingRepoPrefix + opts.project
-	if opts.stagingRepo != "" {
-		stagingRepo = opts.stagingRepo
+	stagingRepo, err := resolveStagingRepo(opts, filepath.Join(repo.Dir(), consts.ProdRegistry))
+	if err != nil {
+		return err
 	}
 
 	opt := manifest.GrowOptions{}
@@ -402,6 +403,27 @@ func runPromote(opts *promoteOptions) error {
 
 	// Success!
 	return nil
+}
+
+// resolveStagingRepo returns the staging repo to promote images from.
+// It returns the --staging-repo value if set. Otherwise, it reads the source
+// registry from the project's promoter manifest in baseDir.
+func resolveStagingRepo(opts *promoteOptions, baseDir string) (string, error) {
+	if opts.stagingRepo != "" {
+		return opts.stagingRepo, nil
+	}
+
+	srcRegistry, err := manifest.FindStagingRepo(baseDir, opts.project)
+	if err != nil {
+		return "", fmt.Errorf(
+			"determining staging repo for project %s: %w",
+			opts.project, err,
+		)
+	}
+
+	logrus.Infof("Using staging repo %s from the promoter manifest of project %s", srcRegistry, opts.project)
+
+	return string(srcRegistry), nil
 }
 
 // disableIndexSkipHash makes git write the index checksum in the repository

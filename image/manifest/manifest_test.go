@@ -144,6 +144,69 @@ func TestFind(t *testing.T) {
 	}
 }
 
+func TestFindStagingRepo(t *testing.T) {
+	const project = "foo"
+
+	for _, tc := range []struct {
+		name        string
+		manifest    string
+		expected    image.Registry
+		expectedErr string
+	}{
+		{
+			name: "artifact registry source",
+			manifest: `registries:
+- name: us-central1-docker.pkg.dev/k8s-staging-images/foo
+  src: true
+- name: us-docker.pkg.dev/k8s-artifacts-prod/images/foo
+`,
+			expected: "us-central1-docker.pkg.dev/k8s-staging-images/foo",
+		},
+		{
+			name: "gcr source",
+			manifest: `registries:
+- name: us-docker.pkg.dev/k8s-artifacts-prod/images/foo
+- name: gcr.io/k8s-staging-foo
+  src: true
+`,
+			expected: "gcr.io/k8s-staging-foo",
+		},
+		{
+			name: "no source registry",
+			manifest: `registries:
+- name: us-docker.pkg.dev/k8s-artifacts-prod/images/foo
+`,
+			expectedErr: "getting source registry",
+		},
+		{
+			name:        "missing manifest",
+			expectedErr: "reading promoter manifest of project \"foo\"",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			baseDir := t.TempDir()
+
+			if tc.manifest != "" {
+				dir := filepath.Join(baseDir, "manifests", "k8s-staging-"+project)
+				require.NoError(t, os.MkdirAll(dir, 0o755))
+				require.NoError(t, os.WriteFile(
+					filepath.Join(dir, "promoter-manifest.yaml"), []byte(tc.manifest), 0o600,
+				))
+			}
+
+			got, err := manifest.FindStagingRepo(baseDir, project)
+			if tc.expectedErr != "" {
+				require.ErrorContains(t, err, tc.expectedErr)
+
+				return
+			}
+
+			require.NoError(t, err)
+			require.Equal(t, tc.expected, got)
+		})
+	}
+}
+
 func TestApplyFilters(t *testing.T) {
 	tests := []struct {
 		// name is folder name
