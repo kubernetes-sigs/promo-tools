@@ -19,7 +19,7 @@ require (
 	github.com/policylabs/signer v0.6.4
 	github.com/sigstore/cosign/v3 v3.1.3
 	github.com/sigstore/protobuf-specs v0.5.2
-	github.com/sigstore/sigstore v1.11.0
+	github.com/sigstore/sigstore v1.11.1
 	github.com/sigstore/sigstore-go v1.3.0
 	github.com/sirupsen/logrus v1.10.2
 	github.com/slsa-framework/verifier v0.1.0
@@ -128,7 +128,7 @@ require (
 	github.com/cncf/xds/go v0.0.0-20260202195803-dba9d589def2 // indirect
 	github.com/cockroachdb/apd/v3 v3.2.1 // indirect
 	github.com/common-nighthawk/go-figure v0.0.0-20210622060536-734e95fb86be // indirect
-	github.com/coreos/go-oidc/v3 v3.20.0 // indirect
+	github.com/coreos/go-oidc/v3 v3.21.0 // indirect
 	github.com/cyberphone/json-canonicalization v0.0.0-20241213102144-19d51d7fe467 // indirect
 	github.com/cyphar/filepath-securejoin v0.6.1 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
