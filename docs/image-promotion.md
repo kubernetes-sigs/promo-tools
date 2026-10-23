@@ -371,6 +371,89 @@ provenance:
   any of them, at no more than their lowest level. Every builder ID may be
   listed once, and a builder that names signers and one that doesn't must
   not match each other through an ID without `@`.
+
+  A builder that is a reusable GitHub Actions workflow can restrict the runs
+  that may call it with `callers`. A reusable workflow signs as itself at
+  the ref its caller used, so any workflow that calls it at that ref, also
+  from a branch, a pull request or another repository, gets that identity
+  for subjects of its choice. `callers` checks the calling workflow that Fulcio
+  records in the signing certificate (its Build Config URI) and that the
+  provenance names, in `buildDefinition.externalParameters.workflow` for
+  SLSA v1 or in `invocation.configSource` for SLSA v0.2 as the SLSA GitHub
+  generator writes it. Its entries are alternatives: the calling run has to
+  match all fields of one of them. For example, releases of version tags
+  from three workflows, or pushes to the main branch from one of them:
+
+  ```yaml
+  - id: https://github.com/kubernetes-sigs/security-profiles-operator/.github/workflows/provenance.yml
+    level: 3
+    signers: [...]
+    callers:
+    - workflows:
+      - .github/workflows/build.yml
+      - .github/workflows/helm-chart-package.yaml
+      - .github/workflows/image-reproducible.yml
+      refs:
+      - refs/tags/v[0-9]*.[0-9]*.[0-9]*
+      events:
+      - release
+    - workflows:
+      - .github/workflows/build.yml
+      refs:
+      - refs/heads/main
+      events:
+      - push
+  ```
+
+  A push of a version tag, or a `workflow_dispatch` run of
+  `.github/workflows/build.yml` on the main branch, matches neither entry.
+  `callers` needs a builder ID on github.com, since only the calling
+  workflows of GitHub Actions are understood. Each entry has these fields:
+
+  - `refs` (required): patterns of the git ref the calling run ran for,
+    in [`path.Match`](https://pkg.go.dev/path#Match) syntax, where `*`
+    matches within one path segment. These are globs, not version
+    patterns: `refs/tags/v[0-9]*.[0-9]*.[0-9]*` also matches
+    `refs/tags/v1abc.2x.3-rc`, so the protection of the tags is what
+    keeps their names in shape.
+  - `workflows` (optional): the paths of the workflows directly in
+    `.github/workflows/` of the source repository that may call the
+    builder. Empty allows any workflow. A workflow path alone is no
+    constraint, since whoever can push a ref decides what the workflow
+    contains at that ref, so every entry needs `refs`.
+  - `events` (optional): the GitHub Actions events that may trigger the
+    calling run, like `push` or `release`, which Fulcio records as the
+    build trigger of the certificate. Empty allows any event.
+
+  Provenance of a builder with `callers` passes only when its certificate
+  names a calling workflow on github.com, the workflow is in the source
+  the [SLSA verifier][slsa-verifier] verified it for, the provenance names
+  the same workflow at the same ref, the certificate names the same source
+  repository and ref as the calling workflow, and the workflow, ref and
+  event match one of the entries. A certificate without a build trigger
+  matches no entry with `events`.
+  Provenance that fails doesn't count, like provenance of an untrusted
+  builder. When several builders with `callers` match the builder ID of the
+  provenance, for example `.../provenance.yml` and
+  `.../provenance.yml@refs/tags/v1.1.1`, the provenance has to match an
+  entry of each of them. A matching builder without `callers` doesn't lift
+  them.
+
+  A reusable workflow in the same repository that its caller calls with
+  `./`, like `uses: ./.github/workflows/provenance.yml`, runs at the ref of
+  its caller, so the `signers` of the builder already pin the refs of those
+  callers. With the signer above, which allows version tags only, the
+  second entry of the example never matches; it needs a signer like
+  `...provenance\.yml@refs/(tags/v[0-9.]+|heads/main)`. `refs` matters
+  when the reusable workflow is called by its full name at a ref, from a
+  branch or another repository, or for a third party generator pinned at
+  its own tag.
+
+  Prefer tag refs, like `refs/tags/v*`, over branch refs, or restrict
+  `events`: runs triggered by `pull_request_target` or `workflow_run` run
+  for the base or default branch, possibly with code of a pull request.
+  Either way, a `refs` constraint is only as strong as the protection of
+  those tags or branches in the repository.
 - `sources`: the repositories the images may be built from, without a ref.
 - `predicateTypes` (optional): predicate types that must also be attested
   for every image by one of the signers, for example an SPDX 3 SBOM
@@ -404,23 +487,25 @@ provenance:
   provenance: an image whose highest verified level is below its required
   level violates the policy, with the reasons any of its provenance was
   rejected for, and its provenance at lower levels still counts, so it is
-  carried all the same when the image satisfies the policy. For example, to require level 3 for the images an isolated
-  provenance generator attests, next to a self-signed build at level 1:
+  carried all the same when the image satisfies the policy. For example,
+  when an isolated provenance generator attests every image at level 3,
+  next to a self-signed build at level 1, require level 3 for all of them:
 
   ```yaml
   levels:
   - images:
-    - spoc
-    - charts/*
-    - security-profiles-operator
-    - security-profiles-operator-amd64
-    - security-profiles-operator-arm64
-    - security-profiles-operator-ppc64le
+    - "*"
+    - "*/*"
     level: 3
   ```
 
-  The per-arch images are listed one by one: `security-profiles-operator-*`
-  would also match the bundle and catalog images, which only reach level 1.
+  `*` matches the images at the top of the source registry and `*/*` the
+  ones one level below, like `charts/operator`. This also covers images
+  added later, which then fail the policy until the generator attests
+  them. Deeper names, like `charts/operator/bundle`, need `*/*/*` as well.
+  Images listed by name, like `charts/*` or `operator-amd64`, only hold
+  those to the level, and any other image passes with the level 1
+  provenance.
 
   An index without build provenance of its own passes through its
   platform manifests, so they are held to the level of the index image. An

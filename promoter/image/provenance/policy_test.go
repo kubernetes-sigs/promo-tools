@@ -17,6 +17,7 @@ limitations under the License.
 package provenance
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -292,6 +293,49 @@ func TestPolicyBuilderSigners(t *testing.T) {
 	require.Zero(t, (&Policy{Builders: policy.Builders}).highestLevel(), "no signers")
 }
 
+// cleanWorkflowErr is the error of a caller workflow that is not a YAML
+// file directly in the workflows directory.
+const cleanWorkflowErr = "must be a YAML file directly in .github/workflows/"
+
+func TestPolicyBuilderCallers(t *testing.T) {
+	t.Parallel()
+
+	policy := callerPolicy()
+	require.Contains(t, policy.String(), testGeneratorBuilder+" (level 3, signers "+testGeneratorSigner+
+		`, callers [workflows [".github/workflows/build.yml"] refs ["refs/tags/v*"]])`)
+
+	alternatives := alternativeCallersPolicy()
+	require.Contains(t, alternatives.String(), `callers [workflows [".github/workflows/build.yml", `+
+		`".github/workflows/other.yml"] refs ["refs/tags/v*"] events ["release"] or `+
+		`workflows [".github/workflows/build.yml"] refs ["refs/heads/main"] events ["push"]])`)
+
+	reversed := alternativeCallersPolicy()
+	slices.Reverse(reversed.Builders[1].Callers)
+	require.True(t, alternatives.Equal(reversed), "the order of the callers doesn't matter")
+
+	other := callerPolicy()
+	other.Builders[1].Callers[0].Refs = []string{"refs/heads/*"}
+	require.False(t, policy.Equal(other), "the callers are part of the policy")
+
+	other.Builders[1].Callers = nil
+	require.False(t, policy.Equal(other), "a builder without callers differs from one with")
+
+	require.False(t, policy.Equal(alternatives), "another caller is no alternative to none")
+
+	// A workflow that spells out the separators of the description
+	// doesn't make one caller equal to two.
+	forged := callerPolicy()
+	forged.Builders[1].Callers[0].Workflows = []string{
+		testCallerWorkflow + "] refs [" + testReleaseRefs + "] or workflows [" + otherWorkflow,
+	}
+
+	split := callerPolicy()
+	split.Builders[1].Callers = append(split.Builders[1].Callers, Caller{
+		Workflows: []string{otherWorkflow}, Refs: []string{testReleaseRefs},
+	})
+	require.False(t, forged.Equal(split), "the values of the callers are quoted")
+}
+
 func TestPolicyValidateBuilderSigners(t *testing.T) {
 	t.Parallel()
 
@@ -360,6 +404,72 @@ func TestPolicyValidateBuilderSigners(t *testing.T) {
 				{ID: testGeneratorBuilder + "2", Level: 3, Signers: []string{testGeneratorSigner}},
 			},
 		},
+		{
+			name: "builder with callers",
+			builders: []Builder{
+				{ID: testSelfSignedBuilder, Level: 1},
+				{ID: testGeneratorBuilder, Level: 3, Signers: []string{testGeneratorSigner}, Callers: testCallers()},
+			},
+		},
+		{
+			name:     "callers of a builder outside GitHub",
+			builders: []Builder{{ID: testSelfSignedBuilder, Level: 1, Callers: testCallers()}},
+			wantErr:  "callers need a builder on github.com",
+		},
+		{
+			name: "caller with events",
+			builders: []Builder{{
+				ID: testGeneratorBuilder, Level: 3, Signers: []string{testGeneratorSigner},
+				Callers: []Caller{{Refs: []string{testReleaseRefs}, Events: []string{releaseEvent, "workflow_dispatch"}}},
+			}},
+		},
+		{
+			name: "caller event that is no GitHub Actions event name",
+			builders: []Builder{{
+				ID: testGeneratorBuilder, Level: 3, Signers: []string{testGeneratorSigner},
+				Callers: []Caller{{Refs: []string{testReleaseRefs}, Events: []string{"Release Published"}}},
+			}},
+			wantErr: "must be a GitHub Actions event name",
+		},
+		{
+			name: "caller without constraints",
+			builders: []Builder{{
+				ID: testGeneratorBuilder, Level: 3, Signers: []string{testGeneratorSigner}, Callers: []Caller{{}},
+			}},
+			wantErr: "callers[0]: refs are required",
+		},
+		{
+			name: "caller workflows without refs",
+			builders: []Builder{{
+				ID: testGeneratorBuilder, Level: 3, Signers: []string{testGeneratorSigner},
+				Callers: []Caller{{Workflows: []string{testCallerWorkflow}}},
+			}},
+			wantErr: "callers[0]: refs are required: workflows alone only name a file",
+		},
+		{
+			name: "caller ref that isn't a full ref",
+			builders: []Builder{{
+				ID: testGeneratorBuilder, Level: 3, Signers: []string{testGeneratorSigner},
+				Callers: []Caller{{Refs: []string{"v*"}}},
+			}},
+			wantErr: "must be a pattern of a full git ref",
+		},
+		{
+			name: "invalid second caller",
+			builders: []Builder{{
+				ID: testGeneratorBuilder, Level: 3, Signers: []string{testGeneratorSigner},
+				Callers: []Caller{testCallers()[0], {Refs: []string{"v*"}}},
+			}},
+			wantErr: `callers[1]: ref "v*" must be a pattern of a full git ref`,
+		},
+		{
+			name: "malformed caller ref pattern",
+			builders: []Builder{{
+				ID: testGeneratorBuilder, Level: 3, Signers: []string{testGeneratorSigner},
+				Callers: []Caller{{Refs: []string{"refs/tags/["}}},
+			}},
+			wantErr: "must be a pattern of a full git ref",
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -377,6 +487,32 @@ func TestPolicyValidateBuilderSigners(t *testing.T) {
 			require.ErrorContains(t, err, tc.wantErr)
 		})
 	}
+}
+
+func TestPolicyValidateCallerWorkflows(t *testing.T) {
+	t.Parallel()
+
+	for _, workflow := range []string{
+		testCallerWorkflow + "@refs/heads/main",
+		"/" + testCallerWorkflow,
+		"./" + testCallerWorkflow,
+		".github/workflows/../build.yml",
+		".github/workflows/nested/build.yml",
+		".github/workflows/build.json",
+		"ci/build.yml",
+	} {
+		t.Run(workflow, func(t *testing.T) {
+			t.Parallel()
+
+			policy := callerPolicy()
+			policy.Builders[1].Callers[0].Workflows = []string{workflow}
+			require.ErrorContains(t, policy.Validate(), cleanWorkflowErr)
+		})
+	}
+
+	policy := callerPolicy()
+	policy.Builders[1].Callers[0].Workflows = []string{".github/workflows/helm-chart-package.yaml"}
+	require.NoError(t, policy.Validate())
 }
 
 func TestPolicyEnabled(t *testing.T) {
