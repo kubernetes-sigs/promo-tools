@@ -24,6 +24,7 @@ import (
 
 	intoto "github.com/in-toto/attestation/go/v1"
 	"github.com/policylabs/collector/envelope/bare"
+	slsavsa "github.com/slsa-framework/verifier/pkg/slsa/vsa"
 	"github.com/stretchr/testify/require"
 )
 
@@ -127,7 +128,7 @@ func TestVerificationSummaryWithoutPolicy(t *testing.T) {
 		pred.Policy.URI)
 	require.Equal(t, map[string]string{algorithmGitCommit: strings.Repeat("c", 40)}, pred.Policy.Digest)
 	require.Empty(t, pred.InputAttestations)
-	require.Equal(t, resultPassed, pred.VerificationResult)
+	require.Equal(t, slsavsa.ResultPassed, pred.VerificationResult)
 	require.Equal(t, []string{LevelBuildUnevaluated, LevelManifestReviewed}, pred.VerifiedLevels)
 	require.Equal(t, "1.0", pred.SLSAVersion)
 }
@@ -146,43 +147,43 @@ func TestVerificationSummaryLevels(t *testing.T) {
 		{
 			name:    "one policy",
 			results: []*PolicyResult{satisfied(3)},
-			result:  resultPassed,
+			result:  slsavsa.ResultPassed,
 			levels:  []string{levelBuild3, LevelManifestReviewed},
 		},
 		{
 			name:    "the lowest level of all policies",
 			results: []*PolicyResult{satisfied(3), satisfied(2)},
-			result:  resultPassed,
+			result:  slsavsa.ResultPassed,
 			levels:  []string{levelBuild2, LevelManifestReviewed},
 		},
 		{
 			name:    "a level that was not verified is never claimed",
 			results: []*PolicyResult{satisfied(0)},
-			result:  resultPassed,
+			result:  slsavsa.ResultPassed,
 			levels:  []string{LevelBuildUnevaluated, LevelManifestReviewed},
 		},
 		{
 			name:    "not even next to a verified level",
 			results: []*PolicyResult{satisfied(0), satisfied(3)},
-			result:  resultPassed,
+			result:  slsavsa.ResultPassed,
 			levels:  []string{LevelBuildUnevaluated, LevelManifestReviewed},
 		},
 		{
 			name:    "in any order",
 			results: []*PolicyResult{satisfied(3), satisfied(0)},
-			result:  resultPassed,
+			result:  slsavsa.ResultPassed,
 			levels:  []string{LevelBuildUnevaluated, LevelManifestReviewed},
 		},
 		{
 			name:    "a policy in warn mode that is not satisfied",
 			results: []*PolicyResult{satisfied(3), {Violations: []string{testViolation}}},
-			result:  resultFailed,
+			result:  slsavsa.ResultFailed,
 			levels:  []string{levelFailed},
 		},
 		{
 			name:    "a missing result is not satisfied",
 			results: []*PolicyResult{nil},
-			result:  resultFailed,
+			result:  slsavsa.ResultFailed,
 			levels:  []string{levelFailed},
 		},
 	} {
@@ -213,19 +214,19 @@ func TestVerificationSummarySources(t *testing.T) {
 		{
 			name:     "all sources satisfied",
 			outcomes: []*ImageProvenance{satisfied, satisfied},
-			result:   resultPassed,
+			result:   slsavsa.ResultPassed,
 			levels:   []string{levelBuild3, LevelManifestReviewed},
 		},
 		{
 			name:     "a source without a policy",
 			outcomes: []*ImageProvenance{satisfied, {}},
-			result:   resultPassed,
+			result:   slsavsa.ResultPassed,
 			levels:   []string{LevelBuildUnevaluated, LevelManifestReviewed},
 		},
 		{
 			name:     "a source not satisfied",
 			outcomes: []*ImageProvenance{{}, failed},
-			result:   resultFailed,
+			result:   slsavsa.ResultFailed,
 			levels:   []string{levelFailed},
 		},
 	} {
@@ -264,7 +265,7 @@ func TestChildSummaryInput(t *testing.T) {
 	stmt := summaryOf(t, ChildSummaryInput(child, []*SummaryInput{index}))
 	require.Equal(t, summaryName+"@"+child, stmt.Predicate.ResourceURI)
 	require.Equal(t, strings.Repeat("9", 64), stmt.Subject[0].Digest[algorithmSHA256])
-	require.Equal(t, resultPassed, stmt.Predicate.VerificationResult)
+	require.Equal(t, slsavsa.ResultPassed, stmt.Predicate.VerificationResult)
 	require.Equal(t, []string{LevelBuildUnevaluated, LevelManifestReviewed}, stmt.Predicate.VerifiedLevels)
 	require.Empty(t, stmt.Predicate.InputAttestations)
 	require.NotNil(t, stmt.Predicate.Policy)
@@ -276,7 +277,7 @@ func TestChildSummaryInput(t *testing.T) {
 	failed := summaryInput(&ImageProvenance{Results: []*PolicyResult{{Violations: []string{testViolation}}}}, nil)
 	failed.Policy.Name = "other/promoter-manifest.yaml"
 	stmt = summaryOf(t, ChildSummaryInput(child, []*SummaryInput{index, failed}))
-	require.Equal(t, resultFailed, stmt.Predicate.VerificationResult)
+	require.Equal(t, slsavsa.ResultFailed, stmt.Predicate.VerificationResult)
 	require.Equal(t, []string{levelFailed}, stmt.Predicate.VerifiedLevels)
 	require.Equal(t, summaryManifest().GetUri(), stmt.Predicate.Policy.URI)
 
@@ -309,7 +310,7 @@ func TestChildSummaryInputPlatformResults(t *testing.T) {
 
 	// The platform manifest claims the level of its own provenance.
 	stmt := summaryOf(t, ChildSummaryInput(child, []*SummaryInput{index(false, satisfied)}))
-	require.Equal(t, resultPassed, stmt.Predicate.VerificationResult)
+	require.Equal(t, slsavsa.ResultPassed, stmt.Predicate.VerificationResult)
 	require.Equal(t, []string{levelBuild2, LevelManifestReviewed}, stmt.Predicate.VerifiedLevels)
 	require.Len(t, stmt.Predicate.InputAttestations, 1)
 	require.Equal(t, summarySource+"@"+platformProvenance.Location, stmt.Predicate.InputAttestations[0].URI)
@@ -317,7 +318,7 @@ func TestChildSummaryInputPlatformResults(t *testing.T) {
 	// An index with provenance of its own passes its platform manifests
 	// without claiming a level for them.
 	stmt = summaryOf(t, ChildSummaryInput(child, []*SummaryInput{index(true, violated)}))
-	require.Equal(t, resultPassed, stmt.Predicate.VerificationResult)
+	require.Equal(t, slsavsa.ResultPassed, stmt.Predicate.VerificationResult)
 	require.Equal(t, []string{LevelBuildUnevaluated, LevelManifestReviewed}, stmt.Predicate.VerifiedLevels)
 	require.Empty(t, stmt.Predicate.InputAttestations)
 
@@ -328,7 +329,7 @@ func TestChildSummaryInputPlatformResults(t *testing.T) {
 
 	// Neither the index nor the platform manifest satisfy the policy.
 	stmt = summaryOf(t, ChildSummaryInput(child, []*SummaryInput{index(false, violated)}))
-	require.Equal(t, resultFailed, stmt.Predicate.VerificationResult)
+	require.Equal(t, slsavsa.ResultFailed, stmt.Predicate.VerificationResult)
 }
 
 func TestVerificationSummaryThroughPlatforms(t *testing.T) {
@@ -453,6 +454,80 @@ func TestVerificationSummaryInputAttestations(t *testing.T) {
 	// Without a discovery nothing was accepted.
 	stmt = summaryOf(t, summaryInput(outcome, nil))
 	require.Empty(t, stmt.Predicate.InputAttestations)
+
+	// Attestations with an incomplete digest can't be identified either,
+	// the summary is written without them.
+	// Layers without a value, without an algorithm and without a colon.
+	outcome.Results[1].Accepted = []*Attestation{
+		referrer, other,
+		{Source: SourceReferrer, Location: "sha256:" + strings.Repeat("6", 64), Layer: "sha256:"},
+		{Source: SourceReferrer, Location: "sha256:" + strings.Repeat("7", 64), Layer: ":" + strings.Repeat("c", 64)},
+		{Source: SourceReferrer, Location: "sha256:" + strings.Repeat("8", 64), Layer: strings.Repeat("c", 64)},
+	}
+
+	for _, digest := range []map[string]string{
+		{algorithmSHA256: ""},
+		{"": strings.Repeat("d", 64)},
+	} {
+		envs[0].GetPredicate().SetOrigin(&intoto.ResourceDescriptor{Digest: digest})
+
+		stmt = summaryOf(t, summaryInput(outcome, &Discovery{Reference: summarySource + "@" + testDigest}))
+		inputs = stmt.Predicate.InputAttestations
+		require.Len(t, inputs, 2, "only the referrers with complete digests")
+		require.Equal(t, summarySource+"@"+referrer.Location, inputs[0].URI)
+		require.Equal(t, summarySource+"@"+other.Location, inputs[1].URI)
+	}
+}
+
+// TestVerificationSummaryJSON pins the whole statement of one summary, so
+// that a change of the SLSA verifier, which builds it, shows up as a changed
+// field. protojson doesn't promise byte stable output, so it compares JSON.
+func TestVerificationSummaryJSON(t *testing.T) {
+	t.Parallel()
+
+	referrer := &Attestation{
+		Source:   SourceReferrer,
+		Location: "sha256:" + strings.Repeat("a", 64),
+		Layer:    "sha256:" + strings.Repeat("e", 64),
+	}
+	outcome := &ImageProvenance{
+		Policies: []*Policy{{}},
+		Results:  []*PolicyResult{{Satisfied: true, SLSALevel: 3, Accepted: []*Attestation{referrer}}},
+	}
+
+	data, err := VerificationSummary(summaryInput(outcome, &Discovery{Reference: summarySource + "@" + testDigest}))
+	require.NoError(t, err)
+	require.JSONEq(t, `{
+  "_type": "https://in-toto.io/Statement/v1",
+  "subject": [
+    {
+      "name": "registry.k8s.io/security-profiles-operator/security-profiles-operator",
+      "digest": {"sha256": "1111111111111111111111111111111111111111111111111111111111111111"}
+    }
+  ],
+  "predicateType": "https://slsa.dev/verification_summary/v1",
+  "predicate": {
+    "inputAttestations": [
+      {
+        "digest": {"sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"},
+        "uri": "us-central1-docker.pkg.dev/k8s-staging-images/sp-operator/security-profiles-operator@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    ],
+    "policy": {
+      "digest": {"gitCommit": "cccccccccccccccccccccccccccccccccccccccc"},
+      "uri": "git+https://github.com/kubernetes/k8s.io#registry.k8s.io/manifests/k8s-staging-sp-operator/promoter-manifest.yaml"
+    },
+    "resourceUri": "registry.k8s.io/security-profiles-operator/security-profiles-operator@sha256:1111111111111111111111111111111111111111111111111111111111111111",
+    "slsaVersion": "1.0",
+    "timeVerified": "2026-09-29T12:00:00Z",
+    "verificationResult": "PASSED",
+    "verifiedLevels": ["SLSA_BUILD_LEVEL_3", "K8S_PROMOTION_MANIFEST_REVIEWED"],
+    "verifier": {
+      "id": "https://k8s.io/promo-tools/verifier/v1",
+      "version": {"kpromo": "v4.7.0"}
+    }
+  }
+}`, string(data))
 }
 
 func TestVerificationSummaryErrors(t *testing.T) {
@@ -466,10 +541,24 @@ func TestVerificationSummaryErrors(t *testing.T) {
 	_, err = VerificationSummary(in)
 	require.ErrorContains(t, err, "no source image")
 
+	for _, digest := range []string{"latest", ":" + strings.Repeat("a", 64), "sha256:"} {
+		in = summaryInput(&ImageProvenance{}, nil)
+		in.Digest = digest
+		_, err = VerificationSummary(in)
+		require.ErrorContains(t, err, "invalid digest")
+	}
+
 	in = summaryInput(&ImageProvenance{}, nil)
-	in.Digest = "latest"
+	in.Time = time.Time{}
 	_, err = VerificationSummary(in)
-	require.ErrorContains(t, err, "invalid digest")
+	require.ErrorContains(t, err, "no verification time")
+
+	// Every digest of the promoter manifest has to be complete, which the
+	// SLSA verifier would reject the summary for otherwise.
+	in = summaryInput(&ImageProvenance{}, nil)
+	in.Policy.Digest[algorithmSHA256] = ""
+	_, err = VerificationSummary(in)
+	require.ErrorContains(t, err, "incomplete digest of the promoter manifest")
 
 	// A summary claims a reviewed promoter manifest.
 	for _, policy := range []*ResourceDescriptor{
