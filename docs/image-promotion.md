@@ -327,6 +327,31 @@ provenance:
   every violation and promotes anyway, and `require` blocks the promotion.
   Only `require` replaces the verify-if-present check, so trying a policy in
   `warn` mode never weakens the promotion.
+- `images` (optional): patterns of the images the policy applies to, for a
+  source registry whose images don't all come from the builders of the
+  policy. They have the syntax of the `images` of `levels`, relative to the
+  source registry of the policy, in
+  [`path.Match`](https://pkg.go.dev/path#Match) syntax, where `*` doesn't
+  match a `/`, so images of nested repositories count with their path:
+  `charts/*` covers `charts/operator`. By default the policy applies to
+  every image of the source registry, and it always applies to the image at
+  the source registry itself, which has no name. Any other image is
+  promoted as without a policy: it keeps the verify-if-present check, and
+  its summary has the level `SLSA_BUILD_LEVEL_UNEVALUATED`. The promoter
+  logs each image a policy leaves out, as a warning in `require` mode. For
+  example, the release images of Kubernetes come from krel, while `pause`,
+  in the same staging registry, is built separately:
+
+  ```yaml
+  images:
+  - kube-*
+  - kubectl*
+  - conformance*
+  ```
+
+  A pattern that matches no image of the source registry gets the same
+  warning as one of `levels`, and so does a `levels` pattern that matches
+  only images outside of `images`.
 - `signers`: the identities trusted to sign the staging attestations, as
   [signer identity specs][signer-principals], for example
   `sigstore::<issuer>::<identity>`, or
@@ -664,8 +689,9 @@ images the digest was promoted from, usually one:
   after their promotion. A failed summary has the verified level `FAILED`.
 - `verifiedLevels` of a passed summary are the lowest SLSA build level the
   policies verified (`SLSA_BUILD_LEVEL_<n>`), or
-  `SLSA_BUILD_LEVEL_UNEVALUATED` when a staging image had no policy or a
-  policy verified no level, plus `K8S_PROMOTION_MANIFEST_REVIEWED`.
+  `SLSA_BUILD_LEVEL_UNEVALUATED` when a staging image had no policy, or one
+  whose `images` don't include it, or a policy verified no level, plus
+  `K8S_PROMOTION_MANIFEST_REVIEWED`.
 - `inputAttestations` are the attestations the policies accepted: their
   location in the staging repository and the digest of their sigstore
   bundle, or, for legacy `.att` tags, of their payload. Carried attestations

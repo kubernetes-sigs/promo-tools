@@ -83,7 +83,8 @@ The summary records:
   in `warn` mode;
 - `verifiedLevels`: the SLSA build level the policy verified, from
   `SLSA_BUILD_LEVEL_1` to `SLSA_BUILD_LEVEL_3`, or
-  `SLSA_BUILD_LEVEL_UNEVALUATED` when no policy applies or it verified no level,
+  `SLSA_BUILD_LEVEL_UNEVALUATED` when no policy applies (also to an image outside
+  the `images` of the policy) or it verified no level,
   plus `K8S_PROMOTION_MANIFEST_REVIEWED`. A failed summary has only `FAILED`;
 - `policy`: the promoter manifest and the commit it was read at;
 - `inputAttestations`: the staging attestations the policy accepted, by

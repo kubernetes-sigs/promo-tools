@@ -632,6 +632,27 @@ func TestWriteVerificationSummariesEqualPolicy(t *testing.T) {
 	require.Equal(t, "git+https://github.com/kubernetes/k8s.io#promoter-manifest.yaml", st.statement(t).Predicate.Policy.URI)
 }
 
+func TestWriteVerificationSummariesEqualPolicyOtherImages(t *testing.T) {
+	t.Parallel()
+
+	st := newSummaryTest(t)
+
+	// The policy of its own manifest leaves the image out, so an equal
+	// policy that applies to it, for example of a parent source registry
+	// that names the image with its path, isn't the policy of its
+	// manifest, and the summary names the repository.
+	policy := &provenance.Policy{Mode: provenance.PolicyModeWarn, Images: []string{"another-image"}}
+	st.outcomes[st.edge.SrcReference()] = &provenance.ImageProvenance{
+		Policies: []*provenance.Policy{policy},
+		Results:  []*provenance.PolicyResult{{Satisfied: true, SLSALevel: 3}},
+	}
+
+	require.NoError(t, st.di.WriteVerificationSummaries(
+		context.Background(), st.opts, st.summaryManifests(t, policy), st.edges, nil, st.outcomes,
+	))
+	require.Equal(t, "git+https://github.com/kubernetes/k8s.io", st.statement(t).Predicate.Policy.URI)
+}
+
 func TestPolicyContextChildren(t *testing.T) {
 	t.Parallel()
 

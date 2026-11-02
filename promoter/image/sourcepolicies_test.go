@@ -28,6 +28,48 @@ import (
 	"sigs.k8s.io/promo-tools/v4/types/image"
 )
 
+// testStagingRegistry is the source registry of the manifests of the tests.
+const testStagingRegistry = "gcr.io/staging"
+
+func TestSourcePoliciesImages(t *testing.T) {
+	t.Parallel()
+
+	const digest = image.Digest("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+
+	edge := func(name string) promotion.Edge {
+		return promotion.Edge{
+			SrcRegistry: registry.Context{Name: testStagingRegistry, Src: true},
+			SrcImageTag: promotion.ImageTag{Name: image.Name(name), Tag: "v1"},
+			Digest:      digest,
+			DstRegistry: registry.Context{Name: "gcr.io/prod"},
+		}
+	}
+
+	policy := &provenance.Policy{
+		Mode:     provenance.PolicyModeRequire,
+		Images:   []string{"kube-*"},
+		Signers:  []string{"sigstore::https://accounts.google.com::a@example.com"},
+		Builders: []provenance.Builder{{ID: "https://builder.example.com", Level: 1}},
+		Sources:  []string{"github.com/example/a"},
+	}
+
+	mfests := []schema.Manifest{{
+		Registries: []registry.Context{{Name: testStagingRegistry, Src: true}},
+		Provenance: policy,
+		Filepath:   "a/promoter-manifest.yaml",
+	}}
+
+	kube, pause := edge("kube-apiserver"), edge("pause")
+
+	refPolicies, err := sourcePolicies(mfests, map[promotion.Edge]any{kube: nil, pause: nil})
+	require.NoError(t, err)
+
+	// An image the policy leaves out is checked as without a policy.
+	require.Equal(t, []schema.AppliedProvenancePolicy{{Policy: policy, Image: "kube-apiserver"}}, refPolicies[kube.SrcReference()])
+	require.Contains(t, refPolicies, pause.SrcReference())
+	require.Empty(t, refPolicies[pause.SrcReference()])
+}
+
 func TestSourcePoliciesLevels(t *testing.T) {
 	t.Parallel()
 
@@ -77,7 +119,7 @@ func TestSourcePoliciesLevels(t *testing.T) {
 
 			mfests := []schema.Manifest{
 				{
-					Registries: []registry.Context{{Name: "gcr.io/staging", Src: true}},
+					Registries: []registry.Context{{Name: testStagingRegistry, Src: true}},
 					Provenance: policy,
 					Filepath:   "a/promoter-manifest.yaml",
 				},

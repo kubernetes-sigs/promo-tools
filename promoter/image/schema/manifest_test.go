@@ -352,6 +352,16 @@ const (
 	testPolicyImage = "img"
 )
 
+// testNestedSrc is a source registry nested in testPolicySrc, testScopeImage
+// and testScopePattern an image and a pattern of the images of a policy, and
+// testTypoPattern a pattern that matches no image.
+const (
+	testNestedSrc    = "gcr.io/a/nested"
+	testScopeImage   = "kube-apiserver"
+	testScopePattern = "kube-*"
+	testTypoPattern  = "typo"
+)
+
 func TestProvenancePolicies(t *testing.T) {
 	t.Parallel()
 
@@ -416,7 +426,7 @@ func TestApplicableProvenancePolicies(t *testing.T) {
 
 	policies, err := ProvenancePolicies([]Manifest{
 		{Registries: []registry.Context{{Name: "GCR.io/a/", Src: true}}, Provenance: parent},
-		{Registries: []registry.Context{{Name: "gcr.io/a/nested", Src: true}}, Provenance: nested},
+		{Registries: []registry.Context{{Name: testNestedSrc, Src: true}}, Provenance: nested},
 		// A nested manifest without a policy does not switch the parent's
 		// policy off.
 		{Registries: []registry.Context{{Name: "gcr.io/a/open", Src: true}}},
@@ -435,7 +445,7 @@ func TestApplicableProvenancePolicies(t *testing.T) {
 		{registry: testPolicySrc, name: testPolicyImage, want: []AppliedProvenancePolicy{inParent(testPolicyImage)}},
 		{registry: "gcr.io/a/", name: testPolicyImage, want: []AppliedProvenancePolicy{inParent(testPolicyImage)}},
 		{registry: "Gcr.io/a", name: testPolicyImage, want: []AppliedProvenancePolicy{inParent(testPolicyImage)}},
-		{registry: "gcr.io/a/nested", name: testPolicyImage, want: []AppliedProvenancePolicy{inParent("nested/img"), inNested}},
+		{registry: testNestedSrc, name: testPolicyImage, want: []AppliedProvenancePolicy{inParent("nested/img"), inNested}},
 		{registry: testPolicySrc, name: "nested/img", want: []AppliedProvenancePolicy{inParent("nested/img"), inNested}},
 		{registry: "gcr.io/a/open", name: testPolicyImage, want: []AppliedProvenancePolicy{inParent("open/img")}},
 		{registry: testPolicySrc, name: "nested-img", want: []AppliedProvenancePolicy{inParent("nested-img")}},
@@ -448,13 +458,77 @@ func TestApplicableProvenancePolicies(t *testing.T) {
 	}
 }
 
-func TestUnmatchedLevelPatterns(t *testing.T) {
+func TestApplicableProvenancePoliciesImages(t *testing.T) {
+	t.Parallel()
+
+	// Like k8s-staging-kubernetes: the release images have a policy, pause
+	// is promoted as without one.
+	scoped := &provenance.Policy{Mode: provenance.PolicyModeWarn, Images: []string{testScopePattern, "conformance*"}}
+	nested := &provenance.Policy{Mode: provenance.PolicyModeRequire}
+
+	policies, err := ProvenancePolicies([]Manifest{
+		{Registries: []registry.Context{{Name: testPolicySrc, Src: true}}, Provenance: scoped},
+		{Registries: []registry.Context{{Name: testNestedSrc, Src: true}}, Provenance: nested},
+	})
+	require.NoError(t, err)
+
+	for _, tc := range []struct {
+		registry image.Registry
+		name     image.Name
+		want     []AppliedProvenancePolicy
+	}{
+		{registry: testPolicySrc, name: testScopeImage, want: []AppliedProvenancePolicy{{Policy: scoped, Image: testScopeImage}}},
+		{registry: testPolicySrc, name: "conformance-amd64", want: []AppliedProvenancePolicy{{Policy: scoped, Image: "conformance-amd64"}}},
+		{registry: testPolicySrc, name: "pause"},
+		// The images of a nested registry are named with their path, which
+		// the scope of the parent doesn't match, so only the nested policy
+		// applies.
+		{registry: testNestedSrc, name: testScopeImage, want: []AppliedProvenancePolicy{{Policy: nested, Image: testScopeImage}}},
+	} {
+		require.Equal(t, tc.want, ApplicableProvenancePolicies(policies, tc.registry, tc.name),
+			"%s %s", tc.registry, tc.name)
+	}
+
+	// The policy of the parent leaves pause out, the nested one has no
+	// images.
+	require.Equal(t, []image.Registry{testPolicySrc}, ExcludedProvenancePolicies(policies, testPolicySrc, "pause"))
+	require.Empty(t, ExcludedProvenancePolicies(policies, testPolicySrc, testScopeImage))
+	require.Empty(t, ExcludedProvenancePolicies(policies, "gcr.io/other", "pause"))
+
+	// The parent policy leaves out an image of the nested registry, which
+	// the nested policy covers, so the image isn't without a policy.
+	require.Equal(t, []image.Registry{testPolicySrc}, ExcludedProvenancePolicies(policies, testNestedSrc, testScopeImage))
+	require.Equal(t, []AppliedProvenancePolicy{{Policy: nested, Image: testScopeImage}},
+		ApplicableProvenancePolicies(policies, testNestedSrc, testScopeImage))
+
+	// The image at a nested source registry, which a parent manifest
+	// names with the path of the nested registry, stays in the scope of the
+	// nested policy, which names it as its own.
+	scopedNested := &provenance.Policy{Mode: provenance.PolicyModeRequire, Images: []string{testScopePattern}}
+	policies, err = ProvenancePolicies([]Manifest{
+		{Registries: []registry.Context{{Name: testNestedSrc, Src: true}}, Provenance: scopedNested},
+	})
+	require.NoError(t, err)
+	require.Equal(t, []AppliedProvenancePolicy{{Policy: scopedNested}},
+		ApplicableProvenancePolicies(policies, testPolicySrc, "nested"))
+	require.Empty(t, ExcludedProvenancePolicies(policies, testPolicySrc, "nested"))
+
+	// Manifests of the same source registry that differ only in the images
+	// conflict.
+	_, err = ProvenancePolicies([]Manifest{
+		{Registries: []registry.Context{{Name: testPolicySrc, Src: true}}, Provenance: scoped},
+		{Registries: []registry.Context{{Name: testPolicySrc, Src: true}}, Provenance: &provenance.Policy{Mode: provenance.PolicyModeWarn}},
+	})
+	require.ErrorContains(t, err, "declare different provenance policies")
+}
+
+func TestUnmatchedPatterns(t *testing.T) {
 	t.Parallel()
 
 	withLevels := func(mode provenance.PolicyMode) *provenance.Policy {
 		return &provenance.Policy{
 			Mode:   mode,
-			Levels: []provenance.ImageLevel{{Images: []string{testPolicyImage, "nested/*", "typo"}, Level: 3}},
+			Levels: []provenance.ImageLevel{{Images: []string{testPolicyImage, "nested/*", testTypoPattern}, Level: 3}},
 		}
 	}
 
@@ -474,19 +548,29 @@ func TestUnmatchedLevelPatterns(t *testing.T) {
 
 	// The images of a nested manifest count for the parent policy, those
 	// of a sibling registry don't.
-	require.Equal(t, map[string][]string{testPolicySrc + "/promoter-manifest.yaml": {"typo"}},
-		unmatchedLevelPatterns([]Manifest{
+	require.Equal(t, map[string][]string{testPolicySrc + "/promoter-manifest.yaml": {testTypoPattern}},
+		unmatchedPatterns([]Manifest{
 			manifest(testPolicySrc, withLevels(provenance.PolicyModeWarn), testPolicyImage),
-			manifest("gcr.io/a/nested", nil, "chart"),
-			manifest("gcr.io/ab", nil, "typo"),
+			manifest(testNestedSrc, nil, "chart"),
+			manifest("gcr.io/ab", nil, testTypoPattern),
 		}))
 
-	require.Empty(t, unmatchedLevelPatterns([]Manifest{
-		manifest(testPolicySrc, withLevels(provenance.PolicyModeWarn), testPolicyImage, "nested/chart", "typo"),
+	require.Empty(t, unmatchedPatterns([]Manifest{
+		manifest(testPolicySrc, withLevels(provenance.PolicyModeWarn), testPolicyImage, "nested/chart", testTypoPattern),
 	}), "every pattern matches")
 
-	require.Empty(t, unmatchedLevelPatterns([]Manifest{
+	require.Empty(t, unmatchedPatterns([]Manifest{
 		manifest(testPolicySrc, withLevels(provenance.PolicyModeOff)),
 		manifest("gcr.io/b", nil, testPolicyImage),
 	}), "a policy that is off requires nothing")
+
+	// The images patterns too, and a levels pattern has to match an image
+	// the policy applies to.
+	scoped := withLevels(provenance.PolicyModeWarn)
+	scoped.Images = []string{testPolicyImage, "nested/*", testScopePattern}
+
+	require.Equal(t, map[string][]string{testPolicySrc + "/promoter-manifest.yaml": {testScopePattern, testTypoPattern}},
+		unmatchedPatterns([]Manifest{
+			manifest(testPolicySrc, scoped, testPolicyImage, "nested/chart", testTypoPattern),
+		}))
 }
