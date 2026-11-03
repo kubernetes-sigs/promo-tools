@@ -425,8 +425,13 @@ func (pc *policyContext) summaryInput(
 			ownPolicy = false
 		}
 
+		// An equal policy of another manifest, which applies to the image
+		// although the one of its own manifest leaves it out, isn't the
+		// policy of its manifest.
+		applies := pc.policies[edgePath].AppliesTo(string(edge.SrcImageTag.Name))
+
 		for _, policy := range outcome.Policies {
-			if !policy.Equal(pc.policies[edgePath]) {
+			if !applies || !policy.Equal(pc.policies[edgePath]) {
 				ownPolicy = false
 			}
 		}

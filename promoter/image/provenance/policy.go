@@ -141,6 +141,14 @@ type Policy struct {
 	// Mode is off (the default), warn or require.
 	Mode PolicyMode `yaml:"mode,omitempty"`
 
+	// Images are patterns of the images the policy applies to, like the
+	// images of Levels. Empty applies it to every image of the source
+	// registry. Any other image is promoted as without a policy, for a
+	// source registry whose images don't all come from these builders. The
+	// image at the source registry itself has no name to match, so the
+	// policy always applies to it.
+	Images []string `yaml:"images,omitempty"`
+
 	// Signers are the identities trusted to sign the staging attestations,
 	// written as signer identity specs, for example
 	// "sigstore::https://accounts.google.com::builder@project.iam.gserviceaccount.com".
@@ -230,7 +238,15 @@ func (p *Policy) Validate() error {
 
 	errs = append(errs, p.validateLevels()...)
 
-	if !p.Enabled() && (len(p.Signers) > 0 || len(p.Builders) > 0 || len(p.Sources) > 0 ||
+	for i, pattern := range p.Images {
+		errs = append(errs, validatePattern(pattern, "images")...)
+
+		if slices.Contains(p.Images[:i], pattern) {
+			errs = append(errs, fmt.Errorf("provenance: image pattern %q is listed twice in images", pattern))
+		}
+	}
+
+	if !p.Enabled() && (len(p.Images) > 0 || len(p.Signers) > 0 || len(p.Builders) > 0 || len(p.Sources) > 0 ||
 		len(p.PredicateTypes) > 0 || p.Level > 0 || len(p.Levels) > 0) {
 		logrus.Warnf("provenance: the policy is %s, set a mode to check it", PolicyModeOff)
 	}
@@ -259,6 +275,7 @@ func (p *Policy) Equal(other *Policy) bool {
 	}
 
 	return p.Mode == other.Mode &&
+		sameElements(p.Images, other.Images) &&
 		sameElements(p.Signers, other.Signers) &&
 		sameElements(builderStrings(p.Builders), builderStrings(other.Builders)) &&
 		sameElements(p.Sources, other.Sources) &&
@@ -314,12 +331,17 @@ func (p *Policy) String() string {
 		return string(PolicyModeOff)
 	}
 
-	parts := []string{
-		"mode=" + string(p.Mode),
-		"signers=[" + strings.Join(p.Signers, ", ") + "]",
-		"builders=[" + strings.Join(builderStrings(p.Builders), ", ") + "]",
-		"sources=[" + strings.Join(p.Sources, ", ") + "]",
+	parts := []string{"mode=" + string(p.Mode)}
+
+	if len(p.Images) > 0 {
+		parts = append(parts, "images=["+strings.Join(p.Images, ", ")+"]")
 	}
+
+	parts = append(parts,
+		"signers=["+strings.Join(p.Signers, ", ")+"]",
+		"builders=["+strings.Join(builderStrings(p.Builders), ", ")+"]",
+		"sources=["+strings.Join(p.Sources, ", ")+"]",
+	)
 
 	if len(p.PredicateTypes) > 0 {
 		parts = append(parts, "predicateTypes=["+strings.Join(p.PredicateTypes, ", ")+"]")
@@ -334,6 +356,20 @@ func (p *Policy) String() string {
 	}
 
 	return strings.Join(parts, " ")
+}
+
+// AppliesTo reports whether the policy applies to the image, named relative
+// to the source registry of the policy: whether it is enabled and has no
+// images, one of them matches, or the image is the one at the source
+// registry itself, which a nested manifest names as its own.
+func (p *Policy) AppliesTo(image string) bool {
+	if !p.Enabled() {
+		return false
+	}
+
+	return len(p.Images) == 0 || strings.Trim(image, "/") == "" || slices.ContainsFunc(p.Images, func(pattern string) bool {
+		return matchesImage(pattern, image)
+	})
 }
 
 // RequiredLevel returns the SLSA build level the policy requires for the
@@ -358,23 +394,34 @@ func (p *Policy) RequiredLevel(image string) int {
 	return required
 }
 
-// UnmatchedLevelPatterns returns the patterns of the levels that match none
-// of the images, named relative to the source registry of the policy. Such
-// a pattern most likely has a typo, and requires nothing.
-func (p *Policy) UnmatchedLevelPatterns(images []string) []string {
+// UnmatchedPatterns returns the patterns of the images and the levels of
+// the policy that match none of the images, named relative to the source
+// registry of the policy. A levels pattern has to match an image the policy
+// applies to. Such a pattern most likely has a typo, and selects nothing.
+func (p *Policy) UnmatchedPatterns(images []string) []string {
 	if p == nil {
 		return nil
 	}
 
 	var unmatched []string
 
+	check := func(pattern string, images []string) {
+		if !slices.Contains(unmatched, pattern) && !slices.ContainsFunc(images, func(image string) bool {
+			return matchesImage(pattern, image)
+		}) {
+			unmatched = append(unmatched, pattern)
+		}
+	}
+
+	for _, pattern := range p.Images {
+		check(pattern, images)
+	}
+
+	applicable := slices.DeleteFunc(slices.Clone(images), func(image string) bool { return !p.AppliesTo(image) })
+
 	for i := range p.Levels {
 		for _, pattern := range p.Levels[i].Images {
-			if !slices.Contains(unmatched, pattern) && !slices.ContainsFunc(images, func(image string) bool {
-				return matchesImage(pattern, image)
-			}) {
-				unmatched = append(unmatched, pattern)
-			}
+			check(pattern, applicable)
 		}
 	}
 
@@ -407,23 +454,7 @@ func (p *Policy) validateLevels() []error {
 		}
 
 		for _, pattern := range level.Images {
-			if strings.TrimSpace(pattern) == "" {
-				errs = append(errs, errors.New("provenance: image patterns of levels must not be empty"))
-
-				continue
-			}
-
-			if _, err := path.Match(pattern, ""); err != nil {
-				errs = append(errs, fmt.Errorf("provenance: invalid image pattern %q in levels: %w", pattern, err))
-			}
-
-			// Image names are relative to the source registry, so a
-			// pattern with a leading or trailing / never matches.
-			if strings.HasPrefix(pattern, "/") || strings.HasSuffix(pattern, "/") {
-				errs = append(errs, fmt.Errorf(
-					"provenance: image pattern %q in levels must not start or end with a /", pattern,
-				))
-			}
+			errs = append(errs, validatePattern(pattern, "levels")...)
 		}
 
 		// Every satisfied image reaches level 1, so a lower entry would
@@ -445,6 +476,29 @@ func (p *Policy) validateLevels() []error {
 				level.Level, strings.Join(level.Images, ", "), p.Level,
 			)
 		}
+	}
+
+	return errs
+}
+
+// validatePattern checks an image pattern of the field of the policy.
+func validatePattern(pattern, field string) []error {
+	if strings.TrimSpace(pattern) == "" {
+		return []error{fmt.Errorf("provenance: image patterns of %s must not be empty", field)}
+	}
+
+	var errs []error
+
+	if _, err := path.Match(pattern, ""); err != nil {
+		errs = append(errs, fmt.Errorf("provenance: invalid image pattern %q in %s: %w", pattern, field, err))
+	}
+
+	// Image names are relative to the source registry, so a pattern with a
+	// leading or trailing / never matches.
+	if strings.HasPrefix(pattern, "/") || strings.HasSuffix(pattern, "/") {
+		errs = append(errs, fmt.Errorf(
+			"provenance: image pattern %q in %s must not start or end with a /", pattern, field,
+		))
 	}
 
 	return errs

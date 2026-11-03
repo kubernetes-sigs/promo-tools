@@ -38,6 +38,7 @@ import (
 	"sigs.k8s.io/promo-tools/v4/promoter/image/registry"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/schema"
 	"sigs.k8s.io/promo-tools/v4/promoter/image/vuln"
+	"sigs.k8s.io/promo-tools/v4/types/image"
 )
 
 var AllowedOutputFormats = []string{
@@ -496,11 +497,17 @@ func sourcePolicies(
 			continue
 		}
 
+		applicable := schema.ApplicableProvenancePolicies(policies, edge.SrcRegistry.Name, edge.SrcImageTag.Name)
+
 		if _, ok := refPolicies[ref]; !ok {
 			refPolicies[ref] = nil
+
+			if len(applicable) == 0 {
+				logExcludedPolicies(policies, &edge)
+			}
 		}
 
-		for _, applied := range schema.ApplicableProvenancePolicies(policies, edge.SrcRegistry.Name, edge.SrcImageTag.Name) {
+		for _, applied := range applicable {
 			if !slices.ContainsFunc(refPolicies[ref], func(other schema.AppliedProvenancePolicy) bool {
 				return other.Policy.Equal(applied.Policy) &&
 					other.Policy.RequiredLevel(other.Image) == applied.Policy.RequiredLevel(applied.Image)
@@ -511,6 +518,21 @@ func sourcePolicies(
 	}
 
 	return refPolicies, nil
+}
+
+// logExcludedPolicies logs the provenance policies whose images leave out
+// the source image of the edge, to which no policy applies, as a warning for
+// a policy in require mode, since a too narrow pattern exempts images
+// without failing anything.
+func logExcludedPolicies(policies map[image.Registry]*provenance.Policy, edge *promotion.Edge) {
+	for _, src := range schema.ExcludedProvenancePolicies(policies, edge.SrcRegistry.Name, edge.SrcImageTag.Name) {
+		logf := logrus.Infof
+		if policies[src].Mode == provenance.PolicyModeRequire {
+			logf = logrus.Warnf
+		}
+
+		logf("The images of the provenance policy of %s leave out %s, which no provenance policy applies to", src, edge.SrcReference())
+	}
 }
 
 // checkImageProvenance checks one source image against every policy that
