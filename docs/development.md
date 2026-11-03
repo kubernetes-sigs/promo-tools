@@ -40,8 +40,8 @@ in `internal/promoter/image/` and the `registry.Provider` interface in
 
 The `gcr.io/k8s-staging-artifact-promoter` GCR is a staging repo for Docker
 image build artifacts from this project. Every update to the default
-development branch of this Github repo results in the `kpromo` image being
-built in the staging GCR repo:
+development branch of this Github repo and every release tag results in the
+`kpromo` image being built in the staging GCR repo:
 
 1. `gcr.io/k8s-staging-artifact-promoter/kpromo`
 
@@ -78,20 +78,15 @@ Step 4 is done in the [test-infra Github repo][k/test-infra].
 
 ## Versioning
 
-We follow [SemVer](https://semver.org/) for versioning. For each new release,
-create a new release on GitHub with:
-
-- Update VERSION file to bump the semver version (e.g., `1.0.0`)
-- Create a new commit for the 1-liner change above with this command with
-  `git commit --signoff -m "v1.0.0: Release commit"`
-- Create a signed tag at this point with `git tag -s -m "v1.0.0" "v1.0.0"`
-- Push this version to the default development branch (requires write access)
+We follow [SemVer](https://semver.org/) for versioning. A release is a GitHub
+release with a `vX.Y.Z` tag, see [RELEASE.md](/RELEASE.md). The repository
+holds no version references to bump.
 
 ### Default versioning
 
 The Docker images that are produced by this repo are automatically tagged in the
-following format: `YYYYMMDD-<git-describe>`. As such, there is no need to bump
-the VERSION file often as the Docker images will always get a unique identifier.
+following format: `vYYYYMMDD-<git-describe>`. Builds of the default branch are
+also tagged `latest`, images built from a release tag `vX.Y.Z-0`.
 
 [cip-prow-integration]: https://git.k8s.io/k8s.io/k8s.gcr.io/Vanity-Domain-Flip.md#prow-integration
 [k/k8s.io]: https://git.k8s.io/k8s.io

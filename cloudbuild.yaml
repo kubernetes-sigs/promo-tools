@@ -15,7 +15,6 @@ steps:
   - GIT_TAG=$_GIT_TAG
   - PULL_BASE_REF=$_PULL_BASE_REF
   - CLOUDBUILD_REPO=$PROJECT_ID
-  - IMG_VERSION=$_IMG_VERSION
   args:
   - image-push
 
@@ -30,16 +29,15 @@ substitutions:
   # _GIT_TAG will be filled with a git-based tag for the image, of the form
   # vYYYYMMDD-hash, and can be used as a substitution
   _GIT_TAG: '12345'
+  # The branch or release tag the job runs for, passed by the image builder
+  # with --env-passthrough=PULL_BASE_REF. Release tags (vX.Y.Z) push the
+  # image tag vX.Y.Z-0 instead of latest, see hack/cip-image.sh.
   _PULL_BASE_REF: 'dev'
-  _IMG_VERSION: 'v4.8.1-0'
 
 tags:
 - 'kpromo'
 - ${_GIT_TAG}
 - ${_PULL_BASE_REF}
-- ${_IMG_VERSION}
 
 images:
 - 'gcr.io/$PROJECT_ID/kpromo:$_GIT_TAG'
-- 'gcr.io/$PROJECT_ID/kpromo:$_IMG_VERSION'
-- 'gcr.io/$PROJECT_ID/kpromo:latest'

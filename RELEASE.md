@@ -6,9 +6,9 @@ tooling.
 (If there are improvements you'd like to see, please comment on the
 [tracking issue](https://github.com/kubernetes-sigs/promo-tools/issues/539).)
 
-- [Workflow](#workflow)- [Tracking](#tracking)
+- [Tracking](#tracking)
 - [Tagging](#tagging)
-- [Release notes](#release-notes)
+  - [Creating the release](#creating-the-release)
 - [Image promotion](#image-promotion)
 - [Rollout](#rollout)
 - [Announce](#announce)
@@ -16,19 +16,11 @@ tooling.
 ## Tracking
 
 As the first task, a Release Manager should open a tracking issue for the
-release.
+release with the
+[cut release template](https://github.com/kubernetes-sigs/promo-tools/issues/new?template=cut-release.md).
 
-We don't currently have a template for releasing, but the following
-[issue](https://github.com/kubernetes-sigs/promo-tools/issues/523) is a good
-example to draw inspiration from.
-
-We're not striving for perfection with the template, but the tracking issue
-will serve as a reference point to aggregate feedback, so try your best to be
-as descriptive as possible.
-
-## Validation
-
-TODO: Talk about canaries
+The tracking issue will serve as a reference point to aggregate feedback, so
+try your best to be as descriptive as possible.
 
 ## Tagging
 
@@ -44,7 +36,7 @@ SemVer is described in detail [here](https://semver.org/).
 Example:
 
 ```console
-v4.3.0
+vX.Y.Z
 ```
 
 Image tags are derived from the git tag, with the addition of a revision.
@@ -52,43 +44,36 @@ Image tags are derived from the git tag, with the addition of a revision.
 Example:
 
 ```console
-v4.3.0-1
+vX.Y.Z-0
 ```
 
-This is a similar pattern to what you might expect from an OS package.
+The revision is always `0` for images built from a release tag. To fix an
+image issue that is not related to the code, such as a base image change,
+cut a new patch release.
 
-Including a revision number in the image tags means we have an opportunity to
-fix image issues that may be related to infrastructure components.
+### Creating the release
 
-One example is changing a base image that had unintended consequences.
-
-### Updating version references
-
-Versions are (at the time of writing) described in a few places:
-
-- [VERSION](/VERSION)
-- [cloudbuild.yaml](/cloudbuild.yaml)
-- [dependencies.yaml](/dependencies.yaml)
-- [workspace_status.sh](/workspace_status.sh)
-
-Update `dependencies.yaml` first.
-
-Then run the target for verifying dependencies:
+There are no version references to update in the repository. Tag the commit
+on `main` to release with a signed tag, push it and create the GitHub release
+for it, for example:
 
 ```console
-make verify-dependencies
+git tag -s -m vX.Y.Z vX.Y.Z <commit>
+git push https://github.com/kubernetes-sigs/promo-tools vX.Y.Z
+gh release create vX.Y.Z --repo kubernetes-sigs/promo-tools --verify-tag --generate-notes
 ```
 
-This will reveal the other places where dependencies need to be updated.
+Pushing the tag runs the `post-kpromo-push-image` job, which builds the image
+and pushes it to staging with the tags `vYYYYMMDD-<git describe>` and
+`vX.Y.Z-0`. Builds of `main` push `vYYYYMMDD-<git describe>` and `latest`, so
+`latest` stays on `main` when an older commit gets tagged.
 
-After references to the tag version have been updated, commit the content and
-open a pull request to merge these changes.
-
-Once the pull request has been merged,
-
-## Drafting release notes
-
-## Drafting a GitHub release
+To find the image build run of the tag, open the
+[recent runs of the job](https://prow.k8s.io/?job=post-kpromo-push-image) and
+pick the one whose ref is the tag (`vX.Y.Z`). Prow only lists the runs of the
+last few days, older runs are in the
+[job history](https://prow.k8s.io/job-history/gs/kubernetes-ci-logs/logs/post-kpromo-push-image).
+Link the run in the release tracking issue.
 
 ## Image promotion
 
@@ -110,15 +95,15 @@ make kpromo
 
 #### 2. Ensure the New Image Is Staged:
 ```
-# Use something like crane to search for v4.3.0
+# Use something like crane to search for vX.Y.Z
 
-gcrane ls gcr.io/k8s-staging-artifact-promoter/kpromo | grep v4.3.0
-v4.3.0-1
+gcrane ls gcr.io/k8s-staging-artifact-promoter/kpromo | grep vX.Y.Z
+vX.Y.Z-0
 
 # ... or skopeo
 
-skopeo list-tags docker://gcr.io/k8s-staging-artifact-promoter/kpromo | grep v4.3.0
-        "v4.3.0-1"
+skopeo list-tags docker://gcr.io/k8s-staging-artifact-promoter/kpromo | grep vX.Y.Z
+        "vX.Y.Z-0"
 ```
 #### 3. Create the Image Promotion PR
 
@@ -133,7 +118,7 @@ Now, run the following from the `promo-tools` repo, replacing
 actual tag you want to promote:
 
 ```
-./bin/kpromo pr --fork yourUsername --interactive --project artifact-promoter --tag v4.3.0-1
+./bin/kpromo pr --fork yourUsername --interactive --project artifact-promoter --tag vX.Y.Z-0
 ```
 
 `kpromo` will ask you some questions before proceeding and it will
