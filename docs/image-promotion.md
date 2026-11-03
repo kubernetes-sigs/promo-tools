@@ -328,19 +328,20 @@ provenance:
   Only `require` replaces the verify-if-present check, so trying a policy in
   `warn` mode never weakens the promotion.
 - `images` (optional): patterns of the images the policy applies to, for a
-  source registry whose images don't all come from the builders of the
-  policy. They have the syntax of the `images` of `levels`, relative to the
-  source registry of the policy, in
-  [`path.Match`](https://pkg.go.dev/path#Match) syntax, where `*` doesn't
-  match a `/`, so images of nested repositories count with their path:
-  `charts/*` covers `charts/operator`. By default the policy applies to
-  every image of the source registry, and it always applies to the image at
-  the source registry itself, which has no name. Any other image is
-  promoted as without a policy: it keeps the verify-if-present check, and
-  its summary has the level `SLSA_BUILD_LEVEL_UNEVALUATED`. The promoter
-  logs each image a policy leaves out, as a warning in `require` mode. For
-  example, the release images of Kubernetes come from krel, while `pause`,
-  in the same staging registry, is built separately:
+  source registry whose images don't all come from the builders of the policy.
+  They have the syntax of the `images` of `levels`, relative to the source
+  registry of the policy, in [`path.Match`](https://pkg.go.dev/path#Match)
+  syntax, where `*` doesn't match a `/`, so images of nested repositories
+  count with their path: `charts/*` covers `charts/operator`. Without
+  `images`, and with an empty list (`images: []`), which can't be told apart
+  from a missing field, the policy applies to every image of the source
+  registry. It always applies to the image at the source registry itself,
+  which has no name. Any other image is promoted as without a policy: it keeps
+  the verify-if-present check, and its summary has the level
+  `SLSA_BUILD_LEVEL_UNEVALUATED`. The promoter logs each image a policy leaves
+  out, as a warning in `require` mode. For example, the release images of
+  Kubernetes come from krel, while `pause`, in the same staging registry, is
+  built separately:
 
   ```yaml
   images:
@@ -350,8 +351,8 @@ provenance:
   ```
 
   A pattern that matches no image of the source registry gets the same
-  warning as one of `levels`, and so does a `levels` pattern that matches
-  only images outside of `images`.
+  warning as one of `levels`, and a `levels` pattern that matches only images
+  outside of `images` gets a warning of its own.
 - `signers`: the identities trusted to sign the staging attestations, as
   [signer identity specs][signer-principals], for example
   `sigstore::<issuer>::<identity>`, or
