@@ -67,16 +67,21 @@ pushImages() {
     done
 }
 
-# Builds the kpromo container image from repo_root.
+# Builds the kpromo container image from repo_root. Takes the release
+# version (empty for other builds) followed by the image tags.
 buildImage() {
+    local version=$1
+    shift
     local cmd="docker build "
     # Concatenate tags.
     local tags="${*}"
     for tag in $tags; do
         cmd+="-t $tag "
     done
-    # The release version, without the image build suffix of IMG_VERSION.
-    cmd+="--build-arg GIT_VERSION=${IMG_VERSION%-*} "
+    # Other builds leave the version to git describe in the Dockerfile.
+    if [[ -n "$version" ]]; then
+        cmd+="--build-arg GIT_VERSION=${version} "
+    fi
     # Specify Dockerfile location.
     cmd+="$repo_root"
     # Build the container.
@@ -84,10 +89,13 @@ buildImage() {
     $cmd
 }
 
-# Either builds or pushes the image with provided tags.
+# Either builds or pushes the image. Takes the release version (empty for
+# other builds) followed by the image tags.
 handleVariant() {
+    local version=$1
+    shift
     if [[ "$operation" == "build" ]]; then
-        buildImage "${*}"
+        buildImage "$version" "${*}"
     else
         pushImages "${*}"
     fi
@@ -105,11 +113,20 @@ main() {
 
     # Assemble image tag prefix.
     local tag_prefix=${IMG_REGISTRY}/${IMG_REPOSITORY}/${IMG_NAME}
+    local tags=("${tag_prefix}:${IMG_TAG}")
 
-    handleVariant \
-        "${tag_prefix}:latest" \
-        "${tag_prefix}:${IMG_TAG}" \
-        "${tag_prefix}:${IMG_VERSION}"
+    # Release tag pushes (vX.Y.Z) run the image job with the tag as
+    # PULL_BASE_REF and add the release image tag vX.Y.Z-0. They leave latest
+    # to the builds of main, since the tag may point to an older commit.
+    local version=""
+    if [[ "${PULL_BASE_REF:-}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        version=${PULL_BASE_REF}
+        tags+=("${tag_prefix}:${version}-0")
+    else
+        tags+=("${tag_prefix}:latest")
+    fi
+
+    handleVariant "$version" "${tags[@]}"
 
     >&2 echo "$0" finished.
 }

@@ -19,7 +19,7 @@ REPO_ROOT:=$(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
 
 all: test
 
-# Image builds pass the release version, see hack/cip-image.sh.
+# Release image builds pass the version, see hack/cip-image.sh.
 GIT_VERSION ?= $(shell git describe --tags --always --dirty)
 GIT_HASH ?= $(shell git rev-parse HEAD)
 DATE_FMT = +%Y-%m-%dT%H:%M:%SZ
