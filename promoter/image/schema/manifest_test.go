@@ -548,7 +548,9 @@ func TestUnmatchedPatterns(t *testing.T) {
 
 	// The images of a nested manifest count for the parent policy, those
 	// of a sibling registry don't.
-	require.Equal(t, map[string][]string{testPolicySrc + "/promoter-manifest.yaml": {testTypoPattern}},
+	require.Equal(t, map[string]provenance.UnmatchedPatterns{
+		testPolicySrc + "/promoter-manifest.yaml": {Levels: []string{testTypoPattern}},
+	},
 		unmatchedPatterns([]Manifest{
 			manifest(testPolicySrc, withLevels(provenance.PolicyModeWarn), testPolicyImage),
 			manifest(testNestedSrc, nil, "chart"),
@@ -564,12 +566,14 @@ func TestUnmatchedPatterns(t *testing.T) {
 		manifest("gcr.io/b", nil, testPolicyImage),
 	}), "a policy that is off requires nothing")
 
-	// The images patterns too, and a levels pattern has to match an image
-	// the policy applies to.
+	// The images patterns too, and a levels pattern that matches only
+	// images the policy doesn't apply to is reported on its own.
 	scoped := withLevels(provenance.PolicyModeWarn)
 	scoped.Images = []string{testPolicyImage, "nested/*", testScopePattern}
 
-	require.Equal(t, map[string][]string{testPolicySrc + "/promoter-manifest.yaml": {testScopePattern, testTypoPattern}},
+	require.Equal(t, map[string]provenance.UnmatchedPatterns{
+		testPolicySrc + "/promoter-manifest.yaml": {Images: []string{testScopePattern}, Excluded: []string{testTypoPattern}},
+	},
 		unmatchedPatterns([]Manifest{
 			manifest(testPolicySrc, scoped, testPolicyImage, "nested/chart", testTypoPattern),
 		}))

@@ -394,34 +394,64 @@ func (p *Policy) RequiredLevel(image string) int {
 	return required
 }
 
+// UnmatchedPatterns are the patterns of a policy that select nothing, which
+// most likely means a typo.
+type UnmatchedPatterns struct {
+	// Images are the images patterns that match no image.
+	Images []string
+
+	// Levels are the levels patterns that match no image.
+	Levels []string
+
+	// Excluded are the levels patterns that match only images the images
+	// patterns leave out.
+	Excluded []string
+}
+
+// Empty reports whether every pattern matches.
+func (u UnmatchedPatterns) Empty() bool {
+	return len(u.Images) == 0 && len(u.Levels) == 0 && len(u.Excluded) == 0
+}
+
 // UnmatchedPatterns returns the patterns of the images and the levels of
-// the policy that match none of the images, named relative to the source
+// the policy that select none of the images, named relative to the source
 // registry of the policy. A levels pattern has to match an image the policy
-// applies to. Such a pattern most likely has a typo, and selects nothing.
-func (p *Policy) UnmatchedPatterns(images []string) []string {
+// applies to.
+func (p *Policy) UnmatchedPatterns(images []string) UnmatchedPatterns {
+	var unmatched UnmatchedPatterns
+
 	if p == nil {
-		return nil
+		return unmatched
 	}
 
-	var unmatched []string
-
-	check := func(pattern string, images []string) {
-		if !slices.Contains(unmatched, pattern) && !slices.ContainsFunc(images, func(image string) bool {
+	matches := func(pattern string, images []string) bool {
+		return slices.ContainsFunc(images, func(image string) bool {
 			return matchesImage(pattern, image)
-		}) {
-			unmatched = append(unmatched, pattern)
+		})
+	}
+
+	add := func(patterns *[]string, pattern string) {
+		if !slices.Contains(*patterns, pattern) {
+			*patterns = append(*patterns, pattern)
 		}
 	}
 
 	for _, pattern := range p.Images {
-		check(pattern, images)
+		if !matches(pattern, images) {
+			add(&unmatched.Images, pattern)
+		}
 	}
 
 	applicable := slices.DeleteFunc(slices.Clone(images), func(image string) bool { return !p.AppliesTo(image) })
 
 	for i := range p.Levels {
 		for _, pattern := range p.Levels[i].Images {
-			check(pattern, applicable)
+			switch {
+			case !matches(pattern, images):
+				add(&unmatched.Levels, pattern)
+			case !matches(pattern, applicable):
+				add(&unmatched.Excluded, pattern)
+			}
 		}
 	}
 

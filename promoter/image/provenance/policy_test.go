@@ -794,7 +794,7 @@ func TestPolicyUnmatchedPatterns(t *testing.T) {
 
 	var nilPolicy *Policy
 
-	require.Empty(t, nilPolicy.UnmatchedPatterns([]string{testLevelImage}))
+	require.True(t, nilPolicy.UnmatchedPatterns([]string{testLevelImage}).Empty())
 
 	policy := boundBuilderPolicy(0)
 	policy.Levels = []ImageLevel{
@@ -802,15 +802,21 @@ func TestPolicyUnmatchedPatterns(t *testing.T) {
 		{Images: []string{absolute, testLevelImage}, Level: 2},
 	}
 
-	require.Equal(t, []string{absolute},
+	require.Equal(t, UnmatchedPatterns{Levels: []string{absolute}},
 		policy.UnmatchedPatterns([]string{testLevelImage, testNestedImage}))
-	require.Equal(t, []string{testLevelImage, testLevelPattern, absolute},
+	require.Equal(t, UnmatchedPatterns{Levels: []string{testLevelImage, testLevelPattern, absolute}},
 		policy.UnmatchedPatterns(nil))
 
-	// A levels pattern has to match an image the policy applies to.
+	// A levels pattern that matches only images outside of the images of
+	// the policy is reported apart from one that matches no image.
 	policy.Images = []string{testLevelImage, "typo"}
-	policy.Levels = []ImageLevel{{Images: []string{testLevelImage, testLevelPattern}, Level: 3}}
+	policy.Levels = []ImageLevel{{Images: []string{testLevelImage, testLevelPattern, absolute}, Level: 3}}
 
-	require.Equal(t, []string{"typo", testLevelPattern},
-		policy.UnmatchedPatterns([]string{testLevelImage, testNestedImage}))
+	unmatched := policy.UnmatchedPatterns([]string{testLevelImage, testNestedImage})
+	require.Equal(t, UnmatchedPatterns{
+		Images:   []string{"typo"},
+		Levels:   []string{absolute},
+		Excluded: []string{testLevelPattern},
+	}, unmatched)
+	require.False(t, unmatched.Empty())
 }
