@@ -225,7 +225,8 @@ signed recursively, for example the deprecated
 `application/vnd.oci.artifact.manifest.v1+json` media type or an index child
 that is neither an image manifest nor an index. The plan phase rejects them
 before anything is copied, with an error naming the image, the offending
-digest and its media type.
+digest and its media type. [Artifact promotion](artifact-promotion.md)
+describes the layout for files.
 
 ## Signing and attestation
 
