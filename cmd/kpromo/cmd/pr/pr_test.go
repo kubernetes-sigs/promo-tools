@@ -27,11 +27,16 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/format/index"
 	"github.com/stretchr/testify/require"
 	"sigs.k8s.io/release-sdk/github"
+
+	"sigs.k8s.io/promo-tools/v4/image"
 )
 
 const (
-	testFork = "cpanato"
-	testTag  = "v1.34.0"
+	testFork       = "cpanato"
+	testTag        = "v1.34.0"
+	testProject    = "foo"
+	testBuildImage = "build-image"
+	testImage      = "kube-cross"
 )
 
 func TestValidate(t *testing.T) {
@@ -146,6 +151,7 @@ func TestGeneratePRBody(t *testing.T) {
 	tests := []struct {
 		name     string
 		opts     promoteOptions
+		images   []string
 		expected string
 	}{
 		{
@@ -176,11 +182,39 @@ func TestGeneratePRBody(t *testing.T) {
 				"```\nkpromo pr --fork cpanato --issue \"https://github.com/kubernetes/k8s.io/issues/1234\" --tag v1.34.0\n```\n\n" +
 				"/hold\ncc: @kubernetes/release-engineering\n",
 		},
+		{
+			name: "with images",
+			opts: promoteOptions{
+				userFork:  testFork,
+				project:   testBuildImage,
+				reviewers: defaultReviewers,
+				tags:      []string{testTag},
+			},
+			images: []string{"go-runner", testImage},
+			expected: "Image promotion for build-image (go-runner, kube-cross) v1.34.0\n" +
+				"This is an automated PR generated from `kpromo`\n" +
+				"```\nkpromo pr --fork cpanato --project build-image --tag v1.34.0\n```\n\n" +
+				"/hold\ncc: @kubernetes/release-engineering\n",
+		},
+		{
+			name: "too many images",
+			opts: promoteOptions{
+				userFork:  testFork,
+				project:   testBuildImage,
+				reviewers: defaultReviewers,
+				tags:      []string{testTag},
+			},
+			images: []string{"a", "b", "c", "d"},
+			expected: "Image promotion for build-image v1.34.0\n" +
+				"This is an automated PR generated from `kpromo`\n" +
+				"```\nkpromo pr --fork cpanato --project build-image --tag v1.34.0\n```\n\n" +
+				"/hold\ncc: @kubernetes/release-engineering\n",
+		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			require.Equal(t, tc.expected, generatePRBody(&tc.opts))
+			require.Equal(t, tc.expected, generatePRBody(&tc.opts, tc.images))
 		})
 	}
 }
@@ -263,7 +297,7 @@ func indexChecksumSkipped(t *testing.T, dir string) bool {
 
 func TestResolveStagingRepo(t *testing.T) {
 	baseDir := t.TempDir()
-	manifestDir := filepath.Join(baseDir, "manifests", "k8s-staging-foo")
+	manifestDir := filepath.Join(baseDir, "manifests", "k8s-staging-"+testProject)
 	require.NoError(t, os.MkdirAll(manifestDir, 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(manifestDir, "promoter-manifest.yaml"), []byte(`registries:
 - name: us-central1-docker.pkg.dev/k8s-staging-images/foo
@@ -278,18 +312,18 @@ func TestResolveStagingRepo(t *testing.T) {
 	}{
 		{
 			name:     "from promoter manifest",
-			opts:     promoteOptions{project: "foo"},
+			opts:     promoteOptions{project: testProject},
 			expected: "us-central1-docker.pkg.dev/k8s-staging-images/foo",
 		},
 		{
 			name:     "explicit staging repo",
-			opts:     promoteOptions{project: "foo", stagingRepo: "gcr.io/k8s-staging-foo"},
+			opts:     promoteOptions{project: testProject, stagingRepo: "gcr.io/k8s-staging-foo"},
 			expected: "gcr.io/k8s-staging-foo",
 		},
 		{
 			name:        "unknown project",
-			opts:        promoteOptions{project: "bar"},
-			expectedErr: "determining staging repo for project bar",
+			opts:        promoteOptions{project: "unknown"},
+			expectedErr: "determining staging repo for project unknown",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -302,6 +336,183 @@ func TestResolveStagingRepo(t *testing.T) {
 
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, got)
+		})
+	}
+}
+
+func TestPromotedImages(t *testing.T) {
+	const oldList = `- name: bar
+  dmap:
+    "sha256:111": ["v1.0.0"]
+- name: foo
+  dmap:
+    "sha256:222": ["v1.0.0"]
+`
+
+	for _, tc := range []struct {
+		name     string
+		oldList  string
+		newList  string
+		expected []string
+	}{
+		{
+			name:    "unchanged",
+			oldList: oldList,
+			newList: oldList,
+		},
+		{
+			name:    "new digest and new image",
+			oldList: oldList,
+			newList: `- name: bar
+  dmap:
+    "sha256:111": ["v1.0.0"]
+- name: baz
+  dmap:
+    "sha256:444": ["v1.1.0"]
+- name: foo
+  dmap:
+    "sha256:222": ["v1.0.0"]
+    "sha256:333": ["v1.1.0"]
+`,
+			expected: []string{"baz", "foo"},
+		},
+		{
+			name:    "new tag on existing digest",
+			oldList: oldList,
+			newList: `- name: bar
+  dmap:
+    "sha256:111": ["v1.0.0", "v1.1.0"]
+- name: foo
+  dmap:
+    "sha256:222": ["v1.0.0"]
+`,
+			expected: []string{"bar"},
+		},
+		{
+			name:     "no previous list",
+			newList:  oldList,
+			expected: []string{"bar", "foo"},
+		},
+		{
+			name:    "arch variants of a promoted image",
+			oldList: oldList,
+			newList: oldList + `- name: baz
+  dmap:
+    "sha256:444": ["v1.1.0"]
+- name: baz-amd64
+  dmap:
+    "sha256:555": ["v1.1.0"]
+- name: baz-arm64
+  dmap:
+    "sha256:666": ["v1.1.0"]
+`,
+			expected: []string{"baz"},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			newList := &image.ManifestList{}
+			require.NoError(t, newList.Parse([]byte(tc.newList)))
+
+			got := promotedImages([]byte(tc.oldList), newList)
+			if len(tc.expected) == 0 {
+				require.Empty(t, got)
+
+				return
+			}
+
+			require.Equal(t, tc.expected, got)
+		})
+	}
+}
+
+func TestPRTitle(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		opts     promoteOptions
+		images   []string
+		expected string
+	}{
+		{
+			name:     "single image",
+			opts:     promoteOptions{project: testBuildImage, tags: []string{testTag, "v1.35.0"}},
+			images:   []string{testImage},
+			expected: "Image promotion for build-image/kube-cross " + testTag + " / v1.35.0",
+		},
+		{
+			name:     "multiple images",
+			opts:     promoteOptions{project: testBuildImage, tags: []string{testTag}},
+			images:   []string{"go-runner", testImage},
+			expected: "Image promotion for " + testBuildImage + " " + testTag,
+		},
+		{
+			name:     "no images",
+			opts:     promoteOptions{project: testBuildImage, tags: []string{testTag}},
+			expected: "Image promotion for " + testBuildImage + " " + testTag,
+		},
+		{
+			name:     "kubernetes project",
+			opts:     promoteOptions{project: "kubernetes", tags: []string{testTag}},
+			images:   []string{"conformance"},
+			expected: "releng: Image promotion for kubernetes/conformance " + testTag,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.expected, prTitle(&tc.opts, tc.images))
+		})
+	}
+}
+
+func TestWithoutArchVariants(t *testing.T) {
+	const (
+		base  = "distroless-iptables"
+		amd64 = base + "-amd64"
+		arm64 = base + "-arm64"
+	)
+
+	for _, tc := range []struct {
+		name     string
+		images   []string
+		expected []string
+	}{
+		{
+			name: "arch variants with base image",
+			images: []string{
+				base,
+				amd64,
+				arm64,
+				base + "-ppc64le",
+				base + "-s390x",
+			},
+			expected: []string{base},
+		},
+		{
+			name: "docker style arch variants",
+			images: []string{
+				"external-dns",
+				"external-dns-amd64",
+				"external-dns-arm32v7",
+				"external-dns-arm64v8",
+			},
+			expected: []string{"external-dns"},
+		},
+		{
+			name:     "arch variants without base image",
+			images:   []string{amd64, arm64},
+			expected: []string{amd64, arm64},
+		},
+		{
+			name:     "non-arch suffix",
+			images:   []string{"etcd", "etcd-manager"},
+			expected: []string{"etcd", "etcd-manager"},
+		},
+		{
+			name:     "no images",
+			images:   []string{},
+			expected: []string{},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.expected, withoutArchVariants(tc.images))
 		})
 	}
 }
