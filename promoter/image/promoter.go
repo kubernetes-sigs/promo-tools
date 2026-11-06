@@ -220,8 +220,6 @@ func (p *Promoter) PromoteImages(ctx context.Context, opts *options.Options) err
 
 	// Provenance phase: verify image provenance (verify-if-present).
 	pipe.AddPhase(pipeline.NewPhase("provenance", func(ctx context.Context) error {
-		p.discoveries = p.discoverStagingImages(ctx, promotionEdges)
-
 		return p.checkProvenance(ctx, mfests, promotionEdges)
 	}))
 
@@ -445,9 +443,9 @@ func (p *Promoter) CheckSignatures(ctx context.Context, opts *options.Options) e
 	return nil
 }
 
-// checkProvenance checks every source image against the provenance policies
-// that apply to it, and verifies the images without a require policy if
-// attestations are present.
+// checkProvenance discovers the attestations of every source image, checks
+// it against the provenance policies that apply to it, and verifies the
+// images without a require policy if attestations are present.
 func (p *Promoter) checkProvenance(
 	ctx context.Context, mfests []schema.Manifest, edges map[promotion.Edge]any,
 ) error {
@@ -456,7 +454,14 @@ func (p *Promoter) checkProvenance(
 		return errors.New("provenance verifier not configured")
 	}
 
+	// The discoveries are kept for an invalid policy, too. An image
+	// without attestations is worth a warning only if no policy reports
+	// that.
 	refPolicies, err := sourcePolicies(mfests, edges)
+	p.discoveries = p.discoverStagingImages(ctx, edges, func(ref string) bool {
+		return err == nil && len(refPolicies[ref]) == 0
+	})
+
 	if err != nil {
 		return err
 	}
@@ -576,7 +581,7 @@ func (p *Promoter) checkImageProvenance(
 		return nil
 	}
 
-	result, err := verifier.Verify(ctx, ref)
+	result, err := verifier.Verify(ctx, ref, p.discoveries[ref])
 	if err != nil {
 		return fmt.Errorf("verifying provenance for %s: %w", ref, err)
 	}

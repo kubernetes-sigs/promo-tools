@@ -90,16 +90,59 @@ func TestVerifyNoAttestation(t *testing.T) {
 		},
 	}
 
-	result, err := v.Verify(context.Background(), ref)
+	result, err := v.Verify(context.Background(), ref, nil)
 	require.NoError(t, err)
 	require.True(t, result.Verified)
 	require.False(t, called, "no attestation tag, cosign must not run")
 }
 
+func TestVerifyDiscoveredAttestationTag(t *testing.T) {
+	repo := newTestRepo(t)
+	ref := pushTestImage(t, repo)
+	other := pushTestImage(t, newTestRepo(t))
+
+	// A tag the discovery did not see is only looked up again when the
+	// discovery is about another image.
+	attImg, err := random.Image(256, 1)
+	require.NoError(t, err)
+	require.NoError(t, crane.Push(attImg, attestationTagFor(t, repo, ref)))
+
+	for _, tc := range []struct {
+		name      string
+		discovery *Discovery
+		wantCalls int
+	}{
+		{name: "no discovery", wantCalls: 1},
+		{name: "discovery without tag", discovery: &Discovery{Reference: ref, AttestationTag: AttestationTagMissing}},
+		{name: "discovery with tag", discovery: &Discovery{Reference: ref, AttestationTag: AttestationTagPresent}, wantCalls: 1},
+		// A discoverer that did not look the tag up proves nothing.
+		{name: "discovery without tag lookup", discovery: &Discovery{Reference: ref}, wantCalls: 1},
+		{name: "discovery of another image", discovery: &Discovery{Reference: other, AttestationTag: AttestationTagMissing}, wantCalls: 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			calls := 0
+			v := &CosignVerifier{
+				CertIdentity:   testIdentity,
+				CertOidcIssuer: testIssuer,
+				verifyFn: func(context.Context, string, identityOptions, identityOptions) error {
+					calls++
+
+					return nil
+				},
+			}
+
+			result, err := v.Verify(context.Background(), ref, tc.discovery)
+			require.NoError(t, err)
+			require.True(t, result.Verified)
+			require.Equal(t, tc.wantCalls, calls)
+		})
+	}
+}
+
 func TestVerifyRequiresDigest(t *testing.T) {
 	v := &CosignVerifier{}
 
-	_, err := v.Verify(context.Background(), "gcr.io/foo/bar:v1.0")
+	_, err := v.Verify(context.Background(), "gcr.io/foo/bar:v1.0", nil)
 	require.ErrorContains(t, err, "must include a digest")
 }
 
@@ -182,7 +225,7 @@ func TestVerifyWithAttestation(t *testing.T) {
 				},
 			}
 
-			result, err := v.Verify(context.Background(), ref)
+			result, err := v.Verify(context.Background(), ref, nil)
 
 			require.Len(t, calls, tc.wantCalls)
 			require.Equal(t, testRegexp, calls[0].regexp, "first pass uses the configured identity")
