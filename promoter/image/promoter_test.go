@@ -21,6 +21,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/sirupsen/logrus"
+	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/require"
 
 	imagepromoter "sigs.k8s.io/promo-tools/v4/promoter/image"
@@ -211,13 +213,15 @@ func TestPromoteImagesProvenanceAlwaysRuns(t *testing.T) {
 
 // fakeVerifier implements provenance.Verifier for testing.
 type fakeVerifier struct {
-	result *provenance.Result
-	err    error
-	calls  int
+	result    *provenance.Result
+	err       error
+	calls     int
+	discovery *provenance.Discovery
 }
 
-func (f *fakeVerifier) Verify(_ context.Context, _ string) (*provenance.Result, error) {
+func (f *fakeVerifier) Verify(_ context.Context, _ string, discovery *provenance.Discovery) (*provenance.Result, error) {
 	f.calls++
+	f.discovery = discovery
 
 	return f.result, f.err
 }
@@ -395,15 +399,20 @@ func TestPromoteImagesProvenancePolicy(t *testing.T) {
 
 			// No attestations found, so the policy is not satisfied.
 			edge := testEdge()
+			discovery := &provenance.Discovery{Reference: edge.SrcReference()}
 
 			discoverer := &provenancefakes.FakeDiscoverer{}
-			discoverer.DiscoverReturns(&provenance.Discovery{Reference: edge.SrcReference()}, nil)
+			discoverer.DiscoverReturns(discovery, nil)
 			sut.SetDiscoverer(discoverer)
 
 			err := sut.PromoteImages(context.Background(), &options.Options{Confirm: true})
 
 			require.Equal(t, 1, discoverer.DiscoverCallCount())
 			require.Equal(t, tc.wantVerify, verifier.calls)
+
+			if tc.wantVerify > 0 {
+				require.Same(t, discovery, verifier.discovery, "the verifier gets the discovery")
+			}
 
 			if tc.wantErr != "" {
 				require.ErrorContains(t, err, tc.wantErr)
@@ -414,6 +423,98 @@ func TestPromoteImagesProvenancePolicy(t *testing.T) {
 
 			require.NoError(t, err)
 			require.Equal(t, 1, mock.PromoteImagesCallCount())
+		})
+	}
+}
+
+func TestPromoteImagesWarnsWithoutAttestations(t *testing.T) {
+	edge := testEdge()
+
+	// Manifests sharing a source registry must declare the same policy.
+	conflicting := append(
+		policyManifests(testProvenancePolicy(provenance.PolicyModeWarn)),
+		policyManifests(testProvenancePolicy(provenance.PolicyModeRequire))...,
+	)
+	conflicting[1].Filepath = "manifests/other/promoter-manifest.yaml"
+
+	for _, tc := range []struct {
+		name        string
+		mfests      []schema.Manifest
+		discovery   *provenance.Discovery
+		wantWarning bool
+	}{
+		{
+			name:        "nothing found without a policy",
+			discovery:   &provenance.Discovery{Reference: edge.SrcReference()},
+			wantWarning: true,
+		},
+		{
+			name: "attestation found without a policy",
+			discovery: &provenance.Discovery{
+				Reference:    edge.SrcReference(),
+				Attestations: []provenance.Attestation{{Digest: string(edge.Digest), Source: provenance.SourceReferrer}},
+			},
+		},
+		{
+			// Conflicting policies fail the run, but the discovery is
+			// still reported, without the warning.
+			name:      "conflicting policies",
+			mfests:    conflicting,
+			discovery: &provenance.Discovery{Reference: edge.SrcReference()},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			sut := imagepromoter.Promoter{}
+			mock := imagefakes.FakePromoterImplementation{}
+
+			mfests := tc.mfests
+			if mfests == nil {
+				mfests = policyManifests(nil)
+			}
+
+			mock.ParseManifestsReturns(mfests, nil)
+			mock.GetPromotionEdgesReturns(map[promotion.Edge]any{edge: nil}, nil)
+			sut.SetImplementation(&mock)
+			sut.SetProvenanceVerifier(&fakeVerifier{result: &provenance.Result{Verified: true}})
+
+			discoverer := &provenancefakes.FakeDiscoverer{}
+			discoverer.DiscoverReturns(tc.discovery, nil)
+			sut.SetDiscoverer(discoverer)
+
+			// Record the entries of this test only, without keeping the
+			// hook on the global logger. The test is not parallel.
+			hooks := logrus.StandardLogger().ReplaceHooks(make(logrus.LevelHooks))
+
+			t.Cleanup(func() { logrus.StandardLogger().ReplaceHooks(hooks) })
+
+			hook := logtest.NewGlobal()
+
+			err := sut.PromoteImages(context.Background(), &options.Options{Confirm: true})
+			if tc.mfests != nil {
+				require.ErrorContains(t, err, "different provenance policies")
+			} else {
+				require.NoError(t, err)
+			}
+
+			require.Contains(t, sut.Discoveries(), edge.SrcReference())
+
+			var warnings []string
+
+			for _, entry := range hook.AllEntries() {
+				if entry.Level <= logrus.WarnLevel {
+					warnings = append(warnings, entry.Message)
+				}
+			}
+
+			if !tc.wantWarning {
+				require.Empty(t, warnings)
+
+				return
+			}
+
+			require.Len(t, warnings, 1)
+			require.Contains(t, warnings[0], edge.SrcReference())
+			require.Contains(t, warnings[0], "no provenance policy applies")
 		})
 	}
 }

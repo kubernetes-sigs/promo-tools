@@ -34,7 +34,6 @@ import (
 	"github.com/google/go-containerregistry/pkg/name"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
-	"github.com/google/go-containerregistry/pkg/v1/remote/transport"
 	"github.com/policylabs/attestation"
 	"github.com/policylabs/collector/envelope/bare"
 	"github.com/policylabs/collector/envelope/bundle"
@@ -126,22 +125,39 @@ func (d *OCIDiscoverer) Discover(ctx context.Context, ref string) (*Discovery, e
 	}
 
 	discovery := &Discovery{Reference: ref}
+	subject, children := digests[0], digests[1:]
 
-	for _, child := range digests[1:] {
+	for _, child := range children {
 		discovery.Children = append(discovery.Children, child.DigestStr())
 	}
 
-	for _, dg := range digests {
-		if err := d.discoverReferrers(dg, opts, discovery); err != nil {
-			return nil, err
-		}
+	// Only the tag of the image itself is recorded, the verify-if-present
+	// check reads no other.
 
-		if err := d.discoverAttestationTag(ctx, dg, opts, discovery); err != nil {
+	discovery.AttestationTag, err = d.discoverDigest(ctx, subject, opts, discovery)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, child := range children {
+		if _, err := d.discoverDigest(ctx, child, opts, discovery); err != nil {
 			return nil, err
 		}
 	}
 
 	return discovery, nil
+}
+
+// discoverDigest adds the referrers and the attestation tag of the digest
+// to the discovery, and returns whether that tag exists.
+func (d *OCIDiscoverer) discoverDigest(
+	ctx context.Context, digest name.Digest, opts []remote.Option, discovery *Discovery,
+) (AttestationTagState, error) {
+	if err := d.discoverReferrers(digest, opts, discovery); err != nil {
+		return AttestationTagUnknown, err
+	}
+
+	return d.discoverAttestationTag(ctx, digest, opts, discovery)
 }
 
 // IsPlatformManifest reports whether a child of an index is a platform
@@ -388,26 +404,26 @@ func readLayer(img v1.Image, layer v1.Hash) ([]byte, error) {
 
 // discoverAttestationTag adds the attestations in the legacy cosign `.att`
 // tag of the digest to the discovery: DSSE envelopes, and unsigned in-toto
-// statements. A missing tag is not an error, and layers that can't be read
-// are recorded in the discovery and skipped.
+// statements. It returns whether the tag exists, and unknown with an
+// error. A missing tag is not an error, and layers that can't be read are
+// recorded in the discovery and skipped.
 func (d *OCIDiscoverer) discoverAttestationTag(
 	ctx context.Context, digest name.Digest, opts []remote.Option, discovery *Discovery,
-) error {
+) (AttestationTagState, error) {
 	tag := digestToAttestationTag(image.Digest(digest.DigestStr()))
 
 	img, err := remote.Image(digest.Context().Tag(tag), opts...)
 	if err != nil {
-		var terr *transport.Error
-		if errors.As(err, &terr) && terr.StatusCode == http.StatusNotFound {
-			return nil
+		if isNotFound(err) {
+			return AttestationTagMissing, nil
 		}
 
-		return fmt.Errorf("fetching attestation tag of %s: %w", digest, err)
+		return AttestationTagUnknown, fmt.Errorf("fetching attestation tag of %s: %w", digest, err)
 	}
 
 	mf, err := img.Manifest()
 	if err != nil {
-		return fmt.Errorf("reading attestation tag manifest of %s: %w", digest, err)
+		return AttestationTagUnknown, fmt.Errorf("reading attestation tag manifest of %s: %w", digest, err)
 	}
 
 	hasDSSE := false
@@ -434,7 +450,7 @@ func (d *OCIDiscoverer) discoverAttestationTag(
 	}
 
 	if !hasDSSE {
-		return nil
+		return AttestationTagPresent, nil
 	}
 
 	// The collector turns DSSE layers with cosign's certificate and
@@ -447,7 +463,7 @@ func (d *OCIDiscoverer) discoverAttestationTag(
 		coci.WithReadSBOMs(false),
 	)
 	if err != nil {
-		return fmt.Errorf("creating attestation tag collector: %w", err)
+		return AttestationTagUnknown, fmt.Errorf("creating attestation tag collector: %w", err)
 	}
 
 	envs, err := collector.Fetch(ctx, attestation.FetchOptions{MaxReadSize: maxLayerSize})
@@ -455,7 +471,7 @@ func (d *OCIDiscoverer) discoverAttestationTag(
 		discovery.Errors = append(discovery.Errors,
 			fmt.Sprintf("%s %s: %v", digest.DigestStr(), tag, err))
 
-		return nil
+		return AttestationTagPresent, nil
 	}
 
 	for _, env := range envs {
@@ -464,7 +480,7 @@ func (d *OCIDiscoverer) discoverAttestationTag(
 		))
 	}
 
-	return nil
+	return AttestationTagPresent, nil
 }
 
 // readStatement reads and parses an unsigned in-toto statement layer.

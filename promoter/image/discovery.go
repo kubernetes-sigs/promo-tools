@@ -61,9 +61,10 @@ func (p *Promoter) Provenance() map[string]*provenance.ImageProvenance {
 // images of the edges, by source reference. It returns nil without a
 // discoverer. Discovery only reports: a failure is logged as a warning,
 // which tells it apart from an image without attestations, and the image is
-// left out.
+// left out. Finding nothing for a reference that withoutPolicy reports no
+// provenance policy applies to is logged as a warning too.
 func (p *Promoter) discoverStagingImages(
-	ctx context.Context, edges map[promotion.Edge]any,
+	ctx context.Context, edges map[promotion.Edge]any, withoutPolicy func(ref string) bool,
 ) map[string]*provenance.Discovery {
 	if p.discoverer == nil {
 		return nil
@@ -128,24 +129,34 @@ func (p *Promoter) discoverStagingImages(
 			continue
 		}
 
-		logDiscovery(ref, discoveries[ref])
+		logDiscovery(logrus.StandardLogger(), ref, discoveries[ref], withoutPolicy(ref))
 	}
 
 	return discoveries
 }
 
-// logDiscovery logs the attestations found for a staging image.
-func logDiscovery(ref string, discovery *provenance.Discovery) {
+// logDiscovery logs the attestations found for a staging image. Finding
+// nothing is a warning for an image without a provenance policy, since
+// nothing else reports it, unless the image has a legacy attestation tag,
+// which the verify-if-present check verifies.
+func logDiscovery(log logrus.FieldLogger, ref string, discovery *provenance.Discovery, withoutPolicy bool) {
 	lines := discovery.Summary()
 	if len(lines) == 0 {
-		logrus.Infof("No attestations found for %s", ref)
+		switch {
+		case discovery.AttestationTag == provenance.AttestationTagPresent:
+			log.Infof("No attestations read for %s, its legacy attestation tag is verified next", ref)
+		case withoutPolicy:
+			log.Warnf("No attestations found for %s, and no provenance policy applies to it", ref)
+		default:
+			log.Infof("No attestations found for %s", ref)
+		}
 
 		return
 	}
 
-	logrus.Infof("Attestations found for %s:", ref)
+	log.Infof("Attestations found for %s:", ref)
 
 	for _, line := range lines {
-		logrus.Infof("  %s", line)
+		log.Infof("  %s", line)
 	}
 }

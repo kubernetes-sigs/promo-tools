@@ -81,12 +81,33 @@ type Discovery struct {
 	// artifacts attached with another artifact type.
 	Referrers []Referrer
 
+	// AttestationTag says whether the image has a legacy cosign `.att`
+	// tag, which the verify-if-present check verifies. The tags of the
+	// children of an index don't count. A discoverer that does not look
+	// the tag up leaves it unknown, and the verifier looks it up itself.
+	AttestationTag AttestationTagState
+
 	// Errors describe referrers and layers that could not be read or
 	// parsed. They are skipped, so one malformed artifact does not hide
 	// the attestations next to it. The DSSE layers of an `.att` tag are
 	// read together and skipped together.
 	Errors []string
 }
+
+// AttestationTagState says what a discovery found out about the legacy
+// cosign `.att` tag of an image.
+type AttestationTagState int
+
+const (
+	// AttestationTagUnknown means the tag was not looked up.
+	AttestationTagUnknown AttestationTagState = iota
+
+	// AttestationTagMissing means the image has no tag.
+	AttestationTagMissing
+
+	// AttestationTagPresent means the image has a tag.
+	AttestationTagPresent
+)
 
 // Attestation is one attestation found for an image.
 type Attestation struct {

@@ -84,7 +84,10 @@ func (p *Promoter) repairAttestations(
 	}
 
 	if len(undiscovered) > 0 {
-		maps.Copy(discoveries, p.discoverStagingImages(ctx, undiscovered))
+		// Repair candidates have a policy, which reports missing
+		// attestations.
+		withoutPolicy := func(string) bool { return false }
+		maps.Copy(discoveries, p.discoverStagingImages(ctx, undiscovered, withoutPolicy))
 	}
 
 	outcomes, err := evaluateRepairs(ctx, mfests, repairs, discoveries)

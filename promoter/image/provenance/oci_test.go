@@ -288,6 +288,7 @@ func TestDiscoverNoAttestations(t *testing.T) {
 	require.Empty(t, discovery.Attestations)
 	require.Empty(t, discovery.Referrers)
 	require.Empty(t, discovery.Children)
+	require.Equal(t, AttestationTagMissing, discovery.AttestationTag)
 	require.Empty(t, discovery.Summary())
 }
 
@@ -415,6 +416,7 @@ func TestDiscoverAttestationTag(t *testing.T) {
 	d := &OCIDiscoverer{}
 	discovery, err := d.Discover(context.Background(), ref.String())
 	require.NoError(t, err)
+	require.Equal(t, AttestationTagPresent, discovery.AttestationTag)
 	require.Len(t, discovery.Attestations, 1)
 
 	att := discovery.Attestations[0]
@@ -440,6 +442,30 @@ func TestDiscoverAttestationTagStatement(t *testing.T) {
 	require.Equal(t, SourceAttestationTag, att.Source)
 	require.Equal(t, "https://k8s.io/promo-tools/promotion/v1", att.PredicateType)
 	require.Equal(t, SignatureUnsigned, att.Status)
+}
+
+func TestDiscoverAttestationTagWithoutAttestations(t *testing.T) {
+	// The tag is recorded even if nothing in it can be read, since the
+	// verify-if-present check still verifies it.
+	for _, tc := range []struct {
+		name      string
+		mediaType types.MediaType
+		wantLines int
+	}{
+		{name: "other layer", mediaType: "application/octet-stream"},
+		{name: "unreadable statement", mediaType: inTotoMediaType, wantLines: 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ref := pushImage(t, newReferrersRepo(t))
+			pushAttestationTag(t, ref, tc.mediaType, []byte("not an attestation"))
+
+			discovery, err := (&OCIDiscoverer{}).Discover(context.Background(), ref.String())
+			require.NoError(t, err)
+			require.Equal(t, AttestationTagPresent, discovery.AttestationTag)
+			require.Empty(t, discovery.Attestations)
+			require.Len(t, discovery.Summary(), tc.wantLines)
+		})
+	}
 }
 
 func TestDiscoverCopiedAttestation(t *testing.T) {

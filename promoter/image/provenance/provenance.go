@@ -33,8 +33,12 @@ type Verifier interface {
 	// Verify checks whether the image at the given reference has valid
 	// provenance according to the configured policy. The reference
 	// should be a fully qualified image reference including digest
-	// (e.g., "gcr.io/staging/image@sha256:abc...").
-	Verify(ctx context.Context, ref string) (*Result, error)
+	// (e.g., "gcr.io/staging/image@sha256:abc..."). The discovery is
+	// what the promoter found for the image. It is nil if the promoter
+	// has no discoverer or the discovery of the image failed. A verifier
+	// may use it to skip lookups, after checking that it is about the
+	// image.
+	Verify(ctx context.Context, ref string, discovery *Discovery) (*Result, error)
 }
 
 // Result describes the outcome of a provenance verification.

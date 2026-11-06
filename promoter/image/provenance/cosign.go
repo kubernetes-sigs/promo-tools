@@ -59,8 +59,8 @@ const (
 // using the cosign attestation tag convention.
 //
 // It uses verify-if-present semantics: when an attestation tag exists it
-// is cryptographically verified using cosign; when no attestation is
-// found a warning is logged and the image is still allowed through.
+// is cryptographically verified using cosign; when no legacy attestation
+// tag is found, the image is still allowed through.
 // Attestations signed by identities other than the configured ones are
 // also allowed through, as long as they verify cryptographically.
 type CosignVerifier struct {
@@ -99,7 +99,8 @@ type CosignVerifier struct {
 
 // Verify checks whether the image has a valid provenance attestation attached.
 // It first checks for the attestation tag existence, then verifies the
-// attestation signature using cosign.
+// attestation signature using cosign. A discovery of the image records
+// whether the tag exists, so that it is not looked up again.
 //
 // Cosign reports "signed by an identity we do not trust" and "signed by a
 // trusted identity but broken" as the same ErrNoMatchingAttestations. To
@@ -107,7 +108,7 @@ type CosignVerifier struct {
 // identities is verified a second time accepting any identity. Promotion is
 // blocked only when nothing verifies at all, which means the attestation is
 // malformed or tampered with.
-func (v *CosignVerifier) Verify(ctx context.Context, ref string) (*Result, error) {
+func (v *CosignVerifier) Verify(ctx context.Context, ref string, discovery *Discovery) (*Result, error) {
 	result := &Result{}
 
 	parsedRef, err := name.ParseReference(ref)
@@ -129,28 +130,21 @@ func (v *CosignVerifier) Verify(ctx context.Context, ref string) (*Result, error
 		attTag,
 	)
 
-	logrus.Debugf("Checking attestation at %s", attRef)
-
-	// Check if the attestation tag exists.
-	craneOpts := []crane.Option{
-		crane.WithAuthFromKeychain(gcrane.Keychain),
-		crane.WithUserAgent(image.UserAgent),
-	}
-	if v.Transport != nil {
-		craneOpts = append(craneOpts, crane.WithTransport(v.Transport))
-	}
-
-	if _, err := crane.Manifest(attRef, craneOpts...); err != nil {
-		var terr *transport.Error
-		if errors.As(err, &terr) && terr.StatusCode == http.StatusNotFound {
-			logrus.Warnf("No legacy attestation tag %s found for %s, skipping its verification", attTag, ref)
-
-			result.Verified = true
-
-			return result, nil
-		}
-
+	var found bool
+	if sameImage(discovery, ref) && discovery.AttestationTag != AttestationTagUnknown {
+		found = discovery.AttestationTag == AttestationTagPresent
+	} else if found, err = v.attestationTagExists(attRef); err != nil {
 		return nil, fmt.Errorf("checking attestation for %s: %w", ref, err)
+	}
+
+	if !found {
+		// Attestations are attached as referrers today, so a missing tag
+		// is the normal case.
+		logrus.Debugf("No legacy attestation tag %s for %s, nothing to verify there", attTag, ref)
+
+		result.Verified = true
+
+		return result, nil
 	}
 
 	// Attestation exists, verify it cryptographically.
@@ -199,6 +193,29 @@ func (v *CosignVerifier) Verify(ctx context.Context, ref string) (*Result, error
 type identityOptions struct {
 	exact  string
 	regexp string
+}
+
+// attestationTagExists looks up the attestation tag reference.
+func (v *CosignVerifier) attestationTagExists(attRef string) (bool, error) {
+	logrus.Debugf("Checking attestation at %s", attRef)
+
+	craneOpts := []crane.Option{
+		crane.WithAuthFromKeychain(gcrane.Keychain),
+		crane.WithUserAgent(image.UserAgent),
+	}
+	if v.Transport != nil {
+		craneOpts = append(craneOpts, crane.WithTransport(v.Transport))
+	}
+
+	if _, err := crane.Manifest(attRef, craneOpts...); err != nil {
+		if isNotFound(err) {
+			return false, nil
+		}
+
+		return false, fmt.Errorf("fetching %s: %w", attRef, err)
+	}
+
+	return true, nil
 }
 
 // identity returns the certificate identity to verify against, preferring
@@ -309,6 +326,14 @@ func isPredicateMismatch(err error) bool {
 	}
 
 	return strings.Contains(err.Error(), predicateMismatchMessage)
+}
+
+// isNotFound reports whether a registry request failed because the manifest
+// does not exist.
+func isNotFound(err error) bool {
+	var terr *transport.Error
+
+	return errors.As(err, &terr) && terr.StatusCode == http.StatusNotFound
 }
 
 // digestToAttestationTag converts a digest to the cosign attestation tag.

@@ -25,7 +25,7 @@ import (
 )
 
 type FakeVerifier struct {
-	VerifyStub        func(context.Context, string) (*provenance.Result, error)
+	VerifyStub        func(context.Context, string, *provenance.Discovery) (*provenance.Result, error)
 	verifyMutex       sync.RWMutex
 	verifyArgsForCall []FakeVerifierVerifyArgs
 	verifyReturns     struct {
@@ -45,18 +45,19 @@ type FakeVerifier struct {
 type FakeVerifierVerifyArgs struct {
 	Arg1 context.Context
 	Arg2 string
+	Arg3 *provenance.Discovery
 }
 
-func (fake *FakeVerifier) Verify(arg1 context.Context, arg2 string) (*provenance.Result, error) {
+func (fake *FakeVerifier) Verify(arg1 context.Context, arg2 string, arg3 *provenance.Discovery) (*provenance.Result, error) {
 	fake.verifyMutex.Lock()
 	ret, specificReturn := fake.verifyReturnsOnCall[len(fake.verifyArgsForCall)]
-	fake.verifyArgsForCall = append(fake.verifyArgsForCall, FakeVerifierVerifyArgs{arg1, arg2})
+	fake.verifyArgsForCall = append(fake.verifyArgsForCall, FakeVerifierVerifyArgs{arg1, arg2, arg3})
 	stub := fake.VerifyStub
 	fakeReturns := fake.verifyReturns
-	fake.recordInvocation("Verify", []interface{}{arg1, arg2})
+	fake.recordInvocation("Verify", []interface{}{arg1, arg2, arg3})
 	fake.verifyMutex.Unlock()
 	if stub != nil {
-		return stub(arg1, arg2)
+		return stub(arg1, arg2, arg3)
 	}
 	if specificReturn {
 		return ret.result1, ret.result2
@@ -70,17 +71,17 @@ func (fake *FakeVerifier) VerifyCallCount() int {
 	return len(fake.verifyArgsForCall)
 }
 
-func (fake *FakeVerifier) VerifyCalls(stub func(context.Context, string) (*provenance.Result, error)) {
+func (fake *FakeVerifier) VerifyCalls(stub func(context.Context, string, *provenance.Discovery) (*provenance.Result, error)) {
 	fake.verifyMutex.Lock()
 	defer fake.verifyMutex.Unlock()
 	fake.VerifyStub = stub
 }
 
-func (fake *FakeVerifier) VerifyArgsForCall(i int) (context.Context, string) {
+func (fake *FakeVerifier) VerifyArgsForCall(i int) (context.Context, string, *provenance.Discovery) {
 	fake.verifyMutex.RLock()
 	defer fake.verifyMutex.RUnlock()
 	argsForCall := fake.verifyArgsForCall[i]
-	return argsForCall.Arg1, argsForCall.Arg2
+	return argsForCall.Arg1, argsForCall.Arg2, argsForCall.Arg3
 }
 
 func (fake *FakeVerifier) VerifyArgs() []FakeVerifierVerifyArgs {
