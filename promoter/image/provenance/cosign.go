@@ -59,8 +59,8 @@ const (
 // using the cosign attestation tag convention.
 //
 // It uses verify-if-present semantics: when an attestation tag exists it
-// is cryptographically verified using cosign; when no attestation is
-// found a warning is logged and the image is still allowed through.
+// is cryptographically verified using cosign; when no legacy attestation
+// tag is found, the image is still allowed through.
 // Attestations signed by identities other than the configured ones are
 // also allowed through, as long as they verify cryptographically.
 type CosignVerifier struct {
@@ -143,7 +143,10 @@ func (v *CosignVerifier) Verify(ctx context.Context, ref string) (*Result, error
 	if _, err := crane.Manifest(attRef, craneOpts...); err != nil {
 		var terr *transport.Error
 		if errors.As(err, &terr) && terr.StatusCode == http.StatusNotFound {
-			logrus.Warnf("No legacy attestation tag %s found for %s, skipping its verification", attTag, ref)
+			// Attestations are attached as referrers today, so a missing
+			// tag is the normal case, and the attestation discovery has
+			// logged what the image carries already.
+			logrus.Debugf("No legacy attestation tag %s for %s, nothing to verify there", attTag, ref)
 
 			result.Verified = true
 

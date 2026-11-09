@@ -286,11 +286,11 @@ against the SLSA provenance v1 predicate type and the configured signing
 identity (`--certificate-identity` or `--certificate-identity-regexp`) and
 OIDC issuer (`--certificate-oidc-issuer` or
 `--certificate-oidc-issuer-regexp`). The regular expression flags take
-precedence over the exact ones. If no attestation tag is found, a warning
-is logged and the image is still promoted. Attestations attached as OCI
-referrers are not part of this check; [provenance policies](#provenance-policies)
-evaluate them. This allows progressive adoption
-without blocking images that do not yet have attestations.
+precedence over the exact ones. If no attestation tag is found, the image
+is still promoted, so that images without attestations are not blocked;
+the [attestation discovery](#attestation-discovery) logs what each image
+carries. Attestations attached as OCI referrers are not part of this
+check; [provenance policies](#provenance-policies) evaluate them.
 
 Attestations signed by another identity, or with another predicate type,
 are logged and ignored. Promotion is blocked only when an attestation does
