@@ -7,8 +7,8 @@ require (
 	cloud.google.com/go/iam v1.15.1
 	cloud.google.com/go/storage v1.71.0
 	github.com/aws/aws-sdk-go-v2 v1.48.0
-	github.com/aws/aws-sdk-go-v2/config v1.33.18
-	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.23.24
+	github.com/aws/aws-sdk-go-v2/config v1.33.19
+	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.23.25
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.114.10
 	github.com/go-git/go-git/v5 v5.19.3
 	github.com/google/go-containerregistry v0.22.1
@@ -87,7 +87,7 @@ require (
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.27 // indirect
-	github.com/aws/aws-sdk-go-v2/credentials v1.21.0 // indirect
+	github.com/aws/aws-sdk-go-v2/credentials v1.21.1 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.20.9 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/configsources v1.5.12 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.8.12 // indirect
